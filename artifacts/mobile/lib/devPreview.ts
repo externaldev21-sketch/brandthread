@@ -30,7 +30,7 @@ import { DEV_BUYER_PREVIEW, DEV_SELLER_PREVIEW, NAVIGATION_ISOLATION_TEST } from
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
 // Ignore the retired seller-first session key, including in already-open tabs.
-const PREVIEW_ROLE_KEY = 'bt:previewRole:buyer-default';
+const PREVIEW_ROLE_KEY = 'bt:previewRole:explicit-v1';
 
 export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | null {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return null;
@@ -51,10 +51,11 @@ export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | nul
   return role;
 }
 
-export function setDevWebPreviewRole(role: PreviewRole): void {
-  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return;
+export function setDevWebPreviewRole(role: PreviewRole | null): void {
+  if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return;
   try {
-    window.sessionStorage.setItem(PREVIEW_ROLE_KEY, role);
+    if (role) window.sessionStorage.setItem(PREVIEW_ROLE_KEY, role);
+    else window.sessionStorage.removeItem(PREVIEW_ROLE_KEY);
   } catch {
     // The URL parameter remains a usable fallback without session storage.
   }
@@ -91,7 +92,7 @@ export function isProductionPreviewHost(hostnameOverride?: string): boolean {
 
 function persistedPreviewRole(): 'buyer' | 'seller' | null {
   try {
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('user_role') : null;
+    const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(PREVIEW_ROLE_KEY) : null;
     return stored === 'buyer' || stored === 'seller' ? stored : null;
   } catch {
     return null;
@@ -118,8 +119,13 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
   if (typeof window === 'undefined') return false;
   if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'seller';
   const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
+  if (searchOverride === undefined && (v === 'buyer' || v === 'seller' || v === 'guest')) setDevWebPreviewRole(v === 'guest' ? null : v);
   if (v === 'seller') return true;
   if (v === 'buyer') return false;
+  if (v === 'guest') {
+    try { window.sessionStorage.removeItem(PREVIEW_ROLE_KEY); } catch {}
+    return false;
+  }
   return persistedPreviewRole() === 'seller';
 }
 
@@ -195,7 +201,12 @@ export function isBuyerDevPreview(searchOverride?: string): boolean {
   if (typeof window === 'undefined') return false;
   if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'buyer';
   const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
+  if (searchOverride === undefined && (v === 'buyer' || v === 'seller' || v === 'guest')) setDevWebPreviewRole(v === 'guest' ? null : v);
   if (v === 'buyer') return true;
   if (v === 'seller') return false;
+  if (v === 'guest') {
+    try { window.sessionStorage.removeItem(PREVIEW_ROLE_KEY); } catch {}
+    return false;
+  }
   return persistedPreviewRole() === 'buyer';
 }

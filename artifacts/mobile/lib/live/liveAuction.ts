@@ -81,13 +81,13 @@ export function formatBid(cents: number): string {
   return cents % 100 === 0 ? `$${(cents / 100).toLocaleString('en-US')}` : `$${(cents / 100).toFixed(2)}`;
 }
 
-/** The line above the product row: "ana is winning!", "You're winning!", "ana won!". */
+/** The line above the product row identifies the leading bidder or winner. */
 export function auctionStatusLine(a: LiveAuction): string | null {
   if (a.status === 'open') {
-    if (a.youAreLeading) return "You're winning!";
-    return a.leaderName ? `${a.leaderName} is winning!` : null;
+    if (a.youAreLeading) return 'Your bid is leading';
+    return a.leaderName ? `${a.leaderName} is leading` : null;
   }
-  if (a.status === 'sold') return a.youWon ? 'You won!' : `${a.winnerName ?? 'Someone'} won!`;
+  if (a.status === 'sold') return a.youWon ? 'Auction won' : `${a.winnerName ?? 'Someone'} won`;
   if (a.status === 'unsold') return 'No bids';
   return null;
 }

@@ -126,7 +126,7 @@ export default function SetupWalkthroughSheet({
               textColor={theme.text}
             />
             <View style={{ flex: 1 }}>
-              <Text style={s.title}>Let's set up your store</Text>
+              <Text style={s.title}>Set up your store</Text>
               <Text style={s.subtitle}>
                 {done} of {total} steps complete
                 {active ? ` · Next: ${active.label}` : ''}

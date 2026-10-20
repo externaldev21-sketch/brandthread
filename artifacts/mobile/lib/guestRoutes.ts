@@ -6,11 +6,11 @@
  *
  * app/_layout.tsx (AuthGate) consults this before redirecting a signed-out
  * visitor to the sign-in wall. Anything not listed here keeps its existing
- * forced sign-in behaviour (inbox, orders, settings, seller tabs, ...).
+ * account prompt (inbox, orders, settings, seller tabs, ...).
  */
 
 /** Screens inside the `(buyer)` tab group that work without an account. */
-const GUEST_BUYER_TABS = new Set(['', 'index', 'feed', 'discover', 'discover-feed', 'search', 'cart']);
+const GUEST_BUYER_TABS = new Set(['', 'index', 'feed', 'discover', 'discover-feed', 'search']);
 
 /** Top-level screens that only read public data. */
 const GUEST_TOP_LEVEL = new Set([
@@ -19,8 +19,6 @@ const GUEST_TOP_LEVEL = new Set([
   'thread-product-detail', // alias of buyer-product-detail (feed/search/discover tiles)
   'buyer-category', // public: api.publicDiscovery.categoryProducts
   'buyer-trending', // public: api.publicDiscovery.trendingProducts / trendingBrands
-  'buyer-checkout', // guest checkout exists (api.guest.checkout)
-  'thread-checkout', // alias of buyer-checkout (cart + Shop sheet "Buy now")
   'checkout-return', // Stripe hosted Checkout's return page
   'checkout-gift-message', // local to checkout; calls no API
   'buyer-search',
@@ -29,6 +27,7 @@ const GUEST_TOP_LEVEL = new Set([
   'buyer-drops',
   'buyer-drop-detail',
   'seller-profile',
+  'buyer-other-profile',
   'profile-videos',
   'profile-products',
   'location',
@@ -36,6 +35,7 @@ const GUEST_TOP_LEVEL = new Set([
   'muted-words',
   'live-replays',
   'live-replay',
+  'buyer-live',
   'drops', // drops/[dropId]
   'store', // store/product/[productId]
   'u', // u/[username] public profile
@@ -54,9 +54,7 @@ const GUEST_TOP_LEVEL = new Set([
 export function isGuestBrowseRoute(segments: readonly string[]): boolean {
   const first = segments[0] ?? '';
   if (first === '(buyer)') return GUEST_BUYER_TABS.has(segments[1] ?? '');
-  // live/[streamId] (a shared live link) shows guests a preview with
-  // "Log in to watch" (BT-320/321); the /live feed screen itself is unchanged.
-  if (first === 'live') return segments.length > 1;
+  if (first === 'live') return true;
   return GUEST_TOP_LEVEL.has(first);
 }
 

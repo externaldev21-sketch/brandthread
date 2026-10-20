@@ -25,6 +25,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import { enqueueEngagementRetry, ensureEngagementRetryPump, isRetryableFailure } from '@/lib/engagementRetryQueue';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -105,6 +106,7 @@ export default function BuyerOtherProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const router  = useRouter();
+  const { requireSignIn } = useSignInGate();
   const api     = useApi();
   const layout  = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
   const barInset = useBuyerTabBarInset();
@@ -194,13 +196,13 @@ export default function BuyerOtherProfileScreen() {
       setCanonicalUserId(resolvedId);
       setLoadFailed(false);
       setNotFound(false);
-      const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
+      const stories = currentUserId ? await api.social.storiesForUser(resolvedId).catch(() => []) : [];
       const storyList = Array.isArray(stories) ? stories : [];
       setStoryIds(storyList.map((s: any) => s.id));
       // Older servers don't send `seenByMe` — treat missing as unseen.
       setHasUnseenStory(storyList.some((s: any) => s.seenByMe !== true));
       try {
-        const hl = await api.social.userHighlights(resolvedId);
+        const hl = currentUserId ? await api.social.userHighlights(resolvedId) : [];
         setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
       } catch {
         setHighlights([]); // highlights are optional: never fail the profile over them
@@ -211,7 +213,7 @@ export default function BuyerOtherProfileScreen() {
     } finally {
       setApiLoaded(true);
     }
-  }, [api, userId]);
+  }, [api, userId, currentUserId]);
 
   useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
 
@@ -242,6 +244,7 @@ export default function BuyerOtherProfileScreen() {
 
   // ── Follow / unfollow ──────────────────────────────────────────────────────
   const handleFollow = async () => {
+    if (!requireSignIn()) return;
     if (!canonicalReady || followLoading) return;
     const wasFollowing = isFollowing;
     // Tapping "Requested" cancels the pending request (DELETE /follow).
@@ -319,6 +322,7 @@ export default function BuyerOtherProfileScreen() {
 
   // ── Message ────────────────────────────────────────────────────────────────
   const handleMessage = async () => {
+    if (!requireSignIn()) return;
     if (msgLoading) return;
     setMsgLoading(true);
     try {

@@ -23,10 +23,10 @@ import { STORE_ACCENT_COLORS } from '@/lib/storeSetup';
 export interface ChoiceOption { value: string; label: string; description?: string; icon?: IconName }
 
 export const BRAND_STAGE_OPTIONS: ChoiceOption[] = [
-  { value: 'idea', label: 'Just an idea', description: "I'm starting from zero.", icon: 'edit-3' },
+  { value: 'idea', label: 'Idea stage', description: 'Nothing produced yet.', icon: 'edit-3' },
   { value: 'build', label: 'Building now', description: "I'm designing or sourcing products.", icon: 'scissors' },
   { value: 'selling', label: 'Already selling', description: 'I have customers and active orders.', icon: 'shopping-bag' },
-  { value: 'scale', label: 'Ready to scale', description: 'I need stronger systems and growth.', icon: 'trending-up' },
+  { value: 'scale', label: 'Ready to scale', description: 'Expand operations and sales.', icon: 'trending-up' },
 ];
 
 export const SELLER_GOAL_OPTIONS: ChoiceOption[] = [
@@ -276,8 +276,8 @@ export function BuildingStoreStep({
         ) : null}
         {!building && !buildError && canOfferSample ? (
           <View style={styles.sample}>
-            <Text style={[styles.sampleTitle, { color: palette.foreground }]}>Try a free logo</Text>
-            <Text style={[styles.sampleSub, { color: palette.mutedForeground }]}>One free logo for your brand name. Pick a style.</Text>
+            <Text style={[styles.sampleTitle, { color: palette.foreground }]}>Generate a logo</Text>
+            <Text style={[styles.sampleSub, { color: palette.mutedForeground }]}>One free logo for your brand name. Choose a style.</Text>
             <View style={styles.styleRow}>
               {LOGO_SAMPLE_STYLES.map((style) => {
                 const on = sampleStyle === style;

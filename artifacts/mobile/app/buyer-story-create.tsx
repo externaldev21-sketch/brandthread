@@ -1196,7 +1196,7 @@ export default function StoryComposer() {
         type: 'buyer_to_buyer',
         participant: { userId: person.userId, name: person.name, handle: person.handle, initials: person.initials, color: person.color, accountType: person.accountType },
       });
-      await sendMessage(conv.id, 'Sent you my story ✨');
+      await sendMessage(conv.id, 'Shared my story');
       haptics.success();
       setAlsoShareSentIds((prev) => new Set(prev).add(person.userId));
     } catch {

@@ -29,10 +29,10 @@ export function SellerPlanRecommendationStep({
 
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.eyebrow, { color: theme.secondary }]}>YOUR PERSONALIZED PLAN</Text>
+      <Text style={[styles.eyebrow, { color: theme.secondary }]}>RECOMMENDED PLAN</Text>
       <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.name}</Text>
       <Text style={styles.reason}>{recommendation.reason}</Text>
-      <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
+      <Text style={styles.guidance}>You can choose any plan and change it before subscribing.</Text>
       {hasRealTrialOffer && (
         <View style={[styles.trialBadge, { borderColor: theme.accent }]}>
           <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>{`${SELLER_TRIAL_DAYS}-day free trial`}</Text>

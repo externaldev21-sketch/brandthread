@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+// Shared geometry serves both profiles and onboarding. Copy changes must not
+// alter its rendering math.
 import {
   LOGO_STITCH_LEAD_IN,
   ThreadPathBuilder,

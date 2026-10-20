@@ -38,6 +38,7 @@ import {
 // navigator (so the bar stays on screen) but have no slot of their own.
 
 function BuyerTabLayout() {
+  const { isSignedIn } = useAuth();
   const colors = useColors();
   const [dmBadgeCount, setDmBadgeCount] = useState(0);
   // Muted communities contribute nothing; a muted-only unread never lights the tab.
@@ -78,6 +79,7 @@ function BuyerTabLayout() {
   }, [settled.value, settled.settleImmediately, reduceMotion, pathname]);
 
   const loadBadgeCount = useCallback(async () => {
+    if (!isSignedIn) { setDmBadgeCount(0); return; }
     try {
       // Dev-web preview: no real backend/account, so route through the same
       // demo-gated preview data the Inbox screen itself renders
@@ -99,7 +101,7 @@ function BuyerTabLayout() {
     } catch {
       // Badges are non-critical.
     }
-  }, []);
+  }, [isSignedIn]);
 
   // Realtime: unread counts move the moment a message lands or is read on
   // another device (api-server ws/messagesHub.ts). The 30s poll below stays
@@ -108,9 +110,10 @@ function BuyerTabLayout() {
     if (event.type === 'badges.changed' || event.type === 'message.created' || event.type === 'conversation.updated') {
       void loadBadgeCount();
     }
-  }, !isBuyerDevPreview());
+  }, !!isSignedIn && !isBuyerDevPreview());
 
   useEffect(() => {
+    if (!isSignedIn) { setDmBadgeCount(0); return; }
     void loadBadgeCount();
     const unsubscribe = subscribeSocial(() => { void loadBadgeCount(); });
     const timer = setInterval(() => { void loadBadgeCount(); }, 30_000);
@@ -118,7 +121,7 @@ function BuyerTabLayout() {
       unsubscribe();
       clearInterval(timer);
     };
-  }, [loadBadgeCount]);
+  }, [loadBadgeCount, isSignedIn]);
 
   return (
     <Tabs

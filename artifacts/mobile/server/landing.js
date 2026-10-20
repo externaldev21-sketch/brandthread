@@ -51,11 +51,12 @@ function landingPathFor(staticRoot) {
   return path.join(staticRoot, LANDING_FILE);
 }
 
-function shouldServeLanding({ method = 'GET', pathname, searchParams, headers = {}, staticRoot }) {
+function shouldServeLanding({ method = 'GET', pathname, searchParams, headers = {}, staticRoot, appPreview = false }) {
   if (method !== 'GET' && method !== 'HEAD') return false;
   if (!fs.existsSync(landingPathFor(staticRoot))) return false;
   if (pathname === '/welcome') return true;
   if (pathname !== '/') return false;
+  if (appPreview) return false;
   if (!String(headers.accept || '').includes('text/html')) return false;
   if (!hasOnlyMarketingParams(searchParams)) return false;
   return !hasClerkSession(headers.cookie);

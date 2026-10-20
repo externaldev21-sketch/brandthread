@@ -75,6 +75,7 @@ const h = vi.hoisted(() => {
       completeOnboarding: vi.fn(rec('api.auth.completeOnboarding')),
     },
     referrals: { apply: vi.fn(rec('api.referrals.apply')) },
+    ageGate: { submit: vi.fn(rec('api.ageGate.submit')) },
     ai: { brandMemoryRebuild: vi.fn(async () => ({})) },
   };
   const storage = new Map<string, string>();
@@ -99,6 +100,17 @@ vi.mock('react-native', () => ({
   BackHandler: { addEventListener: () => ({ remove: () => {} }) },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
+// Native worklets/gestures have their own motion tests; these tests exercise
+// the real flow, validation and background writes without a native renderer.
+vi.mock('@/components/onboarding/OnboardingStepTransition', () => ({
+  OnboardingStepTransition: h.host('OnboardingStepTransition'),
+}));
+vi.mock('react-native-reanimated', async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  withDelay: (_delay: number, animation: unknown) => animation,
+  withSequence: (...animations: unknown[]) => animations.at(-1),
+}));
+vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn() }));
 vi.mock('@/components/KeyboardProviderCompat', () => ({ KeyboardAvoidingView: h.host('KeyboardAvoidingView') }));
 vi.mock('@expo/vector-icons', () => ({ Feather: h.host('Feather'), Ionicons: h.host('Ionicons') }));
 vi.mock('@/components/branding/GoogleGlyph', () => ({ default: h.host('GoogleGlyph') }));
@@ -218,6 +230,7 @@ async function pickUsername(name = 'sam_lee') {
 
 describe('launch onboarding (real screen, mocked Clerk + API)', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     h.calls.length = 0;
     h.storage.clear();
     h.clerk.signedIn = false;
@@ -228,7 +241,7 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     h.router.replace.mockClear();
     h.router.push.mockClear();
   });
-  afterEach(() => { act(() => tree?.unmount()); });
+  afterEach(() => { act(() => tree?.unmount()); vi.restoreAllMocks(); });
 
   it('buyer: email sign-up → username → photo → interest → brands → sizes → notifications → Shop', async () => {
     await render();
@@ -262,8 +275,9 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     await press('account-type-buyer');
     await press('onboarding-role-continue');
 
-    const finish = h.calls.slice(h.calls.lastIndexOf('api.auth.updateProfile') - 1);
+    const finish = h.calls.slice(h.calls.lastIndexOf('api.auth.sync'));
     expect(finish[0]).toBe('api.auth.sync');
+    expect(finish).toContain('api.ageGate.submit');
     expect(finish).toContain('api.syncBuyerOnboarding:Womenswear');
     expect(finish.find((c) => c.startsWith('api.saveBuyerSurvey'))).toBe('api.saveBuyerSurvey:{"sizes":{"tops":"M"},"likedBrandIds":["s2"]}');
     expect(h.api.auth.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ accountType: 'buyer', username: 'sam_lee', name: 'Sam Lee' }));
@@ -297,6 +311,77 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     expect(h.router.push).toHaveBeenLastCalledWith('/store-setup-brand');
   });
 
+  it('advances immediately during slow photo/follow writes, but waits for both before completion', async () => {
+    let finishPhoto!: (value: { profileImageUrl: string }) => void;
+    let finishFollow!: (value: { isFollowing: boolean }) => void;
+    h.api.auth.uploadAvatar.mockImplementationOnce(() => new Promise((resolve) => { finishPhoto = resolve; }));
+    const { setSellerFollowing } = await import('@/services/socialService');
+    vi.mocked(setSellerFollowing).mockImplementationOnce(() => new Promise((resolve) => { finishFollow = resolve; }));
+    await render();
+    await signUpWithEmail();
+    await pickUsername();
+    await press('onboarding-photo-add');
+    await press('onboarding-photo-library');
+    await press('onboarding-photo-continue');
+    expect(has('onboarding-interest')).toBe(true);
+    await press('onboarding-interest-Womenswear');
+    await press('onboarding-brand-s2');
+    await press('onboarding-brands-next');
+    expect(has('onboarding-sizes')).toBe(true);
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(h.storage.get('onboarding_complete')).not.toBe('true');
+    expect(h.router.replace).not.toHaveBeenCalledWith('/thread-explainer');
+    await act(async () => { finishPhoto({ profileImageUrl: 'https://cdn/avatar.jpg' }); });
+    await flush();
+    expect(h.router.replace).not.toHaveBeenCalledWith('/thread-explainer');
+    await act(async () => { finishFollow({ isFollowing: true }); });
+    await flush();
+    expect(h.calls).toContain('api.saveBuyerSurvey:{"sizes":{},"likedBrandIds":["s2"]}');
+    expect(h.router.replace).toHaveBeenLastCalledWith('/thread-explainer');
+  });
+
+  it('returns a failed background photo upload to its original step for retry, without marking complete', async () => {
+    h.api.auth.uploadAvatar.mockRejectedValueOnce(new Error('Upload interrupted'));
+    await render();
+    await signUpWithEmail();
+    await pickUsername();
+    await press('onboarding-photo-add');
+    await press('onboarding-photo-library');
+    await press('onboarding-photo-continue');
+    expect(has('onboarding-interest')).toBe(true);
+    await press('onboarding-interest-skip');
+    await press('onboarding-brands-skip');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(has('onboarding-photo')).toBe(true);
+    expect(h.storage.get('onboarding_complete')).not.toBe('true');
+    expect(h.router.replace).not.toHaveBeenCalledWith('/thread-explainer');
+    expect(tree.root.findAll((node) => node.props.children === 'Upload interrupted').length).toBeGreaterThan(0);
+    await press('onboarding-photo-continue');
+    await flush();
+    expect(h.api.auth.uploadAvatar).toHaveBeenCalledTimes(2);
+    expect(has('onboarding-interest')).toBe(true);
+  });
+
+  it('restores unacknowledged optional work after a restart rather than silently dropping it', async () => {
+    h.clerk.signedIn = true;
+    h.storage.set('onboarding_draft:user_1', JSON.stringify({
+      version: 10, ownerId: 'user_1', step: 'ROLE',
+      username: 'sam_lee',
+      pendingPhoto: { uri: 'file:///pending.jpg', mimeType: 'image/jpeg' },
+      pendingBrands: [],
+    }));
+    await render();
+    expect(has('onboarding-photo')).toBe(true);
+    expect(byId('onboarding-photo-preview').props.source).toEqual({ uri: 'file:///pending.jpg' });
+    expect(h.storage.get('onboarding_complete')).not.toBe('true');
+  });
+
   it('offers Continue with Apple first and signs up through Clerk oauth_apple after the birthday', async () => {
     await render();
     const options = tree.root.findAll((n) => typeof n.type === 'string' && ['onboarding-apple', 'onboarding-use-email', 'onboarding-google'].includes(n.props.testID));
@@ -309,6 +394,47 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     await press('onboarding-dob-continue');
     expect(h.calls).toEqual(['clerk.sso:oauth_apple']);
     expect(has('onboarding-username')).toBe(true);
+  });
+
+  it('opens the code layout immediately while email preparation runs, without allowing premature verification', async () => {
+    let resolveCreate!: (value: { error: null }) => void;
+    vi.spyOn(h.signUp, 'create').mockImplementationOnce(() => new Promise((resolve) => { resolveCreate = resolve; }));
+    await render();
+    await press('onboarding-use-email');
+    expect(tree.root.findByType('OnboardingStepTransition' as never).props.direction).toBe(1);
+    await press('onboarding-back');
+    expect(tree.root.findByType('OnboardingStepTransition' as never).props.direction).toBe(-1);
+    await press('onboarding-use-email');
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    await type('onboarding-email-input', 'sam@example.com');
+    await press('onboarding-email-continue');
+    expect(has('onboarding-code')).toBe(true);
+    expect(byId('onboarding-code-continue').props.disabled).toBe(true);
+    await enterCode('000000');
+    expect(h.calls).not.toContain('clerk.signUp.verifyEmailCode');
+    await act(async () => { resolveCreate({ error: null }); });
+    await flush();
+    await press('onboarding-code-continue');
+    expect(h.calls).toContain('clerk.signUp.verifyEmailCode');
+    expect(has('onboarding-username')).toBe(true);
+  });
+
+  it('returns email-delivery failures to the email field with a retryable real error', async () => {
+    vi.spyOn(h.signUp.verifications, 'sendEmailCode').mockResolvedValueOnce({
+      error: { errors: [{ code: 'form_identifier_invalid' }] },
+    } as never);
+    await render();
+    await press('onboarding-use-email');
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    await type('onboarding-email-input', 'sam@example.com');
+    await press('onboarding-email-continue');
+    expect(has('onboarding-email')).toBe(true);
+    expect(byId('onboarding-email-error').props.children).toBeTruthy();
+    expect(h.clerk.signedIn).toBe(false);
+    await press('onboarding-email-continue');
+    expect(has('onboarding-code')).toBe(true);
   });
 
   it('an email that already has an account logs in with a code instead (Depop: one field for both)', async () => {

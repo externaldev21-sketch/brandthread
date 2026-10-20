@@ -11,6 +11,12 @@ import type { Server } from "node:http";
 import { inArray, or } from "drizzle-orm";
 import { blocks, db, follows, users } from "@workspace/db";
 
+// Public headers now use optional Clerk identity instead of requireAuth.
+// Model the same authenticated identity at both middleware boundaries.
+vi.mock("@clerk/express", () => ({
+  getAuth: (req: any) => ({ userId: req.header("x-test-user-id") || null }),
+}));
+
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: () => void) => {
     req.clerkUserId = req.header("x-test-user-id");
@@ -148,6 +154,16 @@ describe("followsMe on any owner's list", () => {
 });
 
 describe("profile mutual followers + website", () => {
+  it("serves public profile headers anonymously without viewer relationship data", async () => {
+    const response = await get(`/api/social/profile/${target}`, "");
+    expect(response.status).toBe(200);
+    const profile = await response.json();
+    expect(profile.userId).toBe(target);
+    expect(profile.isFollowing).toBe(false);
+    expect(profile.isFollowedBy).toBe(false);
+    expect(profile.mutualFollowers).toBeUndefined();
+    expect(profile.email).toBeUndefined();
+  });
   it("counts people the viewer follows who follow the profile, excluding blocked relations", async () => {
     const profile = await get(`/api/social/profile/${target}`, viewer).then((r) => r.json() as Promise<any>);
     expect(profile.mutualFollowers.count).toBe(4);

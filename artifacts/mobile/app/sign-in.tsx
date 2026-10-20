@@ -79,7 +79,7 @@ export default function SignInScreen() {
   const clerk = useClerk();
 
   const router = useRouter();
-  const { addAccount, returnTo, email: emailParam } = useLocalSearchParams<{ addAccount?: string; returnTo?: string; email?: string }>();
+  const { addAccount, returnTo, guestPrompt, email: emailParam } = useLocalSearchParams<{ addAccount?: string; returnTo?: string; guestPrompt?: string; email?: string }>();
   // Guest tapped an account-only action: come back to it after signing in.
   const afterSignIn = safeReturnTo(returnTo);
   const insets = useSafeAreaInsets();
@@ -171,7 +171,8 @@ export default function SignInScreen() {
         if (url.startsWith('http') && typeof window !== 'undefined') {
           window.location.href = url;
         } else {
-          router.replace(destination as Href);
+          if (guestPrompt === '1' && afterSignIn && router.canGoBack()) router.back();
+          else router.replace(destination as Href);
         }
       },
     });

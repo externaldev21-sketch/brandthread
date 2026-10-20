@@ -257,7 +257,7 @@ export default function CommunityChatScreen() {
                   <EmptyState
                     compact
                     icon="message-circle"
-                    title="Say hello"
+                    title="No messages yet"
                     description={`Be the first to start the conversation in ${community?.name ?? 'this group'}.`}
                   />
                 </View>

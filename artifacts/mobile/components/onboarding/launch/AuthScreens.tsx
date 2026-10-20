@@ -7,13 +7,14 @@
  *  CodeScreen      Depop "Check your inbox" (+ code) https://mobbin.com/screens/fd03dc84-8c32-4f9c-b062-307316b6d83d
  *  DetailsScreen   TikTok "Create password"          https://mobbin.com/flows/d07ea40f-5774-4111-95bc-bfe13af206f5
  */
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { InertContext } from './motion';
+import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatDobInput } from '@/lib/ageGate';
-import { Field, FieldError, FieldHint, OnbHeader, OnbScreen, PillButton, Sub, TextLink, Title } from './kit';
+import { Field, FieldError, FieldHint, OnbHeader, OnbScreen, PillButton, ScalePressable, Sub, TextLink, Title } from './kit';
 
 // ─── Birthday ────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ export function BirthdayScreen({
         autoFocus
         error={!!error}
         returnKeyType="next"
-        onSubmitEditing={() => { if (value.length === 10) onContinue(); }}
+        onSubmitEditing={() => { if (value.length === 10 && !busy) onContinue(); }}
       />
       <FieldError testID="onboarding-dob-error" message={error} />
       <PillButton
@@ -96,7 +97,7 @@ export function EmailScreen({
         autoFocus
         error={!!error}
         returnKeyType="go"
-        onSubmitEditing={() => { if (valid) onContinue(); }}
+        onSubmitEditing={() => { if (valid && !busy) onContinue(); }}
       />
       <FieldError testID="onboarding-email-error" message={error} />
       <PillButton
@@ -138,6 +139,7 @@ export function CodeScreen({
   const { theme } = useAppTheme();
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
   const [resendNote, setResendNote] = useState('');
+  const inert = useContext(InertContext);
   useEffect(() => {
     if (seconds <= 0) return;
     const t = setTimeout(() => setSeconds((v) => v - 1), 1000);
@@ -170,9 +172,9 @@ export function CodeScreen({
           value={code}
           onChangeText={onChange}
           onComplete={onComplete}
-          autoFocus
+          autoFocus={!inert}
           error={!!error}
-          disabled={busy}
+          disabled={busy || inert}
         />
       </View>
       <FieldError testID="onboarding-code-error" message={error} />
@@ -233,7 +235,7 @@ export function DetailsScreen({
       {needsName ? (
         <>
           <Field testID="onboarding-first-name" label="First name" value={firstName} onChangeText={onFirstName} autoCapitalize="words" autoComplete="given-name" textContentType="givenName" autoFocus={!needsPassword} />
-          <Field testID="onboarding-last-name" label="Last name" value={lastName} onChangeText={onLastName} autoCapitalize="words" autoComplete="family-name" textContentType="familyName" />
+          <Field testID="onboarding-last-name" label="Last name" value={lastName} onChangeText={onLastName} autoCapitalize="words" autoComplete="family-name" textContentType="familyName" returnKeyType={needsPassword ? 'next' : 'go'} onSubmitEditing={() => { if (!needsPassword && passwordOk && nameOk && !busy) onContinue(); }} />
         </>
       ) : null}
       {needsPassword ? (
@@ -248,10 +250,12 @@ export function DetailsScreen({
             autoComplete="new-password"
             textContentType="newPassword"
             autoFocus
+            returnKeyType="go"
+            onSubmitEditing={() => { if (passwordOk && nameOk && !busy) onContinue(); }}
             right={(
-              <Pressable onPress={() => setShow((v) => !v)} hitSlop={10} accessibilityRole="button" accessibilityLabel={show ? 'Hide password' : 'Show password'}>
+              <ScalePressable onPress={() => setShow((v) => !v)} hitSlop={10} accessibilityRole="button" accessibilityLabel={show ? 'Hide password' : 'Show password'}>
                 <Feather name={show ? 'eye-off' : 'eye'} size={20} color={theme.muted} />
-              </Pressable>
+              </ScalePressable>
             )}
           />
           <FieldHint message="8 characters minimum" ok={password.length >= 8} />

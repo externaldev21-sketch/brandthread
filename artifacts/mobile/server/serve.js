@@ -361,6 +361,7 @@ const server = http.createServer(async (req, res) => {
     searchParams: requestUrl.searchParams,
     headers: req.headers,
     staticRoot: STATIC_ROOT,
+    appPreview: basePath === '/fast-preview',
   })) {
     const landingHtml = fs.readFileSync(landingPathFor(STATIC_ROOT), 'utf8');
     const gzip = /\bgzip\b/.test(acceptEncoding);

@@ -57,7 +57,7 @@ export function openLiveRoomSocket(streamId: string, handlers: LiveRoomHandlers)
     if (stopped || typeof WebSocket === 'undefined' || !API_BASE_URL) return;
     const token = await getServiceToken();
     if (stopped) return;
-    if (!token) { scheduleRetry(); return; }
+    if (!token) return; // Guests use public polling; no authenticated socket retry loop.
     let ws: WebSocket;
     try { ws = new WebSocket(liveRoomUrl(API_BASE_URL, streamId, token)); } catch { scheduleRetry(); return; }
     socket = ws;

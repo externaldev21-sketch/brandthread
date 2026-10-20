@@ -32,7 +32,7 @@ export const SPACE = { xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48, x
 export const RADIUS = { field: 18, card: 22, pill: 999 } as const;
 
 /** Press feedback shared by every tappable surface in the flow. */
-export const PRESS_SCALE = 0.97;
+export const PRESS_SCALE = 0.96;
 
 export const MOTION = {
   /** Thread draw-on curve: fast start, long silky settle. */

@@ -276,7 +276,7 @@ export default function BuyerFriendRequestsScreen() {
       return (
         <EmptyState
           icon="user-check"
-          title="All caught up"
+          title="No friend requests"
           description="Everyone you follow also follows you back."
         />
       );

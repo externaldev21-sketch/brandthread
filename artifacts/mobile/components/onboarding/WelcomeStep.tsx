@@ -59,7 +59,7 @@ export function WelcomeStep({
         <View style={styles.brandRow}>
           <BrandthreadLogo size={40} />
           <Text style={[TYPE.title1, styles.tagline]} numberOfLines={2}>
-            Where brands find their people.
+          Shop and sell independent fashion.
           </Text>
         </View>
 

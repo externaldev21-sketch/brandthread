@@ -149,7 +149,7 @@ export default function AdminPromotionsScreen() {
           keyExtractor={(i) => `${i.kind}:${i.id}`}
           contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xxl * 2 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.text} />}
-          ListEmptyComponent={<EmptyState icon="check-circle" title="Nothing here" description={tab === 'in_review' ? 'New paid promotions appear here for review.' : 'No items yet.'} />}
+          ListEmptyComponent={<EmptyState icon="check-circle" title="No promotions" description={tab === 'in_review' ? 'New paid promotions appear here for review.' : 'No items yet.'} />}
           renderItem={({ item }) => (
             <View style={s.card} testID={`promo-${item.id}`}>
               <View style={s.cardTop}>

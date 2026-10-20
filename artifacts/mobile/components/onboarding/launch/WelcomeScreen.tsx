@@ -8,13 +8,13 @@
  */
 import React from 'react';
 import { MEDIA } from '@/lib/theme';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FieldError, GUTTER, OutlineOption } from './kit';
+import { FieldError, GUTTER, OutlineOption, ScalePressable } from './kit';
 
 export type WelcomeMode = 'signup' | 'login';
 
@@ -57,9 +57,9 @@ export function WelcomeScreen({
       <View style={s.topBar}>
         <View />
         {onClose ? (
-          <Pressable testID="onboarding-welcome-close" onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+          <ScalePressable testID="onboarding-welcome-close" onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <Feather name="x" size={24} color={theme.text} />
-          </Pressable>
+          </ScalePressable>
         ) : null}
       </View>
       {devBanner}

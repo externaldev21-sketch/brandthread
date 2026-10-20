@@ -41,7 +41,7 @@ export default function LaunchChecklistCard() {
     <View style={s.root} testID="get-ready-to-sell">
       <View style={s.header}>
         <View style={s.headerText}>
-          <Text accessibilityRole="header" style={s.title}>Get ready to sell</Text>
+          <Text accessibilityRole="header" style={s.title}>Set up your store</Text>
           <Text style={s.sub}>Use this guide to get your store up and running.</Text>
         </View>
         <Pressable onPress={dismiss} accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={10} style={s.close}>

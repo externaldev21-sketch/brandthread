@@ -9,6 +9,8 @@ import { RetainedScene } from '@/components/RetainedScene';
 import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWarmup';
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
+import { guestReturnPath, requestGuestSignIn } from '@/lib/guestSignIn';
+import { GuestSignInSheet } from '@/components/GuestSignInSheet';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { webAppPathname } from '@/lib/webAppPathname';
 import { isAccessCleared } from '@/lib/accessGate';
@@ -663,8 +665,8 @@ const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
 })();
-const DEV_WEB_ONBOARDING_PREVIEW =
-  __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;
+// Reloading a browser is never permission to sign out an existing session.
+const DEV_WEB_ONBOARDING_PREVIEW = false;
 
 // The preview role for THIS page: the one the URL asked for, or - after a reload of a plain tab URL
 // such as /orders, where in-app navigation had already dropped `?bt_preview=` - the role the first
@@ -737,7 +739,9 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const { addAccount, returnTo } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  const guestPathname = usePathname();
+  const guestParams = useGlobalSearchParams();
+  const { addAccount, returnTo, guestPrompt } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string; guestPrompt?: string }>();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
@@ -1026,9 +1030,16 @@ function AuthGate() {
     // and direct browser links regardless of authentication/onboarding state.
     if (inPublicScreen) return;
 
-    // Unauthenticated: show splash first time, then sign-in
+    // A fresh install opens the public feed, not onboarding or an auth wall.
+    if (!isSignedIn && atRoot) {
+      router.replace('/(buyer)/' as never);
+      return;
+    }
+    // Private deep links show the same prompt. Dismiss always returns to browsing.
     if (!isSignedIn && inProtectedArea && !isGuestAllowedRoute) {
-      router.replace(splashSeen ? '/sign-in' : '/splash');
+      requestGuestSignIn(guestReturnPath(guestPathname, guestParams), () => {
+        router.replace('/(buyer)/' as never);
+      });
       return;
     }
     if (!isSignedIn) return; // stay on auth screen or guest-allowed route
@@ -1080,7 +1091,8 @@ function AuthGate() {
     // A guest who was sent to sign-in from an account-only action returns to it.
     const returnDest = inAuthScreen ? safeReturnTo(returnTo) : null;
     if (onboardingDone && returnDest && !inAddAccountFlow) {
-      router.replace(returnDest as never);
+      if (guestPrompt === '1' && router.canGoBack()) router.back();
+      else router.replace(returnDest as never);
       return;
     }
     if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer && !inAddAccountFlow) {
@@ -1103,11 +1115,11 @@ function AuthGate() {
     if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(buyer)/${rest}` : '/(buyer)/') as never);
-    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
+    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !isGuestAllowedRoute && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, returnTo, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
+  }, [addAccount, returnTo, guestPrompt, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady, guestPathname, guestParams]);
 
   return null;
 }
@@ -1565,6 +1577,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <SellerBarGate />
       <WhatsNewHost />
       <AuthGate />
+      <GuestSignInSheet />
       <ServiceConfigurer />
       {backgroundReady && (
         <React.Suspense fallback={null}>

@@ -34,6 +34,7 @@ import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { useApi } from '@/lib/api';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import { isUUID } from '@/lib/engagementUtils';
 import { buildPostUrl } from '@/lib/shareLinks';
 import { storyPostShareHref } from '@/lib/storyPostShare';
@@ -106,6 +107,7 @@ function AccountThreadShareSheet({
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
+  const { requireSignIn } = useSignInGate();
   // "Send to" row (#145): recent chats first, then friends (lib/shareRecents).
   const [allTargets, setAllTargets] = useState<ShareTarget[]>([]);
   const friends = React.useMemo(() => allTargets.slice(0, SHARE_ROW_MAX), [allTargets]);
@@ -227,7 +229,7 @@ function AccountThreadShareSheet({
 
   async function sendToFriend(friend: ShareTarget) {
     const owner = myUserId;
-    if (!owner) { onFeedback('Sign in to send posts to friends.', 'error'); return; }
+    if (!owner) { requireSignIn(); return; }
     await runAction(`friend:${friend.userId}`, async () => {
       // A recent chat already has a conversation: send straight into it.
       const conversation = friend.conversationId ? { id: friend.conversationId } : await createOrGetConversation({

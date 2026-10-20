@@ -74,6 +74,15 @@ export function createFakeOnboardingApi() {
       const user = ensureUser(body?.name, clerkId);
       return { status: 200, body: user };
     }
+    if (p === '/auth/age' && method === 'POST') {
+      if (!dbUser) return { status: 409, body: { error: { code: 'PROFILE_REQUIRED', message: 'Create the profile before submitting age.' } } };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body?.dateOfBirth ?? '')) {
+        return { status: 400, body: { error: { code: 'INVALID_DOB', message: 'Use a valid date of birth.' } } };
+      }
+      // Test API mirrors production's band-only response; do not retain DOB.
+      dbUser.ageBand = '18_plus';
+      return { status: 200, body: { ageBand: dbUser.ageBand } };
+    }
     if (p === '/auth/me' && get) {
       if (!dbUser) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'No account yet' } } };
       return { status: 200, body: dbUser };

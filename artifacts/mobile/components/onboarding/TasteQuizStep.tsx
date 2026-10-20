@@ -156,7 +156,7 @@ export function TasteQuizStep({ onDone }: Props) {
   async function share() {
     if (!identity) return;
     try {
-      await Share.share({ message: `My style on Brandthread: ${identity.title}` });
+      await Share.share({ message: `Style profile on Brandthread: ${identity.title}` });
     } catch {
       // dismissed
     }
@@ -210,7 +210,7 @@ export function TasteQuizStep({ onDone }: Props) {
     <View style={styles.wrap} testID="taste-quiz">
       <View style={styles.topRow}>
         <View style={styles.pill}>
-          <Text style={styles.pillTitle}>Learning your style</Text>
+          <Text style={styles.pillTitle}>Building your style profile</Text>
           <Text style={styles.pillSub}>{left} left</Text>
         </View>
         <PressableScale

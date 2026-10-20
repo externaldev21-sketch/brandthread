@@ -18,7 +18,7 @@
 - [Design Studio Architecture](design-studio-architecture.md) — Expo-safe shared rendering, full-resolution master exports, validated imports, and ordered timer persistence govern the editor.
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
-- [Expo web boot & root route](expo-web-boot.md) — buyer-default development review stays fresh; explicit role links remain, and real users/production are unchanged.
+- [Expo web boot & root route](expo-web-boot.md) — regular guest browsing and explicit fresh buyer/seller review are separate; preserve startup and routing safeguards.
 - [Expo dependency repair](expo-dependency-repair.md) — avoid interrupted pnpm relinks; newly published SDK patches may be blocked by registry release age before online Expo checks advance.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — wait for root registration before redirecting; merged Stack screen names must stay unique.
@@ -39,6 +39,7 @@
 - [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.
 - [Truthful seller profile metrics](truthful-seller-profile-metrics.md) — count settled paid orders and deduplicated signed-in storefront visits; never fabricate growth.
 - [Guest commerce boundaries](guest-commerce-boundaries.md) — guest shopping stays public-route-only; order lookup uses a hashed capability, with no loyalty or saved payment identity.
+- [Guest browsing contract](guest-browsing-contract.md) — public browsing has no sign-in walls; account actions use a dismissible sheet and never auto-replay after authentication.
 - [Integer-cents money contracts](integer-cents-money-contracts.md) — mobile money stays in explicit *Cents fields; parse decimal strings strictly and format only at the UI boundary.
 - [Mobile API resilience](mobile-api-resilience.md) — classify transport/server failures centrally; only read requests get global retry actions, while mutations require explicit screen-level retries.
 - [Promote objective boundary](promote-objectives.md) — Boost defaults to views; objective-aware delivery remains deferred until exposure attribution and ranking support exist.

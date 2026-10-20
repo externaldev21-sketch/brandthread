@@ -68,6 +68,7 @@ import {
   type Department,
 } from '@/components/onboarding/launch/ProfileScreens';
 import { ClerkKeyBanner } from '@/components/onboarding/launch/ClerkKeyBanner';
+import { OnboardingStepTransition } from '@/components/onboarding/OnboardingStepTransition';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -79,6 +80,7 @@ const PENDING_USERNAME_KEY = 'onboarding_pending_username';
 
 type AuthMethod = 'email' | 'apple' | 'google';
 type Provider = 'apple' | 'google';
+type ProfileWorkOutcome = { step: 'PHOTO' | 'BRANDS'; error?: string; followedIds?: string[] };
 
 function draftKeyForUser(userId?: string | null): string | null {
   return userId ? `${DRAFT_KEY_PREFIX}${userId}` : null;
@@ -120,6 +122,9 @@ export default function OnboardingScreen() {
 
   // ── Step + answers ─────────────────────────────────────────────────────────
   const [step, setStep] = useState<StepId>(isDevWebPreviewUser ? FIRST_PROFILE_STEP : 'WELCOME');
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const currentStep = useRef(step);
+  currentStep.current = step;
   const [ready, setReady] = useState(isDevWebPreviewUser);
   const [welcomeMode, setWelcomeMode] = useState<WelcomeMode>('signup');
   const [authMethod, setAuthMethod] = useState<AuthMethod | null>(null);
@@ -149,8 +154,23 @@ export default function OnboardingScreen() {
 
   const sourceUserId = useRef<string | null | undefined>(isAddAccount ? undefined : null);
   const restored = useRef(false);
+  const emailRequest = useRef(0);
+  const profileWork = useRef<Partial<Record<'PHOTO' | 'BRANDS', Promise<ProfileWorkOutcome>>>>({});
+  const currentOwner = useRef(user?.id);
+  currentOwner.current = user?.id;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => { profileWork.current = {}; }, [user?.id]);
 
-  const go = useCallback((next: StepId) => { setError(''); setStep(next); }, []);
+  const go = useCallback((next: StepId, travel?: 1 | -1) => {
+    setDirection(travel ?? (next === backTarget(currentStep.current) ? -1 : 1));
+    setError('');
+    currentStep.current = next;
+    setStep(next);
+  }, [role]);
 
   // ── Restore (signed-in users resume where they left off) ─────────────────
   useEffect(() => {
@@ -182,6 +202,18 @@ export default function OnboardingScreen() {
           setStoreName(typeof draft.storeName === 'string' ? draft.storeName : '');
           setStage(typeof draft.stage === 'string' ? draft.stage : null);
           setPhotoUploadedUri(typeof draft.photoUploadedUri === 'string' ? draft.photoUploadedUri : null);
+          // Resume unacknowledged background writes instead of losing the choice.
+          if (typeof draft.pendingPhoto?.uri === 'string') {
+            setPhoto({ uri: draft.pendingPhoto.uri, mimeType: draft.pendingPhoto.mimeType ?? null });
+            setStep('PHOTO');
+          }
+          if (Array.isArray(draft.pendingBrands)) {
+            const pendingBrands = draft.pendingBrands.filter((b: DiscoverBrand) => typeof b?.sellerId === 'string' && typeof b?.name === 'string');
+            if (pendingBrands.length) {
+              setBrands(pendingBrands);
+              if (!draft.pendingPhoto?.uri) setStep('BRANDS');
+            }
+          }
         } else {
           const pending = await AsyncStorage.getItem(PENDING_USERNAME_KEY);
           if (pending) setUsername(pending);
@@ -202,10 +234,12 @@ export default function OnboardingScreen() {
     const t = setTimeout(() => {
       AsyncStorage.setItem(key, JSON.stringify({
         version: DRAFT_VERSION, ownerId: user!.id, step, username, department, followedIds, sizes, role, storeName, stage, photoUploadedUri,
+        pendingPhoto: photo && !photoUploadedUri ? photo : null,
+        pendingBrands: brands.filter((b) => !followedIds.includes(b.sellerId)),
       })).catch(() => {});
     }, 300);
     return () => clearTimeout(t);
-  }, [department, followedIds, isAddAccount, photoUploadedUri, ready, role, sizes, stage, step, storeName, user?.id, username]);
+  }, [brands, department, followedIds, isAddAccount, photo, photoUploadedUri, ready, role, sizes, stage, step, storeName, user?.id, username]);
 
   // Android hardware back follows the on-screen back.
   useEffect(() => {
@@ -283,32 +317,45 @@ export default function OnboardingScreen() {
 
   // ── Email + code ─────────────────────────────────────────────────────────
   async function continueFromEmail() {
+    if (busy) return;
     const address = email.trim().toLowerCase();
+    const attempt = ++emailRequest.current;
     setBusy('email');
     setError('');
+    setCode('');
+    go('CODE');
+    const isCurrent = () => mounted.current && emailRequest.current === attempt && currentStep.current === 'CODE';
+    const fail = (message: string) => {
+      if (!isCurrent()) return;
+      go('EMAIL', -1);
+      setError(message);
+    };
     try {
       const created = await signUp.create({ emailAddress: address });
+      if (!isCurrent()) return;
       const createErr = created.error as any;
       const exists = createErr && ((createErr.errors?.[0]?.code ?? createErr.code) === 'form_identifier_exists');
       if (exists) {
         // Depop: one field for both. This email has an account → log in by code.
         const sent = await signIn.emailCode.sendCode({ emailAddress: address });
-        if (sent.error) { setError(mapClerkError(sent.error)); return; }
+        if (!isCurrent()) return;
+        if (sent.error) { fail(mapClerkError(sent.error)); return; }
         setCodeMode('signin');
       } else if (createErr) {
-        setError(mapClerkError(createErr));
+        fail(mapClerkError(createErr));
         return;
       } else {
         const sent = await signUp.verifications.sendEmailCode();
-        if (sent.error) { setError(mapClerkError(sent.error)); return; }
+        if (!isCurrent()) return;
+        if (sent.error) { fail(mapClerkError(sent.error)); return; }
         setCodeMode('signup');
       }
-      setCode('');
-      go('CODE');
     } catch (e) {
-      setError(mapClerkError(e));
+      fail(mapClerkError(e));
     } finally {
-      setBusy(null);
+      if (mounted.current && emailRequest.current === attempt) {
+        setBusy((current) => current === 'email' ? null : current);
+      }
     }
   }
 
@@ -414,47 +461,86 @@ export default function OnboardingScreen() {
     advance('USERNAME');
   }
 
-  async function continueFromPhoto() {
+  function continueFromPhoto() {
     if (!photo) { advance('PHOTO'); return; }
-    setBusy('photo');
+    const selectedPhoto = photo;
+    const owner = user?.id;
     setError('');
-    try {
-      await ensureServerUser();
-      const res = await api.auth.uploadAvatar(photo);
-      setPhotoUploadedUri(res.profileImageUrl);
-      advance('PHOTO');
-    } catch (e) {
-      setError(apiErrorMessage(e, 'Couldn’t upload your picture.'));
-    } finally {
-      setBusy(null);
-    }
+    // Optional uploads must not hold the next screen behind a network round trip.
+    // Completion below still waits for them and routes failures back for retry.
+    let work!: Promise<ProfileWorkOutcome>;
+    work = (async (): Promise<ProfileWorkOutcome> => {
+      try {
+        await ensureServerUser();
+        if (!mounted.current || currentOwner.current !== owner) return { step: 'PHOTO' };
+        const res = await api.auth.uploadAvatar(selectedPhoto);
+        if (mounted.current && currentOwner.current === owner && profileWork.current.PHOTO === work) {
+          setPhotoUploadedUri(res.profileImageUrl);
+        }
+        return { step: 'PHOTO' };
+      } catch (e) {
+        return { step: 'PHOTO', error: apiErrorMessage(e, 'Couldn’t upload your picture.') };
+      }
+    })();
+    profileWork.current.PHOTO = work;
+    advance('PHOTO');
   }
 
-  async function continueFromBrands() {
-    setBusy('brands');
+  function continueFromBrands() {
+    const owner = user?.id;
+    const selectedBrands = [...brands];
+    const previouslyFollowed = [...followedIds];
     setError('');
-    try {
-      await ensureServerUser();
-      const toFollow = brands.filter((b) => !followedIds.includes(b.sellerId));
-      const results = await Promise.allSettled(toFollow.map((b) => setSellerFollowing(b.sellerId, true)));
-      const ok = toFollow.filter((_, i) => results[i].status === 'fulfilled').map((b) => b.sellerId);
-      const nextFollowed = [...followedIds, ...ok];
-      setFollowedIds(nextFollowed);
-      const failed = toFollow.filter((_, i) => results[i].status === 'rejected');
-      if (failed.length) {
-        setError(`Couldn’t follow ${failed.map((b) => b.name).join(', ')}. Try again or skip.`);
-        return;
+    let work!: Promise<ProfileWorkOutcome>;
+    work = (async (): Promise<ProfileWorkOutcome> => {
+      try {
+        await ensureServerUser();
+        if (!mounted.current || currentOwner.current !== owner) return { step: 'BRANDS' };
+        const toFollow = selectedBrands.filter((b) => !previouslyFollowed.includes(b.sellerId));
+        const results = await Promise.allSettled(toFollow.map((b) => setSellerFollowing(b.sellerId, true)));
+        const ok = toFollow.filter((_, i) => results[i].status === 'fulfilled').map((b) => b.sellerId);
+        const nextFollowed = [...new Set([...previouslyFollowed, ...ok])];
+        if (mounted.current && currentOwner.current === owner && profileWork.current.BRANDS === work) {
+          setFollowedIds(nextFollowed);
+        }
+        const failed = toFollow.filter((_, i) => results[i].status === 'rejected');
+        return {
+          step: 'BRANDS', followedIds: nextFollowed,
+          ...(failed.length ? { error: `Couldn’t follow ${failed.map((b) => b.name).join(', ')}. Try again or skip.` } : {}),
+        };
+      } catch (e) {
+        return { step: 'BRANDS', error: apiErrorMessage(e, 'Couldn’t follow those brands.') };
       }
-      advance('BRANDS');
-    } catch (e) {
-      setError(apiErrorMessage(e, 'Couldn’t follow those brands.'));
-    } finally {
+    })();
+    profileWork.current.BRANDS = work;
+    advance('BRANDS');
+  }
+
+  async function settleProfileWork(): Promise<{ followedIds: string[] } | null> {
+    const owner = currentOwner.current;
+    const outcomes = await Promise.all(Object.values(profileWork.current));
+    if (!mounted.current || currentOwner.current !== owner) return null;
+    const failed = outcomes.find((outcome) => outcome.error);
+    if (failed) {
       setBusy(null);
+      go(failed.step, -1);
+      setError(failed.error!);
+      return null;
     }
+    return { followedIds: outcomes.find((outcome) => outcome.step === 'BRANDS')?.followedIds ?? followedIds };
+  }
+
+  function skipProfileWork(from: 'PHOTO' | 'BRANDS') {
+    // Explicit Skip dismisses a failed optional write, not an acknowledged one.
+    delete profileWork.current[from];
+    if (from === 'PHOTO') setPhoto(null);
+    else setBrands([]);
+    advance(from);
   }
 
   async function turnOnNotifications() {
     setBusy('notifications');
+    advance('NOTIFICATIONS');
     try {
       if (Platform.OS !== 'web') {
         const current = await Notifications.getPermissionsAsync();
@@ -463,8 +549,7 @@ export default function OnboardingScreen() {
     } catch {
       // Push is optional: a failure or denial never blocks onboarding.
     } finally {
-      setBusy(null);
-      advance('NOTIFICATIONS');
+      setBusy((current) => current === 'notifications' ? null : current);
     }
   }
 
@@ -483,10 +568,13 @@ export default function OnboardingScreen() {
     setBusy('finish');
     setError('');
     const styleInterests = department ? [department] : [];
-    const survey: OnboardingSurvey = { sizes, likedBrandIds: followedIds };
+    let survey: OnboardingSurvey = { sizes, likedBrandIds: followedIds };
     let profileId: string | null = null;
     let failureStage = 'profile';
     try {
+      const pending = await settleProfileWork();
+      if (!pending) return;
+      survey = { sizes, likedBrandIds: pending.followedIds };
       const name = displayName();
       const profile = await api.auth.sync({ name });
       profileId = profile.clerkId;
@@ -529,6 +617,8 @@ export default function OnboardingScreen() {
     setBusy('finish');
     setError('');
     try {
+      const pending = await settleProfileWork();
+      if (!pending) return;
       const name = displayName();
       const profile = await api.auth.sync({ name });
       await submitPendingAge(api);
@@ -537,7 +627,7 @@ export default function OnboardingScreen() {
       if (referralCode) await api.referrals.apply(referralCode, profile.clerkId).catch(() => {});
       // Interest / sizes / followed brands are buyer-side answers; a seller
       // shops too, so they're kept on the same preference record.
-      await saveBuyerSurvey(profile.clerkId, { sizes, likedBrandIds: followedIds }, department ? [department] : [], api);
+      await saveBuyerSurvey(profile.clerkId, { sizes, likedBrandIds: pending.followedIds }, department ? [department] : [], api);
       await api.auth.completeOnboarding('seller');
       await markComplete(profile.clerkId, 'seller');
       api.ai.brandMemoryRebuild().catch(() => {});
@@ -573,6 +663,7 @@ export default function OnboardingScreen() {
   const onBack = back ? () => go(back) : undefined;
   const isBusy = (key: string) => busy === key;
 
+  function renderStep() {
   switch (step) {
     case 'WELCOME':
       return (
@@ -593,7 +684,7 @@ export default function OnboardingScreen() {
     case 'EMAIL':
       return <EmailScreen value={email} onChange={(v) => { setEmail(v); setError(''); }} error={error} onBack={() => go('BIRTHDAY')} onContinue={() => { void continueFromEmail(); }} busy={isBusy('email')} />;
     case 'CODE':
-      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={() => go('EMAIL')} onResend={resendCode} busy={isBusy('code')} />;
+      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={() => go('EMAIL')} onResend={resendCode} busy={isBusy('code') || isBusy('email')} />;
     case 'DETAILS':
       return (
         <DetailsScreen
@@ -627,9 +718,9 @@ export default function OnboardingScreen() {
       return (
         <PhotoScreen
           uri={photo?.uri ?? photoUploadedUri}
-          onPicked={(a) => { setPhoto(a); setError(''); }}
+          onPicked={(a) => { setPhoto(a); setPhotoUploadedUri(null); setError(''); }}
           onContinue={() => { void continueFromPhoto(); }}
-          onSkip={() => advance('PHOTO')}
+           onSkip={() => skipProfileWork('PHOTO')}
           busy={isBusy('photo')}
           error={error}
           progress={progress}
@@ -644,7 +735,7 @@ export default function OnboardingScreen() {
           selected={brands}
           onChange={(b) => { setBrands(b); setError(''); }}
           onContinue={() => { void continueFromBrands(); }}
-          onSkip={() => advance('BRANDS')}
+           onSkip={() => skipProfileWork('BRANDS')}
           busy={isBusy('brands')}
           error={error}
           progress={progress}
@@ -664,6 +755,13 @@ export default function OnboardingScreen() {
     default:
       return null;
   }
+  }
+
+  return (
+    <OnboardingStepTransition stepId={step} direction={direction} onBack={onBack}>
+      {renderStep()}
+    </OnboardingStepTransition>
+  );
 }
 
 const s = StyleSheet.create({

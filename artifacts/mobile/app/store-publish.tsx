@@ -310,7 +310,7 @@ export default function StorePublishScreen() {
             </Text>
             <View style={pub.shareActions}>
               <SecondaryButton
-                label={sharingPreview ? 'Generating…' : shareCopied ? 'Link copied!' : 'Copy preview link'}
+                label={sharingPreview ? 'Generating…' : shareCopied ? 'Link copied' : 'Copy preview link'}
                 onPress={handleSharePreview}
                 disabled={sharingPreview}
                 icon={shareCopied ? 'check' : 'link'}
@@ -350,7 +350,7 @@ export default function StorePublishScreen() {
           </BrandthreadCard>
         ) : validation?.canPublish ? (
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
-            <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
+            <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to publish.</Text>
             <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
               {siteUrl ? <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>{displayUrl(siteUrl)}</Text> : null}
             <PrimaryButton

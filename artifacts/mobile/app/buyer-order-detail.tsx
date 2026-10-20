@@ -305,7 +305,7 @@ function ReviewSheet({
     : rating <= 2 ? 'Not great'
     : rating === 3 ? 'It was okay'
     : rating === 4 ? 'Pretty good'
-    : 'Excellent!';
+    : 'Excellent';
 
   if (!visible) return null;
 

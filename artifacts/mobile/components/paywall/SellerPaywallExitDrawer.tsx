@@ -99,7 +99,7 @@ export function SellerPaywallExitDrawer({
           </View>
 
           <View style={styles.wrap}>
-            <Text style={[styles.title, { color: theme.text }]}>Not ready to commit?</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Your plan options</Text>
             {!pricing.loading && !pricing.failed && (
               <Text style={[styles.reframe, { color: theme.muted }]}>
                 {pricing.note

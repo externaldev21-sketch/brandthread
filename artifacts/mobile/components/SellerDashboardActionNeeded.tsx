@@ -45,7 +45,7 @@ export function SellerDashboardActionNeeded({
       {allCaughtUp ? (
         <View style={styles.caughtUpRow} testID="seller-dashboard-all-caught-up">
           <Icon name="check-circle" size={16} color={theme.success} />
-          <Text style={[styles.caughtUpText, { color: theme.muted }]}>You’re all caught up</Text>
+          <Text style={[styles.caughtUpText, { color: theme.muted }]}>No action needed</Text>
         </View>
       ) : (
         <View>

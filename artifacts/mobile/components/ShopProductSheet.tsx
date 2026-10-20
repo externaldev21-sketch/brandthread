@@ -55,6 +55,7 @@ import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/co
 import { ON_DARK, OVERLAY, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 
 import { addToCart, createBuyNowSession, getCart, getBuyerProduct, warmCart } from '@/services/cartService';
+import { useSignInGate } from '@/hooks/useSignInGate';
 
 import type {
   BuyerProduct,
@@ -358,6 +359,7 @@ export function ShopProductSheet({
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const router = useRouter();
+  const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
 
   // Gallery aspect (photo audit follow-up): always a full-width 3:4
@@ -799,6 +801,7 @@ export function ShopProductSheet({
   }
 
   async function handleAddToCart() {
+    if (!requireSignIn()) return;
     if (!product) return;
     if (!allOptionsSelected) {
       rejectMissingVariant('Please select all options before adding to cart.');
@@ -843,6 +846,7 @@ export function ShopProductSheet({
 
   // Buy now
   async function handleBuyNow() {
+    if (!requireSignIn()) return;
     if (!product) return;
     if (!allOptionsSelected) {
       rejectMissingVariant('Please select all options.');

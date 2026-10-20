@@ -22,7 +22,8 @@
  *                       https://mobbin.com/screens/f1309ebc-8e30-48ea-8d56-0b72b1692c1e
  *                       https://mobbin.com/screens/f10440c9-2c15-407c-a8ba-fe2f23d4323e
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { InertContext } from './motion';
 import { MEDIA } from '@/lib/theme';
 import {
   ActivityIndicator,
@@ -56,6 +57,7 @@ import {
   OnbScreen,
   PillButton,
   RadioRow,
+  ScalePressable,
   SectionTitle,
   Sub,
   Title,
@@ -165,7 +167,7 @@ export function UsernameScreen({
         error={!!error}
         maxLength={30}
         returnKeyType="next"
-        onSubmitEditing={() => { if (canContinue) onContinue(); }}
+        onSubmitEditing={() => { if (canContinue && !busy) onContinue(); }}
         right={availability.state === 'checking' ? <ActivityIndicator size="small" /> : null}
       />
       {error ? (
@@ -177,8 +179,8 @@ export function UsernameScreen({
       ) : null}
       {suggestions.length > 0 ? (
         <View style={s.chips}>
-          {suggestions.map((sug) => (
-            <Chip key={sug} testID={`onboarding-username-suggestion-${sug}`} label={sug} selected={sug === value} onPress={() => onChange(sug)} />
+          {suggestions.map((sug, i) => (
+            <Chip index={i} key={sug} testID={`onboarding-username-suggestion-${sug}`} label={sug} selected={sug === value} onPress={() => onChange(sug)} />
           ))}
         </View>
       ) : null}
@@ -253,7 +255,7 @@ export function PhotoScreen({
     >
       <Title>Add a profile picture</Title>
       <Sub>Add a profile picture so people know it’s you. Everyone will be able to see your picture.</Sub>
-      <Pressable onPress={openPicker} accessibilityRole="button" accessibilityLabel="Choose a profile picture" style={s.avatarWrap}>
+      <ScalePressable onPress={openPicker} accessibilityRole="button" accessibilityLabel="Choose a profile picture" style={s.avatarWrap}>
         {uri ? (
           <Image testID="onboarding-photo-preview" source={{ uri }} style={s.avatar} />
         ) : (
@@ -262,24 +264,24 @@ export function PhotoScreen({
             <View style={[s.avatarBody, { backgroundColor: placeholderFg }]} />
           </View>
         )}
-      </Pressable>
+      </ScalePressable>
       <FieldError testID="onboarding-photo-error" message={error || pickError} />
 
       <Modal visible={sheet} transparent animationType="slide" onRequestClose={() => setSheet(false)}>
         <Pressable style={s.backdrop} onPress={() => setSheet(false)} accessibilityLabel="Close" />
         <View style={[s.sheet, { backgroundColor: theme.background, borderColor: theme.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={[s.grabber, { backgroundColor: theme.border }]} />
-          <Pressable onPress={() => setSheet(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close" style={s.sheetClose}>
+          <ScalePressable onPress={() => setSheet(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close" style={s.sheetClose}>
             <Feather name="x" size={24} color={theme.text} />
-          </Pressable>
+          </ScalePressable>
           <Text style={[s.sheetTitle, { color: theme.text }]}>Add picture</Text>
           <View style={[s.sheetGroup, { borderColor: theme.border }]}>
-            <Pressable testID="onboarding-photo-library" onPress={() => { void pick('library'); }} style={[s.sheetRow, { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]} accessibilityRole="button">
+            <ScalePressable testID="onboarding-photo-library" onPress={() => { void pick('library'); }} style={[s.sheetRow, { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]} accessibilityRole="button">
               <Text style={[s.sheetRowText, { color: theme.text }]}>Choose from Camera Roll</Text>
-            </Pressable>
-            <Pressable testID="onboarding-photo-camera" onPress={() => { void pick('camera'); }} style={s.sheetRow} accessibilityRole="button">
+            </ScalePressable>
+            <ScalePressable testID="onboarding-photo-camera" onPress={() => { void pick('camera'); }} style={s.sheetRow} accessibilityRole="button">
               <Text style={[s.sheetRowText, { color: theme.text }]}>Take photo</Text>
-            </Pressable>
+            </ScalePressable>
           </View>
         </View>
       </Modal>
@@ -308,12 +310,12 @@ export function InterestScreen({
     >
       <Title>What do you shop for?</Title>
       <View style={s.list}>
-        {DEPARTMENTS.map((d) => (
-          <ListRow key={d} testID={`onboarding-interest-${d}`} label={d} selected={value === d} onPress={() => onPick(d)} />
+        {DEPARTMENTS.map((d, i) => (
+          <ListRow key={d} index={i} testID={`onboarding-interest-${d}`} label={d} selected={value === d} onPress={() => onPick(d)} />
         ))}
       </View>
       <Text style={[s.footnote, { color: theme.muted }]}>
-        We tailor your experience based on the department you select to only show you the items you want to see.
+        Your selection filters the items you see.
       </Text>
     </OnbScreen>
   );
@@ -344,6 +346,7 @@ export function BrandsScreen({
   const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const inert = useContext(InertContext);
 
   useEffect(() => {
     let cancelled = false;
@@ -368,19 +371,20 @@ export function BrandsScreen({
       header={<OnbHeader progress={progress} onBack={onBack} />}
       footer={<SkipNextRow testPrefix="onboarding-brands" onSkip={onSkip} onNext={onContinue} nextDisabled={selected.length === 0} loading={busy} />}
     >
-      <Title>Pick brands you love</Title>
-      <Sub>We’ll show you their pieces first and follow them for you.</Sub>
+      <Title>Choose brands to follow</Title>
+      <Sub>Follow brands and see their pieces first.</Sub>
       <View style={[s.search, { backgroundColor: searchBg }]}>
         <Feather name="search" size={18} color={theme.muted} />
         <TextInput
           testID="onboarding-brands-search"
           value={query}
           onChangeText={setQuery}
-          placeholder="Search any brand"
+          placeholder="Search brands"
           placeholderTextColor={theme.muted}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          editable={!inert}
           style={[s.searchInput, { color: theme.text }]}
         />
       </View>
@@ -402,11 +406,11 @@ export function BrandsScreen({
           <SectionTitle>Brands on Brandthread</SectionTitle>
           {rest.length > 0 ? (
             <View style={s.chips}>
-              {rest.map((b) => <Chip key={b.sellerId} testID={`onboarding-brand-${b.sellerId}`} label={b.name} selected={false} onPress={() => toggle(b)} />)}
+              {rest.map((b, i) => <Chip index={i} key={b.sellerId} testID={`onboarding-brand-${b.sellerId}`} label={b.name} selected={false} onPress={() => toggle(b)} />)}
             </View>
           ) : (
             <Text style={[s.footnote, { color: theme.muted }]}>
-              {q ? `No brands match “${query.trim()}”.` : brands.length === 0 ? 'No brands to follow yet. You can find them later in Discover.' : 'You’ve picked them all.'}
+              {q ? `No brands match “${query.trim()}”.` : brands.length === 0 ? 'No brands available. Find brands later in Discover.' : 'All brands selected.'}
             </Text>
           )}
         </>
@@ -467,24 +471,24 @@ export function SizesScreen({
       footer={(
         <View style={s.sizesFooter}>
           <Text style={[s.sizesCount, { color: theme.text }]}>
-            {count === 0 ? 'No sizes picked' : `You’ve picked ${count} size${count === 1 ? '' : 's'}`}
+            {count === 0 ? 'No sizes selected' : `${count} size${count === 1 ? '' : 's'} selected`}
           </Text>
           {count === 0 ? (
             <PillButton testID="onboarding-sizes-skip" label="Skip" variant="secondary" onPress={onSkip} style={s.okBtn} />
           ) : (
-            <PillButton testID="onboarding-sizes-ok" label="Ok" onPress={onContinue} style={s.okBtn} />
+            <PillButton testID="onboarding-sizes-ok" label="Continue" onPress={onContinue} style={s.okBtn} />
           )}
         </View>
       )}
     >
       <Title>Your sizes</Title>
-      <Sub>This will help you see items that are more relevant.</Sub>
+      <Sub>Used to show items in your size.</Sub>
       {categories.map((c) => {
         const value = sizes[c.key];
         return (
           <View key={c.key} style={s.sizeBlock}>
             <Text style={[s.sizeQ, { color: theme.text }]}>{SIZE_QUESTIONS[c.key] ?? c.label}</Text>
-            <Pressable
+            <ScalePressable
               testID={`onboarding-size-${c.key}`}
               onPress={() => setOpen(c.key)}
               accessibilityRole="button"
@@ -493,11 +497,11 @@ export function SizesScreen({
             >
               <Text style={[s.sizeValue, { color: value ? theme.text : theme.subtle }]}>{value ?? 'Select'}</Text>
               {value ? (
-                <Pressable testID={`onboarding-size-${c.key}-clear`} onPress={() => set(c.key, null)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Clear ${c.label} size`}>
+                <ScalePressable testID={`onboarding-size-${c.key}-clear`} onPress={() => set(c.key, null)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Clear ${c.label} size`}>
                   <Feather name="x" size={22} color={theme.text} />
-                </Pressable>
+                </ScalePressable>
               ) : <Feather name="chevron-right" size={20} color={theme.muted} />}
-            </Pressable>
+            </ScalePressable>
             <Text style={[s.sizeExample, { color: theme.subtle }]}>{SIZE_EXAMPLES[c.key] ?? ''}</Text>
           </View>
         );
@@ -581,8 +585,8 @@ export function RoleScreen({
       <Title>How will you use Brandthread?</Title>
       <Sub>You can open a store later from your profile.</Sub>
       <View style={s.list}>
-        <RadioRow testID="account-type-buyer" label="Shop" sub="Buy from independent brands and catch their drops." selected={value === 'buyer'} onPress={() => onChange('buyer')} />
-        <RadioRow testID="account-type-seller" label="Sell" sub="Open a store and sell your own brand." selected={value === 'seller'} onPress={() => onChange('seller')} />
+        <RadioRow testID="account-type-buyer" label="Shop" sub="Buy from independent brands and follow their drops." selected={value === 'buyer'} onPress={() => onChange('buyer')} />
+        <RadioRow index={1} testID="account-type-seller" label="Sell" sub="Open a store and sell your own brand." selected={value === 'seller'} onPress={() => onChange('seller')} />
       </View>
       <FieldError testID="onboarding-role-error" message={error} />
     </OnbScreen>
@@ -637,10 +641,10 @@ export function StoreScreen({
 }
 
 export const BRAND_STAGES = [
-  { value: 'idea', label: 'Just an idea', sub: 'I’m starting from zero.' },
+  { value: 'idea', label: 'Idea stage', sub: 'Nothing produced yet.' },
   { value: 'build', label: 'Building now', sub: 'I’m designing or sourcing products.' },
   { value: 'selling', label: 'Already selling', sub: 'I have customers and orders.' },
-  { value: 'scale', label: 'Ready to scale', sub: 'I need stronger systems and growth.' },
+  { value: 'scale', label: 'Ready to scale', sub: 'Expand operations and sales.' },
 ] as const;
 
 export function StageScreen({
@@ -657,10 +661,10 @@ export function StageScreen({
       header={<OnbHeader onBack={onBack} title="Start selling" />}
       footer={<PillButton testID="onboarding-stage-continue" label="Open my store" onPress={onContinue} disabled={!value} loading={busy} />}
     >
-      <StepCard step={2} total={2} title="Where’s your brand at?" body="We use this to set up your dashboard. Buyers never see it." />
+      <StepCard step={2} total={2} title="Brand stage" body="Used to set up your dashboard. Buyers never see it." />
       <View style={s.list}>
-        {BRAND_STAGES.map((st) => (
-          <RadioRow key={st.value} testID={`onboarding-stage-${st.value}`} label={st.label} sub={st.sub} selected={value === st.value} onPress={() => onChange(st.value)} />
+        {BRAND_STAGES.map((st, i) => (
+          <RadioRow key={st.value} index={i} testID={`onboarding-stage-${st.value}`} label={st.label} sub={st.sub} selected={value === st.value} onPress={() => onChange(st.value)} />
         ))}
       </View>
       <FieldError testID="onboarding-stage-error" message={error} />

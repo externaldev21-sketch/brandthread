@@ -11,7 +11,8 @@
  *  - Chip: pill, filled with a check when picked           — Depop "Show these brands in search"
  *  - ListRow / RadioRow: hairline rows                     — Depop "Interest" / Etsy
  */
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useContext, useEffect } from 'react';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { MEDIA } from '@/lib/theme';
 import {
   ActivityIndicator,
@@ -23,6 +24,7 @@ import {
   TextInput,
   View,
   type StyleProp,
+  type PressableProps,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
@@ -30,6 +32,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { InertContext, ProgressMemoryContext, SPRING_PAGE, useArrivalStyle, usePressMotion } from './motion';
 
 type Theme = ReturnType<typeof useAppTheme>['theme'];
 
@@ -71,6 +74,7 @@ export function OnbScreen({
             style={s.flex}
             contentContainerStyle={s.body}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
           >
             {children}
@@ -104,13 +108,13 @@ export function OnbHeader({
     <View style={s.header}>
       <View style={s.headerSide}>
         {onBack ? (
-          <Pressable testID="onboarding-back" onPress={onBack} hitSlop={HIT} accessibilityRole="button" accessibilityLabel="Back">
+          <ScalePressable testID="onboarding-back" onPress={onBack} hitSlop={HIT} accessibilityRole="button" accessibilityLabel="Back">
             <Feather name="chevron-left" size={28} color={theme.text} />
-          </Pressable>
+          </ScalePressable>
         ) : onClose ? (
-          <Pressable testID="onboarding-close" onPress={onClose} hitSlop={HIT} accessibilityRole="button" accessibilityLabel="Close">
+          <ScalePressable testID="onboarding-close" onPress={onClose} hitSlop={HIT} accessibilityRole="button" accessibilityLabel="Close">
             <Feather name="x" size={24} color={theme.text} />
-          </Pressable>
+          </ScalePressable>
         ) : null}
       </View>
       <View style={s.headerCenter}>
@@ -121,7 +125,7 @@ export function OnbHeader({
             accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
             style={[s.track, { backgroundColor: fillFor(theme) }]}
           >
-            <View style={[s.fill, { backgroundColor: theme.text, width: `${Math.max(4, Math.min(100, progress * 100))}%` }]} />
+            <ProgressFill pct={Math.max(4, Math.min(100, progress * 100))} color={theme.text} />
           </View>
         ) : title ? (
           <Text style={[s.headerTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
@@ -132,16 +136,56 @@ export function OnbHeader({
   );
 }
 
+/** Starts from the flow's previous value (per transition mount) so the bar glides across header remounts. */
+function ProgressFill({ pct, color }: { pct: number; color: string }) {
+  const reduce = useReducedMotion();
+  const memory = useContext(ProgressMemoryContext);
+  const inert = useContext(InertContext);
+  const w = useSharedValue(memory?.current ?? pct);
+  useEffect(() => {
+    if (inert) return; // the leaving layer never overwrites the flow's progress
+    if (memory) memory.current = pct;
+    w.value = reduce ? pct : withSpring(pct, SPRING_PAGE);
+  }, [pct, reduce, w, inert, memory]);
+  const style = useAnimatedStyle(() => ({ width: `${w.value}%` }));
+  return <Animated.View style={[s.fill, { backgroundColor: color }, style]} />;
+}
+
+/** First-arrival stagger slot (index × 70ms). Static on revisits / Reduce Motion. */
+export function Arrive({ index, children }: { index: number; children: React.ReactNode }) {
+  const style = useArrivalStyle(index);
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * Drop-in for a raw Pressable with a static style: press-in 0.96 + light
+ * haptic, spring release. One node (animated Pressable), so flex/spacing stay.
+ */
+export function ScalePressable({ style, onPressIn, onPressOut, disabled, ...rest }: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle> }) {
+  const motion = usePressMotion({ disabled: !!disabled });
+  return (
+    <AnimatedPressable
+      {...rest}
+      disabled={disabled}
+      onPressIn={(e) => { motion.onPressIn(); onPressIn?.(e); }}
+      onPressOut={(e) => { motion.onPressOut(); onPressOut?.(e); }}
+      style={[style, motion.style]}
+    />
+  );
+}
+
 // ─── Type ────────────────────────────────────────────────────────────────────
 
 export function Title({ children, style }: { children: React.ReactNode; style?: StyleProp<any> }) {
   const { theme } = useAppTheme();
-  return <Text accessibilityRole="header" style={[s.title, { color: theme.text }, style]}>{children}</Text>;
+  return <Arrive index={0}><Text accessibilityRole="header" style={[s.title, { color: theme.text }, style]}>{children}</Text></Arrive>;
 }
 
 export function Sub({ children, style }: { children: React.ReactNode; style?: StyleProp<any> }) {
   const { theme } = useAppTheme();
-  return <Text style={[s.sub, { color: theme.muted }, style]}>{children}</Text>;
+  return <Arrive index={1}><Text style={[s.sub, { color: theme.muted }, style]}>{children}</Text></Arrive>;
 }
 
 /** Depop: "⚠ Username must be at least 3 characters." under the field. */
@@ -180,6 +224,7 @@ type FieldProps = TextInputProps & {
 /** Depop's outlined field: small label inside the box above the value. */
 export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, error, right, style, variant = 'box', ...props }, ref) {
   const { theme } = useAppTheme();
+  const inert = useContext(InertContext);
   return (
     <View style={[variant === 'box' ? s.field : s.fieldUnderline, { borderColor: error ? theme.error : theme.muted }]}>
       <View style={s.flex}>
@@ -190,6 +235,8 @@ export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, e
           selectionColor={theme.text}
           style={[s.fieldInput, { color: theme.text }, style]}
           {...props}
+          editable={inert ? false : props.editable}
+          autoFocus={inert ? false : props.autoFocus}
         />
       </View>
       {right}
@@ -228,18 +275,23 @@ export function PillButton({
   const primary = variant === 'primary';
   const bg = primary && !disabled ? theme.text : fillFor(theme);
   const fg = primary && !disabled ? theme.background : disabled ? theme.subtle : theme.text;
+  const motion = usePressMotion({ disabled: inactive });
   return (
+    <Animated.View style={[motion.style, style]}>
     <Pressable
       testID={testID}
       onPress={onPress}
+      onPressIn={motion.onPressIn}
+      onPressOut={motion.onPressOut}
       disabled={inactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
-      style={({ pressed }) => [s.pill, { backgroundColor: bg }, pressed && !inactive && { opacity: 0.85 }, style]}
+      style={({ pressed }) => [s.pill, { backgroundColor: bg }, pressed && !inactive && { opacity: 0.85 }]}
     >
       {loading ? <ActivityIndicator color={fg} /> : <Text style={[s.pillText, { color: fg }]}>{label}</Text>}
     </Pressable>
+    </Animated.View>
   );
 }
 
@@ -260,10 +312,14 @@ export function OutlineOption({
   testID?: string;
 }) {
   const { theme } = useAppTheme();
+  const motion = usePressMotion({ disabled: disabled || loading });
   return (
+    <Animated.View style={motion.style}>
     <Pressable
       testID={testID}
       onPress={onPress}
+      onPressIn={motion.onPressIn}
+      onPressOut={motion.onPressOut}
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -273,27 +329,33 @@ export function OutlineOption({
       <View style={s.optionIcon}>{icon}</View>
       {loading ? <ActivityIndicator color={theme.text} /> : <Text style={[s.optionText, { color: theme.text }]}>{label}</Text>}
     </Pressable>
+    </Animated.View>
   );
 }
 
 export function TextLink({ label, onPress, testID, muted }: { label: string; onPress: () => void; testID?: string; muted?: boolean }) {
   const { theme } = useAppTheme();
   return (
-    <Pressable testID={testID} onPress={onPress} hitSlop={HIT} accessibilityRole="button" style={s.textLink}>
+    <ScalePressable testID={testID} onPress={onPress} hitSlop={HIT} accessibilityRole="button" style={s.textLink}>
       <Text style={[s.textLinkText, { color: muted ? theme.muted : theme.text }]}>{label}</Text>
-    </Pressable>
+    </ScalePressable>
   );
 }
 
 // ─── Choice pieces ───────────────────────────────────────────────────────────
 
 /** Depop brand chip: outlined pill; picked = filled with a leading check. */
-export function Chip({ label, selected, onPress, testID }: { label: string; selected: boolean; onPress: () => void; testID?: string }) {
+export function Chip({ label, selected, onPress, testID, index = 0 }: { label: string; selected: boolean; onPress: () => void; testID?: string; index?: number }) {
   const { theme } = useAppTheme();
+  const motion = usePressMotion({ selected: !!selected });
   return (
+    <Arrive index={2 + Math.min(index, 8)}>
+    <Animated.View style={motion.style}>
     <Pressable
       testID={testID}
       onPress={onPress}
+      onPressIn={motion.onPressIn}
+      onPressOut={motion.onPressOut}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       accessibilityLabel={label}
@@ -306,16 +368,23 @@ export function Chip({ label, selected, onPress, testID }: { label: string; sele
       {selected ? <Feather name="check" size={14} color={theme.background} /> : null}
       <Text style={[s.chipText, { color: selected ? theme.background : theme.text }]}>{label}</Text>
     </Pressable>
+    </Animated.View>
+    </Arrive>
   );
 }
 
 /** Depop "Interest" list row: label, hairline under it, tap to choose. */
-export function ListRow({ label, selected, onPress, testID }: { label: string; selected?: boolean; onPress: () => void; testID?: string }) {
+export function ListRow({ label, selected, onPress, testID, index = 0 }: { label: string; selected?: boolean; onPress: () => void; testID?: string; index?: number }) {
   const { theme } = useAppTheme();
+  const motion = usePressMotion({ selected: !!selected });
   return (
+    <Arrive index={2 + Math.min(index, 8)}>
+    <Animated.View style={motion.style}>
     <Pressable
       testID={testID}
       onPress={onPress}
+      onPressIn={motion.onPressIn}
+      onPressOut={motion.onPressOut}
       accessibilityRole="radio"
       accessibilityState={{ selected: !!selected }}
       style={({ pressed }) => [s.listRow, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
@@ -323,6 +392,8 @@ export function ListRow({ label, selected, onPress, testID }: { label: string; s
       <Text style={[s.listRowText, { color: theme.text }]}>{label}</Text>
       {selected ? <Feather name="check" size={20} color={theme.text} /> : null}
     </Pressable>
+    </Animated.View>
+    </Arrive>
   );
 }
 
@@ -333,18 +404,24 @@ export function RadioRow({
   selected,
   onPress,
   testID,
+  index = 0,
 }: {
   label: string;
   sub?: string;
   selected: boolean;
   onPress: () => void;
-  testID?: string;
+  testID?: string; index?: number;
 }) {
   const { theme } = useAppTheme();
+  const motion = usePressMotion({ selected: !!selected });
   return (
+    <Arrive index={2 + Math.min(index, 8)}>
+    <Animated.View style={motion.style}>
     <Pressable
       testID={testID}
       onPress={onPress}
+      onPressIn={motion.onPressIn}
+      onPressOut={motion.onPressOut}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={sub ? `${label}. ${sub}` : label}
@@ -358,6 +435,8 @@ export function RadioRow({
         {selected ? <View style={[s.radioDot, { backgroundColor: theme.text }]} /> : null}
       </View>
     </Pressable>
+    </Animated.View>
+    </Arrive>
   );
 }
 

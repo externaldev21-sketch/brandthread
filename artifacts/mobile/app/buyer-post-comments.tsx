@@ -43,6 +43,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'expo-router';
+import { useSignInGate } from '@/hooks/useSignInGate';
 
 import { useUser } from '@clerk/expo';
 
@@ -700,6 +701,7 @@ export function ThreadCommentsSheet({ visible, postId, postAuthorId, postAuthorN
 }
 
 function CommentsThread({ input, embedded = false, onClose }: { input: CommentsThreadInput; embedded?: boolean; onClose?: () => void }) {
+  const { goToSignIn, requireSignIn } = useSignInGate();
   useFailOnNestedButtonWarning();
   const { theme } = useAppTheme();
   const { height: windowHeight } = useWindowDimensions();
@@ -986,6 +988,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   // Row callbacks are stable (useCallback) so a like re-renders only the
   // liked row: CommentRow is memoized and the other rows' props are unchanged.
   const handleLike = useCallback(async (comment: Row) => {
+    if (!requireSignIn()) return;
     const liked = !comment.likedByMe;
     if (liked) haptic('like');
     // Optimistic update
@@ -999,11 +1002,12 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     } catch {
       setCommentsSynced(prev => prev.map(c => c.id === comment.id ? restoreReaction(c, comment) : c));
     }
-  }, [api, isPreviewPost, postId, setCommentsSynced]);
+  }, [api, isPreviewPost, postId, setCommentsSynced, requireSignIn]);
 
   // Dislike is server-backed only (api.comments.dislike) — same endpoint and
   // state for root and reply rows. Disliking clears an active like.
   const handleDislike = useCallback(async (comment: Row) => {
+    if (!requireSignIn()) return;
     if (isPreviewPost) return; // No server row: never fake a local-only dislike.
     const disliked = !comment.dislikedByMe;
     hapticLight();
@@ -1019,9 +1023,10 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   }, [api, isPreviewPost, postId, setCommentsSynced]);
 
   const handleReply = useCallback((comment: Row) => {
+    if (!requireSignIn()) return;
     setReplyingTo(comment);
     inputRef.current?.focus();
-  }, []);
+  }, [requireSignIn]);
 
   const handleCancelReply = () => {
     setReplyingTo(null);
@@ -1104,6 +1109,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   const mentionQuery = activeMentionQuery(inputText);
 
   const handleSend = async () => {
+    if (!requireSignIn()) return;
     const text = inputText.trim();
     const photoDraft = photo.draft;
     const media = photo.media;
@@ -1469,7 +1475,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (
-                <PressableScale style={s.signedOutRow} onPress={() => router.push('/sign-in' as never)} accessibilityRole="button" testID="comments-signed-out-composer">
+                <PressableScale style={s.signedOutRow} onPress={goToSignIn} accessibilityRole="button" testID="comments-signed-out-composer">
                   <Icon name="user" size={32} color={MUTED} />
                   <View style={s.signedOutPill}>
                     <Text style={s.signedOutPlaceholder}>Sign in to join the conversation</Text>

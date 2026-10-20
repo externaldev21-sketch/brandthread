@@ -336,8 +336,8 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── POST /api/live/:id/join ──────────────────────────────────────────────────
-router.post("/:id/join", requireAuth, async (req, res) => {
-  const viewerId = (req as any).clerkUserId as string;
+router.post("/:id/join", async (req, res) => {
+  const viewerId = optionalViewerId(req);
   const { id } = req.params;
 
   try {
@@ -347,11 +347,25 @@ router.post("/:id/join", requireAuth, async (req, res) => {
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Stream not found" });
     const stream = rows.rows[0] as any;
-    if (stream.seller_id !== viewerId && await isBlockedEitherWay(viewerId, stream.seller_id)) {
+    if (viewerId && stream.seller_id !== viewerId && await isBlockedEitherWay(viewerId, stream.seller_id)) {
       return res.status(404).json({ error: "Stream not found" });
     }
     if (stream.status !== "live") {
       return res.status(410).json({ error: "Stream has ended" });
+    }
+    if (!viewerId) {
+      // Public watching is read-only. Guests receive subscriber credentials,
+      // never publishing credentials, user presence, chat or purchase privileges.
+      const appId = process.env.AGORA_APP_ID ?? "";
+      const appCert = process.env.AGORA_APP_CERTIFICATE ?? "";
+      const viewerUid = Math.floor(Math.random() * 2_000_000_000) + 1;
+      return res.json({
+        channelName: stream.channel_name,
+        agoraUid: viewerUid,
+        agoraAppId: appId,
+        hostAgoraUid: typeof stream.agora_uid === "number" ? stream.agora_uid : null,
+        token: generateToken(appId, appCert, stream.channel_name, viewerUid, 0),
+      });
     }
     if (stream.seller_id !== viewerId && await blockedBetween(viewerId, stream.seller_id)) {
       return res.status(404).json({ error: "Stream not found" });

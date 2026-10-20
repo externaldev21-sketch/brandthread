@@ -49,11 +49,11 @@ const THREAD_FEATURES = [
   {
     icon: 'heart' as const,
     title: 'Like & Save',
-    body: 'Double-tap to like a post. Tap the bookmark to save it to your collection. Brands see your love and surface more of what fits your style.',
+    body: 'Double-tap to like a post. Tap the bookmark to save it to a collection.',
   },
   {
     icon: 'shopping-bag' as const,
-    title: 'Buy in one tap',
+    title: 'Shop from a post',
     body: "Products are tagged directly in posts. Tap a product to see details, add to cart, and check out — all without leaving the Thread.",
   },
   {
@@ -64,7 +64,7 @@ const THREAD_FEATURES = [
   {
     icon: 'repeat' as const,
     title: 'Repost drops',
-    body: "Share posts from brands you love to your own feed. Your friends see your picks, and brands discover new audiences.",
+    body: 'Repost a brand’s post to share it with your friends.',
   },
 ];
 

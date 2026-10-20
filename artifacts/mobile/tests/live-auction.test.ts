@@ -52,11 +52,11 @@ describe('viewer state', () => {
     expect(withViewer({ ...sold, paid: true }, 'ana')).toMatchObject({ youWon: true, payable: false });
     expect(withViewer(sold, 'ben')).toMatchObject({ youWon: false, payable: false });
   });
-  it('status line: "<name> is winning!", "You\'re winning!", "<name> won!"', () => {
-    expect(auctionStatusLine(withViewer(base, 'ben'))).toBe('ana is winning!');
-    expect(auctionStatusLine(withViewer(base, 'ana'))).toBe("You're winning!");
-    expect(auctionStatusLine(withViewer({ ...base, status: 'sold', winnerName: 'ana' }, 'ben'))).toBe('ana won!');
-    expect(auctionStatusLine(withViewer({ ...base, status: 'sold', winnerName: 'ana' }, 'ana'))).toBe('You won!');
+  it('status line identifies the leading bidder and winner without hype', () => {
+    expect(auctionStatusLine(withViewer(base, 'ben'))).toBe('ana is leading');
+    expect(auctionStatusLine(withViewer(base, 'ana'))).toBe('Your bid is leading');
+    expect(auctionStatusLine(withViewer({ ...base, status: 'sold', winnerName: 'ana' }, 'ben'))).toBe('ana won');
+    expect(auctionStatusLine(withViewer({ ...base, status: 'sold', winnerName: 'ana' }, 'ana'))).toBe('Auction won');
     expect(auctionStatusLine({ ...base, status: 'unsold', leaderName: null })).toBe('No bids');
   });
   it('ignores stale snapshots (an older bid count, or open after ended)', () => {

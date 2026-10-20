@@ -5,8 +5,8 @@ import { isSignedInOnlyPath } from './guestApiPolicy';
 describe('guest browse routes (5.1.1(v))', () => {
   it('lets a guest open feed, discover, search, stores, products, drops and profiles', () => {
     for (const segs of [
-      ['(buyer)'], ['(buyer)', 'index'], ['(buyer)', 'feed'], ['(buyer)', 'discover'], ['(buyer)', 'search'], ['(buyer)', 'cart'],
-      ['buyer-product-detail'], ['thread-product-detail'], ['buyer-category'], ['buyer-trending'], ['seller-profile'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
+      ['(buyer)'], ['(buyer)', 'index'], ['(buyer)', 'feed'], ['(buyer)', 'discover'], ['(buyer)', 'search'],
+      ['buyer-product-detail'], ['thread-product-detail'], ['buyer-category'], ['buyer-trending'], ['seller-profile'], ['buyer-other-profile'], ['live'], ['buyer-live'], ['buyer-post-comments'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
     ]) {
       expect(isGuestBrowseRoute(segs)).toBe(true);
     }
@@ -16,6 +16,8 @@ describe('guest browse routes (5.1.1(v))', () => {
     for (const segs of [
       ['(buyer)', 'inbox'], ['(buyer)', 'orders'], ['(buyer)', 'profile'], ['(buyer)', 'edit-profile'],
       ['(tabs)', 'index'], ['buyer-settings'], ['buyer-conversation'], ['create-post'], ['delete-account'],
+      ['buyer-checkout'], ['thread-checkout'],
+      ['(buyer)', 'cart'],
     ]) {
       expect(isGuestBrowseRoute(segs)).toBe(false);
     }
@@ -46,7 +48,7 @@ describe('signed-out API guard', () => {
 describe('guest checkout + product aliases (BT-249, BT-250)', () => {
   it('lets a guest open the thread-* aliases the cart, Shop sheet and feed tiles push', () => {
     expect(isGuestBrowseRoute(['thread-product-detail'])).toBe(true);
-    expect(isGuestBrowseRoute(['thread-checkout'])).toBe(true);
+    expect(isGuestBrowseRoute(['thread-checkout'])).toBe(false);
     expect(isGuestBrowseRoute(['checkout-return'])).toBe(true);
   });
 

@@ -167,7 +167,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
           <View style={s.empty}><ActivityIndicator color={CP.white} /></View>
         ) : data.length === 0 && !media.loading ? (
           <View style={s.empty}>
-            <Text style={s.emptyTitle}>{media.isWeb ? 'Choose photos or videos' : tab === 'all' ? 'Nothing here yet' : `No ${tab} found`}</Text>
+            <Text style={s.emptyTitle}>{media.isWeb ? 'Choose photos or videos' : tab === 'all' ? 'No photos or videos' : `No ${tab} found`}</Text>
             <Text style={s.emptyBody}>{media.isWeb ? 'Pick files from this device to build your post.' : 'Photos and videos on your device will show up here.'}</Text>
             {media.isWeb ? <PillButton label="Browse files" onPress={() => fileInput.current?.click()} flex={false} style={{ marginTop: 16, paddingHorizontal: 28 }} testID="gallery-browse" /> : null}
           </View>

@@ -45,7 +45,7 @@ export default function ListingSuccessScreen() {
       <View style={s.body}>
         <View style={s.hero}>
           <SuccessCheck size={56} iconSize={28} />
-          <Text style={s.headline} accessibilityRole="header">{updated ? 'Changes saved' : 'Listed!'}</Text>
+          <Text style={s.headline} accessibilityRole="header">{updated ? 'Changes saved' : 'Product listed'}</Text>
           <Text style={s.sub}>
             {updated ? 'Your listing is up to date.' : 'Your item is live in your store and in search.'}
           </Text>

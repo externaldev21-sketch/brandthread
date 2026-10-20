@@ -54,7 +54,7 @@ const MAX_GARMENTS = 4;
 const INITIAL_MSG: Message = {
   id: '0',
   role: 'assistant',
-  content: "Add photos of your piece and any references, then tell me the vibe.",
+  content: "Add product photos and references, then describe the style.",
 };
 
 export default function AIPhotographyChatScreen() {
@@ -400,7 +400,7 @@ export default function AIPhotographyChatScreen() {
             title={mode === 'outfitSwap' ? 'Add a hero photo' : 'Add your product photos'}
             message={mode === 'outfitSwap'
               ? 'Upload one photo of the model and scene, then add garments to swap in.'
-              : "Add photos of your piece and any reference shots, then describe the vibe."}
+              : "Add product photos and references, then describe the style."}
             actionLabel={addPhotosDisabled ? undefined : 'Add photos'}
             onAction={addPhotosDisabled ? undefined : pickPhotos}
             testID="ai-photography-empty"

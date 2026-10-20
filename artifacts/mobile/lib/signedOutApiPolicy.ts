@@ -29,6 +29,7 @@ const SEG = '[^/]+';
 const PUBLIC_RULES: readonly Rule[] = [
   { methods: READ, pattern: /^healthz$/ },
   { methods: READ, pattern: /^config\/features$/ },
+  { methods: READ, pattern: new RegExp(`^social/profile/${SEG}$`) },
 
   // Public browse surface (search, profiles, products, drops, discover…), minus
   // the per-account pieces that live under the same prefix but need a session.
@@ -53,12 +54,14 @@ const PUBLIC_RULES: readonly Rule[] = [
   { methods: READ, pattern: new RegExp(`^freelancers/(?!me$|connect$|apply$)${SEG}$`) },
   { methods: READ, pattern: /^live\/(?:active|feed)$/ },
   { methods: READ, pattern: new RegExp(`^live/(?!start$)${SEG}(?:/comments)?$`) },
+  // Anonymous audience credentials only; the server does not record guest presence.
+  { methods: ['POST'], pattern: new RegExp(`^live/${SEG}/join$`) },
   { methods: READ, pattern: /^manufacturers\/public(?:\/[^/]+)?$/ },
   { methods: ['POST'], pattern: /^manufacturers\/public\/apply$/ },
   { methods: READ, pattern: new RegExp(`^manufacturers/invite-tokens/resolve/${SEG}$`) },
   {
     methods: READ,
-    pattern: new RegExp(`^posts/(?!mine$|feed$|watched-videos$|repost-context$)${SEG}(?:/comments)?$`),
+    pattern: new RegExp(`^posts/(?!mine$|feed$|watched-videos$|repost-context$)${SEG}(?:/comments(?:/${SEG}/replies)?)?$`),
   },
   { methods: READ, pattern: /^posts\/media\/.+$/ },
   { methods: READ, pattern: new RegExp(`^reviews/(?:product|seller)/${SEG}$`) },

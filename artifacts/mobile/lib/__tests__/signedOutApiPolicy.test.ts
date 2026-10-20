@@ -63,7 +63,12 @@ describe('signedOutApiPolicy', () => {
     expect(isPublicApiRequest('PATCH', '/api/posts/abc')).toBe(false);
     expect(isPublicApiRequest('DELETE', '/api/posts/abc')).toBe(false);
     expect(isPublicApiRequest('GET', '/api/posts/mine')).toBe(false);
-    expect(isPublicApiRequest('POST', '/api/live/abc/join')).toBe(false);
+    expect(isPublicApiRequest('POST', '/api/live/abc/join')).toBe(true);
+    expect(isPublicApiRequest('POST', '/api/live/abc/comment')).toBe(false);
+    expect(isPublicApiRequest('GET', '/api/posts/abc/comments/def/replies')).toBe(true);
+    expect(isPublicApiRequest('POST', '/api/posts/abc/comments')).toBe(false);
+    expect(isPublicApiRequest('GET', '/api/social/profile/abc')).toBe(true);
+    expect(isPublicApiRequest('GET', '/api/social/profile/abc/posts')).toBe(false);
   });
 
   it('normalizes versioned, query-string and absolute paths', () => {

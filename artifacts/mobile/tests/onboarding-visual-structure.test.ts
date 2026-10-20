@@ -39,9 +39,9 @@ describe('onboarding visual structure (launch rebuild)', () => {
     expect(layout).toContain('threadExplainerSeen === false');
   });
 
-  it('drafts are keyed per Clerk user and store the step id (v9)', () => {
+  it('drafts are keyed per Clerk user and store the current step-id format', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(DRAFT_VERSION).toBe(9);
+    expect(DRAFT_VERSION).toBe(10);
     expect(onboarding).toContain("const DRAFT_KEY_PREFIX = 'onboarding_draft:';");
     expect(onboarding).toContain('version: DRAFT_VERSION, ownerId: user!.id, step,');
   });

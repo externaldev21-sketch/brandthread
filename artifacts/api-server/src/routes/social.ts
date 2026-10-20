@@ -28,7 +28,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
-import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
+import { publicPostCondition, publicProfileLikes, visibleCommentCounts, officialPostVisibleTo } from "../lib/postVisibility";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -38,6 +38,7 @@ import {
   notMutedBy,
   profilesById,
   publishingRestriction,
+  optionalViewerId,
 } from "../lib/safety";
 import {
   ownerAllows, ownersAllowing, privacySettingsOf, resolveAccountPrivacy, stricterReplyPerm, userIsSearchable,
@@ -93,7 +94,16 @@ const createStoryBody = looseBody({
 });
 const storyLikeBody = looseBody({ liked: optBoolish });
 const createNoteBody = looseBody({ text: cappedUnknown(2_000) });
-router.use(requireAuth);
+// Public profile headers contain no account data. All relationship mutations,
+// private posts, stories, notes and lists retain the existing auth middleware.
+router.use((req, res, next) => {
+  if (req.method === "GET" && /^\/profile\/[^/]+\/?$/.test(req.path)) {
+    (req as any).clerkUserId = optionalViewerId(req) ?? "";
+    next();
+    return;
+  }
+  requireAuth(req, res, next);
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -630,16 +640,18 @@ router.get("/profile/:userId", async (req, res) => {
   if (!canonicalClerkId) { res.status(404).json({ error: "User not found" }); return; }
   const other = canonicalClerkId;
 
-  const [userRow] = await db.select().from(users).where(eq(users.clerkId, other)).limit(1);
+  const [userRow] = await db.select().from(users).where(and(
+    eq(users.clerkId, other), officialPostVisibleTo(myId || null, users.clerkId),
+  )).limit(1);
   if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
   // One banner: a former storefront banner becomes the profile banner.
-  const user = await withStorefrontBannerAdopted(req, userRow, bannerStorage);
+  const user = myId ? await withStorefrontBannerAdopted(req, userRow, bannerStorage) : userRow;
 
   if (user.deletedAt || user.suspendedAt) { res.status(404).json({ error: "User not found" }); return; }
 
   // If the target has blocked the viewer, the profile is invisible (404).
   // If the viewer blocked them, show only enough to recognise and unblock.
-  const relation = other === myId ? "none" : await blockRelation(myId, other);
+  const relation = !myId || other === myId ? "none" : await blockRelation(myId, other);
   if (relation === "blocked_me" || relation === "mutual") {
     res.status(404).json({ error: "User not found" }); return;
   }
@@ -710,7 +722,7 @@ router.get("/profile/:userId", async (req, res) => {
     // Bio link (profile endpoint only — formatUser stays unchanged).
     website: user.website ?? null,
     // "Followed by …" line — only when looking at someone else.
-    ...(other !== myId ? { mutualFollowers: await mutualFollowersFor(myId, other) } : {}),
+    ...(myId && other !== myId ? { mutualFollowers: await mutualFollowersFor(myId, other) } : {}),
   });
 });
 

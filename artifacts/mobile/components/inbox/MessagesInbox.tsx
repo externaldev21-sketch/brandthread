@@ -1576,7 +1576,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       return <QuietEmptyState title="No messages yet" message="Messages from buyers show up here." testID="inbox-empty-state" />;
     }
     return (
-      <QuietEmptyState title="Keep it real in DMs" message="Send a message to someone in your network."
+      <QuietEmptyState title="No messages yet" message="Send a message to someone in your network."
         actionLabel="Send a message" onAction={() => openCompose()} testID="inbox-empty" />
     );
   }

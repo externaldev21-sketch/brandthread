@@ -66,7 +66,7 @@ function barOccupied(bar: Case['bar']): number {
 
 describe('profile empty states — copy and CTAs', () => {
   it('gives your own tabs a CTA into the real flow and other people’s profiles none', () => {
-    expect(profileEmptyState('buyer:posts', true).cta).toEqual({ label: 'Share your first thread', route: '/create-post?accountType=buyer' });
+    expect(profileEmptyState('buyer:posts', true).cta).toEqual({ label: 'Create a post', route: '/create-post?accountType=buyer' });
     // Seller's own tabs (Dev): "Create post" opens the create camera flow.
     expect(profileEmptyState('seller:post', true).cta).toEqual({ label: 'Create post', route: '/create-post' });
     expect(profileEmptyState('seller:draft', true).cta?.route).toBe('/create-post');

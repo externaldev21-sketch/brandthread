@@ -35,6 +35,8 @@ import { Icon } from '@/components/ui/Icon';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
 import { MOTION, PRESS_SCALE, RADIUS, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
+import { SPRING_RELEASE } from './launch/motion';
+import { hapticLight } from '@/lib/haptics';
 import { radius } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
 
@@ -140,8 +142,8 @@ export function PressableScale({
         {...a11y}
         disabled={disabled}
         onPress={onPress}
-        onPressIn={() => { if (!reduceMotion) scale.value = withTiming(PRESS_SCALE, { duration: 90 }); }}
-        onPressOut={() => { scale.value = reduceMotion ? 1 : withSpring(1, { damping: 14, stiffness: 320 }); }}
+        onPressIn={() => { if (disabled) return; hapticLight(); if (!reduceMotion) scale.value = withTiming(PRESS_SCALE, { duration: 90 }); }}
+        onPressOut={() => { scale.value = reduceMotion ? 1 : withSpring(1, SPRING_RELEASE); }}
         style={style}
       >
         {children}
@@ -200,7 +202,7 @@ export function PillButton({
   textStyle?: StyleProp<TextStyle>;
 }) {
   const { theme } = useAppTheme();
-  const { reduceMotion, lightTap } = useOnboardingMotion();
+  const { reduceMotion } = useOnboardingMotion();
   const scale = useSharedValue(1);
   const pressStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
   const inactive = disabled || loading;
@@ -238,13 +240,13 @@ export function PillButton({
         accessibilityState={{ disabled: inactive, busy: loading }}
         disabled={inactive}
         onPressIn={() => {
+          if (haptic) hapticLight();
           if (!reduceMotion) scale.value = withTiming(PRESS_SCALE, { duration: 90 });
         }}
         onPressOut={() => {
-          scale.value = reduceMotion ? 1 : withSpring(1, { damping: 14, stiffness: 320 });
+          scale.value = reduceMotion ? 1 : withSpring(1, SPRING_RELEASE);
         }}
         onPress={() => {
-          if (haptic) lightTap();
           onPress();
         }}
       >

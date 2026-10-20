@@ -16,6 +16,28 @@ describe('Save login info', () => {
   it('persists the session token by default', async () => {
     await tokenCache.saveToken('__clerk_client_jwt', 'abc');
     expect(secure.get('__clerk_client_jwt')).toBe('abc');
+    resetTokenCacheForTests();
+    expect(await tokenCache.getToken('__clerk_client_jwt')).toBe('abc');
+  });
+
+  it('restores web tokens after a cold start without relying on memory', async () => {
+    const { Platform } = await import('react-native');
+    const previous = Platform.OS;
+    const web = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => web.get(key) ?? null,
+      setItem: (key: string, value: string) => { web.set(key, value); },
+      removeItem: (key: string) => { web.delete(key); },
+    });
+    Object.assign(Platform, { OS: 'web' });
+    try {
+      await tokenCache.saveToken('__clerk_client_jwt', 'web-session');
+      resetTokenCacheForTests();
+      expect(await tokenCache.getToken('__clerk_client_jwt')).toBe('web-session');
+    } finally {
+      Object.assign(Platform, { OS: previous });
+      vi.unstubAllGlobals();
+    }
   });
 
   it('when off, keeps the token in memory only so a restart signs out', async () => {

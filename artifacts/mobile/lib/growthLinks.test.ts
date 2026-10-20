@@ -16,8 +16,8 @@ describe('growth links open for signed-out visitors (BT-303/319/321)', () => {
     }
   });
 
-  it('only opens the shared-live preview to guests, not the /live feed screen', () => {
-    expect(isGuestBrowseRoute(['live'])).toBe(false);
+  it('opens both the live directory and shared-live viewer to guests', () => {
+    expect(isGuestBrowseRoute(['live'])).toBe(true);
   });
 });
 

@@ -205,7 +205,7 @@ export default function LaunchPublishScreen() {
       ) : (
         <View style={[s.confirm, { paddingBottom: tabBarInset + SP.md }]}>
           <View style={s.confirmBody}>
-            <Text style={s.title}>Ready to go live</Text>
+            <Text style={s.title}>Publish your store</Text>
             {storeUrl && <Text style={s.url}>{storeUrl.replace('https://', '')}</Text>}
             {problem && <Text style={s.problem}>{problem}</Text>}
           </View>

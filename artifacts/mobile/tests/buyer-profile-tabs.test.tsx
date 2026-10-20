@@ -674,11 +674,11 @@ describe('buyer profile tabs', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/connections?type=followers');
   });
 
-  it('offers "Share your first thread" when the buyer has no posts', async () => {
+  it('offers "Create a post" when the buyer has no posts', async () => {
     getMyPostsMock.mockResolvedValue([]);
     renderer = await renderScreen();
     const cta = renderer.root.findByProps({ testID: 'profile-empty-state-action' });
-    expect(textContent(cta.props.children)).toContain('Share your first thread');
+    expect(textContent(cta.props.children)).toContain('Create a post');
     await act(async () => { cta.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
   });

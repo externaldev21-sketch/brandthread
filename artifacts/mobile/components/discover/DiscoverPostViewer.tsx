@@ -33,6 +33,7 @@ import { haptics } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
+import { requestGuestSignIn } from '@/lib/guestSignIn';
 import { isUUID } from '@/lib/engagementUtils';
 import { apiErrorMessage } from '@/lib/safety';
 import { discoverEngagementFor, discoverPostApiId, rememberDiscoverEngagement, toggledLike } from '@/lib/discoverEngagement';
@@ -269,9 +270,8 @@ export function DiscoverPostViewer({
     router.push(`/buyer-post-comments?${qs.toString()}` as never);
   }
 
-  function requireSignIn() {
-    onClose();
-    router.push('/sign-in' as never);
+  function requireSignIn(post: DiscoverPost) {
+    requestGuestSignIn(`/buyer-post-viewer?postId=${encodeURIComponent(discoverPostApiId(post.id))}`, undefined, onClose);
   }
 
   return (
@@ -292,7 +292,7 @@ export function DiscoverPostViewer({
               onOpenShopTheLook={onOpenShopTheLook}
               onSafetyMenu={onSafetyMenu}
               onOpenComments={openComments}
-              onRequireSignIn={requireSignIn}
+              onRequireSignIn={() => requireSignIn(item)}
             />
           )}
         />

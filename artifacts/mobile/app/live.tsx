@@ -91,6 +91,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { radius } from '@/constants/radii';
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 import { isPreviewDemoMode as isAuctionDemo } from '@/lib/devPreview';
 import { useLiveAuction } from '@/lib/live/useLiveAuction';
 import { LiveAuctionCard } from '@/components/live/LiveAuctionCard';
@@ -260,6 +261,7 @@ export default function LiveScreen() {
   // (this pager has no socket). Web preview `&demo=1` runs a local one.
   const liveAuctionsEnabled = useFeatureFlag('live_auctions');
   const { userId: viewerId } = useAuth();
+  const { requireSignIn } = useSignInGate();
   const auctionStream = streams[activeIndex];
   const auctionDemo = provider.id === 'preview' && isAuctionDemo() && auctionStream?.products[0]
     ? { productName: auctionStream.products[0].name, imageUri: auctionStream.products[0].imageUri ?? null, priceCents: auctionStream.products[0].priceCents }
@@ -278,9 +280,10 @@ export default function LiveScreen() {
   const [agreement, setAgreement] = useState<'checking' | 'needed' | 'accepted'>('checking');
   useEffect(() => {
     let alive = true;
+    if (!viewerId) { setAgreement('accepted'); return; }
     void hasAcceptedLiveBuyerAgreement().then(ok => { if (alive) setAgreement(ok ? 'accepted' : 'needed'); });
     return () => { alive = false; };
-  }, []);
+  }, [viewerId]);
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
 
   // Live-only codes for the stream whose bag is open (real streams only —
@@ -406,6 +409,7 @@ export default function LiveScreen() {
   }, []);
 
   const buy = useCallback((stream: LiveStream, productId: string) => {
+    if (!requireSignIn()) return;
     const sel = liveShopSelection(stream, productId, provider.id === 'preview');
     if (!sel) return;
     // A co-host's product is bought from the co-host's store.
@@ -501,14 +505,15 @@ export default function LiveScreen() {
                 bottomInset={bottomInset}
                 muted={muted}
                 onClose={close}
-                onFollow={() => { void pager.setFollowing(item.host.id, !item.followedByViewer); }}
+                onFollow={() => { if (requireSignIn()) void pager.setFollowing(item.host.id, !item.followedByViewer); }}
                 onOpenHost={() => openHost(item.host.id, item.host.name, item.host.handle, item.host.initials)}
                 onBuy={pid => buy(item, pid)}
                 onOpenShop={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
                 onMore={() => openStreamOptions(item)}
-                onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
+                onLike={(x, y, count) => { if (!requireSignIn()) return; heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
+                  if (!requireSignIn()) return;
                   try { await pager.sendChat(text); } catch (e: any) {
                     setNotice(e?.message ? String(e.message) : 'Message not sent');
                     throw e;

@@ -56,6 +56,7 @@ import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 
 import { useApi } from '@/lib/api';
+import { useSignInGate } from '@/hooks/useSignInGate';
 
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
@@ -244,6 +245,7 @@ async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promi
   } catch { return null; }
 }
 export default function BuyerPostViewer() {
+  const { goToSignIn } = useSignInGate();
   const { userId } = useAuth();
   const api = useApi();
   const colors = useColors();
@@ -411,7 +413,7 @@ export default function BuyerPostViewer() {
   engRef.current = eng;
   const runAction = async (kind: PostAction) => {
     if (!realPostId) return; // preview/demo posts have no server record
-    if (!userId) { router.push('/sign-in' as never); return; }
+    if (!userId) { goToSignIn(); return; }
     if (postActionPending(userId, realPostId, kind)) return;
     const before = engRef.current;
     const enabled = kind === 'like' ? !before.liked : kind === 'save' ? !before.saved : !before.reposted;
@@ -477,7 +479,7 @@ export default function BuyerPostViewer() {
     return () => { active = false; unsubscribe(); };
   }, [userId, creatorId]);
   const handleFollow = async () => {
-    if (!userId) { router.push('/sign-in' as never); return; }
+    if (!userId) { goToSignIn(); return; }
     if (!creatorId || creatorId === userId || followInFlight.current) return;
     followInFlight.current = true;
     const previous = following;
@@ -504,7 +506,7 @@ export default function BuyerPostViewer() {
     mediaTap.current = { time: now, x, y };
     if (!previous || now - previous.time > 280 || Math.hypot(previous.x - x, previous.y - y) > 30) return;
     mediaTap.current = null;
-    if (!userId) { router.push('/sign-in' as never); return; }
+    if (!userId) { goToSignIn(); return; }
     if (!engRef.current.liked) void handleLike();
     setBurstPoint({ x, y });
   };

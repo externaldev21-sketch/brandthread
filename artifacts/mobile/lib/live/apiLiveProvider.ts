@@ -18,7 +18,7 @@
  *  - Hearts are real: `sendLike` → POST /api/live/:id/like; the total
  *    (live_streams.like_count) comes back with every poll.
  */
-import { serviceRequest } from '@/lib/serviceConfig';
+import { serviceRequest, hasServiceToken } from '@/lib/serviceConfig';
 import { openLiveRoomSocket } from './liveRoomSocket';
 import { setSellerFollowing } from '@/services/socialService';
 import type {
@@ -173,6 +173,7 @@ export function createApiLiveProvider(): LiveStreamProvider {
     },
 
     async leave(streamId) {
+      if (!(await hasServiceToken())) return;
       await post(`/api/live/${encodeURIComponent(streamId)}/leave`).catch(() => {});
     },
 

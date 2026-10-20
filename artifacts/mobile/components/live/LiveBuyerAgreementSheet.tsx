@@ -56,7 +56,7 @@ export function LiveBuyerAgreementSheet({ visible, onAgree, onGoBack }: {
         style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.borderSubtle, paddingBottom: insets.bottom + SP.md }]}
         testID="live-buyer-agreement"
       >
-        <Text style={[styles.title, { color: theme.text }]}>Welcome to your first show!</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Before you watch</Text>
         <Text style={[styles.sub, { color: theme.muted }]}>Before you get started please review the buyer agreement:</Text>
         <View style={styles.rows}>
           {rows.map((row, i) => (

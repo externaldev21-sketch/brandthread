@@ -92,7 +92,7 @@ export default function AccessCodeScreen() {
     router.replace('/sign-in' as never);
   }
 
-  const title = mode === 'code' ? 'Enter your invite code' : mode === 'waitlist' ? 'Join the waitlist' : 'You’re on the list';
+  const title = mode === 'code' ? 'Enter your invite code' : mode === 'waitlist' ? 'Join the waitlist' : 'Waitlist confirmed';
 
   return (
     <View style={s.root}>

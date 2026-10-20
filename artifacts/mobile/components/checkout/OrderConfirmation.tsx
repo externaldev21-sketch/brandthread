@@ -269,7 +269,7 @@ export function OrderConfirmation({
       </View>
 
       <View style={styles.titleBlock}>
-        <Text style={[styles.thanks, { color: theme.text }]} accessibilityRole="header">{t(finalizing ? 'Payment received' : 'Thank you for your order!')}</Text>
+        <Text style={[styles.thanks, { color: theme.text }]} accessibilityRole="header">{t(finalizing ? 'Payment received' : 'Order confirmed')}</Text>
         {!finalizing && session.contact?.email ? <Text style={[styles.body, { color: theme.muted }]}>{`We’ve sent your order confirmation to ${session.contact.email}.`}</Text> : null}
         {!finalizing ? (
           <View style={styles.orderNumbers}>

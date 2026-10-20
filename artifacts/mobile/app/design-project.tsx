@@ -485,7 +485,7 @@ export default function DesignProjectScreen() {
         {/* ── Step 6: Summary + Create ── */}
         {step === 6 && (
           <View>
-            <StepHeader step={6} total={6} title="Ready to create" subtitle="Review your project settings before creating." />
+            <StepHeader step={6} total={6} title="Review your project" subtitle="Review your project settings before creating." />
             <BrandthreadCard style={styles.summaryCard} elevated>
               <View style={[styles.summaryIcon, { backgroundColor: accent + '22' }]}>
                 <Icon name={options.find(o => o.type === projectType)?.icon as any ?? 'edit-2'} size={ICON.xl} color={accent} />

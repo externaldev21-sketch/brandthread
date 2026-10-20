@@ -625,7 +625,7 @@ describe('buyer inbox', () => {
     });
 
     expect(renderer!.root.findAllByProps({ testID: 'inbox-skeleton' }, { deep: false })).toHaveLength(0);
-    expect(textContent(renderer!)).toContain('Keep it real in DMs');
+    expect(textContent(renderer!)).toContain('No messages yet');
     const cta = renderer!.root.findByProps({ testID: 'inbox-empty-action' });
     expect(cta).toBeTruthy();
 

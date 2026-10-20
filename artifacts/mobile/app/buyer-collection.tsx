@@ -282,7 +282,7 @@ export default function BuyerCollection() {
       ) : items.length === 0 ? (
         <EmptyState
           icon="folder"
-          title="Nothing here yet"
+          title="No saved items"
           description="Long-press the save button on anything and add it to this collection."
           style={{ marginTop: SP.xxl }}
         />

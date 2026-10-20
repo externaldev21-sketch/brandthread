@@ -41,7 +41,7 @@ export default function LiveLinkScreen() {
   useEffect(() => {
     if (!streamId) { router.replace('/' as never); return; }
     if (!isLoaded) return;
-    if (isSignedIn) {
+    if (isLoaded) {
       router.replace(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never);
       return;
     }

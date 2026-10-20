@@ -82,6 +82,7 @@ import { BrandedLoader, PressableScale, useUndoToast } from '@/components/Brandt
 import { Button, ErrorState, ThemedRefreshControl } from '@/components/ui';
 
 import { useAuth } from '@clerk/expo';
+import { useSignInGate } from '@/hooks/useSignInGate';
 
 import { formatCents } from '@/lib/money';
 
@@ -185,6 +186,7 @@ export default function CartScreen() {
   const { push } = useThreadPull();
   const api = useApi();
   const { isSignedIn, userId: cartOwnerId } = useAuth();
+  const { requireSignIn } = useSignInGate();
   const { showUndo } = useUndoToast();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
@@ -501,6 +503,7 @@ export default function CartScreen() {
    * session; it never changes how payment itself works).
    */
   async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void; wallet?: boolean } = {}) {
+    if (!requireSignIn()) return;
     const setBusy = opts.onBusy ?? setValidating;
     if (items.length === 0) return;
     setBusy(true);

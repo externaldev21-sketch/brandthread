@@ -284,7 +284,7 @@ export default function ShoppingPreferences() {
 
         {/* Alerts */}
         <Text style={s.sectionTitle}>Alerts and notifications</Text>
-        <Text style={s.sectionDesc}>Stay in the loop on products you care about.</Text>
+        <Text style={s.sectionDesc}>Choose which product updates you receive.</Text>
         <View style={s.card}>
           {([
             { key: 'dropAlerts' as const, label: 'Drop alerts', sub: 'Notify me when brands drop new collections', icon: 'zap' },

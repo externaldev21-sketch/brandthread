@@ -46,7 +46,6 @@ import { GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/c
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
-
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -256,7 +255,6 @@ export default function SetupScreen() {
       >
         {/* Progress bar */}
         <GradientCard colors={[colors.accent, colors.card]} style={s.progressCard} glow>
-          {/* The onboarding thread carries on here, sewn as tasks complete. */}
           <ThreadProgress
             fraction={pct / 100}
             color={theme.text}
@@ -271,7 +269,7 @@ export default function SetupScreen() {
           )}
           {allDone && (
             <Text style={[s.progressNext, { color: theme.text }]}>
-              ✓ All required steps complete — you're ready to go
+              ✓ All required steps complete
             </Text>
           )}
         </GradientCard>
@@ -288,7 +286,7 @@ export default function SetupScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready</Text>
-                <Text style={s.subtitle}>All required setup steps complete. Time to publish.</Text>
+                <Text style={s.subtitle}>All required steps are complete. Your store is ready to publish.</Text>
               </View>
             </View>
             <PrimaryButton

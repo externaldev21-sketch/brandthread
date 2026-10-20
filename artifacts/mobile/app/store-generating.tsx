@@ -101,7 +101,7 @@ export default function StoreGeneratingScreen() {
       answers = null;
     }
     if (!answers) {
-      router.replace(('/store-generate?toast=' + encodeURIComponent("Let's pick your style first")) as never);
+      router.replace(('/store-generate?toast=' + encodeURIComponent('Choose a style first')) as never);
       return;
     }
 

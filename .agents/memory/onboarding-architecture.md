@@ -38,3 +38,21 @@ Incompatible question layouts must not reuse a persisted draft format version, e
 **Why:** Parallel onboarding work reused the same version for different step layouts. Treating matching integers as compatible can restore the wrong question or role.
 
 **How to apply:** Compare the stored step identities and ownership contract when integrating another flow. Give an incompatible layout a new format version and resume at a valid signed-in profile question rather than interpreting the old numeric position.
+
+Onboarding feel changes must preserve the existing step structure, layout, black/white/silver branding and system font. Professional copy edits are explicitly allowed.
+
+**Why:** The owner explicitly rejected layout rebuilds and asked for native motion and reactive controls, not a redesign.
+
+**How to apply:** Improve transitions, gestures, press feedback and keyboard handling without rearranging screens or introducing new questions. Keep wording short, factual and confident.
+
+Keep the existing thread decoration. The owner's phrase "corny frazes" meant copy/wording, not a rejection of the thread line.
+
+**Why:** The owner explicitly corrected the earlier interpretation and cancelled removal of ThreadLine/threadGeometry. They requested a professional Apple/SSENSE tone across onboarding, empty states and prompts.
+
+**How to apply:** Preserve the thread visuals and motion. Replace cutesy phrases, hype slang and exclamation-mark enthusiasm with factual copy; preserve feature names, legal terms and user-authored content.
+
+Retaining an outgoing screen for a transition requires identical provider nesting as well as a stable React key. Make that layer inert, not a second live screen.
+
+**Why:** Moving the same keyed screen under a different provider hierarchy remounts its inputs and effects, which can refire autofocus and network work during a slide.
+
+**How to apply:** Keep the outgoing and incoming layer structure identical; change inert/accessibility values instead of adding or removing provider levels.

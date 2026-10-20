@@ -13,16 +13,17 @@ afterEach(() => {
 
 describe('buyer-first development preview', () => {
   it('defaults to buyer and preserves explicit seller selection', () => {
-    expect(resolvePreviewRole('', null)).toBe('buyer');
-    expect(resolvePreviewRole('', 'invalid')).toBe('buyer');
+    expect(resolvePreviewRole('', null)).toBe(null);
+    expect(resolvePreviewRole('', 'invalid')).toBe(null);
+    expect(resolvePreviewRole('?bt_preview=guest', 'seller')).toBe(null);
     expect(resolvePreviewRole('?bt_preview=seller', null)).toBe('seller');
     expect(resolvePreviewRole('', 'seller')).toBe('seller');
     expect(resolvePreviewRole('?bt_preview=buyer', 'seller')).toBe('buyer');
   });
 
-  it('ignores the retired seller session key and persists only the new role key', async () => {
+  it('ignores retired automatic-role keys and persists only an explicit review selection', async () => {
     vi.stubGlobal('__DEV__', true);
-    const entries = new Map([['bt:previewRole:seller-default', 'seller']]);
+    const entries = new Map([['bt:previewRole:seller-default', 'seller'], ['bt:previewRole:buyer-default', 'buyer']]);
     vi.stubGlobal('window', {
       location: { search: '', hostname: 'localhost' },
       sessionStorage: {
@@ -31,10 +32,10 @@ describe('buyer-first development preview', () => {
       },
     });
     const preview = await import('../lib/devPreview');
-    expect(preview.getDevWebPreviewRole()).toBe('buyer');
+    expect(preview.getDevWebPreviewRole()).toBe(null);
     window.location.search = '?bt_preview=seller';
     expect(preview.getDevWebPreviewRole()).toBe('seller');
-    expect(entries.get('bt:previewRole:buyer-default')).toBe('seller');
+    expect(entries.get('bt:previewRole:explicit-v1')).toBe('seller');
     window.location.search = '';
     expect(preview.getDevWebPreviewRole()).toBe('seller');
     expect(preview.isPreviewDemoMode()).toBe(false);

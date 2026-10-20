@@ -26,7 +26,7 @@ export function NameStep({ name, onChange, onNext, seller, preview }: {
     <StepScreen
       testID="onboarding-name-step"
       title="What's your name?"
-      subtitle={seller ? 'This is how your workspace will greet you.' : 'This is how your profile will appear.'}
+      subtitle={seller ? 'Shown in your workspace.' : 'Shown on your profile.'}
       primary={{ label: 'Next', onPress: onNext, disabled: !ok, testID: 'onboarding-name-next' }}
     >
       <Input
@@ -193,7 +193,7 @@ export function WelcomeUserStep({ username, photoUri, onDone, holdMs = 1800, pre
       {preview ?? <BigAvatar uri={photoUri} size={176} />}
       <View style={styles.welcomeCopy}>
         <Text style={[styles.welcomeTitle, { color: palette.foreground }]}>Welcome to Brandthread,{'\n'}{username}</Text>
-        <Text style={[styles.welcomeSub, { color: palette.mutedForeground }]}>Let's set up your feed.</Text>
+        <Text style={[styles.welcomeSub, { color: palette.mutedForeground }]}>Set up your feed.</Text>
       </View>
     </Pressable>
   );

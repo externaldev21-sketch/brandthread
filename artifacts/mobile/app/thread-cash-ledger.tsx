@@ -167,7 +167,7 @@ export default function ThreadCashLedgerScreen() {
               <EmptyState
                 compact
                 icon="dollar-sign"
-                title={filter ? 'Nothing here' : 'No Thread Cash activity yet'}
+                title={filter ? 'No matching activity' : 'No Thread Cash activity yet'}
                 description={filter ? 'Try another filter.' : 'Check in daily to start earning.'}
               />
             ) : groups.map((g) => (

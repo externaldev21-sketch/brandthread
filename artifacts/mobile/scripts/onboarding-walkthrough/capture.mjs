@@ -31,9 +31,10 @@ const VIEWPORTS = [
 ];
 
 function parseArgs(argv) {
-  const options = { skipBuild: false };
+  const options = { skipBuild: false, role: null };
   for (const arg of argv) {
     if (arg === '--skip-build') options.skipBuild = true;
+    else if (arg === '--role=buyer' || arg === '--role=seller') options.role = arg.slice(7);
     else throw new Error(`Unknown option ${arg}`);
   }
   return options;
@@ -54,6 +55,7 @@ function makeReport(role, viewportId) {
         const message = String(error?.message ?? error).split('\n')[0];
         console.log(`  ✗ ${label} — ${message}`);
         rows.push({ name, ok: false, message });
+        error.walkthroughRows = [...rows];
         throw error;
       }
     },
@@ -66,6 +68,28 @@ async function screenshot(page, dir, index, name) {
   await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
 }
 
+/** Hold touch down long enough to assert real rendered scale feedback. */
+async function pressWithFeedback(page, testId) {
+  const button = page.getByTestId(testId);
+  await button.click({ trial: true });
+  const box = await button.boundingBox();
+  if (!box) throw new Error(`No touch target: ${testId}`);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  try {
+    await page.waitForFunction((element) => {
+      for (let node = element; node instanceof HTMLElement; node = node.parentElement) {
+        const transform = getComputedStyle(node).transform;
+        if (transform !== 'none' && new DOMMatrixReadOnly(transform).a < 0.985) return true;
+      }
+      return false;
+    }, await button.elementHandle(), { timeout: 2_000 });
+    console.log(`    press-in scale verified: ${testId}`);
+  } finally {
+    await page.mouse.up();
+  }
+}
+
 async function openOnboardingContext(browser, { viewport, origin, api }) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
@@ -73,12 +97,16 @@ async function openOnboardingContext(browser, { viewport, origin, api }) {
     hasTouch: viewport.isMobile,
     locale: 'en-US',
     colorScheme: 'dark',
-    reducedMotion: 'reduce',
+    // Exercise the real spring/press behavior, not just static end states.
+    reducedMotion: 'no-preference',
   });
   await context.addInitScript(clerkOnboardingStubScript());
   await installFakeBackend(context, { origin, apiOrigin: DEMO_API, api });
   const page = await context.newPage();
   page.on('pageerror', (err) => console.log(`    (page error: ${err.message.split('\n')[0]})`));
+  page.on('console', (message) => {
+    if (message.type() === 'error') console.log(`    (browser error: ${message.text().slice(0, 500)})`);
+  });
   return { context, page };
 }
 
@@ -119,14 +147,14 @@ async function signUp(page, id, shot, report) {
     await page.getByText('Log in to', { exact: false }).waitFor({ timeout: 5_000 });
     await shot('welcome-login');
     await page.getByTestId('onboarding-toggle-mode').click();
-    await page.getByTestId('onboarding-use-email').click();
+    await pressWithFeedback(page, 'onboarding-use-email');
   });
 
   await report.step('birthday (TikTok) with under-13 error', async () => {
     await page.getByTestId('onboarding-dob').waitFor({ timeout: 10_000 });
     await shot('birthday');
     await page.getByTestId('onboarding-dob').fill('01012020');
-    await page.getByTestId('onboarding-dob-continue').click();
+    await pressWithFeedback(page, 'onboarding-dob-continue');
     await page.getByTestId('onboarding-dob-error').waitFor({ timeout: 5_000 });
     await shot('birthday-error');
     await page.getByTestId('onboarding-dob').fill('');
@@ -138,7 +166,7 @@ async function signUp(page, id, shot, report) {
     await page.getByTestId('onboarding-email-input').waitFor({ timeout: 10_000 });
     await page.getByTestId('onboarding-email-input').fill(id.email);
     await shot('email');
-    await page.getByTestId('onboarding-email-continue').click();
+    await pressWithFeedback(page, 'onboarding-email-continue');
   });
 
   await report.step('code with wrong-code error', async () => {
@@ -160,7 +188,7 @@ async function signUp(page, id, shot, report) {
     await page.getByTestId('onboarding-username-input').fill(id.username);
     await page.getByText('is available', { exact: false }).waitFor({ timeout: 5_000 });
     await shot('username-available');
-    await page.getByTestId('onboarding-username-continue').click();
+    await pressWithFeedback(page, 'onboarding-username-continue');
   });
 }
 
@@ -181,7 +209,7 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-photo').waitFor({ timeout: 10_000 });
       await shot('photo');
       const chooser = page.waitForEvent('filechooser');
-      await page.getByTestId('onboarding-photo-add').click();
+      await pressWithFeedback(page, 'onboarding-photo-add');
       await (await chooser).setFiles(path.join(MOBILE_ROOT, 'assets/images/products/leather-ankle-boots.jpg'));
       await page.getByTestId('onboarding-photo-preview').waitFor({ timeout: 10_000 });
       await shot('photo-picked');
@@ -191,14 +219,14 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
     await report.step('interest (Depop): pick a department', async () => {
       await page.getByTestId('onboarding-interest').waitFor({ timeout: 10_000 });
       await shot('interest');
-      await page.getByTestId('onboarding-interest-Womenswear').click();
+      await pressWithFeedback(page, 'onboarding-interest-Womenswear');
     });
 
     await report.step('brands (Depop): search, pick, follow', async () => {
       await page.getByTestId('onboarding-brands').waitFor({ timeout: 10_000 });
       await page.getByText('Fixture Brand A').waitFor({ timeout: 10_000 });
       await shot('brands');
-      await page.getByTestId('onboarding-brand-seller_fixture_0').click();
+      await pressWithFeedback(page, 'onboarding-brand-seller_fixture_0');
       await page.getByTestId('onboarding-brand-seller_fixture_3').click();
       await page.getByTestId('onboarding-brands-search').fill('atelier');
       await shot('brands-picked-search');
@@ -212,7 +240,7 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-size-tops').click();
       await page.getByTestId('onboarding-size-tops-M').waitFor({ timeout: 5_000 });
       await shot('sizes-sheet');
-      await page.getByTestId('onboarding-size-tops-M').click();
+      await pressWithFeedback(page, 'onboarding-size-tops-M');
       await page.getByTestId('onboarding-size-shoes').click();
       await page.getByTestId('onboarding-size-shoes-9').click();
       await shot('sizes-picked');
@@ -228,7 +256,7 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
     await report.step('Shop or Sell (Etsy) → finish as buyer', async () => {
       await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
       await shot('role');
-      await page.getByTestId('account-type-buyer').click();
+      await pressWithFeedback(page, 'account-type-buyer');
       await shot('role-shop');
       await page.getByTestId('onboarding-role-continue').click();
       await page.waitForURL(/thread-explainer/, { timeout: 20_000 });
@@ -268,13 +296,15 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
 
     await report.step('back button walks back one step', async () => {
       await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
-      await page.getByTestId('onboarding-back').click();
+      // The outgoing layer remains mounted briefly but is aria-hidden/inert.
+      // Target the accessible live control, not both transient testIDs.
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
       await page.getByTestId('onboarding-notifications').waitFor({ timeout: 5_000 });
       await page.getByTestId('onboarding-notifications-skip').click();
     });
 
     await report.step('Sell → store name (Depop Start selling)', async () => {
-      await page.getByTestId('account-type-seller').click();
+      await pressWithFeedback(page, 'account-type-seller');
       await shot('role-sell');
       await page.getByTestId('onboarding-role-continue').click();
       await page.getByTestId('onboarding-store').waitFor({ timeout: 10_000 });
@@ -288,7 +318,18 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-stage-build').click();
       await shot('stage');
       await page.getByTestId('onboarding-stage-continue').click();
-      await page.waitForURL(/store-setup-brand/, { timeout: 20_000 });
+      try {
+        // The seller shell can open the existing setup checklist on Dashboard
+        // instead of leaving the legacy store-brand route in the address bar.
+        await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/store-setup-brand', { timeout: 20_000 });
+        if (new URL(page.url()).pathname === '/') {
+          await page.getByText('Dashboard', { exact: true }).waitFor({ timeout: 10_000 });
+        }
+      } catch (error) {
+        console.log('Seller finish diagnostic:', JSON.stringify({ url: page.url(), user: api.getUser(), screen: (await page.locator('body').innerText()).slice(-1800) }));
+        await shot('finish-error');
+        throw error;
+      }
       const user = api.getUser();
       if (!user?.onboardingComplete || user.accountType !== 'seller' || user.brandName !== id.brandName || user.brandStage !== 'build') {
         throw new Error(`server row not completed as seller: ${JSON.stringify(user)}`);
@@ -304,7 +345,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
-  rmSync(OUTPUT_DIR, { recursive: true, force: true });
+  if (!options.role) rmSync(OUTPUT_DIR, { recursive: true, force: true });
 
   if (!options.skipBuild || !existsSync(path.join(BUILD_DIR, 'index.html'))) {
     console.log('Building the web app (a few minutes)…');
@@ -319,22 +360,30 @@ async function main() {
     for (const viewport of VIEWPORTS) {
       console.log(`\n=== Viewport ${viewport.id} ===`);
 
+      if (options.role !== 'seller') {
       console.log(`-- buyer walkthrough --`);
       const buyerDir = path.join(OUTPUT_DIR, viewport.id, 'buyer');
       try {
         const rows = await runBuyerWalkthrough(browser, { viewport, origin: server.origin, outDir: buyerDir });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
-      } catch {
+      } catch (error) {
         hadFailure = true;
+        allRows.push(...(error.walkthroughRows ?? [{ name: 'walkthrough startup', ok: false, message: String(error) }])
+          .map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
+      }
       }
 
+      if (options.role !== 'buyer') {
       console.log(`-- seller walkthrough --`);
       const sellerDir = path.join(OUTPUT_DIR, viewport.id, 'seller');
       try {
         const rows = await runSellerWalkthrough(browser, { viewport, origin: server.origin, outDir: sellerDir });
         allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
-      } catch {
+      } catch (error) {
         hadFailure = true;
+        allRows.push(...(error.walkthroughRows ?? [{ name: 'walkthrough startup', ok: false, message: String(error) }])
+          .map((r) => ({ ...r, viewport: viewport.id, role: 'seller' })));
+      }
       }
     }
   } finally {
