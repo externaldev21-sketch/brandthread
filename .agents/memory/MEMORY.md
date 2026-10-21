@@ -107,7 +107,7 @@
 - [Test result accounting](test-result-accounting.md) — zero failed assertions does not mean a suite passed; setup errors can leave every assertion skipped.
 - [Validation evidence](validation-evidence-persistence.md) — keep long-run logs in ignored workspace storage; restarts can erase temporary evidence and interrupt checks.
 - [Merge runtime validation](merge-runtime-validation.md) — TypeScript checks do not cover every runtime server; scan tracked sources and syntax-check changed JavaScript.
-- [Native font shim bootstrap](native-font-shim-bootstrap.md) — publish native exports before loading font helpers; web success cannot rule out an iOS import cycle.
+- [Font bootstrap and readiness](native-font-shim-bootstrap.md) — avoid native import cycles; web icons need actual loaded faces and SPA-export font preloads.
 - [Haptics control boundary](haptics-control-boundary.md) — one shared Sounds & haptics control; off silences every haptic, while the new-order sound setting is audio only.
 - [Native UI test harness](native-ui-test-harness.md) — incomplete cache and animation mocks can masquerade as product-load failures or native component crashes.
 - [Pinned-post consolidation](pinned-post-model.md) — owner requires one persistence model, canonical pin API and pin UI across competing implementations.

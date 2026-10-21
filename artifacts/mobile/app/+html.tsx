@@ -1,6 +1,15 @@
 import React from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { Asset } from 'expo-asset';
+import { ICON_FONT_ASSETS } from '@/lib/iconFontAssets';
+
+const iconWebFonts = Object.entries(ICON_FONT_ASSETS).map(([family, source]) => ({
+  family,
+  uri: Asset.fromModule(source).uri,
+}));
+const iconFontCSS = iconWebFonts.map(({ family, uri }) =>
+  `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(uri)}) format("truetype");font-display:block;font-weight:normal;font-style:normal;}`,
+).join('\n');
 
 // Same poster the buyer feed's very first item (FASHION_PREVIEW_POSTS[0] in
 // app/(tabs)/feed.tsx) shows. Resolved here too (Metro gives every `require`
@@ -52,14 +61,13 @@ export default function Root({ children }: { children: React.ReactNode }) {
             the elements we manage ourselves (ScrollView, FlatList). This is
             the standard expo-router web template setting. */}
         <ScrollViewStyleReset />
+        {iconWebFonts.map(({ family, uri }) => (
+          <link key={family} data-bt-icon-font={family} rel="preload" href={uri} as="font" type="font/ttf" crossOrigin="anonymous" />
+        ))}
+        <style dangerouslySetInnerHTML={{ __html: iconFontCSS }} />
 
-        {/* The app already waits for the real Inter faces to load before
-            rendering any text (see useFonts + fontsLoaded gating in
-            app/_layout.tsx), so there's no fallback-font flash once React
-            mounts. This preconnect just gets Google Fonts' CDN connection
-            warmed up before that JS runs, shaving time off the wait rather
-            than changing the gating behavior itself. */}
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* UI text is system-native. Icon fonts are bundled Expo assets,
+            preloaded locally by index.ts; no Google Fonts connection is needed. */}
 
         {/* First-paint target: the buyer feed's very first video's poster.
             Requesting it from the raw HTML, before any JS has parsed or run,

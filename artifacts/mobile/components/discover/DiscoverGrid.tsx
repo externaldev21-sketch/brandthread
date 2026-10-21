@@ -97,6 +97,8 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   onTilePress: (post: DiscoverPost, flatIndex: number) => void;
   onTileLongPress: (post: DiscoverPost) => void;
   contentContainerStyle?: object;
+  /** Explicit scroll-end room for the floating navigation, including web. */
+  bottomClearance?: number;
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
   /** Rendered after the last row (and the load-more skeleton). */
   ListFooterExtra?: React.ReactElement | null;
@@ -136,6 +138,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   onTilePress,
   onTileLongPress,
   contentContainerStyle,
+  bottomClearance = 0,
   ListHeaderComponent,
   ListFooterExtra,
   sponsored = EMPTY_SPONSORED,
@@ -248,9 +251,12 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
     );
   }
 
+  const hideCreatorRows = useMemo(() => posts.length > 0 && !!posts[0].authorId &&
+    posts.every(post => post.authorId === posts[0].authorId), [posts]);
+
   function renderMasonryBlock(posts: DiscoverPost[]) {
     const imageHeightOf = (post: DiscoverPost) => Math.round(masonryColumnWidth / tileAspectRatio(post));
-    const cols = splitMasonryColumns(posts, (post) => imageHeightOf(post) + MASONRY_CAPTION_HEIGHT, MASONRY_ROW_GAP);
+    const cols = splitMasonryColumns(posts, (post) => imageHeightOf(post) + (hideCreatorRows ? 0 : MASONRY_CAPTION_HEIGHT), MASONRY_ROW_GAP);
     const column = (list: DiscoverPost[]) => (
       <View style={{ width: masonryColumnWidth, gap: MASONRY_ROW_GAP }}>
         {list.map((post) => (
@@ -259,6 +265,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
             post={post}
             width={masonryColumnWidth}
             imageHeight={imageHeightOf(post)}
+            showCreator={!hideCreatorRows}
             onPress={() => onTilePress(post, flatIndexOf.get(post.id) ?? 0)}
             onLongPress={() => onTileLongPress(post)}
           />
@@ -288,7 +295,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
       <View style={{ height: 12 }} />
     </>
   );
-  const listFooter = (loadingMore || error === 'more' || ListFooterExtra) ? (
+  const listFooter = (loadingMore || error === 'more' || ListFooterExtra || bottomClearance > 0) ? (
     <>
       {loadingMore ? (
         <View style={styles.footerLoading}>
@@ -297,6 +304,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
       ) : null}
       {error === 'more' && onRetry ? retry("Couldn't load more.") : null}
       {ListFooterExtra ?? null}
+      {bottomClearance > 0 ? <View style={{ height: bottomClearance }} testID="discover-bottom-clearance" /> : null}
     </>
   ) : null;
   const listEmpty = error === 'first' && onRetry ? retry("Couldn't load Discover.") : (showEmpty ?? !loading) ? (

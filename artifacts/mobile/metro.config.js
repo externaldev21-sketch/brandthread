@@ -121,4 +121,14 @@ config.transformer.getTransformOptions = async (...args) => {
   };
 };
 
+// Single-output Expo does not use app/+html.tsx in development either.
+// Begin the same six local font requests before the large dev JS bundle.
+const { withDevIconFontHead } = require('./scripts/icon-font-web');
+const enhanceMiddleware = config.server.enhanceMiddleware;
+config.server.enhanceMiddleware = (middleware, server) =>
+  withDevIconFontHead(
+    enhanceMiddleware ? enhanceMiddleware(middleware, server) : middleware,
+    __dirname,
+  );
+
 module.exports = config;

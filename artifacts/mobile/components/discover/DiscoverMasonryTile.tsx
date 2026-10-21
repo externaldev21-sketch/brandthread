@@ -28,13 +28,14 @@ const ON_PHOTO = '#FFFFFF';
 const PHOTO_SHADE = 'rgba(0,0,0,0.45)';
 
 export function DiscoverMasonryTile({
-  post, width, imageHeight, onPress, onLongPress,
+  post, width, imageHeight, onPress, onLongPress, showCreator = true,
 }: {
   post: DiscoverPost;
   width: number;
   imageHeight: number;
   onPress: () => void;
   onLongPress: () => void;
+  showCreator?: boolean;
 }) {
   const { theme } = useAppTheme();
   const price = post.productTags?.[0]?.priceCents;
@@ -78,7 +79,7 @@ export function DiscoverMasonryTile({
           </View>
         )}
       </View>
-      <View style={styles.byline}>
+      {showCreator ? <View style={styles.byline}>
         {post.authorAvatarUrl ? (
           <CachedImage source={{ uri: post.authorAvatarUrl }} style={styles.avatar} contentFit="cover" />
         ) : (
@@ -87,7 +88,7 @@ export function DiscoverMasonryTile({
           </View>
         )}
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{post.authorName}</Text>
-      </View>
+      </View> : null}
     </Pressable>
   );
 }

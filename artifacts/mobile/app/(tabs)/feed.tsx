@@ -45,6 +45,7 @@ import { isPreviewDemoMode, isBuyerDevPreview } from '@/lib/devPreview';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
+import { canPlayFeedAudio, observeFeedVideoFrame } from '@/lib/feedVideoPresentation';
 
 import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 
@@ -1442,16 +1443,14 @@ function LiveVideoVisual({
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
-    p.muted = muted;
+    // A play request is not a displayed frame. Decode silently first.
+    p.muted = true;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
     if (Platform.OS !== 'web') p.bufferOptions = FEED_VIDEO_BUFFER_OPTIONS;
   });
   const appActive = useAppActive();
-  // The setup callback above only runs when the player is created, so the
-  // sound toggle has to reach already-playing (and preloaded) clips here.
-  useEffect(() => {
-    player.muted = muted;
-  }, [player, muted]);
+  const videoViewRef = useRef<VideoView>(null);
+  const [surfaceLaidOut, setSurfaceLaidOut] = useState(false);
   const [captionTime, setCaptionTime] = useState(0);
   React.useEffect(() => {
     if (!captions || !isActive) return undefined;
@@ -1503,7 +1502,40 @@ function LiveVideoVisual({
     timingRef.current ??= beginFeedVideoTiming(signalPostId ?? 'feed-video');
     if (videoVisible) completeFeedVideoTiming(timingRef.current);
   }, [isActive, videoVisible, signalPostId]);
-  React.useLayoutEffect(() => { setFirstFrameRendered(false); }, [player]);
+  React.useLayoutEffect(() => {
+    // Reusing a prepared player must not reuse another activation's audio
+    // permission, including a fast swipe back to an earlier post.
+    player.muted = true;
+    setFirstFrameRendered(false);
+    setHasStarted(false);
+    setReadyToPlay(player.status === 'readyToPlay');
+  }, [player, isActive]);
+  React.useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const view = videoViewRef.current as unknown as { nativeRef?: { current: HTMLVideoElement | null } } | null;
+    const element = view?.nativeRef?.current;
+    if (!element) return;
+    return observeFeedVideoFrame(element, () => setFirstFrameRendered(true), () => {
+      player.muted = true;
+      setFirstFrameRendered(false);
+    });
+  }, [player, isActive]);
+  React.useLayoutEffect(() => {
+    if (Platform.OS === 'web' || !isActive) return;
+    // Native onFirstFrameRender is one-shot. A retained surface may already
+    // have emitted it while preloading; advancing native progress is the
+    // fallback when that same surface becomes active again.
+    let lastTime = player.currentTime;
+    player.timeUpdateEventInterval = 0.05;
+    const subscription = player.addListener('timeUpdate', ({ currentTime }) => {
+      if (currentTime > lastTime && player.status === 'readyToPlay') setFirstFrameRendered(true);
+      lastTime = currentTime;
+    });
+    return () => subscription.remove();
+  }, [player, isActive]);
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' && firstFrameRendered) player.timeUpdateEventInterval = 0.25;
+  }, [player, firstFrameRendered]);
   const showPoster = Boolean(posterSource || posterUri) && !videoVisible;
   const showFallbackCover = !showPoster && !videoVisible;
   // Fit/crop math runs against the full-bleed frame's aspect (the whole
@@ -1522,6 +1554,10 @@ function LiveVideoVisual({
     });
     const statusSubscription = player.addListener('statusChange', ({ status, error }) => {
       setReadyToPlay(status === 'readyToPlay');
+      if (status !== 'readyToPlay') {
+        player.muted = true;
+        setFirstFrameRendered(false);
+      }
       if (status === 'error') recordFeedVideoError(signalPostId ?? 'feed-video', remoteVideoUri(source), error?.message ?? 'Unknown player error');
     });
     if (player.status === 'readyToPlay') setReadyToPlay(true);
@@ -1538,8 +1574,8 @@ function LiveVideoVisual({
     onFirstFramePainted?.();
   }, [onFirstFramePainted]);
   React.useEffect(() => {
-    if (readyToPlay) reportFirstFramePainted();
-  }, [readyToPlay, reportFirstFramePainted]);
+    if (videoVisible) reportFirstFramePainted();
+  }, [videoVisible, reportFirstFramePainted]);
   const lastTimeRef = useRef(0);
   const finishedRef = useRef(false);
   React.useEffect(() => {
@@ -1558,6 +1594,19 @@ function LiveVideoVisual({
   // Background/lock screen pauses the clip (and its watch timer) the same
   // way leaving the screen does.
   const isScreenFocused = useIsFocused() && appActive;
+  React.useLayoutEffect(() => {
+    player.muted = true;
+    if (!canPlayFeedAudio({
+      active: isActive, focused: isScreenFocused, paused, laidOut: surfaceLaidOut, videoVisible,
+    })) return;
+    // React has removed the poster in this commit; allow that commit to
+    // paint before releasing audio from this exact player.
+    const frame = requestAnimationFrame(() => { player.muted = muted; });
+    return () => {
+      cancelAnimationFrame(frame);
+      player.muted = true;
+    };
+  }, [player, isActive, isScreenFocused, paused, surfaceLaidOut, videoVisible, muted]);
   useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   useFeedWatchSignals(player, isActive, signalPostId);
   React.useEffect(() => {
@@ -1576,13 +1625,13 @@ function LiveVideoVisual({
     // sizing bug above — used to leave the player permanently paused with
     // nothing ever re-triggering play() once a real size arrived. Re-running
     // this effect when the page's measured size changes closes that gap.
-    if (isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
+    if (isActive && !paused && isScreenFocused && surfaceLaidOut && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
       player.play();
     } else {
       player.pause();
       if (!isActive) player.currentTime = 0;
     }
-  }, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
+  }, [isActive, paused, isScreenFocused, surfaceLaidOut, player, pageWidth, pageHeight]);
   React.useEffect(() => {
     player.playbackRate = rate;
   }, [player, rate]);
@@ -1606,7 +1655,10 @@ function LiveVideoVisual({
 
   return (
     <>
-      <View style={frameStyle}>
+      <View style={frameStyle} onLayout={event => {
+        const { width, height } = event.nativeEvent.layout;
+        setSurfaceLaidOut(width > 0 && height > 0);
+      }}>
         {showPoster && (
           <CachedImage
             source={posterSource ?? { uri: posterUri! }}
@@ -1623,13 +1675,16 @@ function LiveVideoVisual({
           />
         )}
         <VideoView
+          ref={videoViewRef}
           player={player}
           // Explicit size: on web the style lands on a <video>, which ignores
           // inset-only sizing and would otherwise render at its intrinsic size.
           style={[StyleSheet.absoluteFill, styles.videoFill]}
           contentFit={fit}
           nativeControls={false}
-          onFirstFrameRender={() => setFirstFrameRendered(true)}
+          onFirstFrameRender={() => {
+            if (Platform.OS !== 'web') setFirstFrameRendered(true);
+          }}
         />
         {/* Stays up for as long as the video is paused, gone on resume. */}
         <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none" testID="feed-paused-icon">

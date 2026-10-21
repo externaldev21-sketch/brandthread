@@ -97,7 +97,8 @@ export function NoteComposerSheet({
     }
   }
 
-  const bubbleBg = `${theme.text}1F`;
+  const bubbleBg = theme.cardElevated;
+  const bubbleBorder = `${theme.text}1F`;
 
   return (
     <Sheet
@@ -107,6 +108,9 @@ export function NoteComposerSheet({
       headerRight="none"
       accessibilityLabel={initialText ? 'Edit your note' : 'New note'}
       testID="note-composer-sheet"
+      fullHeight
+      scrollable={false}
+      surfaceStyle={{ backgroundColor: theme.background }}
       footer={(
         <View style={styles.bar}>
           <PressableScale
@@ -132,7 +136,9 @@ export function NoteComposerSheet({
                 {remaining}
               </Text>
             ) : null}
-            <CharacterRing used={text.length} max={NOTE_MAX_CHARS} color={remaining <= 0 ? theme.error : theme.text} track={`${theme.text}26`} />
+            {text.length > 0 ? (
+              <CharacterRing used={text.length} max={NOTE_MAX_CHARS} color={remaining <= 0 ? theme.error : theme.text} track={`${theme.text}26`} />
+            ) : null}
             <PressableScale
               onPress={share}
               disabled={!canShare}
@@ -152,7 +158,7 @@ export function NoteComposerSheet({
     >
       <View style={styles.stage}>
         <View style={styles.bubbleWrap}>
-          <View style={[styles.bubble, { backgroundColor: bubbleBg }]}>
+          <View style={[styles.bubble, { backgroundColor: bubbleBg, borderWidth: StyleSheet.hairlineWidth, borderColor: bubbleBorder }]}>
             <TextInput
               ref={inputRef}
               value={text}
@@ -173,10 +179,10 @@ export function NoteComposerSheet({
             />
           </View>
           {/* Thought-bubble tail: two shrinking dots down toward the avatar. */}
-          <View style={[styles.tailDot, styles.tailDotBig, { backgroundColor: bubbleBg }]} />
-          <View style={[styles.tailDot, styles.tailDotSmall, { backgroundColor: bubbleBg }]} />
+          <View style={[styles.tailDot, styles.tailDotBig, { backgroundColor: bubbleBg, borderWidth: StyleSheet.hairlineWidth, borderColor: bubbleBorder }]} />
+          <View style={[styles.tailDot, styles.tailDotSmall, { backgroundColor: bubbleBg, borderWidth: StyleSheet.hairlineWidth, borderColor: bubbleBorder }]} />
         </View>
-        <View style={[styles.avatar, { backgroundColor: `${theme.text}1F` }]}>
+        <View style={[styles.avatar, { backgroundColor: `${theme.text}1F` }, { borderWidth: StyleSheet.hairlineWidth, borderColor: `${theme.text}26` }]}>
           {/* Initials underneath, so a slow or failed photo never leaves a blank circle. */}
           <Text style={[styles.initials, { color: theme.text }]}>{initials ?? ''}</Text>
           {avatarUri ? (
@@ -231,9 +237,10 @@ function CharacterRing({ used, max, color, track }: { used: number; max: number;
 }
 
 const styles = StyleSheet.create({
-  stage: { alignItems: 'center', paddingTop: 8, paddingBottom: 20 },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 8, paddingBottom: 20 },
   bubbleWrap: { alignItems: 'center', marginBottom: 14 },
   bubble: {
+    alignSelf: 'center',
     minWidth: 160,
     maxWidth: 280,
     borderRadius: 22,
@@ -249,8 +256,8 @@ const styles = StyleSheet.create({
   },
   inputWeb: { outlineStyle: 'none' } as object,
   tailDot: { position: 'absolute', borderRadius: 99 },
-  tailDotBig: { width: 12, height: 12, bottom: -10, left: '42%' },
-  tailDotSmall: { width: 6, height: 6, bottom: -18, left: '38%' },
+  tailDotBig: { width: 12, height: 12, bottom: -10, left: '50%', marginLeft: -6 },
+  tailDotSmall: { width: 6, height: 6, bottom: -18, left: '47%', marginLeft: -3 },
   avatar: {
     width: AVATAR,
     height: AVATAR,

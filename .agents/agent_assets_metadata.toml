@@ -677,3 +677,31 @@ mtime_ms = 1792440367103
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/69864891-5305-4a33-ac64-fb65a1e2b889/17b67e24-005a-41c0-8127-a7b4e52dad05"
 storage_version_token = "1792440463876468"
 content_type = "image/png"
+
+[[outputs]]
+id = "mMLtC7syEriYUwWOOhel2"
+uri = "file://.local/validation/discover-polish/top.png"
+type = "image"
+title = "Discover — search and grid"
+description = "390×844 development preview: filled search pill, visible filters and 12pt grid spacing."
+logical_id = "e5636739-a127-47a3-a95e-7a3cee7a8146"
+content_hash = "sha256:010ff5085cc68cb51bb3daf6caf401dcce33130a8083381110d0f6106e96cd93"
+size = 373078
+mtime_ms = 1792546812941
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/e5636739-a127-47a3-a95e-7a3cee7a8146/bf7b7fe7-54d2-47bf-98ad-6c94fbca0c75"
+storage_version_token = "1792546857227085"
+content_type = "image/png"
+
+[[outputs]]
+id = "aa9mvQxDCroODikHKw7i8"
+uri = "file://.local/validation/discover-polish/bottom.png"
+type = "image"
+title = "Discover — final row clearance"
+description = "390×844 development preview scrolled to the end: the last tiles are fully above the floating tab bar."
+logical_id = "312fbcb8-be44-48fd-947f-220e0fdef694"
+content_hash = "sha256:8f9b115e273d20b580af8b3439fea777a0db41330c4e258194a8e0ca20a8b90e"
+size = 329580
+mtime_ms = 1792546812960
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/312fbcb8-be44-48fd-947f-220e0fdef694/6f45e1a4-e4dc-4b7e-91d3-71e147c41085"
+storage_version_token = "1792546857967052"
+content_type = "image/png"

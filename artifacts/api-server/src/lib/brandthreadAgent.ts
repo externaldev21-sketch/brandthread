@@ -58,27 +58,15 @@ export interface WelcomeStep {
 // Clean, short, no emoji — Dev's black/white/silver tone. Every feature named
 // here exists in the app (see ASSISTANT_LINKS in brandthreadAssistant.ts).
 export const BUYER_WELCOME_STEPS: WelcomeStep[] = [
-  { text: "Hi, I'm Brandthread. Welcome in.", delaySeconds: 0 },
-  { text: "Threads is your feed of drops and posts from independent brands. Tap any tagged piece to shop it.", delaySeconds: 2 },
-  { text: "Use Discover to find new brands, save what you love into collections, and catch brands selling LIVE.", delaySeconds: 4 },
-  { text: "Ask me anything about the app, any time.", delaySeconds: 6 },
+  { text: "Welcome to Brandthread.", delaySeconds: 0 },
+  { text: "I'm the Brandthread Agent. I can help you find brands, track orders, and answer anything about the app — anytime.", delaySeconds: 2 },
+  { text: "Want a quick look at how Thread Cash works?", delaySeconds: 4 },
 ];
 
 export const SELLER_WELCOME_STEPS: WelcomeStep[] = [
-  { text: "Hi, I'm Brandthread. Let's get your store moving.", delaySeconds: 0 },
-  { text: "Start in Store Builder, then add your first products and post them to the feed.", delaySeconds: 2 },
-  { text: "Go LIVE to sell in real time. Orders and payouts live in your dashboard.", delaySeconds: 4 },
-  {
-    text: "Need production? The Manufacturer Hub connects you with makers. For deeper questions about your numbers, Brandthread AI has your store data.",
-    delaySeconds: 6,
-    attachment: {
-      type: "agent_card",
-      title: "Open Brandthread AI",
-      subtitle: "Ask anything about your brand.",
-      meta: { cardKind: "link", deepLink: "/ai-brain" },
-    },
-  },
-  { text: "Ask me anything about the app, any time.", delaySeconds: 8 },
+  { text: "Welcome to Brandthread.", delaySeconds: 0 },
+  { text: "I'm the Brandthread Agent. I can help with listing products, going live, payouts, and importing your Shopify catalog.", delaySeconds: 2 },
+  { text: "Want me to walk you through your first listing?", delaySeconds: 4 },
 ];
 
 export const BUYER_WELCOME_QUICK_REPLIES: AgentQuickReply[] = [
@@ -86,6 +74,7 @@ export const BUYER_WELCOME_QUICK_REPLIES: AgentQuickReply[] = [
   { label: "Find brands", value: "Find brands" },
   { label: "What's LIVE?", value: "What's LIVE?" },
   { label: "How do saves work?", value: "How do saves work?" },
+  { label: "Just browsing", value: "Just browsing for now" },
 ];
 
 export const SELLER_WELCOME_QUICK_REPLIES: AgentQuickReply[] = [
@@ -166,7 +155,7 @@ export interface CreateWelcomeResult {
 }
 
 /**
- * Creates (once) the welcome conversation + 4-5 staggered welcome messages
+ * Creates (once) the welcome conversation + 3 staggered welcome messages
  * for a user. Safe to call more than once for the same user — the second
  * call is a no-op thanks to the `agent_conversations` primary-key-on-userId
  * ledger, which also makes concurrent calls race-safe (the loser's insert is

@@ -73,6 +73,12 @@ describe('no white-flash background regressions', () => {
   it('paints the web document background reactively (persisted theme, not a fixed hardcode)', () => {
     const layout = read('app/_layout.tsx');
     expect(layout).toContain("document.body.style.backgroundColor = '#000000'");
+    expect(layout).toContain("document.documentElement.style.backgroundColor = '#000000'");
+    expect(layout).toContain("if (root) root.style.backgroundColor = '#000000'");
+    expect(layout).toContain('document.documentElement.style.backgroundColor = background');
+    expect(layout).toContain('document.body.style.backgroundColor = background');
+    expect(layout).toContain('if (root) root.style.backgroundColor = background');
+    expect(layout).toContain('if (runtimeBackgroundPainted) return');
     expect(layout).toContain('peekPersistedTheme(AsyncStorage)');
     expect(layout).toContain('document.body.style.backgroundColor = persisted.background');
   });

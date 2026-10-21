@@ -31,5 +31,5 @@ export function DiscoverFilterRow({
   active: DiscoverFilterKey;
   onChange: (key: DiscoverFilterKey) => void;
 }) {
-  return <SegmentTabs tabs={TABS} value={active} onChange={onChange} scrollable testID="discover-filter-row" />;
+  return <SegmentTabs tabs={TABS} value={active} onChange={onChange} divider={false} testID="discover-filter-row" />;
 }

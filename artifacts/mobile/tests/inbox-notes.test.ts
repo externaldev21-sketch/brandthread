@@ -170,6 +170,23 @@ describe('notes bubble wiring', () => {
     const social = read('services/socialService.ts');
     expect(social).toContain('JSON.stringify(audience ? { text, audience } : { text })');
   });
+
+  it('uses a tall dark composer with a centered outlined bubble and a ring only after typing', () => {
+    const composer = read('components/social/NoteComposerSheet.tsx');
+    expect(composer).toContain('const bubbleBg = theme.cardElevated;');
+    expect(composer).toContain('const bubbleBorder = `${theme.text}1F`;');
+    expect(composer).toContain('borderWidth: StyleSheet.hairlineWidth, borderColor: bubbleBorder');
+    expect(composer).toContain("left: '50%', marginLeft: -6");
+    expect(composer).toContain("left: '47%', marginLeft: -3");
+    expect(composer).toContain("alignSelf: 'center'");
+    expect(composer).toMatch(/text\.length > 0 \? \(\s*<CharacterRing/);
+    expect(composer).toContain('fullHeight');
+    expect(composer).toContain('scrollable={false}');
+    expect(composer).toContain('surfaceStyle={{ backgroundColor: theme.background }}');
+    const sheet = read('components/ui/BottomSheet.tsx');
+    expect(sheet).toContain('fullHeight: fillHeight = false');
+    expect(sheet).toContain('(detents || fillHeight) && { height: fullHeight, maxHeight: fullHeight }');
+  });
 });
 
 // ─── Backend route + schema/migration wiring ──────────────────────────────

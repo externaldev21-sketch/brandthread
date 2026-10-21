@@ -54,14 +54,15 @@ describe("createWelcomeConversationOnce", () => {
       .where(eq(messages.conversationId, result.conversationId))
       .orderBy(messages.createdAt);
     // 3-5 short lines, buyer-tailored, no emoji.
-    expect(msgs.length).toBeGreaterThanOrEqual(3);
-    expect(msgs.length).toBeLessThanOrEqual(5);
+    expect(msgs).toHaveLength(3);
     expect(msgs.every((m) => m.senderId === BRANDTHREAD_AGENT_CLERK_ID)).toBe(true);
     expect(msgs[0].body).toContain("Brandthread");
     const buyerText = msgs.map((m) => m.body).join(" ");
-    expect(buyerText).toMatch(/Threads/);
-    expect(buyerText).toMatch(/Discover/);
-    expect(buyerText).toMatch(/LIVE/);
+    expect(msgs.map((m) => m.body)).toEqual([
+      "Welcome to Brandthread.",
+      "I'm the Brandthread Agent. I can help you find brands, track orders, and answer anything about the app — anytime.",
+      "Want a quick look at how Thread Cash works?",
+    ]);
     expect(buyerText).not.toMatch(/\p{Extended_Pictographic}/u);
     const last = msgs[msgs.length - 1];
     expect(last.attachment).toMatchObject({ type: "quick_replies" });
@@ -80,10 +81,12 @@ describe("createWelcomeConversationOnce", () => {
       .where(eq(messages.conversationId, result.conversationId))
       .orderBy(messages.createdAt);
     const allText = msgs.map((m) => m.body).join(" ");
-    expect(allText).toMatch(/Store Builder/);
-    expect(allText).toMatch(/LIVE/);
+    expect(msgs.map((m) => m.body)).toEqual([
+      "Welcome to Brandthread.",
+      "I'm the Brandthread Agent. I can help with listing products, going live, payouts, and importing your Shopify catalog.",
+      "Want me to walk you through your first listing?",
+    ]);
     expect(allText).toMatch(/payouts/i);
-    expect(allText).toMatch(/Manufacturer/);
     expect(allText).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 

@@ -18,7 +18,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { IconButton } from '@/components/ui/IconButton';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { X_GUTTER, X_HAIRLINE, X_HEADER_HEIGHT, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
+import { X_GUTTER, X_HEADER_HEIGHT, X_SPACE, X_TYPE, xColors } from '@/constants/reframe';
 
 export function DiscoverSearchHeader({
   title,
@@ -27,6 +27,7 @@ export function DiscoverSearchHeader({
   bellBadge,
   searchBarRef,
   searchBarHidden,
+  beforeSearch,
 }: {
   title: string;
   onSearchPress: () => void;
@@ -36,6 +37,7 @@ export function DiscoverSearchHeader({
   searchBarRef?: React.Ref<View>;
   /** Hidden while the search overlay's copy of this bar is on screen. */
   searchBarHidden?: boolean;
+  beforeSearch?: React.ReactNode;
 }) {
   const { theme } = useAppTheme();
   const topPad = useHeaderTopInset();
@@ -59,15 +61,16 @@ export function DiscoverSearchHeader({
           />
         )}
       </View>
+      {beforeSearch}
       <TouchableOpacity
         ref={searchBarRef as never}
         onPress={onSearchPress}
         accessibilityRole="button"
         accessibilityLabel="Search products and brands"
-        style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: c.divider }, searchBarHidden && { opacity: 0 }]}
+        style={[styles.searchBar, { backgroundColor: theme.cardElevated }, searchBarHidden && { opacity: 0 }]}
         testID="discover-search-bar"
       >
-        <Icon name="search" size={16} color={c.secondary} />
+        <Icon name="search" size={18} color={c.secondary} />
         <Text style={[styles.searchPlaceholder, { color: c.secondary }]} numberOfLines={1}>Search</Text>
       </TouchableOpacity>
     </View>
@@ -82,9 +85,9 @@ const styles = StyleSheet.create({
   title: { ...X_TYPE.title, flexShrink: 1 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    height: 36, borderRadius: RADII.pill, borderWidth: X_HAIRLINE,
+    height: 44, borderRadius: RADII.pill, borderWidth: 0,
     paddingHorizontal: SPACING.sm,
-    marginHorizontal: X_GUTTER, marginTop: X_SPACE[4], marginBottom: X_SPACE[8],
+    marginHorizontal: X_GUTTER, marginTop: X_SPACE[4], marginBottom: 0,
   },
   searchPlaceholder: { ...X_TYPE.body, fontFamily: FONT.regular },
 });

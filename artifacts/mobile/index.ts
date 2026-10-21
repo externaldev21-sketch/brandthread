@@ -2,4 +2,5 @@
 // check start before Expo Router evaluates any screen, so start-up crashes are
 // reported too. Both are no-ops when they are not configured.
 import './lib/bootstrap';
+import './lib/iconFontBootstrap';
 import 'expo-router/entry';

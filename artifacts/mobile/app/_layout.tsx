@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { getIconFontBootReady, getIconFontServerReady, subscribeIconFonts } from '@/lib/iconFonts';
 import { AffiliateRefCapture } from '@/components/AffiliateRefCapture';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
@@ -246,6 +247,17 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
     if (Platform.OS === 'android') {
       try { NavigationBar.setStyle('light'); } catch { /* best-effort */ }
     }
+  }, [background]);
+
+  // Expo's dev document does not use +html.tsx. Paint the viewport canvas
+  // as well as the React host, including the area under the home indicator.
+  React.useLayoutEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    runtimeBackgroundPainted = true;
+    document.documentElement.style.backgroundColor = background;
+    document.body.style.backgroundColor = background;
+    const root = document.getElementById('root');
+    if (root) root.style.backgroundColor = background;
   }, [background]);
 
   // Exposes the active theme's accent as a CSS custom property so the
@@ -642,10 +654,20 @@ if (Platform.OS !== 'web') {
 // so the pre-render moment matches the app instead of flashing a white
 // screen, then correct it to the user's actual persisted theme (falls back
 // to the same dark default) as soon as it's known, ahead of React mounting.
+let runtimeBackgroundPainted = false;
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.documentElement.style.backgroundColor = '#000000';
   document.body.style.backgroundColor = '#000000';
+  const root = document.getElementById('root');
+  if (root) root.style.backgroundColor = '#000000';
   peekPersistedTheme(AsyncStorage)
-    .then((persisted) => { document.body.style.backgroundColor = persisted.background; })
+    .then((persisted) => {
+      // A late storage read must not overwrite a newer account/theme render.
+      if (runtimeBackgroundPainted) return;
+      document.documentElement.style.backgroundColor = persisted.background;
+      document.body.style.backgroundColor = persisted.background;
+      if (root) root.style.backgroundColor = persisted.background;
+    })
     .catch(() => {});
 }
 
@@ -1975,9 +1997,9 @@ function RootLayout() {
     return runAfterFirstPaint(() => { void preloadAppearanceAssets(); });
   }, []);
 
-  // UI text uses the platform system font (BRANDTHREAD_DESIGN.md), so there
-  // are no font files to wait for.
-  const appReady = true;
+  // UI text is still system-native. Only the six used icon faces preload
+  // behind the existing intro, with a bounded wait and per-glyph readiness.
+  const appReady = useSyncExternalStore(subscribeIconFonts, getIconFontBootReady, getIconFontServerReady);
 
   const appTree = (
     <SafeAreaProvider>

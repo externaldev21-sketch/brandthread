@@ -353,9 +353,9 @@ export default function DiscoverScreen() {
         onSearchPress={openSearch}
         searchBarRef={searchBarRef}
         searchBarHidden={!!search}
+        beforeSearch={<DiscoverFilterRow active={filter} onChange={setFilter} />}
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
-      <DiscoverFilterRow active={filter} onChange={setFilter} />
       {filter === 'forYou' && firstWeek.visible && firstWeek.state && (
         <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
           <FirstWeekCard state={firstWeek.state} onDismiss={firstWeek.dismiss} />
@@ -371,9 +371,9 @@ export default function DiscoverScreen() {
       <DiscoverSearchHeader
         title="Discover"
         onSearchPress={() => router.push('/buyer-search' as never)}
+        beforeSearch={<DiscoverFilterRow active={filter} onChange={setFilter} />}
         onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
-      <DiscoverFilterRow active={filter} onChange={setFilter} />
     </>
   );
   // Brands: "Rising this week" sits at the top, above the existing grid
@@ -419,7 +419,7 @@ export default function DiscoverScreen() {
             setSafetyMenuOpen(() => () => openViewer(post, Math.max(0, idx), forYouPosts));
             setSafetyMenuPost(post);
           }}
-          contentContainerStyle={{ paddingBottom: tabBarClearance }}
+          bottomClearance={tabBarClearance}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
           refreshControl={threadRefresh}

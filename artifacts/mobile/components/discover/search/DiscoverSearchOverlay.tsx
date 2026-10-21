@@ -49,7 +49,7 @@ import { useLiveSearch, type BrandResult, type ProductResult, type VideoResult }
 export interface BarRect { x: number; y: number; width: number; height: number }
 
 /** Same height as DiscoverSearchHeader's bar, so the hand-off is seamless. */
-export const SEARCH_BAR_HEIGHT = 36;
+export const SEARCH_BAR_HEIGHT = 44;
 const CANCEL_W = 56;
 const SPRING = { duration: 240, dampingRatio: 1 } as const;
 
@@ -399,9 +399,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   bar: {
     position: 'absolute', top: 0, left: 0,
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    height: SEARCH_BAR_HEIGHT, borderRadius: RADII.pill, borderWidth: 1,
+    height: SEARCH_BAR_HEIGHT, borderRadius: RADII.pill, borderWidth: 0,
     paddingHorizontal: SPACING.sm,
-    backgroundColor: theme.surface, borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
   },
   input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, fontFamily: FONT.regular, color: theme.text, padding: 0 },
   cancelWrap: { position: 'absolute', right: SCREEN_GUTTER, width: CANCEL_W, height: SEARCH_BAR_HEIGHT, justifyContent: 'center' },

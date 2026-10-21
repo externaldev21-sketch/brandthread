@@ -109,6 +109,8 @@ export interface SheetProps {
   padded?: boolean;
   /** Tallest the sheet may get, as a fraction of the window (default 0.92). */
   maxHeightRatio?: number;
+  /** Opt-in tall presentation without the half-height detent. */
+  fullHeight?: boolean;
   /** Rise with the keyboard (default true). */
   avoidKeyboard?: boolean;
   testID?: string;
@@ -179,7 +181,7 @@ export function SheetGrabber() {
 export function Sheet({
   visible, onClose, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
   children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
-  testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false, surfaceStyle, showGrabber = true,
+  testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false, fullHeight: fillHeight = false, surfaceStyle, showGrabber = true,
 }: SheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -250,7 +252,7 @@ export function Sheet({
       bounces={false}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
-      style={[styles.bodyScroll, detents && { flex: 1 }]}
+      style={[styles.bodyScroll, (detents || fillHeight) && { flex: 1 }]}
       contentContainerStyle={[padded && styles.padded, !hasFooter && styles.bodyEnd, contentContainerStyle]}
     >
       {children}
@@ -259,7 +261,7 @@ export function Sheet({
   const body = scroll ? (
     isWeb ? scroll : <GestureDetector gesture={nativeScroll}>{scroll}</GestureDetector>
   ) : (
-    <View style={[styles.bodyStatic, padded && styles.padded, !hasFooter && styles.bodyEnd, contentContainerStyle]}>
+    <View style={[styles.bodyStatic, fillHeight && { flex: 1 }, padded && styles.padded, !hasFooter && styles.bodyEnd, contentContainerStyle]}>
       {children}
     </View>
   );
@@ -291,12 +293,12 @@ export function Sheet({
               styles.sheet,
               isWebShell && styles.sheetWebShell,
               { backgroundColor: sheetSurfaceColor(theme), maxHeight: `${Math.round(maxHeightRatio * 100)}%` },
-              detents && { height: fullHeight, maxHeight: fullHeight },
+              (detents || fillHeight) && { height: fullHeight, maxHeight: fullHeight },
               sheetStyle,
               surfaceStyle,
             ]}
           >
-            <Animated.View style={[styles.sheetInner, detents && { flex: 1 }, keyboardStyle]}>
+            <Animated.View style={[styles.sheetInner, (detents || fillHeight) && { flex: 1 }, keyboardStyle]}>
               {wrapHandleDrag(
                 <View>
                   {showGrabber ? <SheetGrabber /> : null}

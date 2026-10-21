@@ -9,6 +9,12 @@ Count all prepared native players against the feed's three-player budget, includ
 
 **How to apply:** Verify mounted and speculative players together; report actual native timing separately from browser playback and HTTP checks.
 
+Use the same surface-readiness boundary for poster removal and audio release. Decode silently until the active surface has a frame; revoke audio permission on buffering, source/activation changes, blur and pause.
+
+**Why:** Starting an unmuted player independently of the poster gate permits sound over a static image. Expo web's first-frame event is derived from loadeddata, not compositor presentation; retained native surfaces may emit their one-shot event while preloading.
+
+**How to apply:** Observe the exact web element's presented frame (advancing decoded video progress only as an older-WebKit fallback). Native reactivation needs advancing-progress fallback. Cancel stale callbacks, and unmute only after the poster-removal commit.
+
 Treat rendition bitrates as ceilings, not instructions to enlarge an already compressed source. Preserve the source master.
 
 **Why:** Both fixed-rate encoding and a generic CRF/maxrate combination enlarged already compressed clips. Bounding the rate by the probed source bitrate avoided the large increases; small muxing/GOP-related size differences remain possible.

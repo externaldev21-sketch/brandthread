@@ -126,7 +126,7 @@ describe('Feed page/video container sizing (web all-black bug)', () => {
   });
 
   it('re-fires the play effect once the page has a real measured size, not just on isActive/paused/focus', () => {
-    expect(feed).toMatch(/if \(isActive && !paused && isScreenFocused && \(pageWidth \?\? 0\) > 0 && \(pageHeight \?\? 0\) > 0\) \{\s*player\.play\(\);/);
-    expect(feed).toContain('}, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);');
+    expect(feed).toMatch(/if \(isActive && !paused && isScreenFocused && surfaceLaidOut && \(pageWidth \?\? 0\) > 0 && \(pageHeight \?\? 0\) > 0\) \{\s*player\.play\(\);/);
+    expect(feed).toContain('}, [isActive, paused, isScreenFocused, surfaceLaidOut, player, pageWidth, pageHeight]);');
   });
 });

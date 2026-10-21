@@ -17,7 +17,7 @@ export const BUYER_QUICK_REPLIES: AgentQuickReply[] = [
   { label: 'Show me Thread Cash', value: 'Show me how Thread Cash works' },
   { label: 'Find me brands', value: "Find me some brands I'd like" },
   { label: 'How do I sell?', value: 'How do I start selling on Brandthread?' },
-  { label: 'Just vibing', value: 'Just vibing, no questions right now' },
+  { label: 'Just browsing', value: 'Just browsing for now' },
 ];
 
 /** Parses the `optionsJson` meta string the server sends on a `quick_replies`
@@ -38,25 +38,25 @@ export function parseQuickReplies(optionsJson: string | undefined | null): Agent
 
 /** A canned reply used when the real AI endpoint can't be reached (preview
  *  mode with no backend, or a network failure) — matches the real system
- *  prompt's casual, friend-like tone and covers the same topics. */
+ *  prompt's professional, concierge tone and covers the same topics. */
 export function cannedAgentReply(userText: string): { text: string; cardKind?: 'thread_cash' | 'discover' } {
   const lower = userText.toLowerCase();
   if (lower.includes('thread cash')) {
     return {
-      text: "it's easy — check in daily to earn credit, then toggle it on at checkout as a discount. your card still covers the rest. you can only send it to people you mutually follow, and cash someone sends you can't be re-sent onward.",
+      text: "Check in daily to earn credit, then turn it on at checkout as a discount — your card covers the rest. You can send it to people you mutually follow, and credit someone sends you can't be re-sent onward.",
       cardKind: 'thread_cash',
     };
   }
   if (lower.includes('sell') || lower.includes('listing') || lower.includes('go live') || lower.includes('payout') || lower.includes('shopify')) {
-    return { text: "start from the Seller Hub — list a product in a couple minutes, or pull your whole catalog in from Shopify. Go Live when you're ready to sell in real time, and payouts land once orders ship." };
+    return { text: "Start from the Seller Hub — list a product in a couple of minutes, or import your catalog from Shopify. Go live when you're ready to sell in real time; payouts arrive once orders ship." };
   }
   if (lower.includes('brand') || lower.includes('discover') || lower.includes('find')) {
-    return { text: "Discover's the move — fresh drops and brands picked for you. tap in and I'll keep learning what you like.", cardKind: 'discover' };
+    return { text: "Open Discover — new drops and brands picked for you. The more you browse, the better it gets.", cardKind: 'discover' };
   }
-  if (lower.includes('vibing') || lower.includes('just')) {
-    return { text: "bet, I'm right here whenever" };
+  if (lower.includes('browsing') || lower.includes('vibing') || lower.includes('just')) {
+    return { text: "Sounds good. I'm here whenever you need anything." };
   }
-  return { text: "hear you — I'm here 24/7 for fits, brands, Thread Cash, or anything else. what's up?" };
+  return { text: "I can help with brands, orders, Thread Cash, or anything else in the app. What do you need?" };
 }
 
 const WELCOME_PLAYED_PREFIX = 'brandthread_agent_welcome_played:';
