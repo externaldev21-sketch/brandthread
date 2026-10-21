@@ -59,7 +59,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial,
-  searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
+  searchProfiles, createOrGetConversation, muteConversation, deleteConversationForMe, MY_USER_ID,
   getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
   getNotesForTray, postNote,
 } from '@/services/socialService';
@@ -968,7 +968,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       items: [
         ...(conv.unreadCount > 0 ? [{ key: 'read', label: 'Mark as read', icon: 'check-circle' as const, onPress: () => { void swipeMarkReadConversation(conv); } }] : []),
         { key: 'pin', label: conv.isPinned ? 'Unpin' : 'Pin', icon: 'bookmark', onPress: () => { void swipePinConversation(conv); } },
-        { key: 'mute', label: 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(conv); } },
+        { key: 'mute', label: conv.mutedUntil && Date.parse(conv.mutedUntil) > Date.now() ? 'Unmute' : 'Mute', icon: 'bell-off', onPress: () => { void swipeMuteConversation(conv); } },
         { key: 'archive', label: 'Archive', icon: 'archive', destructive: true, onPress: () => { void swipeArchiveConversation(conv); } },
       ],
     }) : false;
@@ -1004,28 +1004,41 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     }
   }
 
-  // Swipe actions on a Messages-tab row: delete removes it from the inbox
-  // (there is no true delete-conversation endpoint, so this archives it,
-  // matching the existing long-press "Archive" behavior), mute silences the
-  // other participant (reusing the existing user-mute feature), and mark
-  // read clears the unread badge without opening the thread.
+  // Swipe actions affect this conversation for the current viewer only.
   async function swipeDeleteConversation(conv: Conversation) {
-    await swipeArchiveConversation(conv);
+    const confirmed = await confirmDestructiveActionSheet({
+      title: 'Delete conversation?',
+      message: 'This removes the conversation for you only.',
+      confirmLabel: 'Delete',
+    });
+    if (!confirmed) return;
+    try {
+      if (!isPreviewId(conv.id)) await deleteConversationForMe(conv.id);
+      setConversations(prev => prev.filter(item => item.id !== conv.id));
+      showSnackbar('Conversation deleted');
+    } catch {
+      Alert.alert('Couldn’t delete', 'Please try again.');
+    }
   }
 
   async function swipeMuteConversation(conv: Conversation) {
-    const participant = participantOf(conv);
-    if (!participant) return;
+    const wasMuted = !!conv.mutedUntil && Date.parse(conv.mutedUntil) > Date.now();
+    const nextMutedUntil = wasMuted ? undefined : '9999-12-31T00:00:00.000Z';
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, mutedUntil: nextMutedUntil } : item
+    ));
     try {
-      await muteUser({
-        userId: participant.userId,
-        name: participant.name,
-        handle: participant.handle,
-        initials: participant.initials,
-        color: participant.color,
-      });
-      showSnackbar(`Muted ${participant.name}`);
+      const mutedUntil = isPreviewId(conv.id)
+        ? nextMutedUntil
+        : await muteConversation(conv.id, wasMuted ? null : -1);
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, mutedUntil: mutedUntil ?? undefined } : item
+      ));
+      showSnackbar(wasMuted ? 'Conversation unmuted' : 'Conversation muted');
     } catch {
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, mutedUntil: conv.mutedUntil } : item
+      ));
       Alert.alert('Couldn’t mute', 'Please try again.');
     }
   }
@@ -1329,12 +1342,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       }]),
       {
         key: 'mute',
-        label: 'Mute',
+        label: conv.mutedUntil && Date.parse(conv.mutedUntil) > Date.now() ? 'Unmute' : 'Mute',
         icon: 'bell-off',
         color: theme.cardElevated,
         textColor: theme.muted,
         onPress: () => swipeMuteConversation(conv),
-        accessibilityLabel: `Mute ${participant.name}`,
+        accessibilityLabel: `${conv.mutedUntil && Date.parse(conv.mutedUntil) > Date.now() ? 'Unmute' : 'Mute'} conversation with ${participant.name}`,
       },
       {
         key: 'delete',
@@ -1409,7 +1422,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
-                  style={[s.convName, { color: theme.text }]}
+                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
                   numberOfLines={1}
                 >
                   {participant.name}
@@ -1930,7 +1943,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
           <View>
-            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : null}
+            {messagesSearchLower || loadError || inboxFilter !== 'all' ? renderEmptyState() : renderInboxEmptyState()}
             {!messagesSearchLower && !loadError && inboxFilter === 'all' && renderSuggestedSection()}
           </View>
         </ScrollView>
