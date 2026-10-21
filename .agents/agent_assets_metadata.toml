@@ -733,3 +733,17 @@ mtime_ms = 1792552200716
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1765a2a1-0db6-4cc1-8fee-82ebfb058ad1/bb04f9f6-061c-4b14-98c7-8de8067b24e6"
 storage_version_token = "1792552475022089"
 content_type = "image/png"
+
+[[outputs]]
+id = "Bv9-gGRPLR9waFTu5Fa-3"
+uri = "file://.local/validation/closeout/chat-dev.png"
+type = "image"
+title = "Agent chat — spacing verified at 390×844"
+description = "Bundled Inter loaded locally. Professional welcome copy with normal spacing; verified on regular and fast previews."
+logical_id = "3827e11a-b270-4dc1-a209-e0e3949c5f32"
+content_hash = "sha256:ca4ac1d998c0cc8658c60b895b274703657d48d989d3a21c646ce050499f604a"
+size = 44901
+mtime_ms = 1792556932190
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/3827e11a-b270-4dc1-a209-e0e3949c5f32/33057941-da54-4081-9afa-926a51d2fd4f"
+storage_version_token = "1792557264299412"
+content_type = "image/png"

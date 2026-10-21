@@ -66,7 +66,8 @@ function createDevIconFontHead(projectRoot) {
 }
 
 function withDevIconFontHead(middleware, projectRoot) {
-  const head = createDevIconFontHead(projectRoot);
+  const { createDevTextFontHead } = require('./text-font-web');
+  const head = createDevIconFontHead(projectRoot) + createDevTextFontHead(projectRoot);
   return (req, res, next) => {
     const end = res.end;
     res.end = function (chunk, ...args) {

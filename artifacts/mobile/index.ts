@@ -3,4 +3,5 @@
 // reported too. Both are no-ops when they are not configured.
 import './lib/bootstrap';
 import './lib/iconFontBootstrap';
+import './lib/textFontBootstrap';
 import 'expo-router/entry';

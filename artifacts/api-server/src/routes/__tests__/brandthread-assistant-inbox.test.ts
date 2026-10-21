@@ -16,8 +16,9 @@ import type { Server } from "node:http";
 import express from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import {
-  db, pool, users, conversations, conversationParticipants, messages, agentConversations,
+  db, pool, users, conversations, conversationParticipants, messages, agentConversations, aiDataConsents,
 } from "@workspace/db";
+import { setAiConsent } from "../../lib/aiConsent";
 import { BRANDTHREAD_AGENT_CLERK_ID, BUYER_WELCOME_STEPS } from "../../lib/brandthreadAgent";
 import {
   ASSISTANT_FLAG_KEY, ASSISTANT_OFFLINE_REPLY, resetAssistantFlagCache, resetEnsuredWelcomeCache,
@@ -51,6 +52,7 @@ vi.mock("../../lib/sellerSnapshot", () => ({
 const ALL = [TEST_BUYER, TEST_SELLER, OTHER];
 
 async function cleanup() {
+  await db.delete(aiDataConsents).where(inArray(aiDataConsents.clerkUserId, ALL));
   const parts = await db.select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants).where(inArray(conversationParticipants.userId, ALL));
   const ids = [...new Set(parts.map((p) => p.conversationId))];
@@ -227,6 +229,12 @@ describe("Brandthread assistant — pinned inbox chat", () => {
   });
 
   describe("assistant replies", () => {
+    beforeEach(async () => {
+      // Record current-version consent through the same service as Settings.
+      await setAiConsent(TEST_BUYER, true);
+      await setAiConsent(TEST_SELLER, true);
+    });
+
     async function send(text: string) {
       await fetch(`${baseUrl}/api/conversations`);
       const conversationId = (await agentConvIdFor(currentUser))!;
@@ -236,6 +244,18 @@ describe("Brandthread assistant — pinned inbox chat", () => {
       });
       return { res, body: await res.json() as { agentMessage: { text: string; attachment?: any } } };
     }
+
+    it("rejects a message without current AI consent", async () => {
+      await setAiConsent(TEST_BUYER, false);
+      const { res, body } = await send("Do not send this without consent");
+      expect(res.status).toBe(428);
+      expect(body).toMatchObject({ code: "AI_CONSENT_REQUIRED" });
+      expect(body.agentMessage).toBeUndefined();
+      const stored = await db.select({ id: messages.id }).from(messages)
+        .where(and(eq(messages.conversationId, (await agentConvIdFor(TEST_BUYER))!),
+          eq(messages.body, "Do not send this without consent")));
+      expect(stored).toHaveLength(0);
+    });
 
     it("replies with the offline message (persisted) when the LLM isn't configured", async () => {
       llmReply = "this must never be shown";

@@ -1,6 +1,6 @@
 ---
 name: Font bootstrap and readiness
-description: Avoid native font import cycles and verify actual web icon-font readiness and emitted SPA assets.
+description: Preserve native font bootstrap safety; web Inter is an approved exception, and browser font readiness needs real verification.
 ---
 
 A React Native export shim must publish its forwarded native exports before loading helpers that themselves import React Native. Defer those helpers until the wrapped component is accessed.
@@ -8,6 +8,12 @@ A React Native export shim must publish its forwarded native exports before load
 **Why:** The actual iOS Metro bundle resolved the font helper's React Native import back to the partially initialized shim despite the intended resolver exemption. An eager helper load therefore reached `Platform.select` with no Platform export and crashed Expo Go at launch. Web's per-component resolution and ordinary mocked screen tests did not expose the cycle.
 
 **How to apply:** Preserve lazy native getters, text weight mapping, input statics and animation functions. Check the actual native bundle's dependency graph and module initialization, not just successful bundle compilation or web rendering. Do not claim a physical-device launch from a host-stubbed bootstrap check.
+
+**Rule:** Web app text uses bundled Inter; native app text retains the system-font policy.
+
+**Why:** The owner explicitly requested reliable Inter delivery for web chat and app text. This is a web-only exception to the design foundation, not approval to change native typography.
+
+**How to apply:** Preserve native lazy font initialization and system fonts. On web, put an ordinary Latin text fallback before emoji families so a failed text-font download cannot produce emoji-width spaces.
 
 Icon-font readiness on web requires the browser's actual face to be loaded,
 not just the font library's registration flag. Until then, private-use icon

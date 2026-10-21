@@ -8,3 +8,9 @@ description: Orphaned service listeners after workflow startup or workspace depe
 **Why:** Earlier listeners can survive while replacement managed processes start. This also occurred during a merge-only sync with an unchanged lockfile and no package installation, so installation is not a prerequisite. Replacement processes fail or prompt for another port despite healthy application code.
 
 **How to apply:** Use `lsof` and process parent/group information to establish port ownership before stopping anything. Never start Expo directly or reconfigure artifact workflows as a workaround for duplicate listeners.
+
+**Rule:** Do not infer that the managed Project aggregate is missing because individual-workflow inspection cannot find it.
+
+**Why:** The aggregate can restart all artifact services even when it is absent from individual-workflow listings. Adding a parallel Project wrapper did not limit that restart and produced duplicate startup attempts.
+
+**How to apply:** Restore the exact required managed services independently when recovering previews. Do not add a second startup wrapper or blame an absent aggregate listing for a workspace shutdown. A fresh workspace boot and current zero OOM counters do not establish the previous shutdown's trigger.

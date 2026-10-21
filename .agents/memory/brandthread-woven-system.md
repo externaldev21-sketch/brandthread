@@ -7,7 +7,7 @@ description: The clean app-wide visual language that replaced the decorative Wov
 
 **Why:** Decorative stitched rings, hang-tag silhouettes, thread loaders, tension lines, and Thread Pull motion conflicted with the requested premium, direct interface.
 
-**How to apply:** Keep compatibility export names when removing decoration so existing imports do not break. New buyer and seller UI should use clean primitives, runtime theme surfaces, system fonts, native platform icons, normal-case labels, and flat cards without decorative borders. Navigation is direct; do not add decorative seam or thread transitions.
+**How to apply:** Keep compatibility export names when removing decoration so existing imports do not break. New buyer and seller UI should use clean primitives, runtime theme surfaces, native system fonts (web uses the separately approved bundled Inter), native platform icons, normal-case labels, and flat cards without decorative borders. Navigation is direct; do not add decorative seam or thread transitions.
 
 **Rule:** Preserve the seller tab bar's existing swipe and glow motion when applying the new design foundation. The owner approved faster active-pill movement on both seller and buyer bars as a timing-only exception; shape, size, color and glow must remain identical.
 

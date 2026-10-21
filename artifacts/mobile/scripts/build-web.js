@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { writeLandingPage } = require('./landing-page');
 const { addIconFontPreloads } = require('./icon-font-web');
+const { addTextFontPreloads } = require('./text-font-web');
 
 const projectRoot = path.resolve(__dirname, '..');
 const workspacePreview = process.argv.includes('--preview');
@@ -290,6 +291,7 @@ function uploadAndRemoveSourceMaps() {
 
 uploadAndRemoveSourceMaps();
 addIconFontPreloads(outputDir, workspacePreview ? '/fast-preview' : '');
+addTextFontPreloads(outputDir, workspacePreview ? '/fast-preview' : '');
 addCanonicalMetadata();
 writePublicCrawlFiles();
 // After addCanonicalMetadata so the landing page keeps its own head. Served by

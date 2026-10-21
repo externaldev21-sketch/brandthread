@@ -1,8 +1,8 @@
 /**
  * System font resolution (BRANDTHREAD_DESIGN.md, "Type").
  *
- * The app renders every UI string in the platform system font: SF Pro on
- * iOS, Roboto on Android, the OS UI font on web. No font files are loaded.
+ * Native uses SF Pro / Roboto. Web uses locally bundled Inter with a real
+ * system-text fallback before any emoji fonts.
  *
  * Thousands of existing styles carry their weight in `fontFamily` alone
  * (`fontFamily: FONT.bold`, or a hardcoded `'Inter_700Bold'` from before
@@ -23,6 +23,7 @@ import { Platform, StyleSheet, type StyleProp, type TextStyle } from 'react-nati
 export const SYSTEM_FONT: string = Platform.select({
   ios: 'System',
   android: 'sans-serif',
+  web: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   // react-native-web expands 'System' to the -apple-system/Segoe/Roboto stack.
   default: 'System',
 }) as string;
@@ -42,9 +43,10 @@ const INTER_FAMILY = /^Inter_(\d)00/;
 /** Weight a family token stands for, or null if it isn't one. */
 export function weightForFamily(family: unknown): TextStyle['fontWeight'] | null {
   if (typeof family !== 'string') return null;
-  const token = TOKEN_WEIGHTS[family];
+  const primary = family.split(',')[0].trim().replace(/^["']|["']$/g, '');
+  const token = TOKEN_WEIGHTS[primary];
   if (token) return token;
-  const inter = INTER_FAMILY.exec(family);
+  const inter = INTER_FAMILY.exec(primary);
   if (inter) return `${inter[1]}00` as TextStyle['fontWeight'];
   return null;
 }
@@ -56,12 +58,20 @@ export function weightForFamily(family: unknown): TextStyle['fontWeight'] | null
  * allocation in the common case.
  */
 export function withSystemFont<T extends StyleProp<TextStyle>>(style: T): T {
-  if (!style) return style;
+  if (!style) return Platform.OS === 'web'
+    ? { fontFamily: SYSTEM_FONT } as unknown as T : style;
   const flat = StyleSheet.flatten(style) as TextStyle | undefined;
   const weight = weightForFamily(flat?.fontFamily);
-  if (!weight) return style;
+  if (!weight) {
+    if (Platform.OS === 'web' && (!flat?.fontFamily || flat.fontFamily === 'System')) {
+      return [style, { fontFamily: SYSTEM_FONT }] as unknown as T;
+    }
+    return style;
+  }
+  const family = flat?.fontFamily ?? '';
+  const suffix = family.includes(',') ? family.slice(family.indexOf(',')) : '';
   const override: TextStyle = {
-    fontFamily: SYSTEM_FONT,
+    fontFamily: Platform.OS === 'web' ? SYSTEM_FONT + suffix : SYSTEM_FONT,
     fontWeight: flat?.fontWeight ?? weight,
   };
   return [style, override] as unknown as T;

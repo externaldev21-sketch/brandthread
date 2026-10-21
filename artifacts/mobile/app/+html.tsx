@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { Asset } from 'expo-asset';
 import { ICON_FONT_ASSETS } from '@/lib/iconFontAssets';
+import { INTER_WEB_FONT_ASSETS } from '@/lib/textFontAssets';
 
 const iconWebFonts = Object.entries(ICON_FONT_ASSETS).map(([family, source]) => ({
   family,
@@ -9,6 +10,12 @@ const iconWebFonts = Object.entries(ICON_FONT_ASSETS).map(([family, source]) => 
 }));
 const iconFontCSS = iconWebFonts.map(({ family, uri }) =>
   `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(uri)}) format("truetype");font-display:block;font-weight:normal;font-style:normal;}`,
+).join('\n');
+const textWebFonts = Object.entries(INTER_WEB_FONT_ASSETS).map(([weight, source]) => ({
+  weight, uri: Asset.fromModule(source).uri,
+}));
+const textFontCSS = textWebFonts.map(({ weight, uri }) =>
+  `@font-face{font-family:"Inter";src:url(${JSON.stringify(uri)}) format("truetype");font-weight:${weight};font-style:normal;font-display:swap;}`,
 ).join('\n');
 
 // Same poster the buyer feed's very first item (FASHION_PREVIEW_POSTS[0] in
@@ -65,9 +72,13 @@ export default function Root({ children }: { children: React.ReactNode }) {
           <link key={family} data-bt-icon-font={family} rel="preload" href={uri} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
         <style dangerouslySetInnerHTML={{ __html: iconFontCSS }} />
+        {textWebFonts.map(({ weight, uri }) => (
+          <link key={weight} data-bt-text-font={weight} rel="preload" href={uri} as="font" type="font/ttf" crossOrigin="anonymous" />
+        ))}
+        <style dangerouslySetInnerHTML={{ __html: textFontCSS }} />
 
-        {/* UI text is system-native. Icon fonts are bundled Expo assets,
-            preloaded locally by index.ts; no Google Fonts connection is needed. */}
+        {/* Web text and icon fonts are local bundled assets; native text
+            stays system-native. No Google Fonts connection is needed. */}
 
         {/* First-paint target: the buyer feed's very first video's poster.
             Requesting it from the raw HTML, before any JS has parsed or run,

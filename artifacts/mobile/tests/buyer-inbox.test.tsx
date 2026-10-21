@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as typeof globalThis & { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame ??=
   ((cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0) as unknown as number);
-(globalThis as typeof globalThis & { cancelAnimationFrame?: (id: number) => void }).cancelAnimationFrame ??=
-  ((id: number) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>));
+(globalThis as typeof globalThis & { cancelAnimationFrame?: (id: number | null | undefined) => void }).cancelAnimationFrame ??=
+  ((id: number | null | undefined) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>));
 
 const { nativeComponent } = vi.hoisted(() => ({
   nativeComponent: (name: string) => {
@@ -82,6 +82,8 @@ vi.mock('react-native', async (importOriginal) => ({
     timing: () => ({ start: (cb?: () => void) => cb?.() }),
     spring: () => ({ start: (cb?: () => void) => cb?.() }),
     parallel: () => ({ start: (cb?: () => void) => cb?.() }),
+    add: (...values: Array<number | { _value: number }>) =>
+      values.reduce<number>((sum, value) => sum + (typeof value === 'number' ? value : value._value), 0),
   },
   PanResponder: { create: () => ({ panHandlers: {} }) },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
@@ -179,7 +181,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({ userId: 'buyer-1' }),
+  useAuth: () => ({ userId: 'buyer-1', isLoaded: true, isSignedIn: true }),
   useUser: () => ({ user: { hasImage: false, imageUrl: undefined } }),
 }));
 
@@ -245,9 +247,22 @@ vi.mock('@/lib/actionSheet', () => ({
 // A plain no-op mock keeps every test's `loading` starting state
 // independent of run order.
 vi.mock('@/lib/tabDataCache', () => ({
+  TAB_DATA_CACHE_PREFIX: 'bt_tab_data_cache_v1_',
+  PERSISTED_TAB_KEYS: [],
+  initTabDataCache: () => {},
   getCachedTabData: () => undefined,
   setCachedTabData: () => {},
+  setMemoryTabData: () => {},
   hydrateTabData: async () => undefined,
+  hydratePersistedTabData: async () => {},
+  clearTabDataCacheForUser: async () => {},
+} satisfies Record<keyof typeof import('@/lib/tabDataCache'), unknown>));
+
+// Focus work is deferred until paint on-device; execute the same effect
+// immediately in this renderer, which has no native frame scheduler.
+vi.mock('@/hooks/useFocusEffectAfterPaint', () => ({
+  useFocusEffectAfterPaint: (callback: () => void | (() => void)) =>
+    React.useEffect(callback, [callback]),
 }));
 
 vi.mock('@/components/layout', () => ({
