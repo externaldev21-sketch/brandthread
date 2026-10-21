@@ -36,3 +36,9 @@ loading state being tested and timing out under deliberate throttling.
 
 **How to apply:** Use CDP's rendered-frame capture for slow-font checks, with
 readiness/visibility observations running throughout the walkthrough.
+
+Compound web text stacks must put a real Latin/system font before emoji fallbacks; normalize native font aliases before concatenating them.
+
+**Why:** An unregistered native weight alias followed by emoji fonts let an emoji font supply ordinary spaces. Text looked justified despite start alignment and zero CSS word spacing.
+
+**How to apply:** Inspect the computed family and measure whitespace with a browser canvas. Left alignment alone cannot correct fallback-glyph widths; preserve emoji support after a valid Latin/system family.

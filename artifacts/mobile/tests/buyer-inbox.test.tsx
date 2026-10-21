@@ -10,6 +10,10 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as typeof globalThis & { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame ??=
+  ((cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0) as unknown as number);
+(globalThis as typeof globalThis & { cancelAnimationFrame?: (id: number) => void }).cancelAnimationFrame ??=
+  ((id: number) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>));
 
 const { nativeComponent } = vi.hoisted(() => ({
   nativeComponent: (name: string) => {

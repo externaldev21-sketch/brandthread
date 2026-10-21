@@ -705,3 +705,31 @@ mtime_ms = 1792546812960
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/312fbcb8-be44-48fd-947f-220e0fdef694/6f45e1a4-e4dc-4b7e-91d3-71e147c41085"
 storage_version_token = "1792546857967052"
 content_type = "image/png"
+
+[[outputs]]
+id = "TBv5xlCljABWoSNixBMJQ"
+uri = "file://.local/validation/note-agent-check/note-empty.png"
+type = "image"
+title = "Note composer — 390×844"
+description = "Verified full-height black presentation, centered bordered bubble and hidden empty character ring."
+logical_id = "9c91c7dc-505c-4719-998e-af29c3226037"
+content_hash = "sha256:b3681f3b54612f1ff5a22f2cd823d0b449612e354d2568b7c7b9a4d1139bfd7f"
+size = 13610
+mtime_ms = 1792552190740
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/9c91c7dc-505c-4719-998e-af29c3226037/7745cac8-3431-4fea-b0f2-2f40bd00cedf"
+storage_version_token = "1792552474219245"
+content_type = "image/png"
+
+[[outputs]]
+id = "RlMcl-0z41mXpSPhbY3Ft"
+uri = "file://.local/validation/note-agent-check/agent-chat.png"
+type = "image"
+title = "Agent chat — spacing issue remains"
+description = "The professional welcome copy is visible. Wide spaces remain because of the web font fallback; app code was left unchanged."
+logical_id = "1765a2a1-0db6-4cc1-8fee-82ebfb058ad1"
+content_hash = "sha256:f870a71a1705e1a5d78de61ac0b0408d417376df47db27b966933d8c219a62db"
+size = 45357
+mtime_ms = 1792552200716
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1765a2a1-0db6-4cc1-8fee-82ebfb058ad1/bb04f9f6-061c-4b14-98c7-8de8067b24e6"
+storage_version_token = "1792552475022089"
+content_type = "image/png"
