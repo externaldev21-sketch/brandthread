@@ -124,15 +124,38 @@ vi.mock('react-native-svg', async (importOriginal) => ({
   Line: nativeComponent('Line'),
 }));
 
-vi.mock('react-native-reanimated', () => ({
-  default: {
-    View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
-  },
-  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },
-  useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
-  useAnimatedStyle: (fn: () => unknown) => fn(),
-  withTiming: (value: unknown) => value,
-}));
+vi.mock('react-native-reanimated', () => {
+  const chain: Record<string, unknown> = {};
+  for (const m of ['duration', 'delay', 'easing', 'springify', 'damping', 'stiffness', 'withInitialValues', 'build']) {
+    chain[m] = () => chain;
+  }
+  return {
+    default: {
+      View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
+      ScrollView: (props: Record<string, unknown>) => React.createElement('Animated.ScrollView', props, props.children as React.ReactNode),
+      createAnimatedComponent: (c: unknown) => c,
+    },
+    Easing: { out: (fn: unknown) => fn, in: (fn: unknown) => fn, inOut: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },
+    useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    useAnimatedScrollHandler: (fn: (...args: unknown[]) => unknown) => fn,
+    useReducedMotion: () => false,
+    useAnimatedRef: () => ({ current: null }),
+    withTiming: (value: unknown) => value,
+    withSpring: (value: unknown) => value,
+    withDelay: (_delay: number, value: unknown) => value,
+    withSequence: (...values: unknown[]) => values[values.length - 1],
+    withRepeat: (value: unknown) => value,
+    cancelAnimation: () => {},
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+    runOnUI: (fn: (...args: unknown[]) => unknown) => fn,
+    interpolate: (v: number) => v,
+    Extrapolation: { CLAMP: 'clamp', EXTEND: 'extend', IDENTITY: 'identity' },
+    interpolateColor: () => '#000000',
+    FadeIn: chain, FadeInDown: chain, FadeInUp: chain, FadeOut: chain, FadeOutDown: chain, FadeOutUp: chain,
+    LinearTransition: chain, Layout: chain,
+  };
+});
 
 vi.mock('expo-router', () => ({
   usePathname: () => '/(buyer)/inbox',

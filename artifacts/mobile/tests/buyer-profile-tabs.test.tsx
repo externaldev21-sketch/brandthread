@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearTabDataCacheForUser, initTabDataCache } from '@/lib/tabDataCache';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -444,7 +445,10 @@ const baseProfile = {
 describe('buyer profile tabs', () => {
   let renderer: ReactTestRenderer | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Each test starts a fresh account visit, not the previous test's demo cache.
+    initTabDataCache('buyer-1');
+    await clearTabDataCacheForUser('buyer-1');
     getMyProfileMock.mockReset().mockResolvedValue(baseProfile);
     getMyPostsMock.mockReset().mockResolvedValue([
       { id: 'post-1', mediaUrl: 'https://example.com/post-1.jpg', type: 'photo', isArchived: false, isDraft: false, authorName: 'Ava', authorInitials: 'AB', authorColor: '#111', caption: 'Fit check', mediaColors: ['#111', '#222'] },
@@ -479,15 +483,15 @@ describe('buyer profile tabs', () => {
       node => node.props.accessibilityRole === 'tab' && typeof node.props.onPress === 'function',
     ).map((node) => node.props.accessibilityLabel);
     expect([...new Set(tabLabels)]).toEqual(['Posts tab', 'Reposts tab', 'Saved tab', 'Liked tab']);
-    for (const key of ['edit', 'share', 'orders', 'view-as-visitor']) {
-      expect(renderer.root.findAll(node => node.props.testID === `profile-menu-sheet-${key}`).length, key).toBeGreaterThan(0);
-    }
     // The menu mounts its rows on first open (shared MenuSheet), so open it
     // the way a user does: the ... button.
     const menuButton = renderer.root.findAll(
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
     )[0];
     await act(async () => { menuButton.props.onPress(); });
+    for (const key of ['edit-profile', 'share', 'orders', 'view-as-visitor']) {
+      expect(renderer.root.findAll(node => node.props.testID === `profile-menu-sheet-${key}`).length, key).toBeGreaterThan(0);
+    }
     const row = renderer.root.findAll(
       node => node.props.testID === 'profile-menu-sheet-view-as-visitor' && typeof node.props.onPress === 'function',
     )[0];
@@ -535,11 +539,15 @@ describe('buyer profile tabs', () => {
 
   it('opens Orders from the ... menu (no Orders tab any more)', async () => {
     renderer = await renderScreen();
+    const menuButton = renderer.root.findAll(
+      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { menuButton.props.onPress(); });
     const row = renderer.root.findAll(
       node => node.props.testID === 'profile-menu-sheet-orders' && typeof node.props.onPress === 'function',
     )[0];
     await act(async () => { row.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/orders');
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-orders');
   });
 
   it('has no bell (Activity is a tab) and no "Buyer" role chip', async () => {
@@ -743,27 +751,29 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
   });
 
-  it('orders the banner stats Following · Followers · Likes (TikTok; Posts was dropped — dev: high counts were getting cut off)', async () => {
+  it('orders the profile stats Followers · Following · Likes', async () => {
     renderer = await renderScreen();
-    const row = renderer.root.findByProps({ testID: 'profile-banner-stats' });
+    const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
     const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
       .map((node) => node.props.testID);
-    expect([...new Set(keys)]).toEqual(['profile-stat-following', 'profile-stat-followers', 'profile-stat-likes']);
+    expect([...new Set(keys)]).toEqual(['profile-stat-followers', 'profile-stat-following', 'profile-stat-likes']);
   });
 
-  it('puts the avatar, name and stats on the banner (TikTok), with the chip and bio below it', async () => {
+  it('puts the avatar and stats in the identity row, with the name and bio below it', async () => {
     renderer = await renderScreen();
-    const header = renderer.root.findByProps({ testID: 'profile-banner-header' });
+    const header = renderer.root.findByProps({ testID: 'profile-identity-stack' });
     // The mocked Pressable exposes the same testID on both its composite and
     // host instances, so count only host ('string' type) nodes.
     const hostNodesWithTestID = (root: typeof header, testID: string) => root.findAll(
       (node) => node.props.testID === testID && typeof node.type === 'string',
     );
     expect(hostNodesWithTestID(header, 'profile-avatar')).toHaveLength(1);
-    expect(hostNodesWithTestID(header, 'profile-banner-stats')).toHaveLength(1);
+    expect(hostNodesWithTestID(header, 'profile-stats-row')).toHaveLength(1);
+    const identityMeta = renderer.root.findByProps({ testID: 'profile-identity-meta' });
+    expect(textContent(identityMeta.props.children)).toContain('Ava Buyer');
     const below = renderer.root.findByProps({ testID: 'profile-banner-below' });
     expect(hostNodesWithTestID(below, 'profile-avatar')).toHaveLength(0);
-    expect(hostNodesWithTestID(below, 'profile-banner-stats')).toHaveLength(0);
+    expect(hostNodesWithTestID(below, 'profile-stats-row')).toHaveLength(0);
   });
 
   it('renders no video layer without a banner, and no "+ Add profile video" pill (the placeholder covers it)', async () => {
@@ -772,7 +782,7 @@ describe('buyer profile — Instagram layout', () => {
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-cover-affordance')).toHaveLength(0);
   });
 
-  it('with a profile banner (the cover video) shows the banner header, avatar on the left; no pencil — Edit profile is in the ••• menu', async () => {
+  it('with a profile banner shows the avatar on the left and Edit / Share buttons below the header', async () => {
     apiMock.social.profile.mockResolvedValue({
       followersCount: 7, followingCount: 3, coverVideoUrl: 'https://x/cover.mp4', coverPosterUrl: 'https://x/poster.jpg',
       profileBanner: { type: 'video', url: 'https://x/cover.mp4', posterUrl: 'https://x/poster.jpg', gifUrl: null },
@@ -784,10 +794,14 @@ describe('buyer profile — Instagram layout', () => {
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-identity-stack')).toHaveLength(0);
     // Mirrored: avatar (with its badge + note) left, name / @handle / stats right.
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-identity-left')).not.toHaveLength(0);
-    // Edit profile lives in ONE place: the ••• menu (no top-bar pencil, no button row).
-    for (const gone of ['profile-banner-edit', 'profile-edit-button', 'profile-share-button', 'profile-discover-people']) {
-      expect(renderer.root.findAll((node) => node.props.testID === gone), gone).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-edit')).toHaveLength(0);
+    for (const present of ['profile-edit-button', 'profile-share-button', 'profile-discover-people']) {
+      expect(renderer.root.findAll((node) => node.props.testID === present), present).not.toHaveLength(0);
     }
+    const editButton = renderer.root.findAll((node) => node.props.testID === 'profile-edit-button' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { editButton.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+    routerMock.push.mockReset();
     const menuButton = renderer.root.findAll(
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
     )[0];
@@ -797,7 +811,7 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
   });
 
-  it('••• menu: Edit profile · Notifications · Share profile, then Find friends + View as visitor below a separator', async () => {
+  it('••• menu includes account actions, Find friends, visitor view, Orders, Closet and Tagged posts', async () => {
     renderer = await renderScreen();
     const menuButton = renderer.root.findAll(
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
@@ -806,23 +820,22 @@ describe('buyer profile — Instagram layout', () => {
     const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
       && node.props.testID.startsWith('profile-menu-sheet-') && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
     const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];
-    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor']);
+    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor', 'orders', 'closet', 'tagged']);
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-find-friends')).not.toHaveLength(0);
     const notifications = rows.find((node) => node.props.testID === 'profile-menu-sheet-notifications')!;
     await act(async () => { notifications.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-notifications');
   });
 
-  it('with no banner, your own profile shows a dark "Add banner" placeholder that opens the banner sheet', async () => {
+  it('with no banner, shows the clean identity header and no Add banner placeholder', async () => {
     openBannerSheetMock.mockClear();
     apiMock.social.profile.mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null, profileBanner: null });
     renderer = await renderScreen();
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-header')).not.toHaveLength(0);
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-header')).not.toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder')).toHaveLength(0);
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-hero')).toHaveLength(0);
-    const add = renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder-add' && typeof node.props.onPress === 'function')[0];
-    await act(async () => { add.props.onPress(); });
-    expect(openBannerSheetMock).toHaveBeenCalled();
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-banner-placeholder-add')).toHaveLength(0);
+    expect(openBannerSheetMock).not.toHaveBeenCalled();
   });
 
   it('wires the highlights row: "New" opens the create form, a highlight opens itself in the manager', async () => {

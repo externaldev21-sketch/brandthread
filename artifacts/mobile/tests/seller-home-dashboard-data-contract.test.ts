@@ -93,8 +93,8 @@ describe('seller home dashboard data contract', () => {
     // empty line — never fabricated rows.
     expect(source).toContain('emptyMessage="No orders yet. New orders show up here first."');
     expect(source).toContain('emptyMessage="Your best sellers show up here after your first sale."');
-    expect(source).toContain('{topProducts && (newSeller || topProducts.length > 0) && (');
-    expect(source).toContain('{recentOrders && (newSeller || recentOrders.length > 0) && (');
+    expect(source).toContain('{(newSeller || (topProducts?.length ?? 0) > 0) && (');
+    expect(source).toContain('{(newSeller || (recentOrders?.length ?? 0) > 0) && (');
   });
 
   it('renders a flat baseline chart (never fabricated activity) for a brand-new seller', () => {
