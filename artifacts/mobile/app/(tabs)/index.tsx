@@ -12,6 +12,7 @@ import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { SELLER_DASHBOARD_STEPS } from '@/lib/firstRunTips/content';
 import { useScreenInteractive } from '@/lib/perf';
 
@@ -36,6 +37,11 @@ const DEFAULT_SETUP: SetupState = {
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const headerTopInset = useHeaderTopInset();
+  // First-run tour targets, one per SELLER_DASHBOARD_STEPS step. Step 1 is
+  // screen-level copy (centered card). Step 3 describes the tab bar's side
+  // circles, which are out of scope to instrument, so it stays centered.
+  const trafficTipTarget = useTipTarget('seller-dashboard:traffic');
+  const dashboardTipTargets = [null, trafficTipTarget, null];
   const { userId, isLoaded, isSignedIn } = useAuth();
   const api = useApi();
 
@@ -105,7 +111,7 @@ export default function SellerHomeScreen() {
         id="seller-dashboard"
         variant="anchored"
         contentReady={!loading}
-        anchored={{ steps: SELLER_DASHBOARD_STEPS }}
+        anchored={{ steps: SELLER_DASHBOARD_STEPS, targets: dashboardTipTargets }}
       />
     </View>
   );

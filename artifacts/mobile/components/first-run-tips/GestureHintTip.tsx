@@ -12,14 +12,16 @@ import { MEDIA } from '@/lib/theme';
  * whole screen supports (e.g. "swipe left on a row"), not a specific control.
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon } from '@/components/ui/Icon';
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY } from '@/lib/theme';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GestureGlyph } from './GestureGlyph';
-import type { GestureKind } from './types';
+import { SpotlightOverlay, holeFor } from './SpotlightOverlay';
+import { TipBubble } from './TipBubble';
+import type { GestureKind, TargetRect } from './types';
 
 export interface GestureHintTipProps {
   visible: boolean;
@@ -29,16 +31,19 @@ export interface GestureHintTipProps {
   body?: string;
   /** Which corner/edge of the screen the hint anchors to. Defaults to bottom-center, clear of the tab bar. */
   placement?: 'bottom-center' | 'top-center' | 'center';
+  /** Optional measured rect of the real area the gesture applies to (e.g. the first row). When set, that area is spotlighted (click/swipe-through) and the hint is anchored to it. */
+  target?: TargetRect | null;
   reduceMotion?: boolean;
   testID?: string;
 }
 
 export function GestureHintTip({
-  visible, onDismiss, gesture, title, body, placement = 'bottom-center', reduceMotion = false, testID,
+  visible, onDismiss, gesture, title, body, placement = 'bottom-center', target = null, reduceMotion = false, testID,
 }: GestureHintTipProps) {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const tabBarInset = useBuyerTabBarInset();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -46,6 +51,30 @@ export function GestureHintTip({
   }, [visible, fade, reduceMotion]);
 
   if (!visible) return null;
+
+  if (target) {
+    const hole = holeFor(target, screenW, screenH);
+    return (
+      <Animated.View
+        pointerEvents="box-none"
+        style={[StyleSheet.absoluteFill, styles.spot, { opacity: fade }]}
+        testID={testID ?? 'first-run-tip-gesture'}
+      >
+        <SpotlightOverlay hole={hole} onScrimPress={onDismiss} onTargetPress={onDismiss} scrimLabel={`${title}. Tap to dismiss.`} />
+        <TipBubble hole={hole} onClose={onDismiss}>
+          <View style={styles.bubbleRow}>
+            <View style={styles.glyphSlot}>
+              <GestureGlyph gesture={gesture} size={26} reduceMotion={reduceMotion} />
+            </View>
+            <View style={styles.copy}>
+              <Text style={styles.title}>{title}</Text>
+              {body ? <Text style={styles.body}>{body}</Text> : null}
+            </View>
+          </View>
+        </TipBubble>
+      </Animated.View>
+    );
+  }
 
   const positionStyle =
     placement === 'top-center' ? { top: headerTopInset + SP.xl } :
@@ -87,6 +116,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 14,
     maxWidth: 340,
   },
+  spot: { zIndex: 9998, elevation: 9998 },
+  bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingRight: 24 },
   glyphSlot: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.sm },

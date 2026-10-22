@@ -116,6 +116,7 @@ import { X_AVATAR, X_AVATAR_GAP, X_GUTTER, X_HAIRLINE, X_SPACE, X_TYPE, xColors 
 import { EmptyStateBadge } from '@/components/layout/EmptyStateBadge';
 import { Glass } from '@/components/ui/Glass';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { BUYER_INBOX_GESTURE, SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
@@ -1301,6 +1302,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const officialConv = conversations.find(conv => conv.isOfficial);
   useFocusEffect(useCallback(() => () => { setComposeVisible(false); setNoteComposeVisible(false); }, []));
 
+  const inboxTipId = isSeller ? 'seller-inbox' : 'buyer-inbox';
+  const inboxTipTarget = useTipTarget(inboxTipId);
+
   function renderConvRow({ item: conv, index }: { item: Conversation; index: number }) {
     const participant = participantOf(conv);
     if (!participant) return null;
@@ -1364,6 +1368,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions.filter(action => !conv.isOfficial || action.key === 'read' || action.key === 'mute')}>
           <PressableScale
+            {...(index === 0 ? tipTargetProps(inboxTipId) : null)}
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPressIn={() => warmThreadOnPressIn(userId, conv.id)}
             onPress={() => openConversation(conv)}
@@ -2074,10 +2079,10 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         onDismiss={() => setSnackbarMessage(null)}
       />
       <FirstRunTip
-        id={isSeller ? 'seller-inbox' : 'buyer-inbox'}
+        id={inboxTipId}
         variant="gesture"
         contentReady={!loading}
-        gesture={isSeller ? SELLER_INBOX_GESTURE : BUYER_INBOX_GESTURE}
+        gesture={{ ...(isSeller ? SELLER_INBOX_GESTURE : BUYER_INBOX_GESTURE), target: inboxTipTarget }}
       />
     </View>
   );

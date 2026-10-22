@@ -46,6 +46,7 @@ import {
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -67,6 +68,7 @@ export default function MockupToModelScreen() {
   const insets = useSafeAreaInsets();
   const tabBarInset = useSellerTabBarInset();
   const params = useLocalSearchParams<{ seedMockupUri?: string }>();
+  const mockupTipUpload = useTipTarget('mockup-to-model:upload');
 
   // Form state
   const [mockupUri, setMockupUri] = useState<string | null>(null);
@@ -477,7 +479,7 @@ export default function MockupToModelScreen() {
         <Text style={s.sectionLabel}>Garment mockup</Text>
         <Text style={s.sectionSub}>Upload a flat-lay or product image of your garment. Required.</Text>
         {mockupUri ? (
-          <View style={s.uploadZoneFilled}>
+          <View {...tipTargetProps('mockup-to-model:upload')} collapsable={false} style={s.uploadZoneFilled}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               onPress={pickMockup}
@@ -500,6 +502,7 @@ export default function MockupToModelScreen() {
           </View>
         ) : (
           <TouchableOpacity
+            {...tipTargetProps('mockup-to-model:upload')}
             style={s.uploadZone}
             onPress={pickMockup}
             accessibilityLabel="Upload garment mockup"
@@ -573,7 +576,7 @@ export default function MockupToModelScreen() {
         id="mockup-to-model"
         variant="anchored"
         contentReady
-        anchored={{ steps: MOCKUP_TO_MODEL_STEPS }}
+        anchored={{ steps: MOCKUP_TO_MODEL_STEPS, targets: [mockupTipUpload, null] }}
       />
     </View>
   );

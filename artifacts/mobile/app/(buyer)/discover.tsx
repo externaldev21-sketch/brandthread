@@ -61,6 +61,7 @@ import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProd
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { measureTipTargetFrom, useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { FirstWeekCard, useFirstWeek } from '@/components/FirstWeekCard';
 import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
 import { useFeedAds } from '@/hooks/useFeedAds';
@@ -99,6 +100,14 @@ export default function DiscoverScreen() {
   const { isSignedIn } = useAuth();
 
   const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
+  // First-run tip target: the scrolling list/grid the swipe-up hint
+  // describes. Reads the list's existing ref after layout — no new ref,
+  // prop, or layout change on the list itself.
+  const discoverTipTarget = useTipTarget('buyer-discover');
+  useEffect(() => {
+    const t = setTimeout(() => measureTipTargetFrom('buyer-discover', () => listRef.current), 400);
+    return () => clearTimeout(t);
+  }, [filter, listRef]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Every list below is sticky (lib/stickyState.ts): a remount — or a first
@@ -586,7 +595,7 @@ export default function DiscoverScreen() {
         id="buyer-discover"
         variant="gesture"
         contentReady
-        gesture={BUYER_DISCOVER_GESTURE}
+        gesture={{ ...BUYER_DISCOVER_GESTURE, target: discoverTipTarget }}
       />
       {search && (
         <DiscoverSearchOverlay

@@ -10,6 +10,7 @@ import { openPullDownMenu } from '@/lib/contextMenu';
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 import { getCachedTabData, setCachedTabData, setMemoryTabData } from '@/lib/tabDataCache';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
@@ -867,9 +868,16 @@ export default function ProductsScreen() {
     )();
   }, [previewOnly, queryClient]);
 
-  const renderProduct = useCallback(({ item }: { item: Product }) => (
+  // First-run tip target: the first product cell (invisible measurement only).
+  const { ref: firstProductRef, rect: firstProductRect, onLayout: firstProductOnLayout } = useMeasuredTarget();
+  const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => (
     !isGrid ? (
-      <View style={{ paddingHorizontal: gridGap / 2 }}>
+      <View
+        ref={index === 0 ? firstProductRef : undefined}
+        onLayout={index === 0 ? firstProductOnLayout : undefined}
+        collapsable={index === 0 ? false : undefined}
+        style={{ paddingHorizontal: gridGap / 2 }}
+      >
         <ProductRow
           product={item}
           onPress={openProduct}
@@ -879,7 +887,12 @@ export default function ProductsScreen() {
         />
       </View>
     ) : (
-    <View style={{ paddingHorizontal: gridGap / 2 }}>
+    <View
+      ref={index === 0 ? firstProductRef : undefined}
+      onLayout={index === 0 ? firstProductOnLayout : undefined}
+      collapsable={index === 0 ? false : undefined}
+      style={{ paddingHorizontal: gridGap / 2 }}
+    >
       <ProductCard
         product={item}
         width={cardWidth}
@@ -893,7 +906,7 @@ export default function ProductsScreen() {
       />
     </View>
     )
-  ), [isGrid, openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap, salesFlags]);
+  ), [isGrid, openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap, salesFlags, firstProductRef, firstProductOnLayout]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -1069,7 +1082,7 @@ export default function ProductsScreen() {
         id="seller-products"
         variant="gesture"
         contentReady={!loading}
-        gesture={SELLER_PRODUCTS_GESTURE}
+        gesture={{ ...SELLER_PRODUCTS_GESTURE, target: firstProductRect }}
       />
     </View>
   );

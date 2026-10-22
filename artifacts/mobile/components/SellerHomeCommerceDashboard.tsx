@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { tipTargetProps } from '@/components/first-run-tips/tipTargets';
 import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -1135,7 +1136,7 @@ export default function SellerHomeCommerceDashboard({
                   visits yet" zero state below (never hidden behind the
                   sales-only newSeller setup card). */}
               {data && (
-                <View style={styles.section}>
+                <View {...tipTargetProps('seller-dashboard:traffic')} collapsable={false} style={styles.section}>
                   <SellerDashboardTrafficSources
                     totalVisits={data.visitorCount}
                     previousVisits={data.previous?.visitorCount ?? 0}

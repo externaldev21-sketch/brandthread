@@ -13,9 +13,10 @@ import { MEDIA } from '@/lib/theme';
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { SpotlightOverlay, holeFor } from './SpotlightOverlay';
+import { TipBubble } from './TipBubble';
 import type { FirstRunTipStep, TargetRect } from './types';
 
 export interface AnchoredCardTipProps {
@@ -29,8 +30,7 @@ export interface AnchoredCardTipProps {
 }
 
 export function AnchoredCardTip({ visible, onDismiss, steps, targets = [], reduceMotion = false, testID }: AnchoredCardTipProps) {
-  const { height: screenH } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const [stepIndex, setStepIndex] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -53,12 +53,43 @@ export function AnchoredCardTip({ visible, onDismiss, steps, targets = [], reduc
     setStepIndex((i) => i + 1);
   }
 
-  const cardBelowTarget = target ? target.y + target.height + 160 < screenH : false;
-  const positionStyle = target
-    ? cardBelowTarget
-      ? { top: target.y + target.height + SP.md }
-      : { top: Math.max(target.y - 180, insets.top + SP.md) }
-    : { top: '38%' as const };
+  const cardContent = (
+    <>
+      <View style={styles.headerRow}>
+        <Text style={styles.stepCount}>{stepIndex + 1} / {steps.length}</Text>
+        <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Skip" style={target ? styles.skipBesideClose : null}>
+          <Text style={styles.skip}>Skip</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.title}>{step.title}</Text>
+      {step.body ? <Text style={styles.body}>{step.body}</Text> : null}
+      <View style={styles.dots}>
+        {steps.map((_, i) => (
+          <View key={i} style={[styles.dot, i === stepIndex && styles.dotActive]} />
+        ))}
+      </View>
+      <PressableScale onPress={next} style={styles.nextButton} accessibilityRole="button" accessibilityLabel={isLast ? 'Done' : 'Next'}>
+        <Text style={styles.nextButtonText}>{isLast ? 'Done' : 'Next'}</Text>
+      </PressableScale>
+    </>
+  );
+
+  if (target) {
+    // Step with a real measured target: spotlight it (click-through hole)
+    // and anchor the step card to it. A press on the real control (observed
+    // on web) advances the tour like Next.
+    const hole = holeFor(target, screenW, screenH);
+    return (
+      <Animated.View
+        pointerEvents="box-none"
+        style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]}
+        testID={testID ?? 'first-run-tip-anchored'}
+      >
+        <SpotlightOverlay hole={hole} onScrimPress={onDismiss} onTargetPress={next} />
+        <TipBubble hole={hole} onClose={onDismiss}>{cardContent}</TipBubble>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View
@@ -69,31 +100,15 @@ export function AnchoredCardTip({ visible, onDismiss, steps, targets = [], reduc
       {/* A light scrim, not the heavy full-screen dim — this variant stays
           small-footprint per Dev's rule ("small = anchored card"). */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim]} />
-      <View style={[styles.cardWrap, positionStyle, target ? { left: Math.max(Math.min(target.x, 0), 0) } : { left: 0, right: 0, alignItems: 'center' }]}>
-        <View style={styles.card}>
-          <View style={styles.headerRow}>
-            <Text style={styles.stepCount}>{stepIndex + 1} / {steps.length}</Text>
-            <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Skip">
-              <Text style={styles.skip}>Skip</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.title}>{step.title}</Text>
-          {step.body ? <Text style={styles.body}>{step.body}</Text> : null}
-          <View style={styles.dots}>
-            {steps.map((_, i) => (
-              <View key={i} style={[styles.dot, i === stepIndex && styles.dotActive]} />
-            ))}
-          </View>
-          <PressableScale onPress={next} style={styles.nextButton} accessibilityRole="button" accessibilityLabel={isLast ? 'Done' : 'Next'}>
-            <Text style={styles.nextButtonText}>{isLast ? 'Done' : 'Next'}</Text>
-          </PressableScale>
-        </View>
+      <View style={[styles.cardWrap, { top: '38%' as const, left: 0, right: 0, alignItems: 'center' }]}>
+        <View style={styles.card}>{cardContent}</View>
       </View>
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
+  root: { zIndex: 9998, elevation: 9998 },
+  skipBesideClose: { marginRight: 28 },
   scrim: { backgroundColor: mediaAlpha(MEDIA.background, 0.28) },
   cardWrap: { position: 'absolute', paddingHorizontal: SP.lg, zIndex: 9998, elevation: 9998 },
   card: {

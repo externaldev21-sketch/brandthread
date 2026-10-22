@@ -747,3 +747,17 @@ mtime_ms = 1792556932190
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/3827e11a-b270-4dc1-a209-e0e3949c5f32/33057941-da54-4081-9afa-926a51d2fd4f"
 storage_version_token = "1792557264299412"
 content_type = "image/png"
+
+[[outputs]]
+id = "Iu_AbeGrduImx-j4EorQ6"
+uri = "file://.local/validation/spotlight-tips/inbox-390x844.png"
+type = "image"
+title = "Inbox spotlight — 390×844"
+description = "Existing chat tip with a bright measured conversation row and anchored bubble."
+logical_id = "57324e6d-495f-41e5-bfcb-8a3e5871ca83"
+content_hash = "sha256:123880ded340f5b557065c87a3a025b965d272db12cede70bdeb10797a3a258e"
+size = 28795
+mtime_ms = 1792648914261
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/57324e6d-495f-41e5-bfcb-8a3e5871ca83/60f17d04-8639-4bee-b1ff-5012ff72f5fc"
+storage_version_token = "1792649035742972"
+content_type = "image/png"

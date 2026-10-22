@@ -96,6 +96,7 @@ import { groupOrdersByRecency } from '@/lib/groupOrdersByRecency';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
 
 import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 import { readSellerOrdersCache, saveSellerOrdersCache } from '@/lib/sellerOrdersCache';
@@ -641,7 +642,7 @@ function FilterSheet({
  * selection state are unchanged.
  */
 const OrderListRow = React.memo(function OrderListRow({
-  order, isLast, selected, selectionMode, actions, current = false,
+  order, isLast, selected, selectionMode, actions, current = false, tipTarget = false,
 }: {
   order: Order;
   isLast: boolean;
@@ -650,6 +651,8 @@ const OrderListRow = React.memo(function OrderListRow({
   actions: OrderRowActions;
   /** iPad split: the order shown in the detail pane (white outline, like Shopify iPad's selected row). */
   current?: boolean;
+  /** First-run tip: measure this row (measurement only). */
+  tipTarget?: boolean;
 }) {
   const { theme } = useAppTheme();
   // Orders are automatic (paid orders arrive as "To ship"), so the only useful
@@ -671,7 +674,7 @@ const OrderListRow = React.memo(function OrderListRow({
         accessibilityLabel: `${swipeAction.label} order ${order.orderNumber}`,
       }]}
     >
-      <View style={current ? { borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: theme.text } : undefined} accessibilityState={current ? { selected: true } : undefined}>
+      <View {...(tipTarget ? tipTargetProps('seller-orders') : null)} style={current ? { borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: theme.text } : undefined} accessibilityState={current ? { selected: true } : undefined}>
         <OrderRow
           order={order}
           selected={selected}
@@ -1049,6 +1052,11 @@ export default function OrdersScreen() {
   // Date-grouped sections, flattened into recyclable rows
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
   const listRows = useMemo(() => flattenOrderSections(sections), [sections]);
+  // First-run tip target: the first order row actually listed (measurement only).
+  const firstListedOrderId = useMemo(() => {
+    for (const row of listRows) if (row.type === 'order') return row.order.id;
+    return null;
+  }, [listRows]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   // ─── Actions ───────────────────────────────────────────────────────────────
@@ -1211,6 +1219,7 @@ export default function OrdersScreen() {
   }), []);
 
   const selectionMode = selectedIds.length > 0;
+  const sellerOrdersTipTarget = useTipTarget('seller-orders');
   const renderItem = useCallback(({ item }: { item: OrderListItem }) => {
     if (item.type === 'header') {
       return (
@@ -1229,9 +1238,10 @@ export default function OrdersScreen() {
         selectionMode={selectionMode}
         actions={rowActions}
         current={splitView && item.order.id === (splitOrderId ?? orders[0]?.id)}
+        tipTarget={item.order.id === firstListedOrderId}
       />
     );
-  }, [s, selectedIdSet, selectionMode, rowActions, splitView, splitOrderId, orders]);
+  }, [s, selectedIdSet, selectionMode, rowActions, splitView, splitOrderId, orders, firstListedOrderId]);
 
   const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
   const getItemType = useCallback((row: OrderListItem) => row.type, []);
@@ -1417,7 +1427,7 @@ export default function OrdersScreen() {
         id="seller-orders"
         variant="gesture"
         contentReady={!loading}
-        gesture={SELLER_ORDERS_GESTURE}
+        gesture={{ ...SELLER_ORDERS_GESTURE, target: sellerOrdersTipTarget }}
       />
     </View>
   );
