@@ -1,7 +1,7 @@
 /**
  * Buyer Threads Home feed — right action rail (TikTok/Reels-quality pass).
  *
- * Avatar (48pt, thin white ring, live ring integration) + follow badge,
+ * Avatar (38pt circle) + follow badge,
  * like, comment, repost, save, share. Custom filled SVG glyphs (RailGlyph),
  * counts below (formatRailCount: exact 0-999, compact K/M, always shows 0). All motion runs on the
  * UI thread via Reanimated shared values and respects `reduceMotion`.
@@ -34,9 +34,9 @@ export const RAIL_AVATAR_TO_LIKE = 16;
 export const RAIL_WIDTH = 48;
 export const RAIL_RIGHT = 6;
 export const RAIL_DISC_TO_PROGRESS = 12;
-export const RAIL_LAYOUT = { width: 48, avatar: 48, avatarBlock: 73, item: 65, icon: 32, countLine: 15, disc: 40 } as const;
+export const RAIL_LAYOUT = { width: 48, avatar: 38, avatarBlock: 73, item: 65, icon: 32, countLine: 15, disc: 40 } as const;
 export const RAIL_HEIGHT = 373;
-const AVATAR = 48;
+const AVATAR = RAIL_LAYOUT.avatar;
 // Brandthread Woven `color.dark.destructive` (#E5484D). The mobile artifact
 // doesn't depend on @workspace/brandthread-woven yet, so it's mirrored here.
 const HEART_RED = '#E5484D';
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center', height: AVATAR, marginBottom: RAIL_LAYOUT.avatarBlock - AVATAR - RAIL_ITEM_GAP },
   avatarHit: { width: AVATAR, height: AVATAR, alignItems: 'center', justifyContent: 'center' },
   avatar: {
-    width: AVATAR, height: AVATAR, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarBlack: { backgroundColor: '#000' },

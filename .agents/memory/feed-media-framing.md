@@ -31,6 +31,14 @@ The latest approved rail design supersedes the earlier rail brief: Repost lives 
 
 **How to apply:** Apply reviewed visual changes on top of the current playback, HLS, carousel and persistence internals; do not replace those internals with an older implementation.
 
+## Rail avatar preservation
+
+The owner rejected the larger feed-rail avatar and requested the original small circular profile control. Do not enlarge it while polishing icons, shared avatars or other screens.
+
+**Why:** An unrelated rail rebuild changed a profile control the owner already liked. Avatar changes must not move or restyle the remaining action groups.
+
+**How to apply:** Treat rail-avatar sizing as independently protected; keep the red follow badge centered over its bottom edge and preserve the other groups' positions.
+
 ## Watched-post availability
 
 Watched videos stay in Threads/Following: unseen posts rank first, followed by watched posts. Watch history must never remove posts from fresh pages, pagination or repeat loops, on either client or server.
