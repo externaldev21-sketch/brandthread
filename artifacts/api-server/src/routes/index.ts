@@ -6,6 +6,7 @@ import { pushBroadcastAllowance } from "../middlewares/pushBroadcastAllowance";
 import { aiSafetyGuard } from "../middlewares/aiSafetyGuard";
 import { requireAiConsent } from "../middlewares/requireAiConsent";
 import healthRouter from "./health";
+import launchWaitlistRouter from "./launch-waitlist";
 import { responseCache, invalidateResponseCache, bumpResponseCacheGeneration } from "../middlewares/responseCache";
 import clerkStatusRouter from "./clerk-status";
 import authRouter from "./auth";
@@ -415,6 +416,7 @@ router.use("/day-one",                   dayOneRouter);
 // Buyer routes must see the buyer, so no tc here; the seller settings routes apply teamContext() themselves.
 router.use("/brand-membership",          brandMembershipRouter);
 router.use("/preorder-terms",            tc, preorderTermsRouter);
+router.use("/launch-waitlist",           launchWaitlistRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/mystery-boxes",             tc, mysteryBoxesRouter);

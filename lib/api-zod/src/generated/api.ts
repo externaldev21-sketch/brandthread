@@ -9,6 +9,24 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Request a Brandthread launch email without creating an account
+ */
+export const joinLaunchWaitlistBodyEmailMax = 254;
+
+export const joinLaunchWaitlistBodySourceDefault = `landing`;
+
+export const JoinLaunchWaitlistBody = zod.object({
+  "email": zod.string().email().max(joinLaunchWaitlistBodyEmailMax),
+  "source": zod.enum(['instagram', 'landing']).default(joinLaunchWaitlistBodySourceDefault)
+})
+
+export const JoinLaunchWaitlistResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.literal("You're on the list.")
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -1914,7 +1932,7 @@ export const createReportBodyNoteMax = 1000;
 
 
 export const CreateReportBody = zod.object({
-  "targetType": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message']),
+  "targetType": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message', 'community_message', 'community', 'review']),
   "targetId": zod.string(),
   "reason": zod.enum(['spam', 'harassment', 'nudity', 'hate', 'violence', 'ip_counterfeit', 'scam', 'other']),
   "note": zod.string().max(createReportBodyNoteMax).optional().describe('Required when reason is \"other\".')
@@ -1945,7 +1963,7 @@ export const listModerationReportsQueryOffsetMin = 0;
 
 export const ListModerationReportsQueryParams = zod.object({
   "status": zod.enum(['open', 'resolved', 'all']).optional(),
-  "type": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message']).optional(),
+  "type": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message', 'community_message', 'community', 'review']).optional(),
   "limit": zod.coerce.number().min(1).max(listModerationReportsQueryLimitMax).optional(),
   "offset": zod.coerce.number().min(listModerationReportsQueryOffsetMin).optional()
 })

@@ -30,6 +30,7 @@ export type RateLimitPolicyName =
   | "gift-card-lookup"
   | "access-code"
   | "access-waitlist"
+  | "launch-waitlist"
   | "contact-match"
   | "post-create"
   | "review"
@@ -188,6 +189,12 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
   },
   "access-waitlist": {
     id: "access-waitlist",
+    limit: 5,
+    windowMs: 60 * 60_000,
+    message: "Too many requests. Please try again later.",
+  },
+  "launch-waitlist": {
+    id: "launch-waitlist",
     limit: 5,
     windowMs: 60 * 60_000,
     message: "Too many requests. Please try again later.",
@@ -432,6 +439,7 @@ export function rateLimitStoreMode(env: Record<string, string | undefined> = pro
  * (fail open), so a store problem never takes checkout or browsing down.
  */
 export const FAIL_CLOSED_RATE_LIMIT_POLICIES: ReadonlySet<string> = new Set([
+  "launch-waitlist",
   "authentication",
   "access-code",
   "gift-card-lookup",

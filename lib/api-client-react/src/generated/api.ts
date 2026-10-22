@@ -44,6 +44,8 @@ import type {
   GetModerationAccess200,
   GetPartnerManufacturer200,
   HealthStatus,
+  LaunchWaitlistInput,
+  LaunchWaitlistResult,
   LegalAcceptanceInput,
   LikeCommentInput,
   LikePostComment200,
@@ -101,10 +103,6 @@ import type {
 import { customFetch } from '../custom-fetch';
 import type { ErrorType , BodyType } from '../custom-fetch';
 
-type AwaitedInput<T> = PromiseLike<T> | T;
-
-      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
-
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -124,6 +122,76 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getJoinLaunchWaitlistUrl = () => {
+
+
+
+
+  return `/api/launch-waitlist`
+}
+
+/**
+ * @summary Request a Brandthread launch email without creating an account
+ */
+export const joinLaunchWaitlist = async (launchWaitlistInput: LaunchWaitlistInput, options?: RequestInit): Promise<LaunchWaitlistResult> => {
+
+  return customFetch<LaunchWaitlistResult>(getJoinLaunchWaitlistUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(launchWaitlistInput)
+  }
+);}
+
+
+
+
+export const getJoinLaunchWaitlistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLaunchWaitlist>>, TError,{data: BodyType<LaunchWaitlistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinLaunchWaitlist>>, TError,{data: BodyType<LaunchWaitlistInput>}, TContext> => {
+
+const mutationKey = ['joinLaunchWaitlist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinLaunchWaitlist>>, {data: BodyType<LaunchWaitlistInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinLaunchWaitlist(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinLaunchWaitlistMutationResult = NonNullable<Awaited<ReturnType<typeof joinLaunchWaitlist>>>
+    export type JoinLaunchWaitlistMutationBody = BodyType<LaunchWaitlistInput>
+    export type JoinLaunchWaitlistMutationError = ErrorType<void>
+
+    /**
+ * @summary Request a Brandthread launch email without creating an account
+ */
+export const useJoinLaunchWaitlist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLaunchWaitlist>>, TError,{data: BodyType<LaunchWaitlistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinLaunchWaitlist>>,
+        TError,
+        {data: BodyType<LaunchWaitlistInput>},
+        TContext
+      > => {
+      return useMutation(getJoinLaunchWaitlistMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

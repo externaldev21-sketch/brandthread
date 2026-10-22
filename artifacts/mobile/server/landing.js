@@ -2,9 +2,9 @@
  * Decides when the static marketing landing page replaces the app shell.
  *
  * The landing page is served at "/" only for a plain, signed-out browser
- * visit. Anything that could be the app (a session cookie, any query string
- * such as ?bt_preview=, invite codes or ?app=1, a non-HTML request) keeps the
- * existing behaviour, and "/welcome" always shows the landing page.
+ * visit. Unknown/tracking query strings cannot bypass the pre-launch page.
+ * Explicit development previews and signed-in sessions still reach the app;
+ * "/welcome" always shows the landing page.
  */
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +12,6 @@ const path = require('path');
 const LANDING_FILE = 'landing.html';
 // Public seller pricing (scripts/pricing-page.js), the same for everyone.
 const PRICING_FILE = 'pricing.html';
-// Campaign tags that never change what the app does.
-const MARKETING_PARAMS = /^(utm_[a-z_]+|fbclid|gclid|ttclid|msclkid|ref)$/i;
 
 function parseCookies(header = '') {
   const cookies = {};
@@ -40,13 +38,6 @@ function hasClerkSession(cookieHeader) {
   });
 }
 
-function hasOnlyMarketingParams(searchParams) {
-  for (const key of searchParams.keys()) {
-    if (!MARKETING_PARAMS.test(key)) return false;
-  }
-  return true;
-}
-
 function landingPathFor(staticRoot) {
   return path.join(staticRoot, LANDING_FILE);
 }
@@ -58,7 +49,9 @@ function shouldServeLanding({ method = 'GET', pathname, searchParams, headers = 
   if (pathname !== '/') return false;
   if (appPreview) return false;
   if (!String(headers.accept || '').includes('text/html')) return false;
-  if (!hasOnlyMarketingParams(searchParams)) return false;
+  const host = String(headers.host || '').split(':')[0].toLowerCase();
+  const developmentHost = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.replit.dev');
+  if (developmentHost && ['buyer', 'seller', 'guest'].includes(searchParams.get('bt_preview'))) return false;
   return !hasClerkSession(headers.cookie);
 }
 

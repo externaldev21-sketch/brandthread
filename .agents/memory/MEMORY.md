@@ -118,3 +118,4 @@
 - [Feed media framing](feed-media-framing.md) — TikTok feed preserves LIVE/Cart/navigation; videos cover, photos contain with blur; feed zoom resets, viewer zoom stays.
 - [Feed video delivery](feed-video-delivery.md) — count speculative decoders, cap rather than inflate bitrate, authorize HLS children, and preserve cached URLs across backfills.
 - [Posts-first profiles](profile-posts-first.md) — all profile visits default to Posts; existing Products tabs remain second, with selection local to a visit.
+- [Pre-launch public entry](prelaunch-public-entry.md) — Instagram visitors see the existing branded landing and launch email form, not account entry; dev previews stay separate.

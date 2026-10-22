@@ -157,7 +157,7 @@ describe("profile mutual followers + website", () => {
   it("serves public profile headers anonymously without viewer relationship data", async () => {
     const response = await get(`/api/social/profile/${target}`, "");
     expect(response.status).toBe(200);
-    const profile = await response.json();
+    const profile = await response.json() as Record<string, unknown>;
     expect(profile.userId).toBe(target);
     expect(profile.isFollowing).toBe(false);
     expect(profile.isFollowedBy).toBe(false);

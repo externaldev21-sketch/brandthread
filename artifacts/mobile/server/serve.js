@@ -353,8 +353,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Signed-out visits to "/" (and "/welcome") get the static marketing page.
-  // Everything else, including any session cookie or query string, falls
-  // through to the unchanged app handling below.
+  // Session cookies and explicit development previews keep app access.
+  // Tracking/unknown query strings must not bypass the pre-launch cover.
   if (shouldServeLanding({
     method: req.method,
     pathname: requestedPath,
@@ -363,7 +363,11 @@ const server = http.createServer(async (req, res) => {
     staticRoot: STATIC_ROOT,
     appPreview: basePath === '/fast-preview',
   })) {
-    const landingHtml = fs.readFileSync(landingPathFor(STATIC_ROOT), 'utf8');
+    const landingHtml = fs.readFileSync(landingPathFor(STATIC_ROOT), 'utf8')
+      // The separate fast preview shares this static server but is mounted
+      // below /fast-preview. Keep landing-only assets inside that mount.
+      .replaceAll('/landing-assets/', `${basePath}/landing-assets/`)
+      .replaceAll('"/brandthread-logo.png"', `"${basePath}/brandthread-logo.png"`);
     const gzip = /\bgzip\b/.test(acceptEncoding);
     res.writeHead(200, {
       'content-type': 'text/html; charset=utf-8',

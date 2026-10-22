@@ -10,7 +10,7 @@ import { RetainedScene } from '@/components/RetainedScene';
 import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWarmup';
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
-import { guestReturnPath, requestGuestSignIn } from '@/lib/guestSignIn';
+import { GuestRouteBoundary } from '@/components/GuestRouteBoundary';
 import { GuestSignInSheet } from '@/components/GuestSignInSheet';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { webAppPathname } from '@/lib/webAppPathname';
@@ -761,8 +761,6 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const guestPathname = usePathname();
-  const guestParams = useGlobalSearchParams();
   const { addAccount, returnTo, guestPrompt } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string; guestPrompt?: string }>();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
@@ -995,14 +993,7 @@ function AuthGate() {
     // Thread explainer is a post-onboarding buyer screen — let authenticated
     // users stay on it; the screen itself handles its own seen-state redirect.
     const inThreadExplainer = (segments[0] as string) === 'thread-explainer';
-    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen && !inThreadExplainer;
     const inAddAccountFlow = addAccount === '1' && (inAuthScreen || inOnboarding);
-
-    // Allow public access to specific buyer routes for guests
-    // (see lib/guestRoutes.ts — feed, discover, search, stores, products, drops,
-    // public profiles; account-only actions are gated inline at the action)
-    const isGuestAllowedRoute =
-      isGuestBrowseRoute(segments as string[]) || (segments[0] as string) === 'location';
 
     // Development previews skip onboarding without writing completion flags.
     // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
@@ -1057,14 +1048,9 @@ function AuthGate() {
       router.replace('/(buyer)/' as never);
       return;
     }
-    // Private deep links show the same prompt. Dismiss always returns to browsing.
-    if (!isSignedIn && inProtectedArea && !isGuestAllowedRoute) {
-      requestGuestSignIn(guestReturnPath(guestPathname, guestParams), () => {
-        router.replace('/(buyer)/' as never);
-      });
-      return;
-    }
-    if (!isSignedIn) return; // stay on auth screen or guest-allowed route
+    // Private routes render an inline state through GuestRouteBoundary.
+    // Navigation/mount/focus must never request the account-action sheet.
+    if (!isSignedIn) return;
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
@@ -1137,11 +1123,11 @@ function AuthGate() {
     if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(buyer)/${rest}` : '/(buyer)/') as never);
-    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !isGuestAllowedRoute && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
+    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !isGuestBrowseRoute(segments as string[]) && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, returnTo, guestPrompt, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady, guestPathname, guestParams]);
+  }, [addAccount, returnTo, guestPrompt, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }
@@ -1636,7 +1622,7 @@ const AppStack = React.memo(function AppStack() {
         screenLayout={({ children, route, options, navigation }) => (
           <RetainedScene navigation={navigation}>
           <IsolatedStackScene routeName={route.name} presentation={(options as { presentation?: string } | undefined)?.presentation}>
-            {children}
+            <GuestRouteBoundary routeName={route.name}>{children}</GuestRouteBoundary>
           </IsolatedStackScene>
           </RetainedScene>
         )}

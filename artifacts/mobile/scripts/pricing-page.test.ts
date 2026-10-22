@@ -116,34 +116,15 @@ function runTrialScript(html: string, now: Date) {
   return spots.map((s) => s.textContent);
 }
 
-describe('landing pricing section', () => {
+describe('pre-launch landing page has no pricing', () => {
   const html = landing.renderLandingHtml({ pricing: catalogue });
 
-  it('shows every plan with its price, a Try button into seller sign-up and the trial line', () => {
-    for (const plan of catalogue.plans) {
-      expect(html).toContain(`<h3>${plan.name}</h3>`);
-      expect(html).toContain(`<strong>${pricing.formatPrice(plan.priceCents)}</strong>`);
-      expect(html).toContain(`href="/onboarding" data-flow="seller" data-cta-for="${plan.id}">Try ${plan.name}</a>`);
-    }
-    expect(html.match(/class="trial"/g)).toHaveLength(catalogue.plans.length);
-    expect(html).toContain(`Pick a plan and add a card to start your ${catalogue.trialDays}-day free trial.`);
-    expect(html).toContain('href="/pricing"');
-    expect(html).toContain('href="/sign-in?returnTo=%2Fplans"');
-  });
-
-  it('fills in the charge date in the browser', () => {
-    expect(runTrialScript(html, new Date(2026, 9, 13, 9))).toEqual(['Oct 20', 'Oct 20']);
-  });
-
-  it('keeps pricing static while the hero may fetch public marketplace statistics', () => {
-    expect(pricing.renderLandingPricingSection(catalogue)).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|\/api\//);
-    expect(html).toContain('/api/v1/public/stats');
-  });
-
-  it('omits plan cards without a catalogue while retaining the public pricing link', () => {
-    const bare = landing.renderLandingHtml({});
-    expect(bare).not.toContain('id="pricing"');
-    expect(bare).toContain('href="/pricing"');
+  it('does not render plans, pricing, onboarding links or a stats fetch', () => {
+    expect(html).not.toContain('id="pricing"');
+    expect(html).not.toContain('href="/pricing"');
+    expect(html).not.toContain('/onboarding');
+    expect(html).not.toContain('/api/v1/public/stats');
+    for (const plan of catalogue.plans) expect(html).not.toContain(`Try ${plan.name}`);
   });
 });
 
@@ -204,7 +185,7 @@ describe('build output and serving', () => {
     try {
       landing.writeLandingPage(dir, projectRoot, {});
       expect(fs.existsSync(path.join(dir, 'pricing.html'))).toBe(true);
-      expect(fs.readFileSync(path.join(dir, 'landing.html'), 'utf8')).toContain('id="pricing"');
+      expect(fs.readFileSync(path.join(dir, 'landing.html'), 'utf8')).not.toContain('id="pricing"');
       const decide = (pathname: string, method = 'GET') => serverLanding.shouldServePricing({ method, pathname, staticRoot: dir });
       expect(decide('/pricing')).toBe(true);
       expect(decide('/pricing/')).toBe(true);

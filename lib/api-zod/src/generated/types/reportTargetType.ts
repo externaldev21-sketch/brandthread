@@ -19,4 +19,7 @@ export const ReportTargetType = {
   product: 'product',
   profile: 'profile',
   message: 'message',
+  community_message: 'community_message',
+  community: 'community',
+  review: 'review',
 } as const;

@@ -1,62 +1,64 @@
 /**
- * Static marketing landing page for brandthread.app.
+ * Static pre-launch landing page for brandthread.app.
  *
  * Pure string rendering, no app code: plain HTML and CSS plus one small inline
- * script that remembers the chosen signup side (and the typed email), starts
- * the app capture unless the visitor prefers reduced motion, and fills in the
- * live marketplace numbers from the public stats endpoint (the row stays
- * hidden if that request fails). `scripts/build-web.js` writes the result to
- * `static-build/landing.html`, its images and video to
- * `static-build/landing-assets/`, and `server/serve.js` serves it for
- * signed-out visits to "/" and for "/welcome". The Expo app itself is not
- * touched, apart from onboarding reading the prefilled email.
+ * script that reveals the launch-waitlist email form inline, posts it to the
+ * same-origin waitlist endpoint, starts the app capture only after load and
+ * only when motion is welcome, and adds light scroll reveals. The page holds
+ * no sign-up, sign-in or app-entry links: before launch the only action is
+ * "Notify me at launch". `scripts/build-web.js` writes the result to
+ * `static-build/landing.html` (media to `static-build/landing-assets/`) and
+ * `server/serve.js` serves it. The Expo app itself is not touched.
  */
 
-const { PRICING_CSS, PRICING_PATH, renderLandingPricingSection, renderPricingHtml, trialDateScript } = require('./pricing-page');
+const { renderPricingHtml } = require('./pricing-page');
 const PRICING_FILE = 'pricing.html';
 const CANONICAL_ORIGIN = 'https://brandthread.app';
 const LOGO_URL = `${CANONICAL_ORIGIN}/brandthread-logo.png`;
 const TITLE = 'Brandthread | Shop, sell & design streetwear';
 const DESCRIPTION =
-  'Brandthread is where independent labels drop new pieces, sellers run their whole shop, and buyers discover streetwear brands they will actually wear.';
+  'Brandthread is launching soon: discover streetwear in Threads, shop independent-brand drops, sell live with real seller tools and earn Thread Cash.';
 
-// The app's own onboarding reads this key to resume at the account-creation
-// step for the chosen side (app/onboarding.tsx PENDING_FLOW_KEY). Writing it
-// lets "Start selling" skip the Buyer/Seller question without changing the app.
+// Kept for /pricing (pricing-page.js); the landing page itself never writes it.
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
-// Read once by app/onboarding.tsx to prefill the sign-up email. Handed over in
-// storage rather than the URL so addresses never land in server logs.
-const PREFILL_EMAIL_KEY = 'onboarding_prefill_email';
 
-// Real in-app routes (Expo Router): onboarding creates the account, sign-in
-// is for returning users, discover and buyer-search are open to guests, the
-// legal pages are public.
+// Public, non-app destinations only. No sign-up, sign-in or in-app routes.
 const ROUTES = {
   signUp: '/onboarding',
   signIn: '/sign-in',
-  shop: '/discover',
-  pricing: PRICING_PATH,
-  search: '/buyer-search',
   privacy: '/privacy',
   terms: '/terms',
   guidelines: '/community-guidelines',
   support: 'mailto:support@brandthread.app',
 };
+const LEGAL_LINKS = [
+  ['Privacy', ROUTES.privacy],
+  ['Terms', ROUTES.terms],
+  ['Community guidelines', ROUTES.guidelines],
+  ['Support', ROUTES.support],
+];
 
-// Same-origin in production (build-web.js points the app at brandthread.app).
-const STATS_ENDPOINT = '/api/v1/public/stats';
-// Where the QR code points when no App Store URL is configured.
+// Same-origin: the server proxies /api to the API server.
+const WAITLIST_ENDPOINT = '/api/launch-waitlist';
+const WAITLIST_SUCCESS = "You're on the list.";
+const WAITLIST_SOURCES = ['instagram', 'landing'];
 const QR_FALLBACK_URL = `${CANONICAL_ORIGIN}/welcome`;
 
 const ASSET_DIR = 'landing-assets';
-// Logical name -> source file (relative to the mobile project). Published
-// with a content hash in the file name because static files are served
-// `immutable` for a year.
 const LANDING_ASSETS = {
   'app-capture.mp4': 'assets/landing/app-capture.mp4',
   'app-capture.webm': 'assets/landing/app-capture.webm',
   'app-capture-poster.jpg': 'assets/landing/app-capture-poster.jpg',
+  // Inter, bundled locally from the app's own @expo-google-fonts/inter install.
+  'inter-400.ttf': 'node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf',
+  'inter-600.ttf': 'node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf',
+  'inter-700.ttf': 'node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf',
 };
+const INTER_WEIGHTS = [400, 600, 700];
+
+function fontFaceCss(assetUrls) {
+  return INTER_WEIGHTS.map((w) => `@font-face{font-family:Inter;font-style:normal;font-weight:${w};font-display:swap;src:url(${assetUrls[`inter-${w}.ttf`]}) format("truetype")}`).join('\n');
+}
 const CAPTURE_SIZE = { width: 540, height: 1168 };
 
 const STORE_HOSTS = {
@@ -64,10 +66,6 @@ const STORE_HOSTS = {
   playStore: ['play.google.com'],
 };
 
-/**
- * Returns a safe https store URL, or null (badge hidden) when the value is
- * missing, malformed, not https, or points at the wrong host.
- */
 function resolveStoreUrl(value, kind) {
   if (typeof value !== 'string' || !value.trim()) return null;
   let url;
@@ -89,10 +87,6 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * QR code as one SVG path (black modules on white, 2-module quiet zone),
- * computed at build time with the `qrcode` package: no network, no script.
- */
 function qrSvg(text) {
   const QRCode = require('qrcode');
   const { modules } = QRCode.create(text, { errorCorrectionLevel: 'M' });
@@ -105,52 +99,33 @@ function qrSvg(text) {
     }
   }
   const box = size + quiet * 2;
-  return `<svg class="qr" viewBox="0 0 ${box} ${box}" width="88" height="88" shape-rendering="crispEdges" role="img" aria-label="QR code to download the Brandthread app"><rect width="${box}" height="${box}" fill="#ffffff"/><path fill="#000000" d="${d}"/></svg>`;
+  return `<svg class="qr" viewBox="0 0 ${box} ${box}" width="88" height="88" shape-rendering="crispEdges" role="img" aria-label="QR code to open Brandthread on your phone"><rect width="${box}" height="${box}" fill="#ffffff"/><path fill="#000000" d="${d}"/></svg>`;
 }
 
-function structuredData({ appStoreUrl, playStoreUrl }) {
-  const installUrls = [appStoreUrl, playStoreUrl].filter(Boolean);
+function structuredData() {
   return {
     '@context': 'https://schema.org',
     '@graph': [
-      {
-        '@type': 'Organization',
-        name: 'Brandthread',
-        url: CANONICAL_ORIGIN,
-        logo: LOGO_URL,
-        description: DESCRIPTION,
-        email: 'support@brandthread.app',
-      },
-      {
-        '@type': 'WebSite',
-        name: 'Brandthread',
-        url: CANONICAL_ORIGIN,
-        description: DESCRIPTION,
-      },
-      {
-        '@type': 'MobileApplication',
-        name: 'Brandthread',
-        applicationCategory: 'ShoppingApplication',
-        operatingSystem: 'iOS, Android',
-        description: DESCRIPTION,
-        url: CANONICAL_ORIGIN,
-        ...(installUrls.length ? { installUrl: installUrls.length === 1 ? installUrls[0] : installUrls } : {}),
-      },
+      { '@type': 'Organization', name: 'Brandthread', url: CANONICAL_ORIGIN, logo: LOGO_URL, description: DESCRIPTION, email: 'support@brandthread.app' },
+      { '@type': 'WebSite', name: 'Brandthread', url: CANONICAL_ORIGIN, description: DESCRIPTION },
     ],
   };
 }
 
-// The phone's edge, drawn as stacked solid offsets (a slab, not a glow).
 const PHONE_DEPTH = Array.from({ length: 14 }, (_, i) => {
   const grey = Math.round(0x6a - i * 4).toString(16).padStart(2, '0');
   return `${i + 1}px ${i + 1}px 0 #${grey}${grey}${grey}`;
 }).join(',');
 
+// Inter ships with the page (same-origin @font-face, font-display:swap); no
+// third-party font request. System fonts cover the swap period.
+const FONT_STACK = 'Inter,"Inter var",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
+
 const CSS = `
 :root{--black:#000;--ink:#0a0a0a;--panel:#111;--field:#141414;--line:#2a2a2a;--silver:#c7c7c7;--mute:#9a9a9a;--white:#fff}
 *{box-sizing:border-box}
-html{background:var(--black);-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--black);color:var(--white);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+html{background:var(--black);-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--black);color:var(--white);font-family:${FONT_STACK};line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
 :focus-visible{outline:2px solid var(--white);outline-offset:3px}
 [hidden]{display:none!important}
@@ -166,48 +141,47 @@ header{padding-top:env(safe-area-inset-top);border-bottom:1px solid var(--line)}
 .links a{font-size:15px;font-weight:600;color:var(--silver);text-decoration:none}
 .links a:hover{color:var(--white)}
 .nav{display:flex;align-items:center;gap:12px;margin-left:auto}
-.search{position:relative;width:200px}
-.search input{width:100%;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--field);color:var(--white);font:inherit;font-size:14px;padding:0 14px 0 36px;-webkit-appearance:none;appearance:none}
-.search input::placeholder{color:var(--mute)}
-.search input:focus{outline:none;border-color:var(--white)}
-.search svg{position:absolute;left:12px;top:10px;width:16px;height:16px;color:var(--mute);pointer-events:none}
-.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:12px;font-weight:700;font-size:16px;line-height:1.2;text-align:center;text-decoration:none;border:1px solid var(--white);cursor:pointer;font-family:inherit;white-space:nowrap}
+.tag{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--silver);border:1px solid var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:12px;font-weight:700;font-size:16px;line-height:1.2;text-align:center;text-decoration:none;border:1px solid var(--white);cursor:pointer;font-family:inherit;white-space:nowrap;transition:background-color .15s,border-color .15s}
 .btn.solid{background:var(--white);color:var(--black)}
 .btn.solid:hover{background:var(--silver);border-color:var(--silver)}
-.btn.ghost{background:var(--black);color:var(--white);border-color:var(--line)}
-.btn.ghost:hover{border-color:var(--white)}
-.btn.small{min-height:36px;padding:0 16px;font-size:14px;border-radius:999px}
+.btn[disabled]{cursor:progress;background:var(--silver);border-color:var(--silver)}
 .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding-top:56px;padding-bottom:72px}
+.eyebrow{margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 h1{font-size:64px;text-wrap:balance;line-height:1.04;letter-spacing:-.035em;margin:0 0 20px;font-weight:700}
+h2{font-size:40px;line-height:1.08;letter-spacing:-.03em;margin:0 0 12px;font-weight:700;text-wrap:balance}
+h3{font-size:20px;line-height:1.25;letter-spacing:-.01em;margin:0 0 8px;font-weight:700}
 .lede{font-size:18px;color:var(--silver);max-width:34em;margin:0 0 32px;text-wrap:pretty}
-.signup{display:flex;gap:10px;width:100%;max-width:480px}
-.signup input{flex:1;min-width:0;height:52px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--white);font:inherit;font-size:16px;padding:0 16px;-webkit-appearance:none;appearance:none}
-.signup input::placeholder{color:var(--mute)}
-.signup input:focus{outline:none;border-color:var(--white)}
-.sell-link{display:inline-block;margin-top:14px;font-size:15px;font-weight:600;color:var(--silver);text-decoration:none}
-.sell-link:hover{color:var(--white);text-decoration:underline;text-underline-offset:4px}
+.waitlist{width:100%;max-width:480px}
+.waitlist form{display:flex;gap:10px;width:100%}
+.waitlist input{flex:1;min-width:0;height:52px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--white);font:inherit;font-size:16px;padding:0 16px;-webkit-appearance:none;appearance:none}
+.waitlist input::placeholder{color:var(--mute)}
+.waitlist input:focus{outline:none;border-color:var(--white)}
+.waitlist input[aria-invalid="true"]{border-color:var(--white)}
+.consent{margin:12px 0 0;font-size:13px;color:var(--mute);max-width:34em}
+.consent a{color:var(--silver)}
+.status{margin:12px 0 0;font-size:15px;font-weight:600;min-height:0}
+.status:empty{display:none}
+.status.ok{color:var(--white)}
+.status.err{color:var(--silver)}
 .qr-block{display:flex;align-items:center;gap:16px;margin-top:40px}
 .qr-block .qr{display:block;width:88px;height:88px;border-radius:10px;flex:none}
-.qr-block p{margin:0;font-size:16px;font-weight:600}
+.qr-block p{margin:0;font-size:15px;font-weight:600;color:var(--silver)}
 .stage{display:flex;justify-content:center;padding:12px 24px 24px 0}
 .device{width:min(300px,78%);aspect-ratio:9/18.5;border-radius:44px;padding:10px;background:linear-gradient(145deg,#e8e8e8,#7a7a7a 55%,#d6d6d6);transform:rotate(7deg);box-shadow:${PHONE_DEPTH}}
 .screen{height:100%;border-radius:35px;overflow:hidden;background:var(--black);-webkit-mask-image:-webkit-radial-gradient(white,black)}
 .screen video{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
-.panel{border:1px solid var(--line);border-radius:24px;background:var(--panel);padding:28px 40px;margin-bottom:80px}
-.trust{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:16px 24px}
-.trust li{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:var(--silver)}
-.trust svg{width:22px;height:22px;flex:none;color:var(--white)}
-.numbers{border-top:1px solid var(--line);margin-top:28px;padding-top:24px;text-align:center}
-.numbers > p{margin:0 0 20px;font-size:14px;color:var(--mute)}
-.numbers dl{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:0}
-.numbers dl div{display:flex;flex-direction:column-reverse}
-.numbers dt{font-size:14px;color:var(--silver)}
-.numbers dd{margin:0;font-size:44px;line-height:1.1;font-weight:700;letter-spacing:-.03em}
-.badges{display:none;flex-wrap:wrap;gap:12px;margin:24px 0 0;padding:0;list-style:none}
-.badge{display:flex;flex-direction:column;align-items:center;justify-content:center;width:160px;min-height:52px;padding:8px 16px;text-align:center;border:1px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none;line-height:1.15}
-.badge:hover{border-color:var(--white)}
-.badge small{font-size:12px;color:var(--mute);font-weight:400}
-.badge strong{font-size:16px;font-weight:700}
+.section{padding-bottom:80px}
+.section-head{max-width:40em;margin-bottom:32px}
+.section-head p{margin:0;color:var(--silver);font-size:17px}
+.pillars{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.pillars li{border:1px solid var(--line);border-radius:20px;background:var(--panel);padding:24px}
+.pillars svg{width:26px;height:26px;color:var(--white);display:block;margin-bottom:20px}
+.pillars p{margin:0;color:var(--silver);font-size:15px}
+.closer{border:1px solid var(--line);border-radius:24px;background:var(--panel);padding:48px 40px;display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center}
+.closer p.sub{margin:0;color:var(--silver);font-size:17px}
+.reveal{transition:opacity .6s ease,transform .6s ease}
+.js .reveal.pre{opacity:0;transform:translateY(16px)}
 footer{border-top:1px solid var(--line);padding:40px 0 calc(40px + env(safe-area-inset-bottom))}
 .foot{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center;justify-content:space-between}
 .foot nav{display:flex;flex-wrap:wrap;gap:8px 24px}
@@ -215,80 +189,73 @@ footer{border-top:1px solid var(--line);padding:40px 0 calc(40px + env(safe-area
 .foot a:hover{color:var(--white);text-decoration:underline}
 .foot p{margin:0;color:var(--mute);font-size:14px}
 @media (max-width:1000px){
-.links,.search{display:none}
+.links{display:none}
+.pillars{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:860px){
 h1{font-size:48px}
+h2{font-size:32px}
 .hero{grid-template-columns:1fr;gap:48px;padding-top:32px;padding-bottom:56px}
 .stage{padding:0}
 .device{width:min(260px,70%);transform:none;box-shadow:none}
-.trust{grid-template-columns:repeat(2,minmax(0,1fr))}
-.panel{padding:24px 20px;margin-bottom:64px}
+.closer{grid-template-columns:1fr;padding:32px 20px}
+.section{padding-bottom:64px}
 }
 @media (max-width:760px){
-/* A QR code can't be scanned from the phone showing it: badges instead. */
 .qr-block{display:none}
-.badges{display:flex}
 }
 @media (max-width:480px){
 h1{font-size:40px}
-.signup{flex-direction:column}
-.signup input{flex:none;width:100%}
-.signup .btn{width:100%}
-.nav{gap:8px}
-.brand span{display:none}
-.trust{grid-template-columns:1fr}
-.numbers dl{grid-template-columns:1fr;gap:20px}
-.numbers dd{font-size:40px}
+h2{font-size:28px}
+.lede{font-size:17px}
+.waitlist form{flex-direction:column}
+.waitlist input{flex:none;width:100%}
+.waitlist .btn{width:100%}
+.pillars{grid-template-columns:1fr}
+.pillars li{padding:20px}
+.tag{letter-spacing:.08em;padding:6px 10px}
 .foot nav{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:4px 16px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}.js .reveal.pre{opacity:1;transform:none}}
 `.trim();
 
-const SEARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>';
-
-// Plain monochrome line glyphs (no brand marks).
 const GLYPHS = {
-  wallet: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h12A1.5 1.5 0 0 1 19 6.5V8"/><rect x="3" y="8" width="18" height="11" rx="2.5"/><circle cx="16.5" cy="13.5" r="1.2"/>',
-  split: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12h8.5"/><path d="M12 12 6 18"/>',
-  returns: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-  box: '<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5"/><path d="M12 12v9"/>',
+  threads: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  drop: '<path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  live: '<circle cx="12" cy="12" r="2.5"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
+  cash: '<rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 9.5v5M17.5 9.5v5"/>',
 };
-const TRUST_ITEMS = [
-  { glyph: 'wallet', label: 'Apple Pay' },
-  { glyph: 'split', label: 'Klarna & Afterpay where offered' },
-  { glyph: 'returns', label: 'Free returns where offered' },
-  { glyph: 'box', label: 'Ships from the brand' },
-];
-const STAT_LABELS = [
-  ['brands', 'Brands'],
-  ['piecesListed', 'Pieces listed'],
-  ['ordersShipped', 'Orders shipped'],
+const PILLARS = [
+  { glyph: 'threads', title: 'Threads', body: 'Swipe through fashion videos and photo posts. Discover pieces through the people and independent labels behind them.' },
+  { glyph: 'drop', title: 'Independent drops', body: 'New releases straight from independent brands, shipped by the brand itself.' },
+  { glyph: 'live', title: 'Seller tools and live selling', body: 'List products, launch drops, go live and get paid. Manage your store and orders in one place.' },
+  { glyph: 'cash', title: 'Thread Cash', body: 'Earn Thread Cash rewards and apply them as a discount at checkout. Your card covers the rest.' },
 ];
 
 function glyph(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPHS[name]}</svg>`;
 }
 
-function badge(url, small, label) {
-  return `<li><a class="badge" href="${escapeHtml(url)}" rel="noopener"><small>${small}</small><strong>${label}</strong></a></li>`;
-}
-
 function defaultAssetUrls() {
   return Object.fromEntries(Object.keys(LANDING_ASSETS).map((name) => [name, `/${ASSET_DIR}/${name}`]));
 }
 
-function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null, assetUrls = defaultAssetUrls(), pricing = null } = {}) {
-  const appStore = resolveStoreUrl(appStoreUrl, 'appStore');
-  const playStore = resolveStoreUrl(playStoreUrl, 'playStore');
-  const badges = [
-    appStore ? badge(appStore, 'Download on the', 'App Store') : '',
-    playStore ? badge(playStore, 'Get it on', 'Google Play') : '',
-  ].filter(Boolean);
-  const badgeBlock = badges.length ? `<ul class="badges" aria-label="Download the app">${badges.join('')}</ul>` : '';
-  const qrTarget = appStore || QR_FALLBACK_URL;
-  const ld = JSON.stringify(structuredData({ appStoreUrl: appStore, playStoreUrl: playStore })).replace(/</g, '\\u003c');
+/** One "Notify me at launch" button that reveals an inline email form. */
+function waitlistBlock(id) {
+  return `<div class="waitlist" data-waitlist>
+        <button class="btn solid" type="button" data-reveal aria-expanded="false" aria-controls="${id}-form">Notify me at launch</button>
+        <form id="${id}-form" hidden novalidate>
+          <label class="vh" for="${id}-email">Email address</label>
+          <input id="${id}-email" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" required aria-describedby="${id}-consent ${id}-status" />
+          <button class="btn solid" type="submit">Notify me</button>
+        </form>
+        <p class="consent" id="${id}-consent" hidden>By submitting, you agree Brandthread may email you once about our launch. See our <a href="${ROUTES.privacy}">Privacy policy</a>.</p>
+        <p class="status" id="${id}-status" role="status" aria-live="polite"></p>
+      </div>`;
+}
 
+function renderLandingHtml({ assetUrls = defaultAssetUrls() } = {}) {
+  const ld = JSON.stringify(structuredData()).replace(/</g, '\\u003c');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -301,6 +268,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null, assetUrls 
 <link rel="canonical" href="${CANONICAL_ORIGIN}/" />
 <link rel="icon" type="image/png" href="/brandthread-logo.png" />
 <link rel="preload" href="${assetUrls['app-capture-poster.jpg']}" as="image" fetchpriority="high" />
+<link rel="preload" href="${assetUrls['inter-400.ttf']}" as="font" type="font/ttf" crossorigin />
 <meta name="robots" content="index,follow" />
 <meta property="og:site_name" content="Brandthread" />
 <meta property="og:type" content="website" />
@@ -313,47 +281,33 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null, assetUrls 
 <meta name="twitter:description" content="${DESCRIPTION}" />
 <meta name="twitter:image" content="${LOGO_URL}" />
 <script type="application/ld+json">${ld}</script>
-<style>${CSS}
-${pricing ? PRICING_CSS : ''}
-</style>
+<style>${fontFaceCss(assetUrls)}
+${CSS}</style>
+<script>document.documentElement.className+=' js';</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header>
   <div class="wrap bar">
-    <a class="brand" href="/welcome" aria-label="Brandthread home"><img src="/brandthread-logo.png" alt="" width="36" height="36" /><span>Brandthread</span></a>
-    <nav class="links" aria-label="Main">
-      <a href="${ROUTES.shop}">Shop</a>
-      <a href="${ROUTES.signUp}" data-flow="seller">Sell</a>
-      <a href="${ROUTES.pricing}">Pricing</a>
+    <a class="brand" href="#main" aria-label="Brandthread, back to top"><img src="/brandthread-logo.png" alt="" width="36" height="36" /><span>Brandthread</span></a>
+    <nav class="links" aria-label="On this page">
+      <a href="#features">What's inside</a>
+      <a href="#notify">Get notified</a>
     </nav>
-    <div class="nav">
-      <form class="search" role="search" action="${ROUTES.search}" method="get">
-        <label class="vh" for="q">Search Brandthread</label>
-        ${SEARCH_ICON}
-        <input id="q" name="q" type="search" placeholder="Search" autocomplete="off" enterkeyhint="search" />
-      </form>
-      <a class="btn ghost small" href="${ROUTES.signIn}">Log in</a>
-      <a class="btn solid small" href="${ROUTES.signUp}">Sign up</a>
-    </div>
+    <div class="nav"><span class="tag">Launching soon</span></div>
   </div>
 </header>
 <main id="main">
   <div class="wrap hero">
     <div>
+      <p class="eyebrow">Pre-launch</p>
       <h1>Shop, sell and design streetwear.</h1>
-      <p class="lede">Brandthread is where independent labels drop new pieces, sellers run their whole shop, and buyers discover streetwear brands they will actually wear.</p>
-      <form class="signup" action="${ROUTES.signUp}" method="get" data-flow="buyer">
-        <label class="vh" for="signup-email">Email address</label>
-        <input id="signup-email" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" required />
-        <button class="btn solid" type="submit">Get started</button>
-      </form>
-      <a class="sell-link" href="${ROUTES.signUp}" data-flow="seller">Start selling <span aria-hidden="true">&rarr;</span></a>
+      <p class="lede">Discover fashion on Threads. Shop independent drops. Build your store and sell live. Earn Thread Cash rewards. One app, launching soon.</p>
+      ${waitlistBlock('hero')}
       <div class="qr-block">
-        ${qrSvg(qrTarget)}
-        <p>Download the Brandthread app</p>
+        ${qrSvg(QR_FALLBACK_URL)}
+        <p>Open this page on your phone</p>
       </div>
-      ${badgeBlock}
     </div>
     <div class="stage">
       <div class="device">
@@ -367,89 +321,105 @@ ${pricing ? PRICING_CSS : ''}
     </div>
   </div>
 
-  <div class="wrap">
-    <section class="panel" aria-label="Why shop on Brandthread">
-      <ul class="trust">
-        ${TRUST_ITEMS.map((t) => `<li>${glyph(t.glyph)}<span>${escapeHtml(t.label)}</span></li>`).join('\n        ')}
-      </ul>
-      <div class="numbers" data-stats hidden>
-        <p>Live on Brandthread right now</p>
-        <dl>
-          ${STAT_LABELS.map(([key, label]) => `<div><dt>${label}</dt><dd data-stat="${key}"></dd></div>`).join('\n          ')}
-        </dl>
+  <section class="wrap section" id="features" aria-labelledby="features-title">
+    <div class="section-head reveal">
+      <h2 id="features-title">Four ways in. One thread.</h2>
+      <p>Built for the people who wear it, make it and sell it.</p>
+    </div>
+    <ul class="pillars">
+      ${PILLARS.map((p) => `<li class="reveal">${glyph(p.glyph)}<h3>${escapeHtml(p.title)}</h3><p>${escapeHtml(p.body)}</p></li>`).join('\n      ')}
+    </ul>
+  </section>
+
+  <section class="wrap section" id="notify" aria-labelledby="notify-title">
+    <div class="closer reveal">
+      <div>
+        <h2 id="notify-title">Be first through the door.</h2>
+        <p class="sub">One email when Brandthread goes live. Nothing else.</p>
       </div>
-    </section>
-  </div>
-  ${pricing ? renderLandingPricingSection(pricing) : ''}
+      ${waitlistBlock('closer')}
+    </div>
+  </section>
 </main>
 <footer>
   <div class="wrap foot">
     <p>&copy; Brandthread</p>
     <nav aria-label="Legal and support">
-      <a href="${ROUTES.privacy}">Privacy</a>
-      <a href="${ROUTES.terms}">Terms</a>
-      <a href="${ROUTES.guidelines}">Community guidelines</a>
-      <a href="${ROUTES.support}">Support</a>
+      ${LEGAL_LINKS.map(([label, href]) => `<a href="${href}">${label}</a>`).join('\n      ')}
     </nav>
   </div>
 </footer>
 <script>
 (function(){
-  function remember(key,value){try{localStorage.setItem(key,value);}catch(e){}}
-  var links=document.querySelectorAll('a[data-flow]');
-  for(var i=0;i<links.length;i++){
-    links[i].addEventListener('click',function(){remember(${JSON.stringify(PENDING_FLOW_KEY)},this.getAttribute('data-flow'));});
-  }
+  var ENDPOINT=${JSON.stringify(WAITLIST_ENDPOINT)};
+  var SUCCESS=${JSON.stringify(WAITLIST_SUCCESS)};
+  var ua=navigator.userAgent||'';
+  var ref=(location.search||'')+' '+(document.referrer||'');
+  var SOURCE=/Instagram/i.test(ua)||/utm_source=ig|utm_source=instagram|instagram\\.com/i.test(ref)?'instagram':'landing';
+  var EMAIL=/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+  var MESSAGES={400:'That email does not look right. Check it and try again.',429:'Too many tries. Wait a moment, then try again.'};
+  var FALLBACK='Something went wrong on our side. Please try again.';
 
-  // The email rides to onboarding in storage, never in the URL.
-  var form=document.querySelector('form.signup');
-  if(form){
+  var blocks=document.querySelectorAll('[data-waitlist]');
+  for(var i=0;i<blocks.length;i++)wire(blocks[i]);
+  function wire(block){
+    var reveal=block.querySelector('[data-reveal]');
+    var form=block.querySelector('form');
+    var input=form.querySelector('input');
+    var submit=form.querySelector('button[type="submit"]');
+    var consent=block.querySelector('.consent');
+    var status=block.querySelector('.status');
+    function say(text,kind){status.textContent=text;status.className='status'+(kind?' '+kind:'');}
+    reveal.addEventListener('click',function(){
+      reveal.hidden=true;reveal.setAttribute('aria-expanded','true');
+      form.hidden=false;consent.hidden=false;input.focus();
+    });
     form.addEventListener('submit',function(e){
       e.preventDefault();
-      var email=form.querySelector('input').value.trim();
-      remember(${JSON.stringify(PENDING_FLOW_KEY)},form.getAttribute('data-flow'));
-      if(email)remember(${JSON.stringify(PREFILL_EMAIL_KEY)},email);
-      location.href=form.getAttribute('action');
+      if(submit.disabled)return;
+      var email=input.value.trim();
+      if(!EMAIL.test(email)){input.setAttribute('aria-invalid','true');say('Enter a valid email address.','err');input.focus();return;}
+      input.removeAttribute('aria-invalid');
+      submit.disabled=true;input.readOnly=true;submit.textContent='Sending';say('');
+      fetch(ENDPOINT,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify({email:email,source:SOURCE})})
+        .then(function(r){
+          if(r.ok){form.hidden=true;consent.hidden=true;say(SUCCESS,'ok');return;}
+          if(r.status===400)input.setAttribute('aria-invalid','true');
+          fail(MESSAGES[r.status]||FALLBACK);
+        })
+        .catch(function(){fail(FALLBACK);});
     });
+    function fail(text){submit.disabled=false;input.readOnly=false;submit.textContent='Try again';say(text,'err');input.focus();}
   }
 
-  // The capture plays only when motion is welcome; otherwise its poster (a
-  // still of the same app screen) stays.
+  // Poster first: the capture loads only after the page has loaded, and never
+  // when the visitor prefers reduced motion.
   var video=document.querySelector('video[data-capture]');
   var motion=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
+  var loaded=false;
   function syncVideo(){
-    if(!video)return;
+    if(!video||!loaded)return;
     if(motion&&motion.matches){video.pause();return;}
     video.preload='auto';
     var p=video.play();
     if(p&&p.catch)p.catch(function(){});
   }
-  syncVideo();
+  function onLoad(){loaded=true;setTimeout(syncVideo,600);}
+  if(document.readyState==='complete')onLoad();else window.addEventListener('load',onLoad);
   if(motion){
     if(motion.addEventListener)motion.addEventListener('change',syncVideo);
     else if(motion.addListener)motion.addListener(syncVideo);
   }
 
-  // Real counts only. Anything missing, zero or malformed keeps the row hidden.
-  var stats=document.querySelector('[data-stats]');
-  if(stats&&window.fetch){
-    fetch(${JSON.stringify(STATS_ENDPOINT)},{credentials:'omit',headers:{accept:'application/json'}})
-      .then(function(r){return r.ok?r.json():null;})
-      .then(function(data){
-        if(!data)return;
-        var cells=stats.querySelectorAll('[data-stat]');
-        for(var i=0;i<cells.length;i++){
-          var n=data[cells[i].getAttribute('data-stat')];
-          if(typeof n!=='number'||!isFinite(n)||n<1||Math.floor(n)!==n)return;
-        }
-        for(var j=0;j<cells.length;j++){
-          cells[j].textContent=data[cells[j].getAttribute('data-stat')].toLocaleString('en-US');
-        }
-        stats.hidden=false;
-      })
-      .catch(function(){});
+  // Light scroll reveals; content stays visible without IntersectionObserver.
+  var items=document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window&&!(motion&&motion.matches)){
+    var io=new IntersectionObserver(function(entries){
+      for(var k=0;k<entries.length;k++){if(entries[k].isIntersecting){entries[k].target.classList.remove('pre');io.unobserve(entries[k].target);}}
+    },{rootMargin:'0px 0px -10% 0px'});
+    for(var j=0;j<items.length;j++){items[j].classList.add('pre');io.observe(items[j]);}
   }
-})();${pricing ? `\n${trialDateScript(pricing)}` : ''}
+})();
 </script>
 </body>
 </html>
@@ -476,12 +446,8 @@ function writeLandingPage(outputDir, projectRoot, env = process.env) {
     fs.writeFileSync(path.join(assetOut, hashed), body);
     assetUrls[name] = `/${ASSET_DIR}/${hashed}`;
   }
-  const html = renderLandingHtml({
-    appStoreUrl: env.EXPO_PUBLIC_APP_STORE_URL,
-    playStoreUrl: env.EXPO_PUBLIC_PLAY_STORE_URL,
-    assetUrls,
-    pricing: require('./plan-catalogue').loadPlanCatalogue(projectRoot),
-  });
+  void env;
+  const html = renderLandingHtml({ assetUrls });
   fs.writeFileSync(path.join(outputDir, 'landing.html'), html);
   fs.writeFileSync(path.join(outputDir, PRICING_FILE), renderPricingHtml(require('./plan-catalogue').loadPlanCatalogue(), {
     CANONICAL_ORIGIN, LOGO_URL, BASE_CSS: CSS, ROUTES, PENDING_FLOW_KEY,
@@ -495,14 +461,17 @@ module.exports = {
   PRICING_FILE,
   writeLandingPage,
   ASSET_DIR,
+  INTER_WEIGHTS,
   CANONICAL_ORIGIN,
   DESCRIPTION,
   LANDING_ASSETS,
   PENDING_FLOW_KEY,
-  PREFILL_EMAIL_KEY,
   QR_FALLBACK_URL,
   ROUTES,
-  STATS_ENDPOINT,
+  LEGAL_LINKS,
+  WAITLIST_ENDPOINT,
+  WAITLIST_SOURCES,
+  WAITLIST_SUCCESS,
   TITLE,
   qrSvg,
   renderLandingHtml,

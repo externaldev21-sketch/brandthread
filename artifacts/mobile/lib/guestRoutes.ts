@@ -4,9 +4,8 @@
  * account. Buying, posting, messaging, following and liking are gated inline
  * at the action (see hooks/useSignInGate.ts), not at the route.
  *
- * app/_layout.tsx (AuthGate) consults this before redirecting a signed-out
- * visitor to the sign-in wall. Anything not listed here keeps its existing
- * account prompt (inbox, orders, settings, seller tabs, ...).
+ * Public routes render normally. Private routes show an inline sign-in state;
+ * navigation itself never opens the sign-in sheet.
  */
 
 /** Screens inside the `(buyer)` tab group that work without an account. */
@@ -56,6 +55,19 @@ export function isGuestBrowseRoute(segments: readonly string[]): boolean {
   if (first === '(buyer)') return GUEST_BUYER_TABS.has(segments[1] ?? '');
   if (first === 'live') return true;
   return GUEST_TOP_LEVEL.has(first);
+}
+
+/** Root navigator entries which must mount without an account. Buyer children
+ * are checked individually inside their navigator so the tab bar stays usable. */
+export function isGuestScreenEntry(routeName: string, buyerTab = false): boolean {
+  if (buyerTab) return isGuestBrowseRoute(['(buyer)', routeName]);
+  return isGuestBrowseRoute([routeName]) || [
+    '(buyer)', 'index', '', 'sign-in', 'forgot-password', 'splash', 'onboarding',
+    'privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy',
+    'help', 'team-invite', 'community-join', 'invite', 'thread-explainer',
+    // This opt-in test route contains no private data.
+    'navigation-isolation-probe',
+  ].includes(routeName);
 }
 
 /**

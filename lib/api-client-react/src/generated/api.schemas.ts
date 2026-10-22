@@ -5,6 +5,26 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type LaunchWaitlistInputSource = typeof LaunchWaitlistInputSource[keyof typeof LaunchWaitlistInputSource];
+
+
+export const LaunchWaitlistInputSource = {
+  instagram: 'instagram',
+  landing: 'landing',
+} as const;
+
+export interface LaunchWaitlistInput {
+  /** @maxLength 254 */
+  email: string;
+  source?: LaunchWaitlistInputSource;
+}
+
+export const LaunchWaitlistResultValue = {
+  ok: true,
+  message: 'You\'re on the list.',
+} as const;
+export type LaunchWaitlistResult = typeof LaunchWaitlistResultValue;
+
 export interface HealthStatus {
   status: string;
 }
@@ -911,6 +931,9 @@ export const ReportTargetType = {
   product: 'product',
   profile: 'profile',
   message: 'message',
+  community_message: 'community_message',
+  community: 'community',
+  review: 'review',
 } as const;
 
 export type ReportReason = typeof ReportReason[keyof typeof ReportReason];

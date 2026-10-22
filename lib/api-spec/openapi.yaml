@@ -21,6 +21,31 @@ tags:
     description: Account deletion, legal acceptance and sign-in sessions
 
 paths:
+  /launch-waitlist:
+    post:
+      operationId: joinLaunchWaitlist
+      summary: Request a Brandthread launch email without creating an account
+      tags: [account]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaunchWaitlistInput"
+      responses:
+        "200":
+          description: Joined or already on the list (same response)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaunchWaitlistResult"
+        "400":
+          description: Invalid email or source
+        "429":
+          description: Five attempts per IP per hour exceeded
+        "503":
+          description: Storage or rate-limit verification unavailable
   /healthz:
     get:
       operationId: healthCheck
@@ -1270,6 +1295,29 @@ paths:
 
 components:
   schemas:
+    LaunchWaitlistInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        source:
+          type: string
+          enum: [instagram, landing]
+          default: landing
+    LaunchWaitlistResult:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        message:
+          type: string
+          const: "You're on the list."
     HealthStatus:
       type: object
       properties:
