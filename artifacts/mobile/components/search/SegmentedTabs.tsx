@@ -8,19 +8,19 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 
-// Mirrors Instagram's post-submit results tabs (Mobbin "Instagram iOS
-// Searching Instagram") 1:1 in layout/interaction — only the tab set itself
-// is Brandthread's own, per the owner's explicit mapping: Audio -> Products
-// (we sell products, not audio), Places -> Brands/Shops (brand storefronts
-// stand in for locations).
-export type SearchTabKey = 'forYou' | 'accounts' | 'products' | 'tags' | 'brands';
+// Results tabs follow TikTok's search pattern: a mixed "Top" overview first,
+// then one tab per result type (each paginated server-side by
+// GET /api/public/search/all), then Tags. Layout/interaction is unchanged
+// from the Instagram-mirroring pill row this replaced.
+export type SearchTabKey = 'top' | 'products' | 'brands' | 'people' | 'posts' | 'tags';
 
 export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
-  { key: 'forYou', label: 'For you' },
-  { key: 'accounts', label: 'Accounts' },
+  { key: 'top', label: 'Top' },
   { key: 'products', label: 'Products' },
-  { key: 'tags', label: 'Tags' },
   { key: 'brands', label: 'Brands' },
+  { key: 'people', label: 'People' },
+  { key: 'posts', label: 'Posts' },
+  { key: 'tags', label: 'Tags' },
 ];
 
 /**

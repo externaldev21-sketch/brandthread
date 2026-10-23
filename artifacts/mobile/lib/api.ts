@@ -40,6 +40,19 @@ import type { MentionPerson, Story, StoryMentionItem, StoryStickerState } from '
 import type { LiveModerationState, LiveCohostCandidate, LiveCohostInvite, LiveCohostPerson } from '@/lib/live/moderationTypes';
 
 /** Server story highlight (GET /api/social/highlights/*). */
+/** GET /api/public/search/all — see api-server routes/search-unified.ts. */
+export type SearchAllType = 'top' | 'products' | 'brands' | 'people' | 'posts';
+export type SearchAllSectionKey = Exclude<SearchAllType, 'top'>;
+export interface SearchAllSection<T = any> { items: T[]; hasMore: boolean; nextOffset: number | null }
+export interface SearchAllResponse {
+  query: string;
+  type: SearchAllType;
+  style: string | null;
+  sections: Partial<Record<SearchAllSectionKey, SearchAllSection>>;
+  /** Sections with results, best-matching first (drives the Top tab's order). */
+  order: SearchAllSectionKey[];
+}
+
 export interface ServerHighlight {
   id: string; userId: string; title: string;
   coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
@@ -2177,6 +2190,30 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             inStockCount: number;
           };
         }>(`/api/public/search?${params.toString()}`);
+      },
+      /** Unified search (products / brands / people / posts), tiered ranking
+       *  exact > prefix > word > contains > fuzzy. `type: 'top'` returns a short
+       *  slice of every type; any other type pages with limit/offset. `style`
+       *  is a category-chip key (lib/searchCategories.ts) filtering products. */
+      searchAll: (opts: {
+        q: string; type?: SearchAllType; style?: string | null; limit?: number; offset?: number;
+        category?: string[]; size?: string[]; color?: string[]; brand?: string[]; inStock?: boolean;
+        minPriceCents?: number; maxPriceCents?: number; sort?: string;
+      }) => {
+        const params = new URLSearchParams();
+        if (opts.q) params.set('q', opts.q);
+        params.set('type', opts.type ?? 'top');
+        if (opts.style) params.set('style', opts.style);
+        if (opts.limit) params.set('limit', String(opts.limit));
+        if (opts.offset) params.set('offset', String(opts.offset));
+        for (const key of ['category', 'size', 'color', 'brand'] as const) {
+          for (const v of opts[key] ?? []) params.append(key, v);
+        }
+        if (opts.inStock) params.set('inStock', '1');
+        if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
+        if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
+        if (opts.sort && opts.sort !== 'relevance') params.set('sort', opts.sort);
+        return get<SearchAllResponse>(`/api/public/search/all?${params.toString()}`);
       },
       /** Trending search terms (real logged queries once there's enough volume, else categories + brands) for the search empty state. */
       trending: (limit = 8) =>

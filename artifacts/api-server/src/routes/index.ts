@@ -35,6 +35,7 @@ import aiHelpersRouter from "./ai-helpers";
 import { aiCreditsGate } from "../lib/aiCredits/gate";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import searchUnifiedRouter from "./search-unified";
 import accountDeletionPublicRouter from "./account-deletion-public";
 import discoveryRouter from "./discovery";
 import featuredPublicRouter from "./featured-public";
@@ -188,6 +189,7 @@ router.use("/products", (req, res, next) => {
   }
   next();
 });
+router.use("/public",          searchUnifiedRouter); // /search/all — unified products/brands/people/posts search
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
 router.use("/public",          discoveryRouter); // /categories, /trending/products, /trending/brands

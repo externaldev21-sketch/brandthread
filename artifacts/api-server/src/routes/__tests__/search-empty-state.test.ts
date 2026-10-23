@@ -147,6 +147,7 @@ describe("search empty-state endpoints", () => {
     state.selectQueue = [
       [{ sellerId: "seller-1", followerCount: 20 }], // topBrands
       [{ id: "product-1", name: "New Jacket", ownerId: "seller-1", category: "apparel", images: ["img.jpg"], createdAt: new Date() }], // recentProducts
+      [], // top-up: no other seller has active listings
       [{ clerkId: "seller-1", displayName: "Seller One", brandName: "Brand One" }], // sellerRows
     ];
 
@@ -158,6 +159,26 @@ describe("search empty-state endpoints", () => {
     expect(json.brands[0]).toMatchObject({ sellerId: "seller-1", name: "Brand One", followerCount: 20 });
     expect(json.products).toHaveLength(1);
     expect(json.products[0]).toMatchObject({ id: "product-1", name: "New Jacket", brand: "Brand One", imageUri: "img.jpg" });
+  });
+
+  it("tops up suggested brands with the sellers that have the most listings", async () => {
+    state.selectQueue = [
+      [{ sellerId: "seller-1", followerCount: 3 }], // topBrands — only one followed seller
+      [], // recentProducts
+      [{ sellerId: "seller-2", listings: 9 }, { sellerId: "seller-3", listings: 2 }], // top-up by active listings
+      [
+        { clerkId: "seller-1", displayName: "One", brandName: "Brand One" },
+        { clerkId: "seller-2", displayName: "Two", brandName: "Brand Two" },
+        { clerkId: "seller-3", displayName: "Three", brandName: null },
+      ],
+    ];
+
+    const response = await fetch(`${base}/api/public/search/suggested?limit=6`);
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    const json = JSON.parse(body);
+    expect(json.brands.map((b: { name: string }) => b.name)).toEqual(["Brand One", "Brand Two", "Three"]);
+    expect(json.brands[1]).toMatchObject({ sellerId: "seller-2", followerCount: 0 });
   });
 
   it("returns one representative-image category tile per top category", async () => {

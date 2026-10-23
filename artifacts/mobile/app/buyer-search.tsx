@@ -1,26 +1,27 @@
 /**
- * Search — rebuilt to mirror Instagram's own search flow 1:1 (Mobbin
- * "Instagram iOS Searching Instagram" + "Instagram iOS Clearing search
- * history"; layout/spacing/hierarchy/copy/interactions match those flows,
- * only color/font/icon are Brandthread's). Same data sources as before
- * (api.public.search, api.social.search, lib/discoverFeed's composeDiscoverPosts) —
- * this PR replaces the UI only.
+ * Search — Instagram-style entry flow (Mobbin "Instagram iOS Searching
+ * Instagram" + "Clearing search history") with TikTok-style results depth:
+ * one unified endpoint (api.public.searchAll → GET /api/public/search/all)
+ * returns ranked Products, Brands, People and Posts; a "Top" tab shows the
+ * best of each, and every type has its own paginated tab.
  *
- * States, in the order Instagram's own flow moves through them:
- *   1. Unfocused, empty query   — a browse grid (Explore-style) + search
- *      field + add-person icon.
- *   2. Focused, empty query     — Cancel appears; "Recent" header + "See
- *      all" + recent-search rows (server-side history — see lib/api.ts'
- *      api.public.recent/removeRecent/clearRecent/log).
+ * States:
+ *   1. Unfocused, empty query   — category chips, recent searches + trending
+ *      brands above the Explore browse grid.
+ *   2. Focused, empty query     — Cancel appears; trending tags, Recent (kept
+ *      on-device — lib/recentSearches — and merged with the signed-in
+ *      server history), trending brands, shop-by-category.
  *   3. Typing                   — live suggestion list: the query itself
- *      (search icon) first, then matching accounts.
- *   4. Submitted                — tabs (For you / Accounts / Products /
- *      Tags / Brands) + tab content.
+ *      (search icon) first, then matching brands and people.
+ *   4. Submitted                — tabs (Top / Products / Brands / People /
+ *      Posts / Tags) + tab content. A category chip filters product results;
+ *      a chip with no query browses that category's products.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   useWindowDimensions, ActivityIndicator,
+  type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -29,7 +30,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
-import { useApi } from '@/lib/api';
+import { useApi, type SearchAllSectionKey } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
@@ -49,6 +50,8 @@ import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
 import { TagRow, type SearchTag } from '@/components/search/TagRow';
 import { TrendingTags } from '@/components/search/TrendingTags';
+import { TrendingBrands } from '@/components/search/TrendingBrands';
+import { CategoryChips, SEARCH_CHIPS } from '@/components/search/CategoryChips';
 import { hashtagHref, normalizeTag } from '@/lib/hashtagText';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
@@ -63,25 +66,43 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
+import { addRecentSearch, loadRecentSearches, mergeRecent, removeRecentSearch } from '@/lib/recentSearches';
+import { appendPage, SECTION_LABELS } from '@/lib/searchResults';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
-type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
+type BrandItem = SearchBrandRow & { sellerId: string };
+type PersonItem = SearchPerson & { id: string };
+
+type TypeList<T> = { items: T[]; hasMore: boolean; nextOffset: number | null; loading: boolean; loaded: boolean };
+type TabLists = {
+  products: TypeList<ProductResult>;
+  brands: TypeList<BrandItem>;
+  people: TypeList<PersonItem>;
+  posts: TypeList<VideoResult>;
+};
+type TopSections = { products: ProductResult[]; brands: BrandItem[]; people: PersonItem[]; posts: VideoResult[]; order: SearchAllSectionKey[] };
+
+const emptyList = <T,>(): TypeList<T> => ({ items: [], hasMore: false, nextOffset: null, loading: false, loaded: false });
+const emptyTabLists = (): TabLists => ({ products: emptyList(), brands: emptyList(), people: emptyList(), posts: emptyList() });
+const EMPTY_TOP: TopSections = { products: [], brands: [], people: [], posts: [], order: [] };
 
 const DEBOUNCE_MS = 150;
+const PAGE_SIZE = 20;
+/** Start the next page this far (px) before the end of the scroll content. */
+const LOAD_MORE_THRESHOLD = 600;
 
 // Filters live for the app session only (module scope): they survive leaving
 // and re-opening Search, and reset on a fresh launch. Never written to storage.
 let sessionFilters: SearchFilters = {};
 const VIDEO_GRID_GAP = 8;
 
-/** Small, clearly-fictional preview accounts so the Users tab is demoable
+/** Small, clearly-fictional preview accounts so the People tab is demoable
  * under ?bt_preview=buyer with no live backend. Only shown when the real
- * `api.social.search` call fails or returns nothing while in preview mode. */
-const PREVIEW_ACCOUNTS: SearchPerson[] = [
-  { userId: 'preview-buyer-1', name: 'Casey Rivera', username: 'caseyrivera', handle: '@caseyrivera', initials: 'CR', color: pickAvatarColor('preview-buyer-1'), bio: 'Thrifted fits daily', isFollowing: false, accountType: 'buyer', verified: false, roleTag: 'Buyer' },
-  { userId: 'preview-buyer-2', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: pickAvatarColor('preview-buyer-2'), bio: null, isFollowing: false, accountType: 'buyer', verified: true, roleTag: 'Buyer' },
-  { userId: 'preview-seller-1', name: 'Atelier Noire', username: 'ateliernoire', handle: '@ateliernoire', initials: 'AN', color: pickAvatarColor('preview-seller-1'), bio: 'Midnight tailoring', isFollowing: false, accountType: 'seller', verified: true, roleTag: 'Atelier Noire' },
+ * search call fails or returns nothing while in preview mode. */
+const PREVIEW_ACCOUNTS: PersonItem[] = [
+  { id: 'preview-buyer-1', userId: 'preview-buyer-1', name: 'Casey Rivera', username: 'caseyrivera', handle: '@caseyrivera', initials: 'CR', color: pickAvatarColor('preview-buyer-1'), bio: 'Thrifted fits daily', isFollowing: false, accountType: 'buyer', verified: false, roleTag: 'Buyer' },
+  { id: 'preview-buyer-2', userId: 'preview-buyer-2', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: pickAvatarColor('preview-buyer-2'), bio: null, isFollowing: false, accountType: 'buyer', verified: true, roleTag: 'Buyer' },
 ];
 
 function mapPreviewPostToVideo(post: (typeof FASHION_PREVIEW_POSTS)[number]): VideoResult {
@@ -133,7 +154,16 @@ function matchesAny(fields: Array<string | null | undefined>, query: string): bo
   return fields.some((f) => (f ?? '').toLowerCase().includes(q));
 }
 
-/** #tag extraction from a video result's own caption, filtered to the
+/** Bundled preview rows for one type, used only in preview mode when the API has nothing. */
+function previewFallback(key: SearchAllSectionKey, query: string): any[] {
+  if (!query) return [];
+  if (key === 'products') return PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], query));
+  if (key === 'posts') return PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], query));
+  if (key === 'people') return PREVIEW_ACCOUNTS.filter((p) => matchesAny([p.name, p.handle], query));
+  return [];
+}
+
+/** #tag extraction from a post result's own caption, filtered to the
  *  active query — see TagRow's own comment on why this is derived
  *  client-side rather than backed by a dedicated hashtag-search endpoint. */
 function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
@@ -174,10 +204,14 @@ export default function BuyerSearchScreen() {
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [fieldFocused, setFieldFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState<SearchTabKey>('forYou');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [people, setPeople] = useState<SearchPerson[]>([]);
+  const [activeTab, setActiveTab] = useState<SearchTabKey>('top');
+  const [style, setStyle] = useState<string | null>(null);
+  const [top, setTop] = useState<TopSections>(EMPTY_TOP);
+  const [tabLists, setTabLists] = useState<TabLists>(emptyTabLists);
   const [serverTags, setServerTags] = useState<SearchTag[]>([]);
+  // Follow state the viewer changed on this screen, keyed by userId — a
+  // person can appear in both the Top and People lists.
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -187,6 +221,10 @@ export default function BuyerSearchScreen() {
   const activeFilterCount = countActiveFilters(filters);
   const setFilters = useCallback((next: SearchFilters) => { sessionFilters = next; setFiltersState(next); }, []);
   const trimmedQuery = query.trim();
+  // A chip with no query browses that category's products.
+  const browsingChip = !trimmedQuery && !!style;
+  const showResults = (submitted && trimmedQuery.length > 0) || browsingChip;
+  const styleLabel = style ? SEARCH_CHIPS.find((c) => c.key === style)?.label ?? style : null;
 
   // Browse grid backing the unfocused entry state — the same "For You"
   // Explore composition Discover uses (Instagram's own search tab defaults
@@ -201,8 +239,7 @@ export default function BuyerSearchScreen() {
 
   // Deliberately no auto-focus on mount — Instagram's own search tab opens
   // unfocused, showing its Explore grid, until the field is explicitly
-  // tapped (Mobbin "Instagram iOS Searching Instagram"). The pre-rebuild
-  // screen auto-focused; that's part of what this PR replaces.
+  // tapped (Mobbin "Instagram iOS Searching Instagram").
 
   // A term handed in via ?q= (e.g. "See all" -> Recent Searches -> tap a
   // term navigates back here) submits immediately instead of just filling
@@ -222,44 +259,73 @@ export default function BuyerSearchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadRecent = useCallback(() => {
-    api.public.recent(10)
-      .then(({ recent }) => setRecentSearches(recent.map((r) => r.query)))
-      .catch(() => setRecentSearches([]));
-  }, [api]);
+  // Recent searches: on-device list first, then the signed-in server history.
+  const loadRecent = useCallback(async () => {
+    const [local, server] = await Promise.all([
+      loadRecentSearches(),
+      isSignedIn
+        ? api.public.recent(10).then(({ recent }) => recent.map((r) => r.query)).catch(() => [] as string[])
+        : Promise.resolve([] as string[]),
+    ]);
+    setRecentSearches(mergeRecent(local, server));
+  }, [api, isSignedIn]);
 
-  useEffect(() => { loadRecent(); }, [loadRecent]);
+  useEffect(() => { void loadRecent(); }, [loadRecent]);
 
   function removeRecent(term: string) {
     hapticSelection();
     setRecentSearches((current) => current.filter((t) => t !== term));
-    api.public.removeRecent(term).catch(() => {});
+    void removeRecentSearch(term);
+    if (isSignedIn) api.public.removeRecent(term).catch(() => {});
   }
 
+  const productFilterOptions = useMemo(() => {
+    const o = filtersToApiOptions(filters) as Record<string, unknown>;
+    return {
+      category: o.category as string[] | undefined, size: o.size as string[] | undefined,
+      color: o.color as string[] | undefined, brand: o.brand as string[] | undefined,
+      inStock: o.inStock as boolean | undefined, sort: o.sort as string | undefined,
+      minPriceCents: o.minPriceCents as number | undefined, maxPriceCents: o.maxPriceCents as number | undefined,
+    };
+  }, [filters]);
+
+  // Bumped on every new query/chip/filter so a slow page from the previous
+  // search can't land in the fresh lists.
+  const searchGen = useRef(0);
+
+  // ── Top overview (also feeds the live suggestions while typing) ─────────
   const performSearch = useCallback(async (term: string) => {
-    const [productRes, peopleRes, tagRes] = await Promise.allSettled([
-      api.public.search({ q: term, limit: 30, facets: true, ...filtersToApiOptions(filters) }),
-      api.social.search(term, 20),
+    const gen = ++searchGen.current;
+    setTabLists(emptyTabLists());
+    if (!term) { setTop(EMPTY_TOP); return; } // chip browse: the Products list loads itself
+    const [topRes, tagRes, facetRes] = await Promise.allSettled([
+      api.public.searchAll({ q: term, type: 'top', style, ...productFilterOptions }),
       previewMode ? Promise.resolve({ tags: [] as SearchTag[] }) : Promise.resolve().then(() => api.hashtags.search(term, 12)),
+      // Facets for the filter sheet still come from the product search endpoint.
+      Promise.resolve().then(() => api.public.search({ q: term, limit: 1, facets: true })),
     ]);
+    if (gen !== searchGen.current) return;
     setServerTags(tagRes.status === 'fulfilled' ? tagRes.value.tags : []);
-    setResults(productRes.status === 'fulfilled' ? productRes.value.results ?? [] : []);
-    if (productRes.status === 'fulfilled' && productRes.value.facets) setFacets(productRes.value.facets);
-    else if (productRes.status !== 'fulfilled') setFacets(null);
-    let peopleResult = peopleRes.status === 'fulfilled' ? (peopleRes.value as unknown as SearchPerson[]) : [];
-    if (peopleResult.length === 0 && previewMode) {
-      const q = term.toLowerCase();
-      peopleResult = PREVIEW_ACCOUNTS.filter((p) => p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q));
-    }
-    setPeople(peopleResult);
+    if (facetRes.status === 'fulfilled' && facetRes.value?.facets) setFacets(facetRes.value.facets);
+    const sections = topRes.status === 'fulfilled' ? topRes.value.sections : {};
+    const pick = (key: SearchAllSectionKey) => {
+      const rows = (sections[key]?.items ?? []) as any[];
+      return rows.length === 0 && previewMode ? previewFallback(key, term) : rows;
+    };
+    const next: TopSections = {
+      products: pick('products'), brands: pick('brands'), people: pick('people'), posts: pick('posts'),
+      order: topRes.status === 'fulfilled' ? topRes.value.order : [],
+    };
+    if (next.order.length === 0) next.order = (['products', 'brands', 'people', 'posts'] as const).filter((k) => next[k].length > 0);
+    setTop(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewMode, filters]);
+  }, [previewMode, style, productFilterOptions]);
 
   useEffect(() => {
-    const q = query.trim();
-    if (q.length < 1) {
-      setResults([]);
-      setPeople([]);
+    const q = trimmedQuery;
+    if (q.length < 1 && !style) {
+      setTop(EMPTY_TOP);
+      setTabLists(emptyTabLists());
       setSearching(false);
       return;
     }
@@ -270,29 +336,77 @@ export default function BuyerSearchScreen() {
       if (!cancelled) setSearching(false);
     }, DEBOUNCE_MS);
     return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, performSearch]);
 
-  const productResultsRaw = useMemo(() => results.filter((r): r is ProductResult => r.kind === 'product'), [results]);
-  const brandResultsRaw = useMemo(() => results.filter((r): r is BrandResult => r.kind === 'brand'), [results]);
-  const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
-  // Blend in bundled preview posts/products when the live API has nothing
-  // for this query — matched against name/author/brand, not just caption.
-  const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
-  const productResults = productResultsRaw.length > 0 ? productResultsRaw
-    : (trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
-  const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
+  // ── Per-type tabs: first page on open, next page near the end of scroll ──
+  const loadPage = useCallback(async (key: SearchAllSectionKey, reset: boolean) => {
+    const current = tabLists[key];
+    if (current.loading || (!reset && (!current.hasMore || current.nextOffset === null))) return;
+    const offset = reset ? 0 : current.nextOffset ?? 0;
+    const gen = searchGen.current;
+    setTabLists((prev) => ({ ...prev, [key]: { ...prev[key], loading: true } }));
+    try {
+      const res = await api.public.searchAll({
+        q: trimmedQuery, type: key, style, limit: PAGE_SIZE, offset,
+        ...(key === 'products' ? productFilterOptions : {}),
+      });
+      if (gen !== searchGen.current) return;
+      const page = (res.sections[key]?.items ?? []) as any[];
+      const fallback = reset && page.length === 0 && previewMode ? previewFallback(key, trimmedQuery) : null;
+      setTabLists((prev) => ({
+        ...prev,
+        [key]: {
+          items: fallback ?? (reset ? page : appendPage(prev[key].items as any[], page)),
+          hasMore: fallback ? false : !!res.sections[key]?.hasMore,
+          nextOffset: fallback ? null : res.sections[key]?.nextOffset ?? null,
+          loading: false,
+          loaded: true,
+        },
+      }));
+    } catch {
+      if (gen !== searchGen.current) return;
+      setTabLists((prev) => ({
+        ...prev,
+        [key]: reset && previewMode
+          ? { items: previewFallback(key, trimmedQuery), hasMore: false, nextOffset: null, loading: false, loaded: true }
+          : { ...prev[key], loading: false, loaded: true, hasMore: false },
+      }));
+    }
+  }, [api, tabLists, trimmedQuery, style, productFilterOptions, previewMode]);
+
+  const typeTab: SearchAllSectionKey | null = browsingChip ? 'products'
+    : activeTab === 'top' || activeTab === 'tags' ? null : activeTab;
+
+  useEffect(() => {
+    if (!showResults || !typeTab || searching) return;
+    const list = tabLists[typeTab];
+    if (!list.loaded && !list.loading) void loadPage(typeTab, true);
+  }, [showResults, typeTab, searching, tabLists, loadPage]);
+
+  function handleScroll({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (!showResults || !typeTab) return;
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - LOAD_MORE_THRESHOLD) {
+      void loadPage(typeTab, false);
+    }
+  }
+
+  const withFollow = useCallback((p: PersonItem): PersonItem => (
+    p.userId in followOverrides ? { ...p, isFollowing: followOverrides[p.userId] } : p
+  ), [followOverrides]);
+
   // Server-side hashtag search first (real post counts), then tags derived
   // from the matched captions for anything the index does not know yet.
   const tagRows = useMemo(() => {
     const merged = new Map<string, SearchTag>();
     for (const t of serverTags) merged.set(t.tag, t);
-    for (const t of deriveTags(videoResults, trimmedQuery)) {
+    for (const t of deriveTags([...top.posts, ...tabLists.posts.items], trimmedQuery)) {
       const key = normalizeTag(t.tag);
       if (key && !merged.has(key)) merged.set(key, { tag: key, postCount: t.postCount });
     }
     return [...merged.values()];
-  }, [serverTags, videoResults, trimmedQuery]);
+  }, [serverTags, top.posts, tabLists.posts.items, trimmedQuery]);
 
   function openHashtag(tag: string) {
     hapticPrimaryAction();
@@ -325,13 +439,9 @@ export default function BuyerSearchScreen() {
     router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
   }
 
-  function handleResultPress(r: ProductResult | BrandResult) {
+  function handleProductPress(r: ProductResult) {
     hapticPrimaryAction();
-    if (r.kind === 'brand' && (r as any).sellerId) {
-      goToBrand((r as any).sellerId);
-    } else if (r.kind === 'product' && (r as any).productId) {
-      goToProduct((r as any).productId);
-    }
+    if ((r as any).productId) goToProduct((r as any).productId);
   }
 
   function handlePersonPress(p: SearchPerson) {
@@ -355,7 +465,7 @@ export default function BuyerSearchScreen() {
       if (wasFollowing) await api.social.unfollow(person.userId);
       else requested = (await api.social.follow(person.userId))?.status === 'requested';
       // A private account only received a follow request — not following yet.
-      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing && !requested } : p)));
+      setFollowOverrides((prev) => ({ ...prev, [person.userId]: !wasFollowing && !requested }));
       hapticPrimaryAction();
     } catch {
       // Keep previous state on failure.
@@ -372,12 +482,13 @@ export default function BuyerSearchScreen() {
     const trimmed = term.trim();
     if (!trimmed) return;
     setQuery(trimmed);
-    setActiveTab('forYou');
+    setActiveTab('top');
     setSubmitted(true);
     setFieldFocused(false);
     inputRef.current?.blur();
-    api.public.log(trimmed).catch(() => {});
-    loadRecent();
+    setRecentSearches((current) => mergeRecent([trimmed], current));
+    void addRecentSearch(trimmed);
+    if (isSignedIn) api.public.log(trimmed).catch(() => {});
   }
 
   function submit() {
@@ -393,9 +504,18 @@ export default function BuyerSearchScreen() {
   function handleCancel() {
     hapticSelection();
     setQuery('');
+    setStyle(null);
     setSubmitted(false);
     setFieldFocused(false);
     inputRef.current?.blur();
+  }
+
+  function handleChipChange(next: string | null) {
+    setStyle(next);
+    if (next && !trimmedQuery) {
+      setFieldFocused(false);
+      inputRef.current?.blur();
+    }
   }
 
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
@@ -423,7 +543,7 @@ export default function BuyerSearchScreen() {
       <View style={styles.grid} onLayout={onGridLayout}>
         {items.map((item, index) => (
           <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
-            <ProductTile item={item} accent={primary} width={gridCardWidth} onPress={() => handleResultPress(item)} />
+            <ProductTile item={item} accent={primary} width={gridCardWidth} onPress={() => handleProductPress(item)} />
           </AnimatedEntrance>
         ))}
       </View>
@@ -442,16 +562,16 @@ export default function BuyerSearchScreen() {
     </ResponsiveContainer>
   );
 
-  const personRows = (items: SearchPerson[]) => items.map((p) => (
+  const personRows = (items: PersonItem[]) => items.map(withFollow).map((p) => (
     <PersonRow key={p.userId} person={p} loading={!!followPending[p.userId]} onPress={() => handlePersonPress(p)} onToggleFollow={() => handleToggleFollow(p)} />
   ));
 
-  const brandRowList = (items: SearchBrandRow[]) => items.map((b) => (
-    <BrandRow key={b.id} brand={b} onPress={() => goToBrand((brandResultsRaw.find((r) => r.id === b.id) as any)?.sellerId)} />
+  const brandRowList = (items: BrandItem[]) => items.map((b) => (
+    <BrandRow key={b.id} brand={b} onPress={() => goToBrand(b.sellerId)} />
   ));
 
   function renderNoResults() {
-    if (activeFilterCount > 0 && activeTab === 'products') {
+    if (activeFilterCount > 0 && (activeTab === 'products' || browsingChip)) {
       return (
         <View testID="buyer-search-no-results">
           <EmptyState
@@ -463,23 +583,33 @@ export default function BuyerSearchScreen() {
         </View>
       );
     }
+    if (browsingChip) {
+      return (
+        <View testID="buyer-search-no-results">
+          <EmptyState
+            icon="tag"
+            title={`No ${styleLabel} pieces yet`}
+            description="Try another category."
+            action={{ label: 'Clear category', icon: 'x-circle', onPress: () => setStyle(null) }}
+          />
+        </View>
+      );
+    }
     return (
       <View testID="buyer-search-no-results">
         <EmptyState
           icon="search"
           illustration="search"
           title={`No results for "${trimmedQuery}"`}
-          description="Try a different spelling or a broader term."
+          description={style ? `Nothing in ${styleLabel} — try clearing the category.` : 'Try a different spelling or a broader term.'}
           action={{ label: 'Clear search', icon: 'x-circle', onPress: handleCancel }}
         />
       </View>
     );
   }
 
-  // ── Live suggestions while typing — query row (search icon) first, then
-  //    matching accounts, per the Mobbin reference exactly. Tapping any row
-  //    submits directly (no separate "fill" affordance — Instagram doesn't
-  //    have one either). ──────────────────────────────────────────────────
+  // ── Live suggestions while typing — the query row (search icon) first,
+  //    then matching brands and people. Tapping any row submits directly. ──
   type SuggestionRow = { key: string; icon: keyof typeof Feather.glyphMap; avatar?: { uri: string | null; color: string; initials: string }; title: React.ReactNode; subtitle?: string; onSubmit: () => void };
   const suggestionRows = useMemo<SuggestionRow[]>(() => {
     if (!trimmedQuery) return [];
@@ -497,7 +627,14 @@ export default function BuyerSearchScreen() {
     const rows: SuggestionRow[] = [
       { key: 'q', icon: 'search', title: bold(trimmedQuery), onSubmit: () => submitTerm(trimmedQuery) },
     ];
-    for (const p of people.slice(0, 5)) {
+    for (const b of top.brands.slice(0, 3)) {
+      rows.push({
+        key: `b-${b.id}`, icon: 'shopping-bag',
+        title: bold(b.name), subtitle: b.handle,
+        onSubmit: () => goToBrand(b.sellerId),
+      });
+    }
+    for (const p of top.people.slice(0, 4)) {
       rows.push({
         key: `u-${p.userId}`, icon: 'user',
         avatar: { uri: p.avatarUrl ?? null, color: p.color, initials: p.initials },
@@ -507,7 +644,7 @@ export default function BuyerSearchScreen() {
     }
     return rows.slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trimmedQuery, people]);
+  }, [trimmedQuery, top.brands, top.people]);
 
   function renderSuggestions() {
     return (
@@ -543,12 +680,12 @@ export default function BuyerSearchScreen() {
     );
   }
 
-  function renderRecent() {
+  function renderRecentRows(max: number, { showEmpty }: { showEmpty: boolean }) {
+    if (recentSearches.length === 0 && !showEmpty) return null;
     return (
       <View testID="buyer-search-recent">
-        <TrendingTags onPress={openHashtag} />
         <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Recent</Text>
+          <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>RECENT</Text>
           {recentSearches.length > 0 && (
             <TouchableOpacity onPress={() => router.push('/buyer-search-history' as never)} accessibilityRole="button" accessibilityLabel="See all recent searches" hitSlop={12}>
               <Text style={[styles.sectionAction, { color: fg }]}>See all</Text>
@@ -560,7 +697,7 @@ export default function BuyerSearchScreen() {
             <Text style={[TYPE_SCALE.footnote, { color: muted }]}>No recent searches</Text>
           </View>
         ) : (
-          recentSearches.slice(0, 5).map((term) => (
+          recentSearches.slice(0, max).map((term) => (
             <RecentSearchRow key={term} term={term} onPress={() => submitTerm(term)} onRemove={() => removeRecent(term)} />
           ))
         )}
@@ -568,43 +705,127 @@ export default function BuyerSearchScreen() {
     );
   }
 
-  function renderTabContent() {
-    if (activeTab === 'accounts') {
-      if (people.length === 0 && brandRows.length === 0) return renderNoResults();
-      return <View>{personRows(people)}{brandRowList(brandRows)}</View>;
+  function renderFocusedEmpty() {
+    return (
+      <View>
+        <TrendingTags onPress={openHashtag} />
+        {renderRecentRows(5, { showEmpty: true })}
+        <TrendingBrands onPress={goToBrand} />
+      </View>
+    );
+  }
+
+  // Header above the unfocused Explore grid: empty query still surfaces
+  // recent searches and trending brands, not just the grid.
+  const browseHeader = (
+    <View testID="buyer-search-browse-header">
+      {renderRecentRows(3, { showEmpty: false })}
+      <TrendingBrands onPress={goToBrand} max={4} />
+      <Text style={styles.sectionLabel}>EXPLORE</Text>
+    </View>
+  );
+
+  function renderFilterRow() {
+    return (
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
+          accessibilityRole="button"
+          accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
+          testID="buyer-search-filter-button"
+        >
+          <Feather name="sliders" size={14} color={fg} />
+          <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.medium }]}>Filters</Text>
+          {activeFilterCount > 0 && (
+            <View style={[styles.filterBadge, { backgroundColor: fg }]} testID="buyer-search-filter-badge">
+              <Text style={[styles.filterBadgeText, { color: bg }]}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {activeFilterCount > 0 && (
+          <TouchableOpacity
+            onPress={() => { hapticSelection(); setFilters({}); }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all filters"
+            hitSlop={12}
+            testID="buyer-search-filter-clear"
+          >
+            <Text style={[TYPE_SCALE.footnote, { color: muted, fontFamily: FONT.semibold }]}>Clear all</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  function renderListFooter(list: TypeList<unknown>) {
+    if (list.loading) return <ActivityIndicator style={{ marginVertical: SPACING.lg }} color={muted} testID="buyer-search-loading-more" />;
+    if (list.hasMore) {
+      return (
+        <TouchableOpacity onPress={() => typeTab && loadPage(typeTab, false)} accessibilityRole="button" style={styles.loadMore} testID="buyer-search-load-more">
+          <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.semibold }]}>Show more</Text>
+        </TouchableOpacity>
+      );
     }
-    if (activeTab === 'products') {
+    return null;
+  }
+
+  function sectionHeader(key: SearchAllSectionKey, hasMore: boolean) {
+    return (
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>{SECTION_LABELS[key]}</Text>
+        {hasMore && (
+          <TouchableOpacity onPress={() => { hapticSelection(); setActiveTab(key); }} accessibilityRole="button" accessibilityLabel={`See all ${key}`} hitSlop={12} testID={`search-see-all-${key}`}>
+            <Text style={[styles.sectionAction, { color: fg }]}>See all</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  function renderTopSection(key: SearchAllSectionKey, index: number) {
+    const items = top[key];
+    if (items.length === 0) return null;
+    // Always offer "See all" — the per-type tab pages past the Top slice.
+    const body = key === 'products' ? productGrid(items as ProductResult[])
+      : key === 'brands' ? brandRowList(items as BrandItem[])
+      : key === 'people' ? personRows(items as PersonItem[])
+      : videoGrid(items as VideoResult[]);
+    return (
+      <AnimatedEntrance key={key} delay={index * 40}>
+        <View testID={`search-top-${key}`}>
+          {sectionHeader(key, true)}
+          {body}
+        </View>
+      </AnimatedEntrance>
+    );
+  }
+
+  function renderTabContent() {
+    if (browsingChip || activeTab === 'products') {
+      const list = tabLists.products;
       return (
         <View>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => { hapticSelection(); setFilterSheetOpen(true); }}
-              accessibilityRole="button"
-              accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
-              testID="buyer-search-filter-button"
-            >
-              <Feather name="sliders" size={14} color={fg} />
-              <Text style={[TYPE_SCALE.footnote, { color: fg, fontFamily: FONT.medium }]}>Filters</Text>
-              {activeFilterCount > 0 && (
-                <View style={[styles.filterBadge, { backgroundColor: fg }]} testID="buyer-search-filter-badge">
-                  <Text style={[styles.filterBadgeText, { color: bg }]}>{activeFilterCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            {activeFilterCount > 0 && (
-              <TouchableOpacity
-                onPress={() => { hapticSelection(); setFilters({}); }}
-                accessibilityRole="button"
-                accessibilityLabel="Clear all filters"
-                hitSlop={12}
-                testID="buyer-search-filter-clear"
-              >
-                <Text style={[TYPE_SCALE.footnote, { color: muted, fontFamily: FONT.semibold }]}>Clear all</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {productResults.length === 0 ? renderNoResults() : productGrid(productResults)}
+          {browsingChip && <Text style={styles.sectionLabel}>{(styleLabel ?? '').toUpperCase()}</Text>}
+          {renderFilterRow()}
+          {list.items.length === 0
+            ? (list.loaded && !list.loading ? renderNoResults() : <ActivityIndicator style={{ marginTop: SPACING.lg }} color={muted} />)
+            : productGrid(list.items)}
+          {list.items.length > 0 && renderListFooter(list)}
+        </View>
+      );
+    }
+    if (activeTab === 'brands' || activeTab === 'people' || activeTab === 'posts') {
+      const list = tabLists[activeTab];
+      if (list.items.length === 0) {
+        return list.loaded && !list.loading ? renderNoResults() : <ActivityIndicator style={{ marginTop: SPACING.lg }} color={muted} />;
+      }
+      return (
+        <View>
+          {activeTab === 'brands' ? brandRowList(list.items as BrandItem[])
+            : activeTab === 'people' ? personRows(list.items as PersonItem[])
+            : <View style={{ paddingTop: SPACING.sm }}>{videoGrid(list.items as VideoResult[])}</View>}
+          {renderListFooter(list)}
         </View>
       );
     }
@@ -618,42 +839,17 @@ export default function BuyerSearchScreen() {
       }
       return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => openHashtag(t.tag)} />)}</View>;
     }
-    if (activeTab === 'brands') {
-      if (brandRows.length === 0) return renderNoResults();
-      return <View>{brandRowList(brandRows)}</View>;
-    }
 
-    // For you — an Accounts section (up to 5 rows) then a posts grid, per
-    // the Mobbin reference. "View counts" don't exist in our data model
-    // (the real video-search endpoint returns likesCount, not a view
-    // count) — the grid honestly shows likes instead of a fabricated
-    // view-count overlay.
-    const totalCount = productResults.length + people.length + videoResults.length;
-    if (totalCount === 0) return renderNoResults();
-    const topPeople = people.slice(0, 5);
-    return (
-      <View>
-        {topPeople.length > 0 && (
-          <AnimatedEntrance>
-            <Text style={styles.sectionLabel}>ACCOUNTS</Text>
-            {personRows(topPeople)}
-          </AnimatedEntrance>
-        )}
-        {videoResults.length > 0 && (
-          <AnimatedEntrance delay={40}>
-            <Text style={styles.sectionLabel}>POSTS</Text>
-            {videoGrid(videoResults)}
-          </AnimatedEntrance>
-        )}
-      </View>
-    );
+    // Top — the best slice of every type, best-matching section first
+    // (server `order`), each with "See all" into its own paginated tab.
+    if (top.order.length === 0) return searching ? <ActivityIndicator style={{ marginTop: SPACING.lg }} color={muted} /> : renderNoResults();
+    return <View>{top.order.map((key, i) => renderTopSection(key, i))}</View>;
   }
 
   // ── Header: back chevron always visible; the trailing element is either
   //    an add-person icon (idle, unfocused, empty) or a Cancel button
-  //    (focused / typing / submitted) — matching the Mobbin reference's own
-  //    Cancel-on-focus behavior. ────────────────────────────────────────
-  const showCancel = fieldFocused || trimmedQuery.length > 0 || submitted;
+  //    (focused / typing / submitted). ────────────────────────────────────
+  const showCancel = fieldFocused || trimmedQuery.length > 0 || submitted || !!style;
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -715,11 +911,14 @@ export default function BuyerSearchScreen() {
         )}
       </View>
 
-      {trimmedQuery.length === 0 && !fieldFocused ? (
+      <CategoryChips value={style} onChange={handleChipChange} />
+
+      {trimmedQuery.length === 0 && !fieldFocused && !style ? (
         <DiscoverGrid
           posts={browsePosts}
           loading={browseLoading}
           showRails={false}
+          ListHeaderComponent={browseHeader}
           onTilePress={(post, idx) => openViewer(post, idx, browsePosts)}
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
@@ -730,23 +929,27 @@ export default function BuyerSearchScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onScroll={handleScroll}
+          scrollEventThrottle={200}
         >
-          {trimmedQuery.length === 0 ? (
+          {showResults ? (
             <>
-              {renderRecent()}
-              <ShopByCategoryRail categories={shopShelves.categories} />
-            </>
-          ) : !submitted ? (
-            renderSuggestions()
-          ) : (
-            <>
-              <View style={styles.tabsRow}>
-                <SegmentedTabs active={activeTab} onChange={setActiveTab} />
-              </View>
-              <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
+              {!browsingChip && (
+                <View style={styles.tabsRow}>
+                  <SegmentedTabs active={activeTab} onChange={setActiveTab} />
+                </View>
+              )}
+              <View testID="buyer-search-results-state" accessibilityLabel={browsingChip ? `${styleLabel} products` : `Search results for ${query}`}>
                 {renderTabContent()}
               </View>
             </>
+          ) : trimmedQuery.length === 0 ? (
+            <>
+              {renderFocusedEmpty()}
+              <ShopByCategoryRail categories={shopShelves.categories} />
+            </>
+          ) : (
+            renderSuggestions()
           )}
           <View style={{ height: insets.bottom + SPACING.xl }} />
         </ScrollView>
@@ -846,6 +1049,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   filterBadge: { minWidth: 18, height: 18, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   filterBadgeText: { fontSize: 11, fontFamily: FONT.bold },
+  loadMore: { alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
   suggestionRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,
