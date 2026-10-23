@@ -340,16 +340,16 @@ export default function ManufacturerMessagesScreen() {
       rightElement={
         <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
           {manufacturerId ? (
-            <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
+            <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} accessibilityRole="button" accessibilityLabel="View manufacturer profile">
               <Feather name="info" size={16} color={theme.text} />
             </TouchableOpacity>
           ) : null}
           {callingEnabled ? (
             <>
-          <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={'Start voice call'} testID="manufacturer-voice-call" style={s.headerBtn}>
+          <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={'Start voice call'} testID="manufacturer-voice-call" style={s.headerBtn} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
             <Feather name="phone" size={16} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={'Start video call'} testID="manufacturer-video-call" style={s.headerBtn}>
+          <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={'Start video call'} testID="manufacturer-video-call" style={s.headerBtn} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
             <Feather name="video" size={16} color={theme.text} />
           </TouchableOpacity>
             </>
@@ -450,7 +450,7 @@ export default function ManufacturerMessagesScreen() {
             {pending.map((asset, index) => (
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
                 <Image source={{ uri: asset.uri }} style={s.previewImage} />
-                <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
+                <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Remove photo">
                   <Feather name="x" size={12} color={theme.text} />
                 </TouchableOpacity>
               </View>
@@ -459,8 +459,8 @@ export default function ManufacturerMessagesScreen() {
           ) : null
         }
         leftAccessory={
-          <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} accessibilityLabel="Add photos" testID="button-attach">
-            <Feather name="image" size={18} color="#000000" />
+          <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }} accessibilityRole="button" accessibilityLabel="Add photos" testID="button-attach">
+            <Feather name="image" size={18} color={theme.onAccent} />
           </TouchableOpacity>
         }
       />
@@ -515,7 +515,7 @@ const makeBub = (theme: AppThemePreset) => StyleSheet.create({
   systemWrap: { alignItems: 'center', marginVertical: SP.sm, paddingHorizontal: SP.lg },
   systemPill: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, maxWidth: 320 },
   systemText: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, lineHeight: 16 },
-  systemTime: { fontSize: 10, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
+  systemTime: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
 });
 
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
@@ -533,7 +533,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   previewTile: { width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden' },
   previewImage: { width: '100%', height: '100%' },
   previewRemove: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: SP.sm },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 function fmtDate(iso: string | number) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -122,9 +123,9 @@ export default function FinanceScreen() {
   const totalNet = transactions.reduce((acc, t) => acc + (t.net ?? 0), 0);
 
   const overviewCards = [
-    { label: 'Available', value: formatCents(availAmt), color: colors.success, icon: 'trending-up' as const },
-    { label: 'Pending',   value: formatCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
-    { label: 'Net (recent)', value: formatCents(totalNet), color: colors.info, icon: 'percent' as const },
+    { label: 'Available', value: formatCents(availAmt), icon: 'trending-up' as const },
+    { label: 'Pending',   value: formatCents(pendAmt),  icon: 'activity' as const },
+    { label: 'Net (recent)', value: formatCents(totalNet), icon: 'percent' as const },
   ];
 
   // Build expenses list from real transactions
@@ -133,20 +134,20 @@ export default function FinanceScreen() {
      amount:   (t.net >= 0 ? '+' : '') + formatCents(t.net),
     date:     fmtDate(t.created),
     category: txCategory(t.type),
-    positive: t.net >= 0,
   }));
 
   // Fallback P&L data when not connected
+  const totalFees = transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0);
   const PL_DATA_FALLBACK = [
-     { label: 'Gross Revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
-     { label: 'Fees',          value: '-' + formatCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
-     { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
+     { label: 'Gross revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)) },
+     { label: 'Fees',          value: (totalFees > 0 ? '-' : '') + formatCents(totalFees) },
+     { label: 'Net (recent)',  value: formatCents(totalNet), highlight: true },
   ];
 
   const documents = isPreviewMode ? [] : [
-    ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
-    { label: 'Monthly Statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) },
-    { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+    ...(!isReadOnly ? [{ label: 'Download statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    { label: 'Monthly statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) },
+    { label: 'Tax report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
     { label: 'Chargebacks', icon: 'shield' as const, trailing: 'chevron-right' as const, onPress: () => router.push('/disputes' as any) },
   ];
 
@@ -155,7 +156,8 @@ export default function FinanceScreen() {
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" />
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={colors.primary} />
+          <SkeletonBlock width="100%" height={140} />
+          <SkeletonBlock width="100%" height={160} />
         </View>
       </View>
     );
@@ -175,7 +177,7 @@ export default function FinanceScreen() {
       <ScreenHeader title="Finance" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 24, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -184,6 +186,8 @@ export default function FinanceScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => { hapticPrimaryAction(); router.push('/subscription' as any); }}
+          accessibilityRole="button"
+          accessibilityLabel="Platform subscription"
           style={[styles.subCard, { borderColor: colors.border, backgroundColor: colors.card }]}
         >
           <View style={styles.subCardLeft}>
@@ -191,12 +195,12 @@ export default function FinanceScreen() {
             <Text style={[styles.subCardPlan, TABULAR_NUMS, { color: colors.foreground }]}>
               {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'pro' ? 'Pro' : 'Starter'}
               {' '}
-              <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
+              <Text style={[{ color: colors.mutedForeground, fontSize: 13, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
                  {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}
               </Text>
             </Text>
             {subStatus.trialEnd ? (
-              <Text style={[styles.subCardMeta, { color: colors.info }]}>Trial ends {subStatus.trialEnd}</Text>
+              <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Trial ends {subStatus.trialEnd}</Text>
             ) : subStatus.renewsOn ? (
               <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Renews {subStatus.renewsOn}</Text>
             ) : null}
@@ -241,8 +245,8 @@ export default function FinanceScreen() {
         ) : (
           overviewCards.map((card) => (
             <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name={card.icon} size={16} color={card.color} />
-              <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
+              <Feather name={card.icon} size={16} color={colors.mutedForeground} />
+              <Text style={[styles.overviewVal, TABULAR_NUMS, { color: colors.foreground }]}>{card.value}</Text>
               <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
             </View>
           ))
@@ -270,7 +274,7 @@ export default function FinanceScreen() {
               <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
                 {item.label}
               </Text>
-              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+              <Text style={[styles.plValue, TABULAR_NUMS, { color: colors.foreground, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
                 {item.value}
               </Text>
             </View>
@@ -279,10 +283,12 @@ export default function FinanceScreen() {
       </View>
 
       {/* Recent Transactions */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent transactions</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ margin: 20 }} />
+          <View style={{ padding: 16, gap: 8 }}>
+            {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={52} />)}
+          </View>
         ) : balanceError ? (
           <View style={{ padding: 20, alignItems: 'flex-start' }}>
             <RetryRow label="Couldn't load transactions" onRetry={load} />
@@ -297,13 +303,13 @@ export default function FinanceScreen() {
           expenseRows.map((e, i) => (
             <View key={i} style={[styles.expRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
               <View style={styles.expLeft}>
-                <Text style={[styles.expName, { color: colors.foreground }]}>{e.name}</Text>
+                <Text style={[styles.expName, { color: colors.foreground }]} numberOfLines={1}>{e.name}</Text>
                 <View style={styles.expMeta}>
                   <Badge label={e.category} variant="default" />
                   <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
                 </View>
               </View>
-              <Text style={[styles.expAmount, TABULAR_NUMS, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
+              <Text style={[styles.expAmount, TABULAR_NUMS, { color: colors.foreground }]}>{e.amount}</Text>
             </View>
           ))
         )}
@@ -315,7 +321,7 @@ export default function FinanceScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {documents.map((item, i) => (
-              <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={item.label} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
                   <Feather name={item.icon} size={15} color={colors.mutedForeground} />
                 </View>
@@ -333,44 +339,44 @@ export default function FinanceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  accessLoading: { padding: 16, gap: 8 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
   overviewRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   overviewCard: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
-  overviewVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  overviewVal: { fontSize: 17, fontFamily: 'Inter_700Bold' },
   overviewLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   plRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  plLabel: { fontSize: 14 },
-  plValue: { fontSize: 14 },
+  plLabel: { fontSize: 15 },
+  plValue: { fontSize: 15 },
   cashRow: { padding: 14, gap: 8 },
   cashBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   cashFill: { height: '100%', borderRadius: 4 },
   cashLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  expRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  expLeft: { flex: 1, gap: 5 },
+  expRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  expLeft: { flex: 1, gap: 4 },
   expName: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   expMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   expDate: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  expAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  expAmount: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  docRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  docLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  docLabel: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular' },
 
   // Subscription card
   subCard: {
     flexDirection: 'row', alignItems: 'center', borderRadius: 14,
-    borderWidth: 1, padding: 14, marginBottom: 20, gap: 12,
+    borderWidth: 1, padding: 16, marginBottom: 20, gap: 12,
   },
-  subCardLeft:    { flex: 1, gap: 3 },
+  subCardLeft:    { flex: 1, gap: 4 },
   subCardLabel:   { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  subCardPlan:    { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  subCardMeta:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  subCardPlan:    { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  subCardMeta:    { fontSize: 13, fontFamily: 'Inter_400Regular' },
   subCardRight:   { alignItems: 'flex-end' },
-  subStatusPill:  { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  subStatusPill:  { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
   subStatusText:  { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });

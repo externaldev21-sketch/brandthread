@@ -6,6 +6,9 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { formatCents } from '@/lib/money';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 
 const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
 
@@ -18,18 +21,23 @@ export default function TaxesDutiesScreen() {
   const [providerConfigured, setProviderConfigured] = useState(false);
   const [chargeShippingTax,  setChargeShippingTax]  = useState(false);
   const [annualReport,       setAnnualReport]       = useState<any>(null);
+  const [configError,        setConfigError]        = useState(false);
 
   const [savingTax,      setSavingTax]      = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
+    setConfigError(false);
     try {
       const cfg = await api.taxes.status();
       setStripeTaxEnabled(cfg.stripeTaxEnabled ?? false);
       setProviderConfigured(cfg.providerConfigured ?? false);
       setChargeShippingTax(cfg.chargeShippingTax ?? false);
-    } catch { /* keep defaults if the config can't be reached */ }
+    } catch {
+      // Don't show "off / not configured" as if it were the real setting.
+      setConfigError(true);
+    }
     try {
       setAnnualReport(await api.taxes.forms1099());
     } catch { /* keep the explicit unavailable state */ }
@@ -110,16 +118,22 @@ export default function TaxesDutiesScreen() {
             <HapticSwitch
               value={stripeTaxEnabled}
               onValueChange={handleToggleTax}
-              disabled={savingTax || loading}
+              disabled={savingTax || loading || configError}
             />
           </View>
 
-          <View style={[styles.statusRow, { borderColor: colors.border }]}>
-            <View style={[styles.dot, { backgroundColor: providerConfigured ? colors.success : colors.mutedForeground }]} />
-            <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-              {providerConfigured ? 'Stripe Tax is configured on your connected account.' : 'Not yet configured — connect Stripe and turn this on to start.'}
-            </Text>
-          </View>
+          {loading ? (
+            <SkeletonLine width="80%" height={13} style={{ marginTop: 12 }} />
+          ) : configError ? (
+            <RetryRow label="Couldn't load tax settings" onRetry={loadConfig} style={{ marginTop: 12 }} />
+          ) : (
+            <View style={[styles.statusRow, { borderColor: colors.border }]}>
+              <View style={[styles.dot, { backgroundColor: providerConfigured ? colors.success : colors.mutedForeground }]} />
+              <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+                {providerConfigured ? 'Stripe Tax is set up for your store.' : 'Not set up yet — connect Stripe and turn this on to start.'}
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
             <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
@@ -144,10 +158,10 @@ export default function TaxesDutiesScreen() {
             <HapticSwitch
               value={chargeShippingTax}
               onValueChange={handleToggleShipping}
-              disabled={savingShipping || loading || !stripeTaxEnabled}
+              disabled={savingShipping || loading || configError || !stripeTaxEnabled}
             />
           </View>
-          {!stripeTaxEnabled && (
+          {!stripeTaxEnabled && !loading && !configError && (
             <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 8 }]}>
               Turn on automatic tax above to set this.
             </Text>
@@ -160,7 +174,14 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax regions and registrations</Text>
-            <TouchableOpacity onPress={openStripeTaxRegistrations} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity
+              onPress={openStripeTaxRegistrations}
+              activeOpacity={0.7}
+              style={[styles.manageBtn, { borderColor: colors.border }]}
+              accessibilityRole="link"
+              accessibilityLabel="Open Stripe tax registrations"
+              hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+            >
               <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Open Stripe</Text>
             </TouchableOpacity>
           </View>
@@ -216,7 +237,7 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <Feather name="info" size={13} color={colors.mutedForeground} style={{ marginLeft: 8 }} />
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Brandthread does not determine where you have nexus, register you, or file returns. Review marketplace-facilitator treatment and state obligations with a qualified accountant.
@@ -228,16 +249,16 @@ export default function TaxesDutiesScreen() {
               <Text style={[styles.rowLabel, { color: colors.foreground }]}>1099-K preparation</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
                 {annualReport
-                  ? `${annualReport.year}: $${(annualReport.grossPaymentCents / 100).toFixed(2)} gross · ${annualReport.transactionCount} transactions`
-                  : 'Annual paid-order totals are unavailable.'}
+                  ? `${annualReport.year}: ${formatCents(annualReport.grossPaymentCents)} gross · ${annualReport.transactionCount} transactions`
+                  : loading ? 'Loading annual paid-order totals…' : 'Annual paid-order totals are unavailable.'}
               </Text>
               {annualReport && (
-                <Text style={[styles.rowDescription, { color: annualReport.threshold?.meetsFederalThreshold ? colors.success : colors.mutedForeground }]}>
+                <Text style={[styles.rowDescription, { color: annualReport.threshold?.meetsFederalThreshold ? colors.foreground : colors.mutedForeground }]}>
                   Federal threshold {annualReport.threshold?.meetsFederalThreshold ? 'exceeded' : 'not exceeded'}: {annualReport.threshold?.summary}.
                 </Text>
               )}
               {annualReport?.forms?.length > 0 && (
-                <Text style={[styles.rowDescription, { color: colors.success }]}>
+                <Text style={[styles.rowDescription, { color: colors.foreground }]}>
                   Tax forms ready: {annualReport.forms.length}.
                 </Text>
               )}
@@ -255,24 +276,24 @@ export default function TaxesDutiesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
+  section: { paddingHorizontal: 20, paddingVertical: 16 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 6, marginBottom: 14, lineHeight: 17 },
+  sectionSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 8, marginBottom: 16, lineHeight: 18 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  divider: { height: 10 },
-  manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  divider: { height: 8 },
+  manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
   manageBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 17 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 },
+  rowLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  rowDescription: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4, lineHeight: 18 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 16, marginTop: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 2 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1 },
-  reportCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
-  unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
-  disclaimer: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
+  statusText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
+  reportCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 16, marginTop: 16 },
+  unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 16, marginTop: 4 },
+  disclaimer: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18, marginTop: 12, paddingHorizontal: 4 },
   rowIcon: { width: 20 },
-  infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  infoBox: { flexDirection: 'row', gap: 12, borderRadius: 12, padding: 16, marginTop: 12 },
+  infoText: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18, flex: 1 },
 });

@@ -4,7 +4,7 @@
  * Params: manufacturerId, productId
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -21,6 +21,7 @@ export default function ManufacturerProductScreen() {
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const { manufacturerId, productId } = useLocalSearchParams<{ manufacturerId: string; productId: string }>();
 
   const [product, setProduct] = useState<ManufacturerProduct | null>(null);
@@ -44,13 +45,15 @@ export default function ManufacturerProductScreen() {
       <ScreenHeader title={product?.name ?? 'Product'} onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
-      ) : error || !product ? (
-        <EmptyState icon="alert-circle" title="Product unavailable" description="This catalog product could not be loaded." action={{ label: 'Retry', onPress: load }} />
+      ) : error ? (
+        <EmptyState icon="alert-circle" title="Couldn't load this product" description="Check your connection and try again." action={{ label: 'Try again', onPress: load }} />
+      ) : !product ? (
+        <EmptyState icon="package" title="Product not found" description="It may have been removed from this manufacturer's catalog." action={{ label: 'Go back', onPress: () => goBackOr(router) }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
           {product.images.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={s.gallery}>
-              {product.images.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
+              {product.images.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={[s.galleryImage, { width: windowWidth }]} />)}
             </ScrollView>
           ) : (
             <View style={[s.gallery, s.galleryFallback]}><Feather name="package" size={ICON.xxl} color={theme.subtle} /></View>
@@ -66,7 +69,7 @@ export default function ManufacturerProductScreen() {
             <View style={s.statsGrid}>
               <View style={s.statItem}>
                 <Feather name="package" size={ICON.sm} color={theme.text} />
-                <Text style={s.statLabel}>MOQ</Text>
+                <Text style={s.statLabel}>Min. order</Text>
                 <Text style={s.statValue}>{product.moq.toLocaleString('en-US')} units</Text>
               </View>
               <View style={s.statItem}>
@@ -81,14 +84,14 @@ export default function ManufacturerProductScreen() {
               </View>
             </View>
 
-            <Text style={s.sectionTitle}>Quantity Pricing</Text>
+            <Text style={s.sectionTitle}>Quantity pricing</Text>
             {product.priceTiers.length === 0 ? (
               <Text style={s.hint}>No tiered pricing published yet — request a quote for a price.</Text>
             ) : (
               <View style={s.tierTable}>
                 <View style={[s.tierRow, s.tierHeaderRow]}>
                   <Text style={[s.tierCell, s.tierHeaderText, { flex: 1.4 }]}>Quantity</Text>
-                  <Text style={[s.tierCell, s.tierHeaderText]}>Unit Price</Text>
+                  <Text style={[s.tierCell, s.tierHeaderText]}>Unit price</Text>
                 </View>
                 {product.priceTiers.map((tier) => (
                   <View key={tier.id} style={s.tierRow}>
@@ -103,7 +106,7 @@ export default function ManufacturerProductScreen() {
 
             {product.customizationOptions.length > 0 && (
               <>
-                <Text style={s.sectionTitle}>Customization Options</Text>
+                <Text style={s.sectionTitle}>Customization options</Text>
                 <View style={s.chipRow}>
                   {product.customizationOptions.map((opt) => (
                     <View key={opt} style={s.chip}><Text style={s.chipText}>{opt}</Text></View>
@@ -118,7 +121,7 @@ export default function ManufacturerProductScreen() {
       {product && (
         <View style={[s.footer, { paddingBottom: SP.md + insets.bottom }]}>
           <PrimaryButton
-            label="Request Quote for this Product"
+            label="Request a quote"
             icon="file-text"
             onPress={() => router.push(`/quote-request?manufacturerId=${product.manufacturerId}&productId=${product.id}` as never)}
           />
@@ -140,7 +143,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   title: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text, flex: 1 },
   description: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },
   statsGrid: { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
-  statItem: { flex: 1, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, alignItems: 'center', gap: 3 },
+  statItem: { flex: 1, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, alignItems: 'center', gap: SP.xs },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   statValue: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, textAlign: 'center' },
   sectionTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.md },

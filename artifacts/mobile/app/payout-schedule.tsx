@@ -5,7 +5,6 @@ import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
@@ -50,7 +49,6 @@ export default function PayoutScheduleScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const api = useApi();
-  const tabBarMetrics = useTabBarMetrics(2);
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const isPreviewMode = isSellerDevPreview();
   const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
@@ -212,7 +210,6 @@ export default function PayoutScheduleScreen() {
     <View style={styles.root}>
       <ScreenHeader title="Payout schedule" onBack={goBack} />
       <ScrollView
-        style={{ marginBottom: tabBarMetrics.occupiedHeight }}
         contentContainerStyle={[styles.content, !info && !loading && !loadError && { flexGrow: 1, justifyContent: 'center' }]}
         showsVerticalScrollIndicator={false}
       >
@@ -221,7 +218,14 @@ export default function PayoutScheduleScreen() {
         ) : loadError ? (
           <ErrorState message="Couldn't load your payout schedule." onRetry={() => { void load(); }} />
         ) : !info || !info.connected ? (
-          <EmptyState icon="credit-card" title="Connect Stripe to choose a schedule" message="" compact />
+          <EmptyState
+            icon="credit-card"
+            title="Connect Stripe to choose a schedule"
+            message="Finish payout setup, then pick when you get paid."
+            actionLabel={isReadOnly ? undefined : 'Set up payouts'}
+            onAction={isReadOnly ? undefined : () => router.push('/payout-setup' as never)}
+            compact
+          />
         ) : (
           <>
             <Text style={styles.sectionTitle}>When you get paid</Text>
@@ -364,10 +368,10 @@ const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: SP.md, paddingBottom: SP.lg },
-    sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
+    sectionTitle: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: SP.sm },
     card: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.md, marginBottom: SP.sm },
     cardOn: { borderColor: text, borderWidth: 2, padding: SP.md - 1 },
-    cardOff: { opacity: 0.6 },
+    cardOff: { opacity: 0.4 },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
     cardTitle: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
     cardSub: { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },

@@ -58,13 +58,19 @@ type Tab = 'discover' | 'my_manufacturers' | 'quotes' | 'samples' | 'production'
 // that clipped off the right edge of a 393pt screen with no affordance.
 const TABS: { key: Tab; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { key: 'discover',         label: 'Discover',       icon: 'search' },
-  { key: 'my_manufacturers', label: 'My Mfgs',        icon: 'users' },
+  { key: 'my_manufacturers', label: 'Partners',       icon: 'users' },
   { key: 'quotes',           label: 'Quotes',         icon: 'file-text' },
   { key: 'samples',          label: 'Samples',        icon: 'package' },
   { key: 'production',       label: 'Orders',         icon: 'layers' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Raw enum -> sentence-case badge label, e.g. 'awaiting_payment' -> 'Awaiting payment'. */
+function statusLabel(status: string): string {
+  const text = status.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 function fmtDate(iso?: string): string {
   if (!iso) return '';
@@ -159,7 +165,9 @@ export default function ManufacturerHub() {
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
-  const isTab = (value: unknown): value is Tab => TABS.some((item) => item.key === value);
+  // 'messages' has no segment in the strip but is still a valid deep-link
+  // target (profile "Inbox", Discover "See all", Orders empty state).
+  const isTab = (value: unknown): value is Tab => value === 'messages' || TABS.some((item) => item.key === value);
   const [activeTab, setActiveTab] = useState<Tab>(isTab(tab) ? tab : 'discover');
   const isSellerSetup = isSellerSetupOrigin(from);
 
@@ -505,7 +513,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const rails: { key: string; title: string; data: Manufacturer[] }[] = [
     { key: 'verified', title: 'Verified manufacturers', data: railVerified },
     { key: 'fast', title: 'Fast customization', data: railFastCustomization },
-    { key: 'moq', title: 'Low MOQ', data: railLowMoq },
+    { key: 'moq', title: 'Low minimum order', data: railLowMoq },
     { key: 'rated', title: 'Top-rated', data: railTopRated },
   ];
 
@@ -525,7 +533,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <Feather name="send" size={ICON.md} color={theme.onAccent} />
             </View>
             <View style={s.rfqCtaBody}>
-              <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for Quotation</Text>
+              <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for quotation</Text>
               <Text style={[s.rfqCtaSubtitle, getOnAccentTextStyle(theme)]}>Broadcast one request to up to 10 manufacturers</Text>
             </View>
             <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
@@ -538,7 +546,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           </TouchableOpacity>
           <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
             <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
-            <Text style={s.rfqSecondaryText}>Compare Suppliers</Text>
+            <Text style={s.rfqSecondaryText}>Compare suppliers</Text>
           </TouchableOpacity>
         </View>
 
@@ -718,10 +726,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
-              description={favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
+              description={favoritesOnly
+                ? 'Save manufacturers from Discover and they will appear here.'
+                : (activeFilterCount(filters) > 0 || searchQuery) ? 'Try adjusting your search or filters.' : 'No manufacturers are listed yet. Check back soon.'}
               action={favoritesOnly
                 ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
-                : { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
+                : (activeFilterCount(filters) > 0 || searchQuery)
+                  ? { label: 'Clear filters', onPress: () => { setSearchQuery(''); setFilters(DEFAULT_FILTERS); setLoading(true); load('', DEFAULT_FILTERS); } }
+                  : undefined}
             />
           )
         }
@@ -775,6 +787,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             onPress={onSave}
             disabled={saving}
             activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
           >
@@ -809,12 +822,12 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             : `${formatCents(mfg.unitPriceMinCents)} – ${formatCents(mfg.unitPriceMaxCents)}`} <Text style={card.priceUnit}>/ unit</Text>
         </Text>
       )}
-      <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'Contact for MOQ'}</Text>
+      <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'on request'}</Text>
       <Text style={card.specialties} numberOfLines={2}>
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <View style={card.detailStack}>
-        <Text style={card.stats} numberOfLines={1}>{mfg.leadTimeDays ? `${mfg.leadTimeDays}d lead time` : 'Lead time varies'}</Text>
+        <Text style={card.stats} numberOfLines={1}>{mfg.leadTimeDays ? `${mfg.leadTimeDays}-day lead time` : 'Lead time varies'}</Text>
         <Text style={card.response} numberOfLines={1}>{mfg.responseTimeHours > 0 ? `Replies in ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
       </View>
 
@@ -824,6 +837,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
           style={card.iconAction}
           onPress={onQuote}
           activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel={`Request a quote from ${mfg.name}`}
         >
@@ -844,9 +858,9 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   coverTouch:    { flex: 1 },
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: theme.accentLight },
+  coverFallbackText: { fontSize: FS.h2, fontFamily: FONT.bold, color: theme.accentLight },
   yearsBadge:    { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.pill, backgroundColor: 'rgba(10,10,11,0.78)' }, // theme-exempt: scrim over the cover photo
-  yearsText:     { fontSize: 10, fontFamily: FONT.semibold, color: '#FAFAFA' }, // theme-exempt: text on the photo scrim
+  yearsText:     { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FAFAFA' }, // theme-exempt: text on the photo scrim
   saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   topRow:        { marginBottom: SP.xs },
   nameCol:       { flex: 1 },
@@ -856,7 +870,7 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.secondary },
   location:      { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.warning },
+  ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
   reviewCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   priceRange:    { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, marginTop: 2 },
   priceUnit:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
@@ -917,11 +931,11 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[fm.root, { paddingBottom: insets.bottom + SP.md }]}>
+      <View style={fm.root}>
         <View style={fm.handle} />
         <View style={fm.header}>
-          <Text style={fm.title}>Filter Manufacturers</Text>
-          <TouchableOpacity onPress={onClose}>
+          <Text style={fm.title}>Filters</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Close filters">
             <Feather name="x" size={ICON.md} color={theme.muted} />
           </TouchableOpacity>
         </View>
@@ -930,7 +944,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
           <Text style={fm.sectionLabel}>Sort by</Text>
           <View style={fm.chipRow}>
-            {([['recommended', 'Recommended'], ['experience', 'Most experience'], ['rating', 'Top rated'], ['moq', 'Lowest MOQ'], ['newest', 'Newest']] as const).map(([val, label]) => (
+            {([['recommended', 'Recommended'], ['experience', 'Most experience'], ['rating', 'Top rated'], ['moq', 'Lowest minimum order'], ['newest', 'Newest']] as const).map(([val, label]) => (
               <FilterChip key={val} label={label} active={local.sort === val} onPress={() => set('sort', val)} />
             ))}
           </View>
@@ -956,21 +970,21 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Min Order Qty (MOQ)</Text>
+          <Text style={fm.sectionLabel}>Minimum order</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤25', val: 25 }, { label: '≤50', val: 50 }, { label: '≤100', val: 100 }, { label: '≤200', val: 200 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.moqMax === val} onPress={() => set('moqMax', val)} />
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Unit Price</Text>
+          <Text style={fm.sectionLabel}>Unit price</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤$10', val: 10 }, { label: '≤$20', val: 20 }, { label: '≤$35', val: 35 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.unitPriceMaxCents === (val === undefined ? undefined : val * 100)} onPress={() => set('unitPriceMaxCents', val === undefined ? undefined : val * 100)} />
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Lead Time</Text>
+          <Text style={fm.sectionLabel}>Lead time</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤14 days', val: 14 }, { label: '≤30 days', val: 30 }, { label: '≤45 days', val: 45 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
               <FilterChip key={label} label={label} active={local.leadTimeDaysMax === val} onPress={() => set('leadTimeDaysMax', val)} />
@@ -1016,7 +1030,7 @@ const makeFm = (theme: AppThemePreset) => StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
   title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
   scroll:      { paddingHorizontal: SP.md, paddingBottom: SP.lg },
-  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm },
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg, paddingVertical: SP.sm },
   switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
@@ -1086,7 +1100,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     return (
       <EmptyState
         icon="users"
-        title="Build your production network."
+        title="Build your production network"
         description="Message a manufacturer from Discover, or invite one you already work with. They'll appear here with their orders and messages."
         action={{ label: 'Invite a manufacturer', onPress: () => router.push('/invite-manufacturer' as never), icon: 'user-plus' }}
         style={s.emptyState}
@@ -1166,7 +1180,7 @@ const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
   counts:   { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   lastMsg:  { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
   divider:  { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
-  actionRow:{ flexDirection: 'row', gap: SP.xs },
+  actionRow:{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1208,7 +1222,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
   const handleAccept = (quote: Quote) => {
-    Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
+    Alert.alert('Accept quote?', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load)
         .catch(() => Alert.alert('Quote update failed', 'Could not accept this quote. Refresh and try again.')) },
@@ -1216,7 +1230,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   };
 
   const handleDecline = (quote: Quote) => {
-    Alert.alert('Decline Quote', 'Are you sure you want to decline this quote?', [
+    Alert.alert('Decline quote?', 'The manufacturer will be notified.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Decline', style: 'destructive', onPress: () => declineQuote(quote.id).then(load)
         .catch(() => Alert.alert('Quote update failed', 'Could not decline this quote. Refresh and try again.')) },
@@ -1242,20 +1256,31 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     quotesByRequest[q.quoteRequestId].push(q);
   });
 
-  if (!loading && quoteRequests.length === 0 && quotes.length === 0) {
+  if (loading && quoteRequests.length === 0 && quotes.length === 0) {
+    return <View style={s.skeletonList} testID="quotes-loading">{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
+  }
+
+  if (quoteRequests.length === 0 && quotes.length === 0) {
     return (
       <View style={s.flex}>
         <EmptyState
           icon="file-text"
-          title="Request your first production quote."
+          title="Request your first production quote"
           description="Send quote requests to manufacturers and compare their offers."
           action={{ label: 'Request a quote', onPress: () => router.push('/quote-request' as never), icon: 'plus' }}
           style={s.emptyState}
         />
-        <QuotesFAB router={router} />
       </View>
     );
   }
+
+  const handleWithdraw = (req: QuoteRequest) => {
+    Alert.alert('Withdraw this request?', 'The manufacturer will be notified.', [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Withdraw', style: 'destructive', onPress: () => withdrawQuoteRequest(req.id).then(load)
+        .catch(() => Alert.alert('Quote update failed', 'Could not withdraw this request. Refresh and try again.')) },
+    ]);
+  };
 
   return (
     <View style={s.flex}>
@@ -1266,21 +1291,21 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       >
         {quoteRequests.length > 0 && (
           <>
-            <SectionHeader title="Quote Requests" style={s.sectionHeader} />
+            <SectionHeader title="Quote requests" style={s.sectionHeader} />
             {quoteRequests.map(req => (
               <QuoteRequestCard
                 key={req.id}
                 req={req}
                 manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => Alert.alert('Quote update failed', 'Could not withdraw this request. Refresh and try again.'))}
+                onWithdraw={() => handleWithdraw(req)}
               />
             ))}
           </>
         )}
         {quotes.length > 0 && (
           <>
-            <SectionHeader title="Quotes Received" style={s.sectionHeader} />
+            <SectionHeader title="Quotes received" style={s.sectionHeader} />
             {quotes.map(q => (
               <QuoteReceivedCard
                 key={q.id}
@@ -1332,7 +1357,7 @@ function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: 
     <View style={qc.root}>
       <View style={qc.topRow}>
         <Text style={qc.productName} numberOfLines={1}>{req.productName}</Text>
-        <StatusBadge label={req.status.replace(/_/g, ' ')} variant={quoteRequestStatusVariant(req.status)} small />
+        <StatusBadge label={statusLabel(req.status)} variant={quoteRequestStatusVariant(req.status)} small />
       </View>
       {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
       <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
@@ -1430,7 +1455,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="package"
-        title="Your samples will appear here."
+        title="Your samples will appear here"
         description="Message a manufacturer about your design. When they send a sample card in chat, pay it there and track it here."
         action={{ label: 'Find a manufacturer', onPress: () => router.setParams({ tab: 'discover' } as never), icon: 'search' }}
         style={s.emptyState}
@@ -1448,7 +1473,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
           <View style={smpCard.root}>
             <View style={smpCard.topRow}>
               <Text style={smpCard.productName} numberOfLines={1}>{item.productName}</Text>
-              <StatusBadge label={item.status.replace(/_/g, ' ')} variant={sampleStatusVariant(item.status)} small />
+              <StatusBadge label={statusLabel(item.status)} variant={sampleStatusVariant(item.status)} small />
             </View>
             {!!item.manufacturerName && <Text style={smpCard.mfgName}>{item.manufacturerName}</Text>}
             {item.estimatedCompletionDate && (
@@ -1534,7 +1559,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="layers"
-        title="Bulk orders show up here."
+        title="Bulk orders show up here"
         description="When a manufacturer sends you a bulk order card in chat and you pay it, you can follow every stage of production here."
         action={{ label: 'Open messages', onPress: () => router.setParams({ tab: 'messages' } as never), icon: 'message-circle' }}
         style={s.emptyState}
@@ -1653,7 +1678,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="message-circle"
-        title="Manufacturer conversations will appear here."
+        title="Manufacturer conversations will appear here"
         description="Message manufacturers directly from their profiles or quote requests."
         style={s.emptyState}
       />
@@ -1741,11 +1766,11 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   searchInput:  { flex: 1, height: 36, backgroundColor: theme.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: theme.border, backgroundColor: theme.accentDim },
-  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: 10, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
-  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, paddingHorizontal: SP.md, marginBottom: SP.sm },
+  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.accent, color: theme.onAccent, fontSize: FS.xs, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
+  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
   skeletonList: { padding: SP.md, gap: SP.md },
   skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
-  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   skeletonTile: { width: '48%', height: 260, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning, backgroundColor: `${theme.warning}1F` },
@@ -1757,7 +1782,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   emptyState:   { flex: 1, justifyContent: 'center', paddingBottom: COMP.tabBarH + SP.lg },
 
   // Discover tab — Alibaba-style sourcing intro (RFQ CTA, categories, featured, previews)
-  discoverIntroContent: { paddingHorizontal: SP.md, paddingTop: SP.xs, gap: SP.md },
+  discoverIntroContent: { paddingTop: SP.xs, gap: SP.md },
   rfqCta:       { borderRadius: RADIUS.lg, overflow: 'hidden' },
   rfqCtaGrad:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md },
   rfqCtaIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }, // theme-exempt: overlay on gradient
@@ -1778,7 +1803,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   featuredCoverFallbackText: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.accentLight },
   featuredVerifiedBadge: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: theme.secondary, alignItems: 'center', justifyContent: 'center' },
   featuredName: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.xs },
-  featuredMeta: { fontSize: 10, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  featuredMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   previewSection: { gap: SP.xs },
   previewRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm },
   previewIcon:  { width: 32, height: 32, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
@@ -1786,7 +1811,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   previewTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   previewSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   previewBadge: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  previewBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: theme.onAccent },
+  previewBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent },
   compareBar:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   compareBarText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
 });

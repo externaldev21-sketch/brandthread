@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
@@ -59,7 +58,6 @@ export default function PayoutDetailScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const api = useApi();
-  const tabBarMetrics = useTabBarMetrics(2);
   const { id } = useLocalSearchParams<{ id: string }>();
   const payoutId = typeof id === 'string' ? id : '';
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
@@ -122,7 +120,6 @@ export default function PayoutDetailScreen() {
     <View style={styles.root}>
       <ScreenHeader title="Payout" onBack={goBack} />
       <ScrollView
-        style={{ marginBottom: tabBarMetrics.occupiedHeight }}
         contentContainerStyle={[styles.content, !payout && !loading && !loadError && { flexGrow: 1, justifyContent: 'center' }]}
         showsVerticalScrollIndicator={false}
       >
@@ -195,7 +192,7 @@ const createStyles = (theme: AppThemePreset) => {
     content: { padding: SP.md, paddingBottom: SP.lg },
     hero: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
     heroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5 },
-    pill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: border },
+    pill: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: border },
     pillText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium },
     group: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, paddingHorizontal: SP.md, marginBottom: SP.md },
     sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm, marginTop: SP.sm },

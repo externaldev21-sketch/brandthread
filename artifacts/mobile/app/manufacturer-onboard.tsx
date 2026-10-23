@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadDraw } from '@/components/onboarding/ThreadLine';
 import { PillButton, Reveal, StepHeadline } from '@/components/onboarding/OnboardingUI';
-import { BG, BORDER, CARD, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
+import { BG, BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE } from '@/lib/theme';
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
@@ -42,7 +42,7 @@ export default function ManufacturerOnboardScreen() {
         <StepHeadline size="title1">{token ? 'You were invited to work on Brandthread' : 'List your factory on Brandthread'}</StepHeadline>
         <Reveal index={1}>
         <Text style={s.text}>
-          Manufacturers use the Brandthread Manufacturer Portal to set up their profile and photos, chat with sellers, send priced sample and bulk cards, update production and get paid through Stripe.
+          Manufacturers use the Brandthread manufacturer portal to set up their profile and photos, chat with sellers, send priced sample and bulk cards, update production and get paid.
           {token ? ' Your invite is private: only the seller who invited you will see your profile.' : ' Your listing goes live in the directory as soon as you finish.'}
         </Text>
         </Reveal>
@@ -73,8 +73,8 @@ const s = StyleSheet.create({
   heroThread: { position: 'absolute', left: -SP.lg, right: -SP.lg, top: 0 },
   icon: { width: 60, height: 60, borderRadius: 30, backgroundColor: BG, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginLeft: SP.lg },
   text: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
-  card: { backgroundColor: CARD, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: SP.md, gap: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: SP.md, gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   url: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center' },
 });

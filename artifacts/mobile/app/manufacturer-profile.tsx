@@ -5,11 +5,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Platform, Image,
+  Alert, ActivityIndicator, Platform, Image, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -173,7 +173,7 @@ export default function ManufacturerProfileScreen() {
   if (!manufacturer) {
     return (
       <View style={[s.root, { paddingTop: headerTopInset }]}>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Go back">
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => goBackOr(router) }} />
@@ -188,9 +188,8 @@ export default function ManufacturerProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        stickyHeaderIndices={[0]}
       >
-        {/* ── Sticky Hero ── */}
+        {/* ── Hero ── */}
         <LinearGradient
           colors={theme.heroGradient}
           start={{ x: 0, y: 0 }}
@@ -198,7 +197,7 @@ export default function ManufacturerProfileScreen() {
           style={[s.hero, { paddingTop: headerTopInset + SP.sm }]}
         >
           {/* Back button */}
-          <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => goBackOr(router)} style={[s.backBtnHero, { top: headerTopInset }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Go back">
             <Feather name="arrow-left" size={ICON.md} color={ON_DARK} />
           </TouchableOpacity>
 
@@ -215,7 +214,7 @@ export default function ManufacturerProfileScreen() {
 
           {/* Name + verified */}
           <View style={s.heroNameRow}>
-             <Text style={[s.heroName, getOnAccentTextStyle(theme)]}>{m.name}</Text>
+             <Text style={[s.heroName, { color: theme.text }]}>{m.name}</Text>
             {m.isVerified && (
               <View style={[s.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
                 <Feather name="check-circle" size={14} color={theme.secondary} />
@@ -226,21 +225,21 @@ export default function ManufacturerProfileScreen() {
 
           {/* Location */}
           <View style={s.heroLocationRow}>
-             <Feather name="map-pin" size={12} color={theme.onAccent} />
-             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
+             <Feather name="map-pin" size={12} color={theme.muted} />
+             <Text style={[s.heroLocation, { color: theme.muted }]}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
           </View>
           {(localTimeLabel(m.timeZone) || m.isPublicDirectory === false) && (
             <View style={s.heroLocationRow}>
               {localTimeLabel(m.timeZone) ? (
                 <>
-                  <Feather name="clock" size={12} color={theme.onAccent} />
-                  <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]} testID="profile-local-time">{localTimeLabel(m.timeZone)}</Text>
+                  <Feather name="clock" size={12} color={theme.muted} />
+                  <Text style={[s.heroLocation, { color: theme.muted }]} testID="profile-local-time">{localTimeLabel(m.timeZone)}</Text>
                 </>
               ) : null}
               {m.isPublicDirectory === false && (
-                <View style={[s.verifiedBadge, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>
-                  <Feather name="lock" size={12} color={theme.onAccent} />
-                  <Text style={[s.verifiedText, { color: theme.onAccent }]}>Private partner</Text>
+                <View style={[s.verifiedBadge, { backgroundColor: theme.cardElevated }]}>
+                  <Feather name="lock" size={12} color={theme.text} />
+                  <Text style={[s.verifiedText, { color: theme.text }]}>Private partner</Text>
                 </View>
               )}
             </View>
@@ -248,8 +247,8 @@ export default function ManufacturerProfileScreen() {
 
           {/* Rating */}
           <View style={s.heroRatingRow}>
-             <StarRating rating={m.rating} color={theme.onAccent} />
-             <Text style={[s.heroRatingText, getOnAccentTextStyle(theme)]}>
+             <StarRating rating={m.rating} color={theme.text} />
+             <Text style={[s.heroRatingText, { color: theme.muted }]}>
                {m.reviewCount > 0 ? `${m.rating.toFixed(1)} (${m.reviewCount} reviews)` : 'No ratings yet'}
              </Text>
           </View>
@@ -258,20 +257,20 @@ export default function ManufacturerProfileScreen() {
         {/* ── Quick Actions ── */}
         <View style={s.quickActions}>
           <TouchableOpacity onPress={handleSave} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="heart" size={ICON.md} color={saved ? RED : MUTED} />
-            <Text style={[s.qaBtnLabel, saved && { color: RED }]}>{saved ? 'Saved' : 'Save'}</Text>
+            <Feather name="heart" size={ICON.md} color={saved ? theme.error : theme.text} />
+            <Text style={[s.qaBtnLabel, { color: theme.text }]}>{saved ? 'Saved' : 'Save'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleMessage} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="message-circle" size={ICON.md} color={CYAN} />
-            <Text style={[s.qaBtnLabel, { color: CYAN }]}>Message</Text>
+            <Feather name="message-circle" size={ICON.md} color={theme.text} />
+            <Text style={[s.qaBtnLabel, { color: theme.text }]}>Message</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/manufacturer-hub?tab=messages' as never)} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="inbox" size={ICON.md} color={PURPLE_LIGHT} />
-            <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Messages</Text>
+            <Feather name="inbox" size={ICON.md} color={theme.text} />
+            <Text style={[s.qaBtnLabel, { color: theme.text }]}>Inbox</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleQuote} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
-            <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Quote</Text>
+            <Feather name="file-text" size={ICON.md} color={theme.text} />
+            <Text style={[s.qaBtnLabel, { color: theme.text }]}>Quote</Text>
           </TouchableOpacity>
         </View>
 
@@ -331,7 +330,7 @@ export default function ManufacturerProfileScreen() {
                   )}
                   {cap.printMethods && cap.printMethods.length > 0 && (
                     <View style={{ marginTop: SP.sm }}>
-                      <Text style={s.capSubLabel}>Print Methods</Text>
+                      <Text style={s.capSubLabel}>Print methods</Text>
                       <View style={s.chipRow}>
                         {cap.printMethods.map(pm => <Chip key={pm} label={pm} color={PURPLE_DIM} textColor={PURPLE_LIGHT} />)}
                       </View>
@@ -348,14 +347,16 @@ export default function ManufacturerProfileScreen() {
               {m.certifications.map(cert => (
                 <View key={cert.id} style={s.certRow}>
                   <View style={s.certIcon}>
-                    <Feather name="award" size={ICON.sm} color={GOLD} />
+                    <Feather name="award" size={ICON.sm} color={FG} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.certName}>{cert.name}</Text>
                     {cert.issuer && <Text style={s.certMeta}>Issued by {cert.issuer}</Text>}
                     {cert.validUntil && <Text style={s.certMeta}>Valid until {cert.validUntil}</Text>}
                   </View>
-                  <StatusBadge label="Active" variant="success" small />
+                  {cert.validUntil && new Date(cert.validUntil).getTime() < Date.now()
+                    ? <StatusBadge label="Expired" variant="neutral" small />
+                    : <StatusBadge label="Active" variant="success" small />}
                 </View>
               ))}
             </SectionCard>
@@ -374,20 +375,20 @@ export default function ManufacturerProfileScreen() {
           <SectionCard title="Pricing">
             <View style={s.pricingGrid}>
               <View style={s.pricingItem}>
-                <Text style={s.pricingLabel}>MOQ</Text>
-                <Text style={s.pricingValue}>{m.moq} units</Text>
+                <Text style={s.pricingLabel}>Minimum order</Text>
+                <Text style={s.pricingValue}>{m.moq > 0 ? `${m.moq.toLocaleString('en-US')} units` : 'On request'}</Text>
               </View>
               <View style={s.pricingItem}>
-                <Text style={s.pricingLabel}>Unit Price</Text>
-                <Text style={s.pricingValue}>{formatCents(m.unitPriceMinCents)}–{formatCents(m.unitPriceMaxCents)}</Text>
+                <Text style={s.pricingLabel}>Unit price</Text>
+                <Text style={s.pricingValue}>{m.unitPriceMinCents > 0 ? `${formatCents(m.unitPriceMinCents)}–${formatCents(m.unitPriceMaxCents)}` : 'On request'}</Text>
               </View>
               <View style={s.pricingItem}>
-                <Text style={s.pricingLabel}>Sample Price</Text>
-                <Text style={s.pricingValue}>{formatCents(m.samplePriceMinCents)}–{formatCents(m.samplePriceMaxCents)}</Text>
+                <Text style={s.pricingLabel}>Sample price</Text>
+                <Text style={s.pricingValue}>{m.samplePriceMinCents > 0 ? `${formatCents(m.samplePriceMinCents)}–${formatCents(m.samplePriceMaxCents)}` : 'On request'}</Text>
               </View>
               <View style={s.pricingItem}>
-                <Text style={s.pricingLabel}>Lead Time</Text>
-                <Text style={s.pricingValue}>{m.leadTimeDays} days</Text>
+                <Text style={s.pricingLabel}>Lead time</Text>
+                <Text style={s.pricingValue}>{m.leadTimeDays > 0 ? `${m.leadTimeDays} days` : 'On request'}</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -398,12 +399,12 @@ export default function ManufacturerProfileScreen() {
               accessibilityLabel={`Request a sample from ${m.name}`}
             >
               <Feather name="scissors" size={ICON.sm} color={FG} />
-              <Text style={s.requestSampleBtnText}>Request a Sample</Text>
+              <Text style={s.requestSampleBtnText}>Request a sample</Text>
             </TouchableOpacity>
           </SectionCard>
 
           {/* ── Product / Sample Catalog ── */}
-          <SectionCard title="Product Catalog">
+          <SectionCard title="Product catalog">
             {productsLoading ? (
               <ActivityIndicator color={PURPLE} />
             ) : productsError ? (
@@ -433,7 +434,7 @@ export default function ManufacturerProfileScreen() {
                       {from !== undefined && (
                         <Text style={s.catalogPrice}>from {formatCents(from)}/unit</Text>
                       )}
-                      <Text style={s.catalogMeta}>MOQ {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}d lead</Text>
+                      <Text style={s.catalogMeta}>Min. {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}-day lead</Text>
                       {product.priceTiers.length > 0 && (
                         <View style={s.tierMiniTable}>
                           {product.priceTiers.slice(0, 3).map((tier) => (
@@ -489,10 +490,10 @@ export default function ManufacturerProfileScreen() {
 
           {/* ── Shipping ── */}
           {m.shippingRegions.length > 0 && (
-            <SectionCard title="Shipping Regions">
+            <SectionCard title="Shipping regions">
               <View style={s.chipRow}>
                 {m.shippingRegions.map(r => (
-                  <Chip key={r} label={r} color={'rgba(16,185,129,0.12)'} textColor={SUCCESS} />
+                  <Chip key={r} label={r} color={CARD_ELEVATED} textColor={FG} />
                 ))}
               </View>
             </SectionCard>
@@ -501,22 +502,22 @@ export default function ManufacturerProfileScreen() {
           {/* ── Contact ── */}
           <SectionCard title="Contact">
             {m.email && (
-              <View style={s.contactRow}>
-                <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(`mailto:${m.email}`)} accessibilityRole="link" accessibilityLabel={`Email ${m.email}`}>
+                <Feather name="mail" size={ICON.sm} color={FG} />
                 <Text style={s.contactText}>{m.email}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {m.website && (
-              <View style={s.contactRow}>
-                <Feather name="globe" size={ICON.sm} color={CYAN} />
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(/^https?:\/\//i.test(m.website!) ? m.website! : `https://${m.website}`)} accessibilityRole="link" accessibilityLabel={`Open ${m.website}`}>
+                <Feather name="globe" size={ICON.sm} color={FG} />
                 <Text style={s.contactText}>{m.website}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {m.phone && (
-              <View style={s.contactRow}>
-                <Feather name="phone" size={ICON.sm} color={SUCCESS} />
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(`tel:${m.phone!.replace(/[^\d+]/g, '')}`)} accessibilityRole="link" accessibilityLabel={`Call ${m.phone}`}>
+                <Feather name="phone" size={ICON.sm} color={FG} />
                 <Text style={s.contactText}>{m.phone}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {!m.email && !m.website && !m.phone && (
               <Text style={s.noContact}>No contact information available.</Text>
@@ -528,7 +529,7 @@ export default function ManufacturerProfileScreen() {
       {/* ── Sticky Quote Button ── */}
       <View style={[s.stickyBottom, { paddingBottom: insets.bottom + SP.sm }]}>
         <PrimaryButton
-          label="Request Quote"
+          label="Request a quote"
           onPress={handleQuote}
           icon="file-text"
           style={{ marginHorizontal: SP.md }}
@@ -662,7 +663,7 @@ const s = StyleSheet.create({
   },
   certIcon: {
     width: 32, height: 32, borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(245,158,11,0.12)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center',
   },
   certName: {
     fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
@@ -682,7 +683,7 @@ const s = StyleSheet.create({
     fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED,
   },
   pricingValue: {
-    fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+    fontSize: FS.md, fontFamily: FONT.bold, color: FG,
   },
   requestSampleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
@@ -725,7 +726,7 @@ const s = StyleSheet.create({
   },
   contactRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingVertical: SP.xs,
+    paddingVertical: SP.xs, minHeight: COMP.minTouchTarget,
   },
   contactText: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
@@ -754,7 +755,7 @@ const s = StyleSheet.create({
     fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 4, minHeight: 32,
   },
   catalogPrice: {
-    fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+    fontSize: FS.sm, fontFamily: FONT.bold, color: FG,
   },
   catalogMeta: {
     fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED,
@@ -766,9 +767,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
   },
   tierMiniQty: {
-    fontSize: 10, fontFamily: FONT.regular, color: SUBTLE,
+    fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE,
   },
   tierMiniPrice: {
-    fontSize: 10, fontFamily: FONT.semibold, color: FG,
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: FG,
   },
 });

@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -37,7 +38,6 @@ export default function PayoutSetupScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
-  const tabBarMetrics = useTabBarMetrics(2); // seller bar, same as payouts.tsx
   const api = useApi();
   const params = useLocalSearchParams<{ returned?: string; refresh?: string; state?: string }>();
   const { isLoaded, isSignedIn } = useAuth();
@@ -86,8 +86,8 @@ export default function PayoutSetupScreen() {
       }
       await WebBrowser.openBrowserAsync(link.url);
       await refresh();
-    } catch (error: any) {
-      Alert.alert('Could not open Stripe', typeof error?.message === 'string' && error.message ? error.message : 'Please try again.');
+    } catch {
+      Alert.alert('Could not open Stripe', 'Try again in a moment.');
     } finally {
       busy.current = false;
       setOpening(false);
@@ -123,17 +123,18 @@ export default function PayoutSetupScreen() {
   const complete = view?.state === 'complete';
 
   return (
-    <View style={[styles.root, { paddingBottom: tabBarMetrics.occupiedHeight }]}>
+    <View style={styles.root}>
       <ScreenHeader title="Payout setup" onBack={() => goBackOr(router, '/payouts')} />
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={theme.text} /></View>
-      ) : !view ? (
-        <View style={styles.center}>
-          <Text style={styles.headTitle}>Could not load setup</Text>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setLoading(true); void refresh(); }} accessibilityRole="button">
-            <Text style={styles.secondaryText}>Try again</Text>
-          </TouchableOpacity>
+        <View style={styles.skeleton}>
+          <LoadingSkeleton height={96} />
+          <LoadingSkeleton height={210} />
         </View>
+      ) : !view ? (
+        <ErrorState
+          message="Couldn't load your payout setup."
+          onRetry={() => { setLoading(true); void refresh(); }}
+        />
       ) : (
         <>
           <ScrollView contentContainerStyle={styles.content} testID="payout-setup-scroll">
@@ -181,7 +182,7 @@ export default function PayoutSetupScreen() {
             <View style={styles.footer}>
               <TouchableOpacity
                 testID="payout-setup-cta"
-                style={[styles.primaryBtn, opening && styles.btnDisabled]}
+                style={[styles.primaryBtn, (opening || skipApi) && styles.btnDisabled]}
                 onPress={onCta}
                 disabled={opening || skipApi}
                 accessibilityRole="button"
@@ -220,13 +221,13 @@ const iconStyles = StyleSheet.create({
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg },
+  skeleton: { padding: SP.md, gap: SP.sm },
   content: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xl },
   readyBadge: { width: 56, height: 56, borderRadius: 28, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   headTitle: { color: theme.text, fontSize: 26, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4 },
   headBody: { color: theme.muted, fontSize: FS.base, lineHeight: 22, fontFamily: FONT.regular, marginTop: SP.sm },
   deadline: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
-  progress: { flexDirection: 'row', gap: 6, marginTop: SP.lg },
+  progress: { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },
   progressSeg: { flex: 1, height: 4, borderRadius: 2, backgroundColor: theme.border },
   progressSegOn: { backgroundColor: theme.text },
   list: { marginTop: SP.lg, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.lg, backgroundColor: theme.card },
@@ -241,7 +242,5 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   footer: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background },
   primaryBtn: { height: 52, borderRadius: RADIUS.lg, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: theme.onAccent, fontSize: FS.base, fontFamily: FONT.semibold },
-  secondaryBtn: { paddingHorizontal: SP.lg, height: 44, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.semibold },
   btnDisabled: { opacity: 0.5 },
 });

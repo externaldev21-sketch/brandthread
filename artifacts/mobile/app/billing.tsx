@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { useRevenueCat } from '@/lib/revenueCat';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -30,7 +31,11 @@ export default function BillingScreen() {
     trialEnd: null as string | null,
     paymentMethodLabel: null as string | null,
   });
+  // A failed billing read must never render as a genuine $0.00 / "No bills yet".
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
   const isReadOnly = isManagerRole(currentRole);
+  const reload = useCallback(() => { setLoadState('loading'); setReloadKey((k) => k + 1); }, []);
 
   useEffect(() => {
     let active = true;
@@ -54,14 +59,15 @@ export default function BillingScreen() {
            currency: invoice.currency.toUpperCase(),
           status: invoice.status === 'paid' ? 'Paid' : 'Unpaid',
         })));
+        setLoadState('ready');
       })
       .catch(() => {
-        // The screen keeps its empty, non-actionable state if live billing data is unavailable.
+        if (active) setLoadState('error');
       });
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, reloadKey]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -97,15 +103,15 @@ export default function BillingScreen() {
         paymentMethodLabel: status.paymentMethodLabel,
       });
       Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
-    } catch (error: any) {
-      Alert.alert('Could not restore purchases', error?.message ?? 'Please try again.');
+    } catch {
+      Alert.alert('Could not restore purchases', 'Try again in a moment.');
     }
   }
 
   function exportBills() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
      const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
-    Share.share({ message: `Billing History\n\n${text}` });
+    Share.share({ message: `Billing history\n\n${text}` });
   }
 
   const filteredBills = bills.filter((b) => {
@@ -118,7 +124,8 @@ export default function BillingScreen() {
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={colors.primary} />
+          <SkeletonBlock width="100%" height={120} />
+          <SkeletonBlock width="100%" height={56} />
         </View>
       </View>
     );
@@ -138,50 +145,63 @@ export default function BillingScreen() {
       <ScreenHeader
         title="Billing"
         rightElement={!isReadOnly ? (
-          <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Export billing history">
+          <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel="Export billing history">
             <Feather name="share" size={17} color={colors.foreground} />
           </TouchableOpacity>
         ) : undefined}
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
             {!isReadOnly && (
-              <TouchableOpacity testID="seller-billing-view-bill" onPress={() => router.push('/subscription' as never)} activeOpacity={0.7}>
+              <TouchableOpacity testID="seller-billing-view-bill" onPress={() => router.push('/subscription' as never)} activeOpacity={0.7} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          <View style={styles.priceRow}>
-            <Text style={[styles.price, { color: colors.foreground }]}>
-               {formatCents(billingStatus.amountCents)}
-            </Text>
-            <Text style={[styles.priceSuffix, { color: colors.mutedForeground }]}>USD</Text>
-          </View>
-          <Text style={[styles.nextBillText, { color: colors.mutedForeground }]}>
-            {billingStatus.trialEnd
-              ? `Free trial ends ${billingStatus.trialEnd}`
-              : billingStatus.renewsOn
-                ? `Next bill is due ${billingStatus.renewsOn}`
-                : 'No upcoming bill'}
-          </Text>
+          {loadState === 'loading' ? (
+            <SkeletonBlock width={160} height={56} style={{ marginBottom: 12 }} />
+          ) : loadState === 'error' ? (
+            <View style={{ alignItems: 'flex-start', marginBottom: 12 }}>
+              <TouchableOpacity onPress={reload} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Couldn't load billing. Tap to retry." style={styles.retryRow}>
+                <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+                <Text style={[styles.retryText, { color: colors.mutedForeground }]}>Couldn't load billing. Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.priceRow}>
+                <Text style={[styles.price, { color: colors.foreground }]}>
+                   {formatCents(billingStatus.amountCents)}
+                </Text>
+                <Text style={[styles.priceSuffix, { color: colors.mutedForeground }]}>USD</Text>
+              </View>
+              <Text style={[styles.nextBillText, { color: colors.mutedForeground }]}>
+                {billingStatus.trialEnd
+                  ? `Free trial ends ${billingStatus.trialEnd}`
+                  : billingStatus.renewsOn
+                    ? `Next bill is due ${billingStatus.renewsOn}`
+                    : 'No upcoming bill'}
+              </Text>
+            </>
+          )}
 
           {isReadOnly ? (
             <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
                 <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
-              <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
+              <Text style={[styles.cardText, { color: colors.foreground }]}>{loadState === 'ready' ? (billingStatus.paymentMethodLabel ?? 'No payment method on file') : '—'}</Text>
             </View>
           ) : (
-            <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`Payment method, ${billingStatus.paymentMethodLabel ?? 'none on file'}`} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
                 <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
-              <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
+              <Text style={[styles.cardText, { color: colors.foreground }]}>{loadState === 'ready' ? (billingStatus.paymentMethodLabel ?? 'No payment method on file') : '—'}</Text>
                <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
@@ -198,7 +218,7 @@ export default function BillingScreen() {
 
         {!isReadOnly && Platform.OS !== 'web' && (
           <View style={styles.section}>
-            <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]} testID="seller-revenuecat-restore">
+            <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} accessibilityRole="button" style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]} testID="seller-revenuecat-restore">
               <Feather name="refresh-cw" size={18} color={colors.primary} />
               <Text style={[styles.cardText, { color: colors.foreground }]}>Restore purchases</Text>
             </TouchableOpacity>
@@ -208,7 +228,7 @@ export default function BillingScreen() {
         {Platform.OS === 'web' && <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Past bills</Text>
-            <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7} accessibilityLabel="Export billing history">
+            <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Export billing history" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Feather name="share" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
@@ -221,6 +241,8 @@ export default function BillingScreen() {
                   onPress={() => { haptic(); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: filter === f }}
                 >
                   <Text style={[styles.filterTabText, { color: filter === f ? colors.foreground : colors.mutedForeground }]}>
                     {f === 'all' ? 'All' : f === 'paid' ? 'Paid' : 'Unpaid'}
@@ -231,7 +253,18 @@ export default function BillingScreen() {
           </View>
 
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {filteredBills.length === 0 ? (
+            {loadState === 'loading' ? (
+              <View style={styles.emptyBills}>
+                <SkeletonBlock width="100%" height={52} />
+              </View>
+            ) : loadState === 'error' ? (
+              <View style={[styles.emptyBills, { alignItems: 'flex-start' }]}>
+                <TouchableOpacity onPress={reload} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Couldn't load past bills. Tap to retry." style={styles.retryRow}>
+                  <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+                  <Text style={[styles.retryText, { color: colors.mutedForeground }]}>Couldn't load past bills. Try again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : filteredBills.length === 0 ? (
               <View style={styles.emptyBills}>
                 <Text style={[styles.billNote, { color: colors.mutedForeground }]}>No bills yet</Text>
               </View>
@@ -242,6 +275,8 @@ export default function BillingScreen() {
                   onPress={() => router.push('/subscription' as never)}
                   disabled={isReadOnly}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Bill ${bill.date}, ${formatCents(bill.amountCents, bill.currency)}, ${bill.status}`}
                   style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                 >
                   <View style={{ flex: 1 }}>
@@ -266,35 +301,37 @@ export default function BillingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  accessLoading: { padding: 16, gap: 8 },
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  section: { paddingHorizontal: 16, paddingVertical: 16 },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   linkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
-  price: { fontSize: 28, fontFamily: 'Inter_700Bold' },
+  price: { fontSize: 26, fontFamily: 'Inter_700Bold' },
   priceSuffix: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  nextBillText: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  nextBillText: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 12 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 4 },
   infoLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 16 },
   cardBrand: { width: 34, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   cardText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
-  noteBar: { paddingHorizontal: 20, paddingVertical: 14 },
-  noteText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  filterTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, flex: 1 },
-  filterTab: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  filterTabText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  noteBar: { paddingHorizontal: 16, paddingVertical: 12 },
+  noteText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  filterTabs: { flexDirection: 'row', borderRadius: 10, padding: 4, flex: 1 },
+  filterTab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  filterTabText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  emptyBills: { padding: 18, alignItems: 'center' },
-  billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
-  billId: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  billNote: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  billAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  emptyBills: { padding: 16, alignItems: 'center' },
+  billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, gap: 12 },
+  billId: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  billNote: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  billAmount: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+  retryText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });
