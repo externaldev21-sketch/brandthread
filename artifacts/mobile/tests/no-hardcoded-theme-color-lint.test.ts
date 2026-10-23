@@ -205,7 +205,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/freelancer-jobs.tsx',
   'app/fulfill-order.tsx',
   'app/help.tsx',
-  'app/integrations/index.tsx',
   'app/invite-manufacturer.tsx',
   'app/live-feed.tsx',
   'app/live.tsx',
