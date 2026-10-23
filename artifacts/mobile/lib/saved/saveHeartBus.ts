@@ -9,7 +9,7 @@ export interface SaveHeartToast {
   message: string;
   actionLabel?: string;
   /** What the action does — resolved by the host so the bus stays UI-free. */
-  action?: { kind: 'collection'; draft: SavedProductDraft } | { kind: 'sign-in' };
+  action?: { kind: 'collection'; draft: SavedProductDraft };
 }
 
 export type SaveHeartEvent =

@@ -4,7 +4,7 @@
  * SaveHeart reports into (see lib/saved/saveHeartBus.ts).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, useSegments } from 'expo-router';
+import { useSegments } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -20,7 +20,6 @@ const DETAIL_FOOTER_H = 84;
 
 export function SaveHeartHost() {
   useSavedProductsSync();
-  const router = useRouter();
   const segments = useSegments() as string[];
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
@@ -55,13 +54,9 @@ export function SaveHeartHost() {
     clearTimer();
     setToast(null);
     if (!action) return;
-    if (action.kind === 'collection') {
-      setSheetDraft(action.draft);
-      setSheetOpen(true);
-    } else {
-      router.push('/sign-in' as never);
-    }
-  }, [toast, router]);
+    setSheetDraft(action.draft);
+    setSheetOpen(true);
+  }, [toast]);
 
   // Keep the toast clear of the floating buyer tab bar and of product
   // detail's sticky purchase footer; everywhere else the default applies.

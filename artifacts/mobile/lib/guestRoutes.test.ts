@@ -1,26 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isGuestBrowseRoute, safeReturnTo } from './guestRoutes';
+import { safeReturnTo } from './guestRoutes';
 import { isSignedInOnlyPath } from './guestApiPolicy';
-
-describe('guest browse routes (5.1.1(v))', () => {
-  it('lets a guest open feed, discover, search, stores, products, drops and profiles', () => {
-    for (const segs of [
-      ['(buyer)'], ['(buyer)', 'index'], ['(buyer)', 'feed'], ['(buyer)', 'discover'], ['(buyer)', 'search'], ['(buyer)', 'cart'],
-      ['buyer-product-detail'], ['seller-profile'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
-    ]) {
-      expect(isGuestBrowseRoute(segs)).toBe(true);
-    }
-  });
-
-  it('keeps account-only areas behind sign-in', () => {
-    for (const segs of [
-      ['(buyer)', 'inbox'], ['(buyer)', 'orders'], ['(buyer)', 'profile'], ['(buyer)', 'edit-profile'],
-      ['(tabs)', 'index'], ['buyer-settings'], ['buyer-conversation'], ['create-post'], ['delete-account'],
-    ]) {
-      expect(isGuestBrowseRoute(segs)).toBe(false);
-    }
-  });
-});
 
 describe('safeReturnTo', () => {
   it('accepts in-app paths and rejects external or looping targets', () => {

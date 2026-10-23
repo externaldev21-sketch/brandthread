@@ -4,7 +4,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
-import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
+import { safeReturnTo } from '@/lib/guestRoutes';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { isAccessCleared } from '@/lib/accessGate';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -664,9 +664,14 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const { addAccount, returnTo } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  const globalParams = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  const { addAccount, returnTo } = globalParams;
+  const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
+  // Account wall: a route opened while signed out (e.g. a deep link) is
+  // remembered here and resumed once the user has signed in / onboarded.
+  const pendingReturnRef = useRef<string | null>(null);
   const topSegment = segments[0];
 
   // Shared seller-shell state — consumed by SellerBarGate with no extra read.
@@ -891,12 +896,6 @@ function AuthGate() {
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen && !inThreadExplainer;
     const inAddAccountFlow = addAccount === '1' && (inAuthScreen || inOnboarding);
 
-    // Allow public access to specific buyer routes for guests
-    // (see lib/guestRoutes.ts — feed, discover, search, stores, products, drops,
-    // public profiles; account-only actions are gated inline at the action)
-    const isGuestAllowedRoute =
-      isGuestBrowseRoute(segments as string[]) || (segments[0] as string) === 'location';
-
     // Development previews skip onboarding without writing completion flags.
     // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
     // also recognize the persisted role when reloading a deep link without it.
@@ -945,12 +944,21 @@ function AuthGate() {
     // and direct browser links regardless of authentication/onboarding state.
     if (inPublicScreen) return;
 
-    // Unauthenticated: show splash first time, then sign-in
-    if (!isSignedIn && inProtectedArea && !isGuestAllowedRoute) {
+    // Unauthenticated: the app requires an account for everything. Show
+    // splash first time, then sign-in; remember where they were headed.
+    if (!isSignedIn && inProtectedArea) {
+      const routeParams = new Set((segments as string[])
+        .filter((seg) => seg.startsWith('['))
+        .map((seg) => seg.replace(/^\[(\.\.\.)?/, '').replace(/\]$/, '')));
+      const query = Object.entries(globalParams)
+        .filter(([k, v]) => typeof v === 'string' && v !== '' && !routeParams.has(k) && k !== 'returnTo' && k !== 'addAccount')
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v as string)}`)
+        .join('&');
+      pendingReturnRef.current = safeReturnTo(query ? `${pathname}?${query}` : pathname);
       router.replace(splashSeen ? '/sign-in' : '/splash');
       return;
     }
-    if (!isSignedIn) return; // stay on auth screen or guest-allowed route
+    if (!isSignedIn) return; // stay on auth screen
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
@@ -996,9 +1004,13 @@ function AuthGate() {
     // bare "/" boot route to the correct dashboard.
     // Thread explainer is an intentional post-onboarding buyer screen — don't
     // redirect buyers away from it; it handles its own navigation.
-    // A guest who was sent to sign-in from an account-only action returns to it.
-    const returnDest = inAuthScreen ? safeReturnTo(returnTo) : null;
+    // A route opened while signed out (deep link) resumes after sign-in.
+    const returnDest = (inAuthScreen ? safeReturnTo(returnTo) : null)
+      ?? (inAuthScreen || inOnboarding || atRoot ? pendingReturnRef.current : null);
+    // Landed anywhere else first (e.g. thread explainer): drop the stale target.
+    if (onboardingDone && !inAuthScreen && !inOnboarding && !atRoot) pendingReturnRef.current = null;
     if (onboardingDone && returnDest && !inAddAccountFlow) {
+      pendingReturnRef.current = null;
       router.replace(returnDest as never);
       return;
     }
@@ -1026,7 +1038,7 @@ function AuthGate() {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, returnTo, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
+  }, [addAccount, returnTo, globalParams, pathname, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }

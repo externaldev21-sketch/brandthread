@@ -69,7 +69,7 @@ function Row({ label, children, testID }: { label: string; children: React.React
 /**
  * A secondary action as a plain text row in the scroll content (icon, label,
  * chevron), not a full-width button. `subtle` is quieter still (muted, no
- * icon weight) for "Create an account".
+ * icon weight).
  */
 function LinkRow({ icon, label, hint, onPress, subtle, testID }: {
   icon: React.ComponentProps<typeof Feather>['name'];
@@ -161,7 +161,7 @@ export function OrderConfirmation({
   const { theme } = useAppTheme();
   const router = useRouter();
   const api = useApi();
-  const { userId, isSignedIn } = useAuth();
+  const { userId } = useAuth();
 
   const items = session.deliveryGroups.flatMap(group => group.items);
   const deliveryEstimates = session.deliveryGroups
@@ -385,18 +385,6 @@ export function OrderConfirmation({
           onPress={() => router.replace('/(buyer)/discover' as never)}
           testID="checkout-continue-shopping"
         />
-        {!isSignedIn ? (
-          <>
-            <Hairline style={styles.linkHairline} />
-            <LinkRow
-              icon="user-plus"
-              label="Create an account to track orders faster"
-              onPress={() => router.replace('/sign-in' as never)}
-              subtle
-              testID="checkout-create-account"
-            />
-          </>
-        ) : null}
       </View>
 
       {!finalizing && singleSeller ? (
@@ -410,8 +398,8 @@ export function OrderConfirmation({
  * The ONE pinned action — Track order (or "Check order status" while the
  * order is still finalizing). A SIBLING of the screen's ScrollView (see
  * app/buyer-checkout.tsx), never inside its scrollable content, so it sits
- * above the home indicator on every screen height. View receipt, Continue
- * shopping and Create an account are text rows in the scroll content, so the
+ * above the home indicator on every screen height. View receipt and Continue
+ * shopping are text rows in the scroll content, so the
  * item list stays visible.
  */
 export function OrderConfirmationActions({

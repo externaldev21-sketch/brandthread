@@ -65,7 +65,7 @@ export default function SignInScreen() {
 
   const router = useRouter();
   const { addAccount, returnTo } = useLocalSearchParams<{ addAccount?: string; returnTo?: string }>();
-  // Guest tapped an account-only action: come back to it after signing in.
+  // Return to the route that was requested before sign-in (account wall).
   const afterSignIn = safeReturnTo(returnTo);
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
@@ -807,18 +807,6 @@ export default function SignInScreen() {
             onPress={() => router.replace('/onboarding' as never)}
             fullWidth
           />
-
-          {/* Guests can browse without an account (Guideline 5.1.1(v)). */}
-          {!isAddAccount && (
-            <Button
-              label="Browse as a guest"
-              variant="tertiary"
-              onPress={() => router.replace('/(buyer)/discover' as never)}
-              fullWidth
-              style={{ marginTop: 8 }}
-              testID="browse-as-guest-button"
-            />
-          )}
 
           <View nativeID="clerk-captcha" />
         </ScrollView>

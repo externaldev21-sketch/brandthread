@@ -189,11 +189,11 @@ describe('order confirmation actions', () => {
     expect(actions).not.toContain('Create an account');
   });
 
-  it('moves View receipt, Continue shopping and Create an account into the scroll content as text rows', () => {
+  it('moves View receipt and Continue shopping into the scroll content as text rows (no guest sign-up row: account wall)', () => {
     const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
     expect(content).toContain('label="View receipt"');
     expect(content).toContain('label="Continue shopping"');
-    expect(content).toMatch(/label="Create an account[^"]*"\s+onPress=\{[^}]+\}\s+subtle/);
+    expect(content).not.toContain('Create an account');
     expect(content).not.toMatch(/<Button[^>]*View receipt/);
   });
 });

@@ -30,7 +30,6 @@ import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
-import { useSignInGate } from '@/hooks/useSignInGate';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -521,7 +520,6 @@ export default function BuyerProductDetailScreen() {
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { isSignedIn } = useAuth();
-  const { goToSignIn } = useSignInGate();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const sizeBadgeModel = useSizeBadgeModel(product);
@@ -811,10 +809,7 @@ export default function BuyerProductDetailScreen() {
 
   async function handleJoinWaitlist() {
     if (!product || !variant) return;
-    if (!isSignedIn) {
-      goToSignIn();
-      return;
-    }
+    if (!isSignedIn) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setWaitlistLoading(true);
     try {
@@ -827,10 +822,7 @@ export default function BuyerProductDetailScreen() {
 
   async function handleReserve() {
     if (!product) return;
-    if (!isSignedIn) {
-      goToSignIn();
-      return;
-    }
+    if (!isSignedIn) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setReserveLoading(true);
     try {
@@ -900,10 +892,7 @@ export default function BuyerProductDetailScreen() {
       Alert.alert('Seller is away', sellerVacationMessage);
       return;
     }
-    if (!isSignedIn) {
-      goToSignIn();
-      return;
-    }
+    if (!isSignedIn) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(messageSellerAboutProductHref({
       sellerId: product.sellerId,

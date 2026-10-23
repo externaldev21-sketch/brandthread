@@ -32,12 +32,9 @@ const PHONE_LOGO_SIZE = 148;
 export function WelcomeStep({
   onGetStarted,
   onSignIn,
-  onBrowse,
 }: {
   onGetStarted: () => void;
   onSignIn: () => void;
-  /** Optional guest entry (Guideline 5.1.1(v)): browse without an account. */
-  onBrowse?: () => void;
 }) {
   const { theme } = useAppTheme();
   const { reduceMotion } = useOnboardingMotion();
@@ -122,16 +119,6 @@ export function WelcomeStep({
             haptic={false}
             onPress={() => { Haptics.selectionAsync(); onSignIn(); }}
           />
-          {onBrowse ? (
-            <PillButton
-              testID="onboarding-welcome-browse-guest"
-              accessibilityLabel="Browse as a guest"
-              label="Browse as a guest"
-              variant="ghost"
-              haptic={false}
-              onPress={() => { Haptics.selectionAsync(); onBrowse(); }}
-            />
-          ) : null}
         </Reveal>
       </View>
     </View>

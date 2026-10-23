@@ -7,11 +7,10 @@
  * Resolution flow:
  * 1. Normalize the username param (lowercase, strip invalid chars).
  * 2. Fetch GET /api/v1/public/profiles/:username — returns safe public DTO.
- * 3a. If visitor is signed in (auth ready + isSignedIn): navigate internally to
- *     buyer-other-profile or seller-profile using the opaque users.id alias.
- * 3b. If visitor is signed out (auth ready + !isSignedIn): stay on /u/{username}
- *     and render a polished public profile landing page from safe DTO fields only.
- *     No posts, no social graph, no private IDs, no seller commerce data.
+ * 3. Once auth is ready, navigate internally to buyer-other-profile or
+ *    seller-profile using the opaque users.id alias. Signed-out visitors never
+ *    reach this screen: AuthGate (app/_layout.tsx) sends them to the
+ *    welcome/sign-in flow and resumes this link after sign-in.
  *
  * Never exposes Clerk IDs in the browser URL.
  *
@@ -23,12 +22,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
-  ScrollView,
-  Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -37,15 +31,10 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticLight } from '@/lib/haptics';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, COMP,
 } from '@/lib/theme';
 import { normalizeUsername } from '@/lib/shareProfile';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SkeletonBlock } from '@/components/layout';
-import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
-import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
-import { a11yHidden } from '@/lib/a11yHidden';
 import { radius } from '@/constants/radii';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
@@ -115,169 +104,11 @@ function getInitials(displayName: string | null, username: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-// ─── Public landing (signed-out) ─────────────────────────────────────────────
-// Same visual shell as every in-app profile (full-bleed hero with the
-// Brandthread thread, avatar over the media, name + role chip), trimmed to the
-// safe public DTO fields, with the Join / Sign in calls to action.
-
-function PublicProfileLanding({
-  profile,
-  insets,
-  onSignIn,
-  onJoin,
-}: {
-  profile: PublicProfileDto;
-  insets: { top: number; bottom: number };
-  onSignIn: () => void;
-  onJoin: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
-  const headerTopInset = useHeaderTopInset();
-  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
-  const initials = getInitials(profile.displayName, profile.username);
-  const displayName = profile.displayName || `@${profile.username}`;
-  const accountLabel =
-    profile.accountType === 'seller' ? 'Seller on Brandthread' : 'On Brandthread';
-
-  return (
-    <View style={[styles.root, styles.landingRoot]}>
-      <ScrollView
-        style={{ width: layout.columnWidth }}
-        contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
-        showsVerticalScrollIndicator={false}
-        accessible
-      >
-        {/* Hero */}
-        <View style={[styles.landingHero, { height: layout.heroHeight }]}>
-          <ProfileHeroMedia active={false} height={layout.heroHeight} />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[`${theme.background}00`, `${theme.background}F2`, theme.background]}
-            locations={[0.4, 0.9, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={[styles.logoRow, { top: headerTopInset + SP.md }]}>
-            <BrandthreadLogo size={28} />
-            <Text style={styles.logoText} accessibilityRole="text">
-              Brandthread
-            </Text>
-          </View>
-          <View style={styles.landingIdentity}>
-            <View style={styles.avatarContainer}>
-              {profile.avatarUrl ? (
-                <Image
-                  source={{ uri: profile.avatarUrl }}
-                  style={styles.avatarImage}
-                  accessible
-                  accessibilityLabel={`${displayName}'s profile photo`}
-                />
-              ) : (
-                <View
-                  style={styles.avatarPlaceholder}
-                  accessible
-                  accessibilityLabel={`${displayName}'s profile photo`}
-                >
-                  <Text style={styles.avatarInitials} {...a11yHidden(true)}>
-                    {initials}
-                  </Text>
-                </View>
-              )}
-              {profile.verified && (
-                <View style={styles.verifiedBadge} accessibilityLabel="Verified">
-                  <Feather name="check" size={10} color={theme.background} />
-                </View>
-              )}
-            </View>
-            <View style={styles.landingIdentityCopy}>
-              <Text style={styles.displayName} accessibilityRole="header" numberOfLines={2}>
-                {displayName}
-              </Text>
-              <View style={styles.handleRow}>
-                <Text style={styles.handle} accessibilityRole="text">
-                  @{profile.username}
-                </Text>
-                {profile.verified && (
-                  <View style={styles.verifiedInline} accessibilityLabel="Verified account">
-                    <Feather name="check-circle" size={ICON.xs} color={theme.success} />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.landingBody}>
-          {/* Account type label */}
-          <View style={styles.accountTypePill}>
-            <Feather
-              name={profile.accountType === 'seller' ? 'shopping-bag' : 'user'}
-              size={ICON.xs}
-              color={theme.muted}
-            />
-            <Text style={styles.accountTypeText}>{accountLabel}</Text>
-          </View>
-
-          {/* Bio (optional) */}
-          {!!profile.bio && (
-            <Text
-              style={styles.bio}
-              accessibilityRole="text"
-              numberOfLines={5}
-            >
-              {profile.bio}
-            </Text>
-          )}
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* CTA block */}
-          <View style={styles.ctaBlock}>
-            <Text style={styles.ctaLabel}>
-              View {displayName}'s full profile on Brandthread
-            </Text>
-
-            {/* Primary: Open / Join */}
-            <PressableScale
-              style={styles.primaryBtn}
-              onPress={() => { hapticLight(); onJoin(); }}
-              accessibilityRole="button"
-              accessibilityLabel="Join Brandthread to view this profile"
-              activeOpacity={0.85}
-            >
-              <Text style={styles.primaryBtnText}>Join Brandthread</Text>
-            </PressableScale>
-
-            {/* Secondary: Sign in */}
-            <PressableScale
-              style={styles.secondaryBtn}
-              onPress={() => { hapticLight(); onSignIn(); }}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in to Brandthread"
-              activeOpacity={0.85}
-            >
-              <Text style={styles.secondaryBtnText}>Sign in</Text>
-            </PressableScale>
-          </View>
-
-          {/* Fine print */}
-          <Text style={styles.finePrint} accessibilityRole="text">
-            Brandthread · Fashion &amp; Commerce
-          </Text>
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export default function PublicProfileRoute() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ username?: string }>();
 
@@ -286,7 +117,7 @@ export default function PublicProfileRoute() {
     : params.username;
   const username = normalizeUsername(rawUsername);
 
-  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { isLoaded: authLoaded } = useAuth();
 
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const mountRef = useRef(true);
@@ -330,8 +161,6 @@ export default function PublicProfileRoute() {
     if (state.kind !== 'ready') return;
     // Don't act until Clerk has resolved the auth state.
     if (!authLoaded) return;
-    // Signed-out visitors stay on this route and see the landing page.
-    if (!isSignedIn) return;
 
     const { profile } = state;
     if (profile.accountType === 'seller') {
@@ -350,13 +179,13 @@ export default function PublicProfileRoute() {
         )}&handle=${encodeURIComponent('@' + profile.username)}&initials=${encodeURIComponent(initials)}` as never,
       );
     }
-  }, [state, authLoaded, isSignedIn, router]);
+  }, [state, authLoaded, router]);
 
   // ── Loading: waiting for resolver or auth readiness ───────────────────────
   // Show spinner while either the fetch or Clerk initialisation is in-flight.
   const isWaiting =
     state.kind === 'loading' ||
-    (state.kind === 'ready' && (!authLoaded || isSignedIn));
+    state.kind === 'ready';
 
   if (isWaiting) {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
@@ -406,43 +235,27 @@ export default function PublicProfileRoute() {
   }
 
   // ── Error / retry ─────────────────────────────────────────────────────────
-  if (state.kind === 'error') {
-    return (
-      <View style={styles.root}>
-        <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
-        <View style={styles.center}>
-          <Feather name="wifi-off" size={40} color={theme.muted} />
-          <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
-          <Text style={styles.notFoundDesc}>{state.message}</Text>
-          <PressableScale
-            style={styles.retryBtn}
-            onPress={() => { hapticLight(); load(); }}
-            accessibilityRole="button"
-            accessibilityLabel="Retry"
-          >
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </PressableScale>
-        </View>
-      </View>
-    );
-  }
-
-  // ── Signed-out public landing ─────────────────────────────────────────────
-  // state.kind === 'ready' && authLoaded && !isSignedIn
   return (
-    <PublicProfileLanding
-      profile={state.profile}
-      insets={{ top: insets.top, bottom: insets.bottom }}
-      onSignIn={() => router.push('/sign-in' as never)}
-      onJoin={() => router.push('/onboarding' as never)}
-    />
+    <View style={styles.root}>
+      <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
+      <View style={styles.center}>
+        <Feather name="wifi-off" size={40} color={theme.muted} />
+        <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
+        <Text style={styles.notFoundDesc}>{state.message}</Text>
+        <PressableScale
+          style={styles.retryBtn}
+          onPress={() => { hapticLight(); load(); }}
+          accessibilityRole="button"
+          accessibilityLabel="Retry"
+        >
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </PressableScale>
+      </View>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
-const AVATAR_SIZE = 88;
-
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
@@ -524,193 +337,7 @@ function makeStyles(theme: AppThemePreset) {
   },
   retryBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
 
-  // ── Public landing layout ──────────────────────────────────────────────────
-  landingRoot: { alignItems: 'center' },
-  landingHero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },
-  landingIdentity: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: SP.md,
-    paddingHorizontal: SP.md, paddingBottom: SP.md,
-  },
-  landingIdentityCopy: { flex: 1, minWidth: 0 },
-  landingBody: { alignItems: 'center', paddingHorizontal: SP.xl, paddingTop: SP.sm },
   skeletonIdentity: { flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.md },
   skeletonLines: { flex: 1, gap: SP.sm },
-  logoRow: {
-    position: 'absolute',
-    left: SP.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-  },
-  logoText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.base,
-    color: theme.text,
-    letterSpacing: 0.2,
-  },
-
-  // Avatar
-  avatarContainer: {
-    position: 'relative',
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-  },
-  avatarImage: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: theme.card,
-  },
-  avatarPlaceholder: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: theme.cardElevated,
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    color: theme.text,
-    letterSpacing: 1,
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: theme.success,
-    borderWidth: 2,
-    borderColor: theme.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Name / handle
-  displayName: {
-    fontFamily: FONT.bold,
-    fontSize: FS.h2,
-    color: theme.text,
-    lineHeight: 34,
-    letterSpacing: -0.8,
-  },
-  handleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginTop: SP.xs,
-    flexWrap: 'wrap',
-  },
-  handle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: theme.muted,
-  },
-  verifiedInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  verifiedText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: theme.success,
-  },
-
-  // Account type pill
-  accountTypePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    marginTop: SP.md,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
-  },
-  accountTypeText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: theme.muted,
-  },
-
-  // Bio
-  bio: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: theme.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: SP.md,
-    maxWidth: 300,
-  },
-
-  // Divider
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: theme.borderSubtle,
-    marginVertical: SP.xl,
-  },
-
-  // CTA block
-  ctaBlock: {
-    width: '100%',
-    alignItems: 'center',
-    gap: SP.md,
-  },
-  ctaLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: theme.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 260,
-    marginBottom: SP.xs,
-  },
-  primaryBtn: {
-    width: '100%',
-    height: COMP.buttonH,
-    borderRadius: radius.md,
-    backgroundColor: theme.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: theme.onAccent,
-  },
-  secondaryBtn: {
-    width: '100%',
-    height: COMP.buttonH,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: theme.text,
-  },
-
-  // Fine print
-  finePrint: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: theme.subtle,
-    marginTop: SP.xl,
-    textAlign: 'center',
-  },
   });
 }

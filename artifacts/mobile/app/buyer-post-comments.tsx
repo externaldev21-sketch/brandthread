@@ -1261,16 +1261,10 @@ export default function BuyerPostCommentsScreen() {
 
           {composerLocked ? (
             <View style={s.lockedComposer}>
-              {isPreviewPost ? (
-                <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
-              ) : meta.commentsDisabled ? (
+              {meta.commentsDisabled && !isPreviewPost ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (
-                <PressableScale onPress={() => { hapticLight(); router.push('/sign-in' as never); }} accessibilityRole="button">
-                  <Text style={s.lockedText}>
-                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text> to join the conversation.
-                  </Text>
-                </PressableScale>
+                <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
               )}
             </View>
           ) : (

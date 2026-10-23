@@ -7,7 +7,6 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -43,7 +42,6 @@ export function LaunchCountdown({
 }) {
   const api = useApi();
   const colors = useColors();
-  const router = useRouter();
   const { isSignedIn } = useAuth();
   const [launchAt, setLaunchAt] = useState<string | null>(null);
   const [skewMs, setSkewMs] = useState(0);
@@ -91,7 +89,7 @@ export function LaunchCountdown({
 
   async function toggle() {
     if (!productId || busy) return;
-    if (!isSignedIn) { router.push('/sign-in' as never); return; }
+    if (!isSignedIn) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setBusy(true);
     const next = !subscribed;

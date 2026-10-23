@@ -396,7 +396,7 @@ export default function BuyerDropDetail() {
       setSubscribed(result.subscribed);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap Notify me again.');
+      Alert.alert('Couldn’t update drop alerts', 'Check your connection and try again.');
     } finally {
       setNotifyLoading(false);
     }

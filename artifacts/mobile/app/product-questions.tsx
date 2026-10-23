@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -27,7 +27,6 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { m
 export default function ProductQuestionsScreen() {
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const api = useApi();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
@@ -53,7 +52,7 @@ export default function ProductQuestionsScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const startAsk = () => {
-    if (!isSignedIn) { router.push('/sign-in' as never); return; }
+    if (!isSignedIn) return;
     setComposing(true);
   };
 

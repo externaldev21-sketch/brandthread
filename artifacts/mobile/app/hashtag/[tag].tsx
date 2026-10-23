@@ -127,7 +127,7 @@ export default function HashtagScreen() {
 
   const toggleFollow = useCallback(async () => {
     if (preview) { setIsFollowing((v) => !v); hapticToggle(); return; }
-    if (!isSignedIn) { router.push('/sign-in' as never); return; }
+    if (!isSignedIn) return;
     const next = !isFollowing;
     setIsFollowing(next);
     hapticToggle();
