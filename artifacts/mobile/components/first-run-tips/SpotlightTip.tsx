@@ -5,9 +5,9 @@ import { MEDIA } from '@/lib/theme';
  * monochrome bubble pointing at it. Reskin of the Rodeo / Grab references
  * cited in the PR, in this app's monochrome.
  *
- * Nothing covers the hole: the real control stays fully interactive
- * (see SpotlightOverlay). Tapping the dim or the X dismisses; on web a press
- * on the real control is observed (not intercepted) and completes the tip.
+ * Tapping the dim or X dismisses. Web target taps perform the real action
+ * and complete the tip; native cutout taps use the approved completion-only
+ * fallback (see SpotlightOverlay), without activating the real control.
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, useWindowDimensions } from 'react-native';

@@ -775,3 +775,17 @@ mtime_ms = 1792734199234
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/88a3ec03-4425-42c1-8f3d-e43267275091/80321573-375b-4e59-a44b-858a4b50bfcd"
 storage_version_token = "1792734248914047"
 content_type = "image/png"
+
+[[outputs]]
+id = "BItNsvPSA-cSpZIW07DIv"
+uri = "file://.local/validation/spotlight-tips/native-completion-presentation.jpg"
+type = "image"
+title = "Spotlight tip — 390×844"
+description = "Actual preview presentation. Native completion-only fallback was separately verified with mobile-touch emulation of the iOS overlay branch."
+logical_id = "1898909c-d4f0-4677-877c-62fdfd5edc88"
+content_hash = "sha256:ad55074900f91d9c5d5994ae608f601701f7b878c0f3e1b9ba8572b560b64006"
+size = 25864
+mtime_ms = 1792741129813
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/1898909c-d4f0-4677-877c-62fdfd5edc88/142cb44c-c7fb-4931-bde2-d000e6049c70"
+storage_version_token = "1792741399482506"
+content_type = "image/jpeg"

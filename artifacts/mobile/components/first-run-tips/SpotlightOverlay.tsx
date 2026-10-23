@@ -1,8 +1,7 @@
 /**
  * Shared spotlight presentation for first-run tips: a 60% black dim with a
- * real, rounded hole over a measured target. Nothing is rendered over the
- * hole, so touches reach the real control underneath (click-through on both
- * native and web) — the target's own actions are never replaced.
+ * real, rounded hole over a measured target. Web touches reach the real
+ * control underneath; native uses the approved completion-only fallback.
  *
  * The dim is four bands around the hole (tap = dismiss) plus four small
  * corner pieces that round the hole's inner corners. Corner pieces are
@@ -11,8 +10,10 @@
  * Completion: on web, a capture-phase, passive document listener observes a
  * press inside the hole (without stopping or altering it) and calls
  * `onTargetPress` on the next tick, after the target's own handler ran.
- * React Native has no non-intercepting global touch observer, so on native
- * `onTargetPress` is not called; the tip completes via X / scrim instead.
+ * Native cannot safely replay a touch to a measurement-only ref: the ref
+ * exposes geometry, not the control's action. A transparent Pressable inside
+ * the hole therefore completes the tip WITHOUT activating the real control.
+ * The user can tap the control normally after the tip closes.
  */
 import React, { useEffect, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -106,6 +107,15 @@ export function SpotlightOverlay({ hole, onScrimPress, onTargetPress, scrimLabel
           <Corner corner="br" r={r} x={x + width - r} y={y + height - r} />
         </>
       ) : null}
+      {Platform.OS !== 'web' && onTargetPress ? (
+        <Pressable
+          testID="spotlight-target-complete"
+          accessibilityRole="button"
+          accessibilityLabel="Continue tip"
+          onPress={() => onTargetRef.current?.()}
+          style={[styles.target, { left: x, top: y, width, height, borderRadius: r }]}
+        />
+      ) : null}
       <View
         pointerEvents="none"
         testID="spotlight-hole"
@@ -117,5 +127,6 @@ export function SpotlightOverlay({ hole, onScrimPress, onTargetPress, scrimLabel
 
 const styles = StyleSheet.create({
   band: { position: 'absolute', backgroundColor: SPOTLIGHT_DIM },
+  target: { position: 'absolute', backgroundColor: 'transparent' },
   ring: { position: 'absolute', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' }, // theme-exempt: neutral spotlight ring
 });
