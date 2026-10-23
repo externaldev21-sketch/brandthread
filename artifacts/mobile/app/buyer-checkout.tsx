@@ -50,9 +50,10 @@ import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
 import { threadCashCeilingCents, withThreadCashRedemption } from '@/lib/threadCashCheckout';
 import { isPreviewCheckoutGroup, placePreviewOrder, withPreviewCheckoutDetails } from '@/lib/previewCheckout';
 import {
-  applyDiscount, createCheckoutSession,
+  applyDiscount, calculateCartSummary, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
 } from '@/services/cartService';
+import { JUST_SOLD_OUT_LABEL, markJustSoldOut, soldOutFromError, type SoldOutInfo } from '@/lib/justSoldOut';
 import {
   CheckoutAddress, CheckoutContact, CheckoutDiscount, CheckoutSession,
 } from '@/services/cartTypes';
@@ -153,6 +154,8 @@ export default function BuyerCheckoutScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<CheckoutError | null>(null);
+  /** Every line in this checkout was claimed by another buyer first. */
+  const [allSoldOut, setAllSoldOut] = useState<SoldOutInfo | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [footerHeight, setFooterHeight] = useState(150);
   const scrollRef = useRef<ScrollView>(null);
@@ -315,6 +318,41 @@ export default function BuyerCheckoutScreen() {
 
   const current = session as CheckoutSession;
 
+  /**
+   * Another buyer claimed a unit first (the server answered SOLD_OUT before
+   * any charge). Mark it for the PDP / live Shop sheet, take it out of the bag
+   * and this checkout, and say so. The rest of the order stays payable.
+   */
+  const handleSoldOut = async (info: SoldOutInfo) => {
+    const base = sessionRef.current ?? current;
+    markJustSoldOut(info.variantId);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    const gone = new Set(base.deliveryGroups.flatMap(g => g.items)
+      .filter(item => !!info.variantId && item.variantId === info.variantId)
+      .map(item => item.id));
+    if (gone.size) await removeCartItems([...gone]).catch(() => {});
+    const deliveryGroups = base.deliveryGroups
+      .map(group => ({ ...group, items: group.items.filter(item => !gone.has(item.id)) }))
+      .filter(group => group.items.length > 0);
+    const items = deliveryGroups.flatMap(group => group.items);
+    if (!items.length) {
+      setAllSoldOut(info);
+      return;
+    }
+    if (gone.size) {
+      const sellers = new Set(deliveryGroups.map(group => group.sellerId));
+      const shippingTotalCents = deliveryGroups.reduce((sum, group) =>
+        sum + (group.availableMethods.find(method => method.id === group.selectedMethodId)?.priceCents ?? 0), 0);
+      await persist({
+        ...base,
+        deliveryGroups,
+        discounts: base.discounts.filter(d => !d.sellerId || sellers.has(d.sellerId)),
+        summary: calculateCartSummary(items, base.summary.discountTotalCents, shippingTotalCents),
+      });
+    }
+    showError({ title: JUST_SOLD_OUT_LABEL, message: info.message });
+  };
+
   // Dev-web preview only (lib/previewCheckout.ts): every group is seeded
   // preview products, so there is no server cart or Stripe to talk to.
   const previewOnly = !!current?.deliveryGroups?.length && current.deliveryGroups.every(isPreviewCheckoutGroup);
@@ -390,7 +428,9 @@ export default function BuyerCheckoutScreen() {
         .catch((err: unknown) => {
           if (!active) return;
           const apiError = err instanceof ApiError ? err : null;
-          if (apiError?.code === 'USE_HOSTED_CHECKOUT') setServerSaidHosted(true);
+          const soldOut = soldOutFromError(err);
+          if (soldOut) void handleSoldOut(soldOut);
+          else if (apiError?.code === 'USE_HOSTED_CHECKOUT') setServerSaidHosted(true);
           else if (apiError && apiError.status >= 400 && apiError.status < 500 && apiError.status !== 429) {
             setError({ title: 'Some items in your order changed', message: apiError.message });
           }
@@ -465,7 +505,10 @@ export default function BuyerCheckoutScreen() {
       return started.clientSecret;
     } catch (err) {
       const apiError = err instanceof ApiError ? err : null;
-      if (apiError?.code === 'USE_HOSTED_CHECKOUT') {
+      const soldOut = soldOutFromError(err);
+      if (soldOut) {
+        await handleSoldOut(soldOut);
+      } else if (apiError?.code === 'USE_HOSTED_CHECKOUT') {
         setServerSaidHosted(true);
         showError({ title: 'One more step', message: 'This order is paid on Stripe’s secure page. Tap Pay again to continue. You haven’t been charged.' });
       } else if (apiError?.code === 'PAYMENT_CANCELED') {
@@ -831,8 +874,15 @@ export default function BuyerCheckoutScreen() {
       await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+    } catch (err) {
+      const soldOut = soldOutFromError(err);
+      if (soldOut) {
+        // Groups already paid keep their orders; only the claimed line goes.
+        setVerifiedOrders(confirmed);
+        await handleSoldOut(soldOut);
+      } else {
+        showError({ title: 'Couldn’t start secure checkout', message: 'Something went wrong reaching Stripe. Check your connection and try again — you haven’t been charged.' });
+      }
     }
     setPlacing(false);
   };
@@ -927,6 +977,20 @@ export default function BuyerCheckoutScreen() {
       <View style={styles.headerSpacer} />
     </View>
   );
+
+  if (allSoldOut) {
+    return (
+      <View style={styles.root} testID="checkout-sold-out">
+        {header('Checkout', leaveCheckout, 'Close checkout')}
+        <ErrorState
+          message={allSoldOut.message}
+          onRetry={leaveCheckout}
+          retryLabel="Keep shopping"
+          style={{ flex: 1 }}
+        />
+      </View>
+    );
+  }
 
   if (loadFailed) {
     return (

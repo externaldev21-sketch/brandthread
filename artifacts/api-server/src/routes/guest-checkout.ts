@@ -14,6 +14,10 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { mapStripeError, requireStripe } from "../lib/stripe";
 import { resolveSellerPlatformFeeBps } from "../lib/planPerks";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import {
+  HOSTED_CHECKOUT_SESSION_TTL_MS, HOSTED_STOCK_RESERVATION_TTL_MS, SOLD_OUT_CODE,
+  StockReservationError, reserveStock, soldOutResponse,
+} from "../lib/money/stockReservation";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { z } from "@workspace/api-zod";
@@ -152,7 +156,12 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       if (!Number.isInteger(quantity) || quantity < 1) return res.status(400).json({ error: `Item ${i}: quantity must be >= 1` });
       const variant = variantById.get(item.variantId);
       if (!variant || variant.productId !== item.productId) return res.status(404).json({ error: `Variant ${item.variantId} not found` });
-      if (variant.status !== "active" || variant.stock < quantity) return res.status(400).json({ error: `${variant.productName} is unavailable or out of stock` });
+      if (variant.status !== "active") return res.status(400).json({ error: `${variant.productName} is unavailable or out of stock` });
+      if (variant.stock < quantity) {
+        return res.status(409).json({
+          error: `${variant.productName} just sold out`, code: SOLD_OUT_CODE, variantId: variant.variantId, productName: variant.productName,
+        });
+      }
       if (sellerId && sellerId !== variant.sellerId) return res.status(400).json({ error: "All items must belong to the same seller" });
       sellerId = variant.sellerId;
       variant.priceCents = (await effectiveUnitPrice({ productId: variant.productId, sellerId: variant.sellerId, priceCents: variant.priceCents })).priceCents;
@@ -257,18 +266,27 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
+    // Claim the stock with the checkout row, before Stripe can charge for it —
+    // see the matching block in routes/buyer.ts.
+    const claimedAt = new Date();
     let checkout: { id: string };
     try {
-      [checkout] = await db.insert(checkoutSessions).values({
-        id: checkoutIdValue,
-        buyerId: null, guestEmail: email, guestAccessTokenHash: tokenHash(accessToken), sellerId, items: cartItems,
-        shippingAddress: shippingAddressValue, ...(key ? { clientIdempotencyKey: key } : {}),
-        chargeModel: money.chargeModel,
-        dropId: chargePlan.dropId,
-        platformFeeCents: money.platformFeeCents,
-        platformFeeBps,
-        processingFeeEstimateCents: money.processingFeeEstimateCents,
-      }).returning({ id: checkoutSessions.id });
+      checkout = await db.transaction(async (tx) => {
+        const [row] = await tx.insert(checkoutSessions).values({
+          id: checkoutIdValue,
+          buyerId: null, guestEmail: email, guestAccessTokenHash: tokenHash(accessToken), sellerId, items: cartItems,
+          shippingAddress: shippingAddressValue, ...(key ? { clientIdempotencyKey: key } : {}),
+          chargeModel: money.chargeModel,
+          dropId: chargePlan.dropId,
+          platformFeeCents: money.platformFeeCents,
+          platformFeeBps,
+          processingFeeEstimateCents: money.processingFeeEstimateCents,
+        }).returning({ id: checkoutSessions.id });
+        await reserveStock(tx, row.id, cartItems.map((item) => ({
+          variantId: item.variantId, quantity: item.quantity, productName: item.productName,
+        })), { now: claimedAt, ttlMs: HOSTED_STOCK_RESERVATION_TTL_MS });
+        return row;
+      });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
       // its own guest checkout, never an authenticated row sharing a key.
@@ -297,6 +315,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      expires_at: Math.floor((claimedAt.valueOf() + HOSTED_CHECKOUT_SESSION_TTL_MS) / 1000),
       automatic_tax: {
         enabled: true,
         liability: { type: "account", account: seller.stripeAccountId },
@@ -322,6 +341,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     return void res.status(201).json({ sessionId: session.id, url: session.url, guestAccessToken: accessToken });
   } catch (error: any) {
     if (!stripeStarted && checkoutId) await db.delete(checkoutSessions).where(eq(checkoutSessions.id, checkoutId));
+    if (error instanceof StockReservationError) return res.status(409).json(soldOutResponse(error));
     if (error.type === "StripeCardError" || error.code === "card_declined") return res.status(402).json({ error: mapStripeError(error) });
     return void res.status(error.status ?? 500).json({ error: error.status ? error.message : "Failed to create checkout session" });
   }

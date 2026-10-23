@@ -228,7 +228,7 @@ describe("POST /api/buyer/checkout/payment-intent", () => {
     expect(await stockOf(cart.productA.variantId)).toBe(3);
   });
 
-  it("refuses the last unit to a second buyer with OUT_OF_STOCK", async () => {
+  it("refuses the last unit to a second buyer with SOLD_OUT", async () => {
     const seller = await seedSeller("oos");
     const buyerOne = await seedBuyer("oos-1");
     const buyerTwo = await seedBuyer("oos-2");
@@ -239,7 +239,7 @@ describe("POST /api/buyer/checkout/payment-intent", () => {
       call(app.base, "POST", "/api/buyer/checkout/payment-intent", buyerTwo, body(groups)),
     ]);
     expect([one.status, two.status].sort()).toEqual([200, 409]);
-    expect([one.body.code, two.body.code]).toContain("OUT_OF_STOCK");
+    expect([one.body.code, two.body.code]).toContain("SOLD_OUT");
     expect(await stockOf(product.variantId)).toBe(0);
   });
 

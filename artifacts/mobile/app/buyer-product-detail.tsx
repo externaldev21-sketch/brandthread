@@ -68,6 +68,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_PRODUCT_DETAIL_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { StockCounter } from '@/components/products/StockCounter';
 import { ApiError } from '@/lib/networkNotice';
+import { JUST_SOLD_OUT_LABEL, isJustSoldOut, useJustSoldOutVersion } from '@/lib/justSoldOut';
 import {
   CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
   shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
@@ -576,6 +577,12 @@ export default function BuyerProductDetailScreen() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+  // Checkout took a just-sold-out line out of the bag: re-render the CTA and recount the bag.
+  const soldOutVersion = useJustSoldOutVersion();
+  useEffect(() => {
+    if (!soldOutVersion) return;
+    void getCart().then(cart => setCartCount(cart.items.reduce((sum, item) => sum + item.quantity, 0))).catch(() => {});
+  }, [soldOutVersion]);
 
   // ── Buyer demand signals ─────────────────────────────────────────────────
   // Populated from server-supplied fields on publicProducts.get() response only.
@@ -787,7 +794,9 @@ export default function BuyerProductDetailScreen() {
   const hasDiscount = variantCompare && variantCompare > variantPrice;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
   const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
-  const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
+  // Another buyer took the last unit while this one was checking out (lib/justSoldOut.ts).
+  const justSoldOut = isJustSoldOut(variant?.id);
+  const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 && !justSoldOut : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const paymentUnavailable = sellerPaymentReady === false;
 
@@ -1184,15 +1193,17 @@ export default function BuyerProductDetailScreen() {
               {/* Monochrome (no green/red): low stock is white and bold,
                   plain in-stock and sold-out are grey. */}
               <View style={[s.stockDot, {
-                backgroundColor: variant.isAvailable && variant.inventoryQuantity <= 5 ? FG : variant.isAvailable ? MUTED : SUBTLE,
+                backgroundColor: justSoldOut ? SUBTLE : variant.isAvailable && variant.inventoryQuantity <= 5 ? FG : variant.isAvailable ? MUTED : SUBTLE,
               }]} />
               <Text style={[
                 s.stockText,
-                variant.isAvailable && variant.inventoryQuantity <= 5
+                !justSoldOut && variant.isAvailable && variant.inventoryQuantity <= 5
                   ? { color: FG, fontFamily: FONT.bold }
                   : { color: MUTED },
               ]}>
-                {variant.isAvailable
+                {justSoldOut
+                  ? `${JUST_SOLD_OUT_LABEL}. Someone grabbed the last one`
+                  : variant.isAvailable
                   ? variant.inventoryQuantity <= 5
                     ? `Only ${variant.inventoryQuantity} left in stock`
                     : 'In stock'
@@ -1203,7 +1214,7 @@ export default function BuyerProductDetailScreen() {
           )}
 
           {/* Waitlist — shown when selected variant is OOS and not pre-order */}
-          {allSelected && variant && !variant.isAvailable && !product.isPreOrder && (
+          {allSelected && variant && (!variant.isAvailable || justSoldOut) && !product.isPreOrder && (
             <TouchableOpacity
               style={[wl.btn, waitlistJoined && wl.joined]}
               onPress={waitlistJoined ? undefined : handleJoinWaitlist}
@@ -1467,7 +1478,7 @@ export default function BuyerProductDetailScreen() {
             label={
               paymentUnavailable ? 'Payments unavailable'
                 : !allSelected ? 'Select options'
-                : !inStock ? 'Sold Out'
+                : !inStock ? (justSoldOut ? JUST_SOLD_OUT_LABEL : 'Sold Out')
                 : 'Buy now'
             }
             icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
