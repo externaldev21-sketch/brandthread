@@ -94,6 +94,7 @@ import { RADII, radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+import { loadDiscoverPlayerPage } from '@/lib/discoverPlayerQueue';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
@@ -107,9 +108,13 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
  * videos that feature one product (product detail "Featured in"), opened at
  * `startPostId`. Same pages, rail, comments, share and shop sheet as the main
  * feed — only the data source and the chrome differ.
+ *
+ * `source: 'discover'` is a Discover tile tap (app/discover-player.tsx): `id`
+ * is a lib/discoverPlayerQueue token, the tapped post plays first, then the
+ * rest of that Discover grid, then the regular Threads For You pages.
  */
 export interface CreatorFeedConfig {
-  source: VideoFeedSource;
+  source: VideoFeedSource | 'discover';
   id: string;
   startPostId?: string;
   title?: string;
@@ -118,6 +123,8 @@ export interface CreatorFeedConfig {
 }
 
 const THREAD_PAGE_SIZE = 30;
+// Small so the tapped Discover post opens without waiting on the whole grid.
+const DISCOVER_PLAYER_PAGE_SIZE = 6;
 
 // Vertical rhythm in the bottom chrome zone, measured from TikTok: the
 // scrub/progress bar sits just above the tab bar (at `bottomClearance`,
@@ -2093,7 +2100,9 @@ export default function FeedScreen({
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   // The feed's sound on/off choice — a single app-wide preference (not
   // per-post), persisted so it survives leaving and returning to the feed.
-  const [soundOn, setSoundOn] = useState(false);
+  // A Discover tap-through starts with sound, like TikTok — the tap itself is
+  // the buyer asking to watch. Toggling still saves the shared preference.
+  const [soundOn, setSoundOn] = useState(creatorFeed?.source === 'discover');
   useEffect(() => {
     AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setSoundOn(true); }).catch(() => {});
   }, []);
@@ -2154,6 +2163,9 @@ export default function FeedScreen({
   const [feedError, setFeedError] = useState(false);
   const [creatorStartIndex, setCreatorStartIndex] = useState(0);
   const creatorOffsetRef = useRef(0);
+  // Discover player: true once its parked grid is used up and paging has
+  // moved on to the regular Threads For You feed.
+  const discoverQueueDoneRef = useRef(false);
   const viewedPostIdsRef = useRef(new Set<string>());
   const api = useApi();
   const feedCursorRef = useRef(createThreadFeedCursor());
@@ -2209,6 +2221,9 @@ export default function FeedScreen({
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
     if (creatorSource && creatorId) {
+      // Discover player: only the first open loads — a social refresh must
+      // neither reshuffle the buyer's place nor supersede that first load.
+      if (creatorSource === 'discover' && !initial) return;
       // Creator/product player: that creator's videos only, opened at the tapped one.
       const generation = feedGenerationRef.current + 1;
       feedGenerationRef.current = generation;
@@ -2216,6 +2231,21 @@ export default function FeedScreen({
       else setFeedRefreshing(true);
       setFeedError(false);
       try {
+        if (creatorSource === 'discover') {
+          // Tapped post first (queue order), so the start index is always 0.
+          const result = await loadDiscoverPlayerPage(creatorId, 0, DISCOVER_PLAYER_PAGE_SIZE);
+          if (feedGenerationRef.current !== generation) return;
+          const playablePosts = result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+          if (playablePosts.length === 0) throw new Error('Post unavailable');
+          setSellerFeedPosts(playablePosts);
+          creatorOffsetRef.current = result.nextOffset;
+          discoverQueueDoneRef.current = !result.hasMore;
+          feedHasMoreRef.current = true;
+          setFeedHasMore(true);
+          setCreatorStartIndex(0);
+          setActiveIndex(0);
+          return;
+        }
         const result = creatorExactPost && creatorSource === 'creator' && creatorStartPostId
           ? await loadExactCreatorVideoReplay(creatorId, creatorStartPostId)
           : await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
@@ -2298,7 +2328,16 @@ export default function FeedScreen({
     const generation = feedGenerationRef.current;
     const cursor = feedCursorRef.current;
     try {
-      const page = creatorSource && creatorId
+      const page = creatorSource === 'discover' && creatorId && !discoverQueueDoneRef.current
+        ? await loadDiscoverPlayerPage(creatorId, creatorOffsetRef.current, DISCOVER_PLAYER_PAGE_SIZE).then((result) => {
+            creatorOffsetRef.current = result.nextOffset;
+            discoverQueueDoneRef.current = !result.hasMore;
+            // Past the Discover grid the player keeps going into Threads For You.
+            return { posts: result.posts, cursor, hasMore: true };
+          })
+        : creatorSource === 'discover'
+        ? await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, 'for-you')
+        : creatorSource && creatorId
         ? await getVideoFeedPage(creatorSource, creatorId, creatorOffsetRef.current).then((result) => {
             creatorOffsetRef.current = result.nextOffset;
             return { posts: result.posts, cursor, hasMore: result.hasMore };

@@ -47,7 +47,6 @@ import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
 import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
-import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
 import { DiscoverFeaturedRail } from '@/components/discover/DiscoverFeaturedRail';
@@ -62,6 +61,7 @@ import {
   composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
 } from '@/lib/discoverFeed';
+import { setDiscoverPlayerQueue } from '@/lib/discoverPlayerQueue';
 
 interface LiveProduct {
   id: string;
@@ -152,7 +152,6 @@ export default function DiscoverScreen() {
   const [dropsLoading, setDropsLoading] = useState(true);
   const [dropsFetched, setDropsFetched] = useState(false);
 
-  const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
 
@@ -265,9 +264,14 @@ export default function DiscoverScreen() {
     ]).finally(() => setRefreshing(false));
   }, [filter, shelves.reload, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
+  // TikTok-style: a tile opens the real Threads feed player at that post and
+  // swipes on through this grid (app/discover-player.tsx). Pushed on the root
+  // stack, so back lands on this tab with its scroll position intact.
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
     hapticLight();
-    setViewer({ posts: allPosts, startIndex: flatIndex });
+    const index = allPosts[flatIndex]?.id === post.id ? flatIndex : Math.max(0, allPosts.findIndex((p) => p.id === post.id));
+    const token = setDiscoverPlayerQueue(allPosts, index);
+    router.push(`/discover-player?q=${encodeURIComponent(token)}` as never);
   }
 
   function openShopTheLook(post: DiscoverPost) {
@@ -420,16 +424,6 @@ export default function DiscoverScreen() {
               <EmptyState icon="zap" title="No drops yet" description="Upcoming drops from sellers will show up here." />
             </View>
           )}
-        />
-      )}
-
-      {viewer && (
-        <DiscoverPostViewer
-          posts={viewer.posts}
-          startIndex={viewer.startIndex}
-          onClose={() => setViewer(null)}
-          onOpenShopTheLook={openShopTheLook}
-          onSafetyMenu={setSafetyMenuPost}
         />
       )}
 

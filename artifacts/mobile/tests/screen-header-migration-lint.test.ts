@@ -122,6 +122,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/product-store.tsx',
   'app/profile-products.tsx',
   'app/profile-videos.tsx',
+  'app/discover-player.tsx',
   'app/return-request.tsx',
   'app/seller-conversation.tsx',
   'app/seller-drop-preview.tsx',
