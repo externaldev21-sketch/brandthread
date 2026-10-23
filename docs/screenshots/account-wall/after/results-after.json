@@ -1,0 +1,82 @@
+{
+  "signed-out-root": {
+    "requested": "/",
+    "landed": "/onboarding",
+    "testIds": [
+      "onboarding-welcome-get-started",
+      "onboarding-welcome-sign-in"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-sign-in": {
+    "requested": "/sign-in",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-discover": {
+    "requested": "/discover",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-feed": {
+    "requested": "/feed",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-public-profile": {
+    "requested": "/u/maya",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-product": {
+    "requested": "/buyer-product-detail?productId=demo-product-1",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-seller-profile": {
+    "requested": "/seller-profile?sellerId=demo-seller",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "signed-out-deeplink-inbox": {
+    "requested": "/inbox",
+    "landed": "/sign-in",
+    "testIds": [
+      "use-password-button"
+    ],
+    "hasBrowseAsGuest": false
+  },
+  "preview-buyer-discover": {
+    "landed": "/discover?bt_preview=buyer"
+  },
+  "preview-buyer-feed": {
+    "landed": "/feed?bt_preview=buyer"
+  },
+  "preview-buyer-profile": {
+    "landed": "/profile?bt_preview=buyer"
+  },
+  "preview-seller-dashboard": {
+    "landed": "/?bt_preview=seller"
+  },
+  "preview-seller-profile": {
+    "landed": "/profile?bt_preview=seller"
+  }
+}
