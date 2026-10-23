@@ -13,6 +13,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -59,13 +60,13 @@ const ROLE_LABEL: Record<string, string> = {
   manager: 'Manager', staff: 'Staff',
 };
 const ROLE_ACCESS: Record<string, string> = {
-  owner: 'Full Access',
+  owner: 'Full access',
   admin: 'Products, orders, payouts, marketing & team',
   finance: 'Balance, payouts & transactions',
   orders: 'Orders, fulfillment & inventory',
   marketing: 'Ads, boosts & discount codes',
   viewer: 'Read-only analytics',
-  manager: 'Orders, Products, Inventory',
+  manager: 'Orders, products & inventory',
   staff: 'Fulfillment only',
 };
 
@@ -162,7 +163,7 @@ export default function TeamScreen() {
         );
         return;
       }
-      Alert.alert('Error', err.message ?? 'Failed to create invite');
+      Alert.alert("Couldn't create the invite", 'Check the email or username and try again.');
     } finally {
       setInviting(false);
     }
@@ -183,7 +184,7 @@ export default function TeamScreen() {
         ],
       );
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to regenerate invite');
+      Alert.alert("Couldn't refresh the link", 'Check your connection and try again.');
     } finally {
       setRegeneratingId(null);
     }
@@ -217,7 +218,7 @@ export default function TeamScreen() {
               await api.team.remove(member.id);
               setMembers(prev => prev.filter(m => m.id !== member.id));
             } catch (err: any) {
-              Alert.alert('Error', err.message ?? 'Failed to dismiss invite');
+              Alert.alert("Couldn't dismiss the invite", 'Check your connection and try again.');
             } finally {
               setDismissingId(null);
             }
@@ -277,6 +278,7 @@ export default function TeamScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.linkBtn, { borderColor: isExpired ? colors.warning + '44' : colors.border }]}
             disabled={isRegenerating || isDismissing}
+            accessibilityRole="button"
             accessibilityLabel={isExpired ? 'Regenerate expired invite' : 'Copy invite link'}
           >
             {isRegenerating
@@ -290,6 +292,7 @@ export default function TeamScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.dismissBtn, { borderColor: colors.border }]}
             disabled={isDismissing || isRegenerating}
+            accessibilityRole="button"
             accessibilityLabel="Dismiss expired invite"
           >
             {isDismissing
@@ -307,7 +310,7 @@ export default function TeamScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Team Management" />
+      <ScreenHeader title="Team" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -317,8 +320,8 @@ export default function TeamScreen() {
 
       {/* Members */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff Accounts</Text>
-        <TouchableOpacity onPress={openInvite} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff</Text>
+        <TouchableOpacity onPress={openInvite} accessibilityRole="button" accessibilityLabel="Invite teammate" style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
           <Feather name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
         </TouchableOpacity>
@@ -326,13 +329,21 @@ export default function TeamScreen() {
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
+          [0, 1, 2].map(i => (
+            <View key={i} style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <SkeletonBlock width={44} height={44} radius={22} />
+              <View style={[styles.memberInfo, { gap: 8 }]}>
+                <SkeletonLine width="50%" height={13} />
+                <SkeletonLine width="70%" height={11} />
+              </View>
+            </View>
+          ))
         ) : loadError ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
             </View>
-            <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>Couldn't load your team</Text>
+            <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: FONT.semibold, textAlign: 'center' }}>Couldn't load your team</Text>
             <TouchableOpacity
               onPress={() => { setLoading(true); load(); }}
               accessibilityRole="button"
@@ -347,7 +358,7 @@ export default function TeamScreen() {
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="user-plus" size={22} color={colors.mutedForeground} />
             </View>
-            <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>No team members yet</Text>
+            <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: FONT.semibold, textAlign: 'center' }}>No team members yet</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
             <TouchableOpacity
               onPress={openInvite}
@@ -384,28 +395,12 @@ export default function TeamScreen() {
         </View>
       )}
 
-      {/* Approval Workflows */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Approval Workflows</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Product Publishing', value: 'Manager approval' },
-          { label: 'Refunds > $100', value: 'Owner approval' },
-          { label: 'Discount Codes', value: 'Manager approval' },
-          { label: 'Manufacturer Orders', value: 'Owner approval' },
-        ].map((w, i) => (
-          <View key={w.label} style={[styles.workflowRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <Text style={[styles.workflowLabel, { color: colors.foreground }]}>{w.label}</Text>
-            <Text style={[styles.workflowVal, { color: colors.mutedForeground }]}>{w.value}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Audit Log */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Audit Log</Text>
+      {/* Activity log */}
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Activity</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {activity.length === 0 ? (
           <View style={{ padding: 16, alignItems: 'center' }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No activity yet</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{loadError ? "Couldn't load activity" : 'No activity yet'}</Text>
           </View>
         ) : (
           <>
@@ -424,6 +419,7 @@ export default function TeamScreen() {
               <TouchableOpacity
                 onPress={loadMoreActivity}
                 activeOpacity={0.7}
+                accessibilityRole="button"
                 style={[styles.loadMoreBtn, { borderTopColor: colors.border }]}
               >
                 {loadingMore
@@ -463,6 +459,8 @@ export default function TeamScreen() {
                     key={r.key}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r.key); }}
                     activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: inviteRole === r.key }}
                     style={[
                       styles.rolePillWrap,
                       { borderColor: inviteRole === r.key ? colors.primary : colors.border,
@@ -477,8 +475,8 @@ export default function TeamScreen() {
                 ))}
               </View>
               <View style={styles.modalActions}>
-                <TouchableOpacity onPress={() => setInviteVisible(false)} activeOpacity={0.7} style={styles.modalCancel}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: 'Inter_500Medium' }}>Cancel</Text>
+                <TouchableOpacity onPress={() => setInviteVisible(false)} activeOpacity={0.7} accessibilityRole="button" style={styles.modalCancel}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleInvite}
@@ -487,7 +485,7 @@ export default function TeamScreen() {
                   style={[styles.addBtn, { backgroundColor: colors.primary, opacity: inviting || !inviteEmail.trim() ? 0.5 : 1 }]}
                 >
                   <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>
-                    {inviting ? 'Creating…' : 'Create Invite'}
+                    {inviting ? 'Creating…' : 'Create invite'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -504,7 +502,7 @@ export default function TeamScreen() {
                   : `Share this link with ${inviteResult.email} so they can join your team:`}
               </Text>
               <View style={[styles.linkBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{inviteResult.inviteUrl}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }} numberOfLines={1}>{inviteResult.inviteUrl}</Text>
               </View>
               <View style={styles.modalActions}>
                 <TouchableOpacity
@@ -521,7 +519,7 @@ export default function TeamScreen() {
                   style={[styles.addBtn, { backgroundColor: colors.secondary }]}
                 >
                   <Feather name="copy" size={14} color={colors.foreground} />
-                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy Link</Text>
+                  <Text style={[styles.addBtnText, { color: colors.foreground }]}>Copy link</Text>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity
@@ -545,37 +543,34 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   addBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   memberLeft: { position: 'relative' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2 },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  memberName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  memberAccess: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   linkBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dismissBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   expiredSection: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
-  expiredHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  expiredHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
   expiredTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  expiredTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  workflowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  workflowLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  workflowVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  logRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  expiredTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  logRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   logDot: { width: 6, height: 6, borderRadius: 3 },
   logInfo: { flex: 1 },
   logAction: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   logMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  loadMoreBtn: { padding: 14, alignItems: 'center', borderTopWidth: 1 },
+  loadMoreBtn: { padding: 16, alignItems: 'center', borderTopWidth: 1 },
   loadMoreText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   secRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  secLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  secLabel: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   secSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 14 },
+  inviteInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 16 },
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
   modalCard: { borderRadius: 16, borderWidth: 1, padding: 20 },
@@ -585,7 +580,7 @@ const styles = StyleSheet.create({
   rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
   roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
-  rolePillTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  rolePillTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   rolePillSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
   modalCancel: { paddingHorizontal: 8, paddingVertical: 7, marginRight: 'auto' },

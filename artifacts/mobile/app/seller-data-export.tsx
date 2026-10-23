@@ -59,7 +59,7 @@ export default function SellerDataExportScreen() {
         const uri = file.uri;
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Data' });
+          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export data' });
         } else {
           Alert.alert('Export ready', 'Open it from the share sheet.');
         }
@@ -87,11 +87,11 @@ export default function SellerDataExportScreen() {
 
   return (
       <View style={styles.root}>
-      <ScreenHeader title="Export My Data" />
+      <ScreenHeader title="Export data" />
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}
-        <Text style={styles.sectionLabel}>What to include</Text>
+        <Text style={styles.sectionLabel}>Include</Text>
         <View style={styles.card}>
           {INCLUDE_OPTIONS.map((opt, i) => {
             const checked = include.includes(opt.key);
@@ -101,6 +101,9 @@ export default function SellerDataExportScreen() {
                 style={[styles.optRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
                 onPress={() => toggleInclude(opt.key)}
                 activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                accessibilityLabel={opt.label}
               >
                 <View style={[styles.optIcon, { backgroundColor: checked ? theme.accentDim : theme.surface }]}>
                   <Feather name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
@@ -126,6 +129,8 @@ export default function SellerDataExportScreen() {
               style={[styles.formatBtn, format === f && styles.formatBtnActive]}
               onPress={() => setFormat(f)}
               activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: format === f }}
             >
               <Feather
                 name={f === 'json' ? 'code' : 'file-text'}
@@ -146,13 +151,13 @@ export default function SellerDataExportScreen() {
         <View style={styles.noteCard}>
           <Feather name="shield" size={14} color={theme.muted} />
           <Text style={styles.noteText}>
-            Exports contain only your own seller data. Customer PII is included — store securely and handle per your privacy policy.
+            Exports contain only your own store data, including customer names and contact details. Store the file securely and handle it according to your privacy policy.
           </Text>
         </View>
 
         {/* Generate button */}
         <PrimaryButton
-          label={loading ? 'Generating…' : 'Generate Export'}
+          label={loading ? 'Generating…' : 'Generate export'}
           onPress={handleExport}
           disabled={loading || include.length === 0}
           loading={loading}
@@ -163,8 +168,8 @@ export default function SellerDataExportScreen() {
         {result && (
           <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <Feather name="check-circle" size={18} color={theme.success} />
-              <Text style={styles.resultTitle}>Export ready!</Text>
+              <Feather name="check-circle" size={18} color={theme.text} />
+              <Text style={styles.resultTitle}>Export ready</Text>
             </View>
             <Text style={styles.resultDate}>
               Generated {new Date(result.exportedAt).toLocaleString()}
@@ -191,28 +196,28 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
   headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
-  sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },
+  sectionLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: -8 },
   card:         { backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border },
-  optRow:       { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  optRow:       { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   optIcon:      { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  optLabel:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  optLabel:     { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text },
   optDesc:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
   checkbox:     { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: theme.accent, borderColor: theme.accent },
-  formatRow:    { flexDirection: 'row', gap: 10 },
-  formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14, alignItems: 'center', gap: 6 },
+  formatRow:    { flexDirection: 'row', gap: 12 },
+  formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 16, alignItems: 'center', gap: 8 },
   formatBtnActive: { borderColor: theme.accent, backgroundColor: theme.accentDim },
-  formatLabel:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: theme.muted },
+  formatLabel:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.muted },
   formatLabelActive: { color: theme.accentLight },
   formatDesc:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
-  noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: theme.surface, borderRadius: 10, padding: 12 },
-  noteText:     { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
-  resultCard:   { backgroundColor: theme.success + '1A', borderRadius: 14, borderWidth: 1, borderColor: theme.success + '4D', padding: 16, gap: 8 },
+  noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: theme.surface, borderRadius: 10, padding: 12 },
+  noteText:     { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
+  resultCard:   { backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 16, gap: 8 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resultTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
-  resultDate:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted },
-  countsRow:    { flexDirection: 'row', gap: 10, marginTop: 4 },
+  resultDate:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted },
+  countsRow:    { flexDirection: 'row', gap: 12, marginTop: 4 },
   countChip:    { flex: 1, backgroundColor: theme.surface, borderRadius: 8, padding: 10, alignItems: 'center', gap: 2 },
-  countVal:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
+  countVal:     { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   countLabel:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
 });

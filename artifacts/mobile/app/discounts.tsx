@@ -8,7 +8,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator, Platform,
+  StyleSheet, Alert, Modal, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { InlineSlider } from '@/components/InlineSlider';
@@ -31,6 +31,8 @@ import {
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { apiErrorMessage } from '@/lib/safety';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
@@ -281,6 +283,11 @@ export default function DiscountsScreen() {
       Alert.alert('Invalid minimum items', 'Enter a whole number of 1 or more.');
       return;
     }
+    const isoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v).getTime());
+    if ((startDate && !isoDate(startDate)) || (hasEnd && endDate && !isoDate(endDate))) {
+      Alert.alert('Invalid date', 'Use the format YYYY-MM-DD, like 2026-12-31.');
+      return;
+    }
     if (minOrder && minOrderCents == null) {
       Alert.alert('Invalid minimum', 'Enter a valid minimum order amount.');
       return;
@@ -347,7 +354,7 @@ export default function DiscountsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowModal(false);
     } catch (err: any) {
-      Alert.alert("Couldn't save the code", err?.message ?? 'Try again.');
+      Alert.alert("Couldn't save the code", apiErrorMessage(err, 'Check your connection and try again.'));
     } finally {
       setSaving(false);
     }
@@ -365,6 +372,7 @@ export default function DiscountsScreen() {
       await api.discountCodes.update(d.id, { active: nextActive });
     } catch {
       setDiscounts(prev => prev.map(x => x.id === d.id ? d : x));
+      Alert.alert("Couldn't update the code", 'Check your connection and try again.');
     }
   }
 
@@ -380,7 +388,10 @@ export default function DiscountsScreen() {
             return;
           }
           try { await api.discountCodes.delete(d.id); }
-          catch { loadDiscounts(); }
+          catch {
+            loadDiscounts();
+            Alert.alert("Couldn't delete the code", 'Check your connection and try again.');
+          }
         },
       },
     ]);
@@ -399,15 +410,17 @@ export default function DiscountsScreen() {
       />
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+        <View style={{ padding: SP.md, gap: SP.sm }}>
+          {[0, 1, 2].map(i => <SkeletonBlock key={i} width="100%" height={136} radius={RADIUS.md} />)}
+        </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 120 }}>
 
           {loadError ? (
             <EmptyState
               icon="alert-circle"
               title="Couldn't load your codes"
-              message="Pull to refresh."
+              message="Check your connection and try again."
               actionLabel="Try again"
               onAction={() => { void loadDiscounts(); }}
               variant="error"
@@ -442,7 +455,7 @@ export default function DiscountsScreen() {
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
         <SafeAreaProvider style={s.modal}>
           <ScreenHeader
-            title={editingId ? 'Edit Discount Code' : 'New Discount Code'}
+            title={editingId ? 'Edit discount code' : 'New discount code'}
             variant="modal"
             onBack={() => setShowModal(false)}
           />
@@ -466,8 +479,13 @@ export default function DiscountsScreen() {
             {/* Code */}
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={s.label}>Code <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional — auto-generated if blank)</Text></Text>
-                <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCode(randomCode()); }}>
+                <Text style={s.label}>Code <Text style={s.labelHint}>(optional — auto-generated if blank)</Text></Text>
+                <TouchableOpacity
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCode(randomCode()); }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Generate a random code"
+                >
                   <Text style={[s.linkText, { color: theme.accent }]}>Generate</Text>
                 </TouchableOpacity>
               </View>
@@ -583,7 +601,7 @@ export default function DiscountsScreen() {
 
             {/* Min order */}
             <View>
-              <Text style={s.label}>Minimum order ($) <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
+              <Text style={s.label}>Minimum order ($) <Text style={s.labelHint}>(optional)</Text></Text>
               <TextInput
                 style={s.input}
                 value={minOrder}
@@ -596,7 +614,7 @@ export default function DiscountsScreen() {
 
             {/* Min quantity */}
             <View>
-              <Text style={s.label}>Minimum items <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
+              <Text style={s.label}>Minimum items <Text style={s.labelHint}>(optional)</Text></Text>
               <TextInput
                 style={s.input}
                 value={minQuantity}
@@ -616,7 +634,7 @@ export default function DiscountsScreen() {
                   ['limited', 'Limited total'],
                   ['single', 'Single-use'],
                 ] as const).map(([t, label]) => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, discType === discType && usageMode === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUsageMode(t); }}>
+                  <TouchableOpacity key={t} style={[s.typeBtn, usageMode === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUsageMode(t); }}>
                     <Text style={[s.typeBtnText, usageMode === t && { color: theme.accent }]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -670,7 +688,7 @@ export default function DiscountsScreen() {
             </View>
 
             <PrimaryButton
-              label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
+              label={saving ? 'Saving…' : editingId ? 'Save changes' : 'Create code'}
               onPress={handleSave}
               disabled={saving}
               style={{ marginTop: SP.sm }}
@@ -722,14 +740,20 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
   onCopy: () => void;
 }) {
   const { theme } = useAppTheme();
-  const { muted: MUTED, border: BORDER, success: SUCCESS, warning: ORANGE, error: RED } = theme;
+  const { muted: MUTED, border: BORDER, error: RED, text: FG } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const pctUsed = d.maxUses ? Math.round((d.usesCount / d.maxUses) * 100) : null;
 
   return (
     <BrandthreadCard style={s.card}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onCopy} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={onCopy}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Copy code ${d.code}`}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={s.codeText}>{d.code}</Text>
             <Feather name="copy" size={12} color={MUTED} />
@@ -743,7 +767,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
         </TouchableOpacity>
         <View style={{ alignItems: 'flex-end', gap: 8 }}>
           <StatusBadge label={STATUS_LABEL[d.status]} variant={STATUS_VARIANT[d.status]} small />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity
               onPress={onEdit}
               hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
@@ -758,7 +782,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
               accessibilityRole="button"
               accessibilityLabel={d.active ? `Pause ${d.code}` : `Resume ${d.code}`}
             >
-              <Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} />
+              <Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={MUTED} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onDelete}
@@ -791,7 +815,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
         )}
         {pctUsed !== null && (
           <View style={{ flex: 1, height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.min(pctUsed, 100)}%`, height: '100%', backgroundColor: pctUsed >= 90 ? RED : pctUsed >= 60 ? ORANGE : SUCCESS }} />
+            <View style={{ width: `${Math.min(pctUsed, 100)}%`, height: '100%', backgroundColor: pctUsed >= 90 ? RED : FG }} />
           </View>
         )}
       </View>
@@ -808,28 +832,28 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BG = theme.background;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
-  center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card:     { marginBottom: SP.sm },
   codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: 1.5 },
   valueText:{ fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: 2, marginBottom: 2 },
   metaText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 3 },
+  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 },
   statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   modal:       { flex: 1, backgroundColor: BG },
 
-  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
+  summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 8 },
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold, letterSpacing: 1.5 },
   summaryValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: 2 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   summaryLine: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
-  label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
+  label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  labelHint:   { fontSize: FS.xs, color: MUTED, textTransform: 'none', letterSpacing: 0 },
+  subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 8 },
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 12, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   typeBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.sm },
   switchLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },

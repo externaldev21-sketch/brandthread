@@ -21,22 +21,13 @@ import { radius } from '@/constants/radii';
 type Colors = ReturnType<typeof useColors>;
 
 const STATUS_OPTIONS: { value: StorePublishStatus; label: string }[] = [
-  { value: 'not_started', label: 'Not Started' },
+  { value: 'not_started', label: 'Not started' },
   { value: 'draft', label: 'Draft' },
   { value: 'published', label: 'Published' },
-  { value: 'password_protected', label: 'Password Protected' },
+  { value: 'password_protected', label: 'Password protected' },
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'unpublished', label: 'Unpublished' },
 ];
-
-function statusColor(st: StorePublishStatus, colors: Colors): string {
-  if (st === 'published') return colors.success;
-  if (st === 'draft') return colors.info;
-  if (st === 'password_protected') return colors.warning;
-  if (st === 'maintenance') return colors.warning;
-  if (st === 'unpublished') return colors.destructive;
-  return colors.mutedForeground;
-}
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
 const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese', 'Japanese'];
@@ -100,7 +91,7 @@ export default function StoreSettingsScreen() {
       await updateSettings(form);
       Alert.alert('Saved', 'Store settings updated.');
     } catch {
-      Alert.alert('Error', 'Failed to save settings.');
+      Alert.alert("Couldn't save settings", 'Check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -109,11 +100,11 @@ export default function StoreSettingsScreen() {
   return (
     <View style={ss.root}>
       <ScreenHeader
-        title="Store Settings"
+        title="Store settings"
         variant="push"
         rightElement={(
           <PrimaryButton
-            label={saving ? 'Saving...' : 'Save'}
+            label={saving ? 'Saving…' : 'Save'}
             onPress={handleSave}
             loading={saving}
             small
@@ -132,14 +123,14 @@ export default function StoreSettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
 
         {/* STORE IDENTITY */}
-        <SectionHeader title="STORE IDENTITY" style={ss.sectionHeader} />
+        <SectionHeader title="Store identity" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
-          <FieldRow ss={ss} label="Store Name">
+          <FieldRow ss={ss} label="Store name">
             <TextInput
               style={ss.input}
               value={form.storeName}
               onChangeText={v => patch({ storeName: v })}
-              placeholder="Your Brand Name"
+              placeholder="Your brand name"
               placeholderTextColor={colors.mutedForeground}
             />
           </FieldRow>
@@ -147,7 +138,7 @@ export default function StoreSettingsScreen() {
           <FieldRow ss={ss} label="Store URL">
             <View style={ss.urlRow}>
               <TextInput
-                style={[ss.input, { flex: 1 }]}
+                style={[ss.input, { flex: 1, minWidth: 0 }]}
                 value={form.storeUrl}
                 onChangeText={v => patch({ storeUrl: v })}
                 placeholder="yourstore"
@@ -158,7 +149,7 @@ export default function StoreSettingsScreen() {
             </View>
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Contact Email">
+          <FieldRow ss={ss} label="Contact email">
             <TextInput
               style={ss.input}
               value={form.contactEmail}
@@ -170,7 +161,7 @@ export default function StoreSettingsScreen() {
             />
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Customer Support Email">
+          <FieldRow ss={ss} label="Customer support email">
             <TextInput
               style={ss.input}
               value={form.supportEmail}
@@ -184,7 +175,7 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* LOCALIZATION */}
-        <SectionHeader title="LOCALIZATION" style={ss.sectionHeader} />
+        <SectionHeader title="Localization" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <FieldRow ss={ss} label="Currency">
             <View style={ss.chipRow}>
@@ -207,7 +198,7 @@ export default function StoreSettingsScreen() {
             </View>
           </FieldRow>
           <View style={ss.divider} />
-          <FieldRow ss={ss} label="Time Zone">
+          <FieldRow ss={ss} label="Time zone">
             <TextInput
               style={ss.input}
               value={form.timezone}
@@ -228,12 +219,11 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* STORE STATUS */}
-        <SectionHeader title="STORE STATUS" style={ss.sectionHeader} />
+        <SectionHeader title="Store status" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <View style={ss.chipRow}>
             {STATUS_OPTIONS.map(opt => {
               const isActive = form.storeStatus === opt.value;
-              const chipColor = statusColor(opt.value, colors);
               return (
                 <PressableScale
                   key={opt.value}
@@ -244,9 +234,9 @@ export default function StoreSettingsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={opt.label}
                   accessibilityState={{ selected: isActive }}
-                  style={[ss.statusChip, isActive && { borderColor: chipColor, backgroundColor: chipColor + '20' }]}
+                  style={[ss.statusChip, isActive && { borderColor: colors.foreground, backgroundColor: colors.secondary }]}
                 >
-                  <Text style={[ss.statusChipLabel, { color: isActive ? chipColor : colors.mutedForeground }]}>{opt.label}</Text>
+                  <Text style={[ss.statusChipLabel, { color: isActive ? colors.foreground : colors.mutedForeground }]}>{opt.label}</Text>
                 </PressableScale>
               );
             })}
@@ -254,7 +244,7 @@ export default function StoreSettingsScreen() {
           {form.storeStatus === 'password_protected' && (
             <>
               <View style={ss.divider} />
-              <FieldRow ss={ss} label="Store Password">
+              <FieldRow ss={ss} label="Store password">
                 <TextInput
                   style={ss.input}
                   value={form.storePassword ?? ''}
@@ -269,24 +259,24 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* CHECKOUT & ACCOUNTS */}
-        <SectionHeader title="CHECKOUT & ACCOUNTS" style={ss.sectionHeader} />
+        <SectionHeader title="Checkout & accounts" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <SwitchRow
-            label="Require Account"
+            label="Require account"
             description="Buyers must create an account to check out"
             value={form.checkoutRequireAccount}
             onValueChange={v => patch({ checkoutRequireAccount: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Guest Checkout"
+            label="Guest checkout"
             description="Allow guest checkout"
             value={form.checkoutGuestAllowed}
             onValueChange={v => patch({ checkoutGuestAllowed: v })}
           />
           <View style={ss.divider} />
           <SwitchRow
-            label="Order Notifications"
+            label="Order notifications"
             description="Email seller on new orders"
             value={form.orderNotifications}
             onValueChange={v => patch({ orderNotifications: v })}
@@ -308,7 +298,7 @@ export default function StoreSettingsScreen() {
           />
         </BrandthreadCard>
 
-        <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
+        <PrimaryButton label="Save settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
       </ScrollView>
       )}
     </View>
@@ -344,20 +334,20 @@ function makeStyles(colors: Colors) {
     sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
     card: { marginHorizontal: SP.md, gap: SP.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-    fieldRow: { gap: 6 },
+    fieldRow: { gap: SP.sm },
     fieldLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold, color: colors.mutedForeground },
     input: {
       fontSize: FS.base, lineHeight: 19, fontFamily: FONT.regular, color: colors.foreground,
       backgroundColor: colors.secondary, borderRadius: RADIUS.sm,
       borderWidth: 1, borderColor: colors.border,
-      paddingHorizontal: SP.md, paddingVertical: 10,
+      paddingHorizontal: SP.md, paddingVertical: 12,
       minHeight: 44,
     },
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-    urlSuffix: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
+    urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     statusChip: {
-      paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.md,
+      paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.md,
       borderWidth: 1, borderColor: colors.border,
       minHeight: 44, justifyContent: 'center',
     },

@@ -4,15 +4,16 @@
  * Reached from More, Store, Gift cards.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Share, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BrandthreadScreen, HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { apiErrorMessage } from '@/lib/safety';
 import { CheckoutField, CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { useApi } from '@/lib/api';
-import { ApiError } from '@/lib/networkNotice';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -75,7 +76,7 @@ export default function GiftCardsManageScreen() {
       setSettings(await api.giftCards.seller.saveSettings(patch));
     } catch (err) {
       setSettings(before);
-      setSaveError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t save that. Try again.');
+      setSaveError(apiErrorMessage(err, 'We couldn’t save that. Try again.'));
     }
   }
 
@@ -101,7 +102,7 @@ export default function GiftCardsManageScreen() {
       setIssueAmount(''); setIssueEmail(''); setIssueName('');
       await load();
     } catch (err) {
-      setIssueError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t issue that card. Try again.');
+      setIssueError(apiErrorMessage(err, 'We couldn’t issue that card. Try again.'));
     } finally {
       setIssuing(false);
     }
@@ -125,7 +126,11 @@ export default function GiftCardsManageScreen() {
       <ScreenHeader title="Gift cards" onBack={() => goBackOr(router)} />
       <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         {loading ? (
-          <View style={s.center}><ActivityIndicator /></View>
+          <View style={{ gap: SP.md }}>
+            <SkeletonBlock width="100%" height={56} />
+            <SkeletonBlock width="100%" height={160} />
+            <SkeletonBlock width="100%" height={240} />
+          </View>
         ) : failed || !settings ? (
           <RetryRow label="Couldn’t load gift cards" onRetry={() => void load()} />
         ) : (
@@ -146,7 +151,10 @@ export default function GiftCardsManageScreen() {
                     style={s.chip}
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${formatCents(cents)}`}
-                    onPress={() => settings.denominations.length > 1 && void save({ denominations: settings.denominations.filter(d => d !== cents) })}
+                    onPress={() => {
+                      if (settings.denominations.length <= 1) { setSaveError('Keep at least one amount.'); return; }
+                      void save({ denominations: settings.denominations.filter(d => d !== cents) });
+                    }}
                   >
                     <Text style={s.chipText}>{formatCents(cents)}  ×</Text>
                   </PressableScale>
@@ -176,7 +184,7 @@ export default function GiftCardsManageScreen() {
               ) : null}
               <CheckoutField label="Amount" value={issueAmount} onChangeText={setIssueAmount} keyboardType="decimal-pad" placeholder="25" />
               <CheckoutField label="Recipient email" value={issueEmail} onChangeText={setIssueEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} placeholder="Enter email" />
-              <CheckoutField label="Recipient name" value={issueName} onChangeText={setIssueName} placeholder="Enter name" autoCapitalize="words" />
+              <CheckoutField label="Recipient name (optional)" value={issueName} onChangeText={setIssueName} placeholder="Enter name" autoCapitalize="words" />
               {issueError ? <Text style={s.error}>{issueError}</Text> : null}
               <Button label="Issue gift card" onPress={() => void issue()} loading={issuing} fullWidth />
             </CheckoutSection>
@@ -209,7 +217,6 @@ export default function GiftCardsManageScreen() {
 
 function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({
-    center: { alignItems: 'center', paddingTop: SP.xl },
     section: { marginTop: SP.sm },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm },
     title: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
@@ -221,7 +228,7 @@ function makeStyles(ck: CheckoutColors) {
     inlineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
     inlineButton: { marginTop: 25, minWidth: 84 },
     total: { fontFamily: FONT.bold, fontSize: 30, color: ck.text },
-    cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2, borderTopWidth: 1, borderTopColor: ck.divider },
+    cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + SP.xs, borderTopWidth: 1, borderTopColor: ck.divider },
     void: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: ck.text },
     codeBox: { gap: SP.sm, padding: SP.md, borderRadius: 14, borderWidth: 1, borderColor: ck.fieldBorder, marginBottom: SP.md },
     code: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: 2, color: ck.text },
