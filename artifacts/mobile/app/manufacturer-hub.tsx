@@ -728,7 +728,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
               description={favoritesOnly
                 ? 'Save manufacturers from Discover and they will appear here.'
-                : (activeFilterCount(filters) > 0 || searchQuery) ? 'Try adjusting your search or filters.' : 'No manufacturers are listed yet. Check back soon.'}
+                : (activeFilterCount(filters) > 0 || searchQuery) ? 'Try adjusting your search or filters.' : 'No manufacturers are listed yet.'}
               action={favoritesOnly
                 ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
                 : (activeFilterCount(filters) > 0 || searchQuery)
