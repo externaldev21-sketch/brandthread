@@ -76,6 +76,8 @@ export default function PublicCollectionScreen() {
     }
   });
 
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     if (!collectionId) { setState({ kind: 'not_found' }); return; }
     let cancelled = false;
@@ -84,7 +86,7 @@ export default function PublicCollectionScreen() {
       .then(data => { if (!cancelled) setState({ kind: 'ready', data }); })
       .catch((err) => { if (!cancelled) setState(err?.status === 404 ? { kind: 'not_found' } : { kind: 'error' }); });
     return () => { cancelled = true; };
-  }, [collectionId]);
+  }, [collectionId, attempt]);
 
   if (state.kind === 'loading') {
     return (
@@ -106,9 +108,15 @@ export default function PublicCollectionScreen() {
             ? 'This collection may be private or no longer exists.'
             : 'Please check your connection and try again.'}
         </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/' as never)}>
-          <Text style={styles.primaryBtnText}>Open Brandthread</Text>
-        </TouchableOpacity>
+        {state.kind === 'error' ? (
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button">
+            <Text style={styles.primaryBtnText}>Try again</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/' as never)} accessibilityRole="button">
+            <Text style={styles.primaryBtnText}>Open Brandthread</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -137,10 +145,12 @@ export default function PublicCollectionScreen() {
         )}
 
         <Text style={styles.title}>{collection.name}</Text>
-        <Text style={styles.subtitle}>By {collection.ownerName} · {collection.itemCount} saved</Text>
+        <Text style={styles.subtitle}>
+          {collection.ownerName?.trim() ? `By ${collection.ownerName.trim()} · ` : ''}{collection.itemCount} saved
+        </Text>
 
         {items.length === 0 ? (
-          <Text style={styles.messageDesc}>Nothing saved here yet.</Text>
+          <Text style={[styles.messageDesc, { marginTop: SP.lg }]}>Nothing saved here yet.</Text>
         ) : (
           <FlatList
             data={items}
@@ -165,7 +175,7 @@ export default function PublicCollectionScreen() {
           />
         )}
 
-        <TouchableOpacity style={[styles.primaryBtn, { marginTop: SP.xl }]} onPress={() => router.replace('/' as never)}>
+        <TouchableOpacity style={[styles.primaryBtn, { marginTop: SP.xl }]} onPress={() => router.replace('/' as never)} accessibilityRole="button">
           <Text style={styles.primaryBtnText}>Open in Brandthread</Text>
         </TouchableOpacity>
       </ResponsiveContainer>

@@ -2251,6 +2251,7 @@ export default function FeedScreen({
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
     setFeedLoadingMore(false);
+    setFeedError(false);
     if (initial) {
       setFeedLoading(true);
       // No skeleton ever covers this — instead, show whatever we last saw
@@ -2281,7 +2282,7 @@ export default function FeedScreen({
       if (feedGenerationRef.current !== generation) return;
       // Keep the current feed visible when a pull-to-refresh or social
       // notification fails; only the first load needs an empty state.
-      if (initial) setSellerFeedPosts([]);
+      if (initial) { setSellerFeedPosts([]); setFeedError(true); }
     } finally {
       if (feedLoadKeyRef.current === loadKey) feedLoadKeyRef.current = null;
       if (feedGenerationRef.current === generation) {
@@ -3104,6 +3105,22 @@ export default function FeedScreen({
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted }}>
                 No results for "{searchQuery}"
               </Text>
+            </View>
+          ) : !feedLoading && feedError ? (
+            <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+              <Feather name="wifi-off" size={40} color={MUTED} />
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
+                Couldn't load your feed
+              </Text>
+              <TouchableOpacity
+                onPress={() => { void loadFeed(true); }}
+                style={styles.creatorRetry}
+                accessibilityRole="button"
+                accessibilityLabel="Retry"
+                testID="feed-retry"
+              >
+                <Text style={styles.creatorRetryText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : !feedLoading ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>

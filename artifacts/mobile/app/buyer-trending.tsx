@@ -63,7 +63,7 @@ export default function BuyerTrendingScreen() {
         <View style={{ paddingHorizontal: SPACING.md }}><ListSkeleton rows={4} /></View>
       ) : error ? (
         <View style={{ paddingHorizontal: SPACING.md }}>
-          <SectionError message="Could not load trending. Tap to retry." onRetry={() => { setLoading(true); load(); }} />
+          <SectionError message="Couldn't load trending right now." onRetry={() => { setLoading(true); load(); }} />
         </View>
       ) : isBrands ? (
         <FlatList

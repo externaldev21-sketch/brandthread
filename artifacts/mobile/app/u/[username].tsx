@@ -146,7 +146,6 @@ function PublicProfileLanding({
         style={{ width: layout.columnWidth }}
         contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
         showsVerticalScrollIndicator={false}
-        accessible
       >
         {/* Hero */}
         <View style={[styles.landingHero, { height: layout.heroHeight }]}>
@@ -362,7 +361,7 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={styles.root} accessibilityLabel="Loading profile" accessible>
+      <View style={styles.root}>
         <ScreenHeader title="Profile" onBack={() => goBackOr(router)} />
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>

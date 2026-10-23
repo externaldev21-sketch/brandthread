@@ -29,7 +29,7 @@ import {
 } from '@/lib/theme';
 import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import {
-  getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
+  getComments, likePost, repostPost, saveItem, removeSavedItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { BuyerPost, Comment, PostSlide } from '@/services/socialTypes';
@@ -354,7 +354,7 @@ export default function BuyerPostViewer() {
             ) : null}
           </View>
           {isOwner && (
-            <TouchableOpacity style={s.editBtn} onPress={() => { setEditOpen(true); setEditCaption(caption); }}>
+            <TouchableOpacity style={s.editBtn} accessibilityRole="button" onPress={() => { setEditOpen(true); setEditCaption(caption); }}>
               <Feather name="edit-2" size={16} color={PURPLE} />
               <Text style={s.editBtnText}>Edit caption</Text>
             </TouchableOpacity>
@@ -389,12 +389,20 @@ export default function BuyerPostViewer() {
 
         {/* Engagement bar */}
         <View style={s.engagementBar}>
-          <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
+          <TouchableOpacity
+            style={s.engageBtn}
+            onPress={handleLike}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? `Unlike, ${likeCount} likes` : `Like, ${likeCount} likes`}
+            accessibilityState={{ selected: liked }}
+          >
             <Feather name="heart" size={22} color={liked ? RED : FG} />
             <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Comments, ${comments.length}`}
             onPress={() => {
               Haptics.selectionAsync();
               const qs = new URLSearchParams({
@@ -424,11 +432,16 @@ export default function BuyerPostViewer() {
           >
             <Feather name="repeat" size={22} color={reposted ? PURPLE : FG} />
           </TouchableOpacity>
-          <TouchableOpacity accessibilityLabel="Save post" accessibilityRole="button"
+          <TouchableOpacity accessibilityLabel={saved ? 'Remove from saved' : 'Save post'} accessibilityRole="button"
+            accessibilityState={{ selected: saved }}
             style={s.engageBtn}
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (!saved && params.postId) {
+              if (!params.postId) return;
+              if (saved) {
+                setSaved(false);
+                await removeSavedItem(params.postId).catch(() => setSaved(true));
+              } else {
                 setSaved(true);
                 await saveItem(
                   { type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 },

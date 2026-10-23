@@ -297,7 +297,7 @@ export default function DiscoverScreen() {
       <DiscoverSearchHeader
         title="Discover"
         onSearchPress={() => router.push('/buyer-search' as never)}
-        onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
+        onBellPress={isSignedIn ? () => router.navigate('/(buyer)/activity' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
       {filter === 'forYou' && <DiscoverFeaturedRail />}
@@ -407,8 +407,8 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={drops}
           keyExtractor={(d) => d.id}
-          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header}
+          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={<>{header}<View style={{ height: SP.md }} /></>}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverDropRow drop={item} />}
           ListEmptyComponent={dropsLoading ? (

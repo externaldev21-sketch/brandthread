@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
@@ -17,11 +18,13 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticDestructiveConfirm, hapticSelection } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SPACING } from '@/constants/spacing';
 
 export default function BuyerSearchHistoryScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [terms, setTerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +104,7 @@ export default function BuyerSearchHistoryScreen() {
         <FlatList
           data={terms}
           refreshControl={pull.refreshControl}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
           keyExtractor={(term) => term}
           renderItem={({ item }) => (
             <RecentSearchRow term={item} onPress={() => submitTerm(item)} onRemove={() => removeTerm(item)} />

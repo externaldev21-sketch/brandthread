@@ -262,6 +262,8 @@ export default function FollowingScreen() {
               <PressableScale
                 key={brand.id}
                 style={s.avatarItem}
+                accessibilityRole="button"
+                accessibilityLabel={`Open drop from ${(brand.handle ?? '').replace('@', '')}`}
                 onPress={() => {
                   hapticPrimaryAction();
                   const drop = drops.find(d => d.id === brand.id);
