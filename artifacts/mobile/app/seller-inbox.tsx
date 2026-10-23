@@ -95,7 +95,7 @@ function InboxPillRow({
             style={[
               pillS.pill,
               active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
                 : { backgroundColor: 'transparent', borderColor: theme.border },
             ]}
             onPress={() => onChange(pill.key)}
@@ -103,11 +103,11 @@ function InboxPillRow({
             accessibilityState={{ selected: active }}
             testID={`seller-inbox-tab-${pill.key}`}
           >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
+            <Text style={[pillS.pillLabel, { color: active ? theme.onAccent : theme.muted }]}>
               {pill.label}
             </Text>
             {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+              <View style={[pillS.pillCount, { backgroundColor: active ? `${theme.onAccent}26` : theme.cardElevated }]}>
                 <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
                   {pill.count > 99 ? '99+' : pill.count}
                 </Text>
@@ -128,7 +128,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  pillCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 function timeAgo(ts?: number): string {
@@ -548,10 +548,15 @@ export default function SellerInboxScreen() {
           onPress={() => openConversation(item.id)}
           onLongPress={() => longPressConversation(item)}
           accessibilityRole="button"
-          accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
+          accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}${hasUnread ? ', unread' : ''}`}
+          accessibilityHint="Long press for more options"
         >
           <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
-            <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+            {other.avatarUri ? (
+              <Image source={{ uri: other.avatarUri }} style={s.avatarImage} />
+            ) : (
+              <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
+            )}
           </View>
           <View style={s.rowCenter}>
             <View style={s.rowTop}>
@@ -663,12 +668,13 @@ export default function SellerInboxScreen() {
         .filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(queryLower);
     })
-    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
+    .sort((a, b) => ((b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)) || ((b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0))),
   [convs, queryLower, pendingDeleteIds]);
 
-  const requestConvs = useMemo(() => convs.filter((c) =>
-    c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)
-  ), [convs, pendingDeleteIds]);
+  const requestConvs = useMemo(() => convs
+    .filter((c) => c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id))
+    .sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0)),
+  [convs, pendingDeleteIds]);
 
   // Header subtitle reflects the Inbox tab's own unread total now that
   // Requests has its own badge on the pill row below — a pending request's
@@ -756,11 +762,12 @@ export default function SellerInboxScreen() {
       ) : loadError && convs.length === 0 ? (
         <View style={s.centerFill}>
           <ErrorState
-            message="Couldn't load messages. Pull to refresh."
+            message="Couldn't load your messages."
             onRetry={onRefresh}
+            retryLabel="Try again"
           />
         </View>
-      ) : convs.length === 0 && joinedCommunities.length === 0 ? (
+      ) : inboxRows.length === 0 && !queryLower ? (
         <View style={s.centerFill}>
           <EmptyState
             icon="message-circle"
@@ -837,7 +844,7 @@ const createStyles = (theme: AppThemePreset) => {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm,
   },
-  requestsHeaderText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
+  requestsHeaderText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17 },
   requestsDeleteAll: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted },
   });
 };

@@ -72,6 +72,11 @@ export function ChatAttachmentCard({
   style,
 }: ChatAttachmentCardProps) {
   const hasImage = !!imageUri;
+  // The default Monochrome palette's card fills are the same pure black as
+  // the chat background, which made the whole card (and an order card's
+  // icon placeholder) invisible — fall back to a faint neutral fill there.
+  const cardFill = theme.card === theme.background ? `${theme.text}14` : theme.card;
+  const placeholderFill = theme.cardElevated === theme.background ? `${theme.text}0D` : theme.cardElevated;
   // expo-image decodes remote images at their RENDERED size (see
   // components/CachedImage.tsx's own doc comment), which keeps memory
   // bounded — but that's a decode-time optimization only. The full
@@ -102,9 +107,9 @@ export function ChatAttachmentCard({
       accessibilityRole="button"
       testID={testID}
       noMinHeight
-      style={[s.card, { backgroundColor: theme.card, alignSelf: isMe ? 'flex-end' : 'flex-start' }, style]}
+      style={[s.card, { backgroundColor: cardFill, alignSelf: isMe ? 'flex-end' : 'flex-start' }, style]}
     >
-      <View style={s.media} accessibilityRole="none">
+      <View style={[s.media, !hasImage && s.mediaIconOnly]} accessibilityRole="none">
         {hasImage ? (
           <CachedImage
             source={{ uri: imageUri! }}
@@ -113,8 +118,8 @@ export function ChatAttachmentCard({
             recyclingKey={imageUri!}
           />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-            <View style={[s.iconCircle, { backgroundColor: theme.card }]}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: placeholderFill, alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[s.iconCircle, { backgroundColor: cardFill }]}>
               <Feather name={icon} size={26} color={iconColor ?? theme.accent} />
             </View>
           </View>
@@ -164,6 +169,9 @@ const s = StyleSheet.create({
     // 44×44 inline thumbnail this replaces.
     aspectRatio: 3 / 4,
   },
+  // Order cards have no photo — a full 3:4 frame around a single icon was a
+  // ~300pt empty block in the thread.
+  mediaIconOnly: { aspectRatio: 2 },
   iconCircle: {
     width: 56,
     height: 56,

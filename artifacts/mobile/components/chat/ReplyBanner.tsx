@@ -58,7 +58,7 @@ export function ReplyBanner({ fromName, previewText, onCancel, theme, testID }: 
         accessibilityLabel="Cancel reply"
         testID={testID ? `${testID}-cancel` : undefined}
       >
-        <Text style={s.close}>×</Text>
+        <Feather name="x" size={ICON.sm} color={theme.muted} style={s.close} />
       </PressableScale>
     </Animated.View>
   );
@@ -86,9 +86,6 @@ const styles = (theme: AppThemePreset) => StyleSheet.create({
     marginTop: 1,
   },
   close: {
-    fontSize: FS.md,
-    fontFamily: FONT.regular,
-    color: theme.muted,
     marginLeft: SP.sm,
   },
 });

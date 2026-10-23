@@ -53,8 +53,8 @@ describe('seller-inbox.tsx: swipe actions', () => {
     expect(src).toContain('if (isSellerPreviewConversationId(c.id)) return;');
   });
 
-  it('pinned conversations sort to the top of the list', () => {
-    expect(src).toContain('.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),');
+  it('pinned conversations sort to the top of the list, then newest first', () => {
+    expect(src).toContain('.sort((a, b) => ((b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)) || ((b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0))),');
   });
 
   it('long-pressing a row still offers Archive (matches the buyer inbox’s long-press menu)', () => {

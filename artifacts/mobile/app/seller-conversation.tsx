@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
+import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking, Pressable } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -259,7 +259,7 @@ export default function SellerConversationScreen() {
   // (lib/previewInbox.ts) marks the SELLER's own seeded messages with
   // fromId 'me', so "own message" bubbles must compare against 'me' here
   // instead of an empty myId. Never taken for a real signed-in account.
-  const effectiveMyId = myId || (isSellerPreviewConversationId(id ?? '') ? 'me' : myId);
+  const effectiveMyId = isSellerPreviewConversationId(id ?? '') ? 'me' : myId;
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -553,7 +553,10 @@ export default function SellerConversationScreen() {
   const convTheme = getConversationTheme(conv?.themeId);
   const sentBubbleColor = convTheme?.sentBubble ?? PURPLE;
   const sentTextColor = convTheme?.sentText ?? ON_DARK;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
+  // The default Monochrome palette's card is the same pure black as the
+  // screen, which left received bubbles with no visible fill at all.
+  const receivedBubbleColor = convTheme?.receivedBubble
+    ?? (CARD === theme.background ? `${theme.text}1F` : CARD);
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   // New every-role-pair DM/message-request routing: `conv.isRequest` and
@@ -929,7 +932,7 @@ export default function SellerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <PressableScale rippleEnabled={false} key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]} activeOpacity={0.9} onPress={() => setViewerUri(uri)}>
+            <PressableScale rippleEnabled={false} key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]} activeOpacity={0.9} onPress={() => setViewerUri(uri)} accessibilityLabel={uris.length > 1 ? `Open photo ${idx + 1} of ${uris.length}` : 'Open photo'}>
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
@@ -1175,6 +1178,9 @@ export default function SellerConversationScreen() {
     const prevMessages = messages;
     const { next, isToggleOff } = applyOptimisticReaction(msg.reactions ?? [], myId, user?.fullName || user?.username || 'You', type);
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
+    // Seeded preview thread: no backend record to post to — keep the
+    // optimistic state instead of rolling back on the guaranteed failure.
+    if (isSellerPreviewConversationId(id)) return;
     try {
       if (isToggleOff) await api.conversations.removeReaction(id, msg.id);
       else await api.conversations.addReaction(id, msg.id, type);
@@ -1490,6 +1496,8 @@ export default function SellerConversationScreen() {
                     ]}
                     onPress={() => handleReact(msg, kind)}
                     activeOpacity={0.7}
+                    accessibilityLabel={`${kind} reaction, ${count}${mine === kind ? ', yours — tap to remove' : ''}`}
+                    accessibilityState={{ selected: mine === kind }}
                     testID={`reaction-chip-${msg.id}-${kind}`}
                   >
                     <ReactionGlyph type={kind} size={12} />
@@ -1963,7 +1971,7 @@ export default function SellerConversationScreen() {
                 setMessages((prev) => [...prev, msg as Msg]);
                 setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
               } catch (e: any) {
-                Alert.alert('Sent, but the chat message failed', e?.message ?? 'The Thread Cash send went through — refresh to see it in chat.');
+                Alert.alert('Thread Cash sent', e?.message ?? 'It couldn’t be posted in this chat. Refresh to see it.');
               }
             }}
           />
@@ -1980,7 +1988,7 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <PressableScale style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <Pressable style={s.modalOverlay} onPress={() => setShowMediaSheet(false)} accessibilityLabel="Close" accessibilityRole="button" />
         <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={s.sheetTitle}>Add to message</Text>
@@ -1998,7 +2006,7 @@ export default function SellerConversationScreen() {
               <Text style={s.sheetOptionDesc}>Under 1 minute</Text>
             </View>
           </PressableScale>
-          <View style={{ height: 20 }} />
+          <View style={{ height: SP.lg }} />
         </SheetRise>
       </Modal>
 
@@ -2009,10 +2017,11 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowAttachPicker(false)}
       >
-        <PressableScale
+        <Pressable
           style={s.modalOverlay}
-          activeOpacity={1}
           onPress={() => setShowAttachPicker(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         />
         <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
@@ -2078,16 +2087,17 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowQuickReplies(false)}
       >
-        <PressableScale
+        <Pressable
           style={s.modalOverlay}
-          activeOpacity={1}
           onPress={() => setShowQuickReplies(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         />
         <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Quick replies</Text>
-            <PressableScale onPress={() => setShowQuickReplies(false)} accessibilityLabel="Close">
+            <PressableScale onPress={() => setShowQuickReplies(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close">
               <Feather name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
@@ -2097,7 +2107,7 @@ export default function SellerConversationScreen() {
           ) : quickReplies.length === 0 ? (
             <View style={s.emptyState}>
               <Feather name="message-square" size={32} color={MUTED} />
-              <Text style={s.emptyText}>No quick replies yet</Text>
+              <Text style={s.emptyText}>No quick replies yet. Save one below to reuse it in any chat.</Text>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -2111,9 +2121,9 @@ export default function SellerConversationScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={s.productName}>
-                      {reply.title}{reply.shortcut ? `  ${reply.shortcut}` : ''}
+                      {reply.title}{reply.shortcut ? ` · ${reply.shortcut}` : ''}
                     </Text>
-                    <Text style={s.productPrice}>{reply.body}</Text>
+                    <Text style={s.productPrice} numberOfLines={2}>{reply.body}</Text>
                   </View>
                 </PressableScale>
               ))}
@@ -2137,16 +2147,17 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <PressableScale
+        <Pressable
           style={s.modalOverlay}
-          activeOpacity={1}
           onPress={() => setShowProductPicker(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         />
         <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Choose a product</Text>
-            <PressableScale accessibilityLabel="Close" onPress={() => setShowProductPicker(false)}>
+            <PressableScale accessibilityLabel="Close" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => setShowProductPicker(false)}>
               <Feather name="x" size={ICON.md} color={MUTED} />
             </PressableScale>
           </View>
@@ -2156,7 +2167,7 @@ export default function SellerConversationScreen() {
           ) : products.length === 0 ? (
             <View style={s.emptyState}>
               <Feather name="shopping-bag" size={32} color={MUTED} />
-              <Text style={s.emptyText}>No products found</Text>
+              <Text style={s.emptyText}>No active products to share yet</Text>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -2200,10 +2211,11 @@ export default function SellerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowBuyerContext(false)}
       >
-        <PressableScale
+        <Pressable
           style={s.modalOverlay}
-          activeOpacity={1}
           onPress={() => setShowBuyerContext(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         />
         <SheetRise style={[s.buyerContextSheetWrap, { paddingBottom: insets.bottom + SP.md }]}>
           <Glass variant="regular" tint="dark" radius={RADIUS.xl} style={StyleSheet.absoluteFill} />
@@ -2243,7 +2255,7 @@ export default function SellerConversationScreen() {
             ) : (buyerOrders?.length ?? 0) === 0 ? (
               <View style={s.emptyState}>
                 <Feather name="package" size={28} color={MUTED} />
-                <Text style={s.emptyText}>No other orders from {displayName} yet</Text>
+                <Text style={s.emptyText}>No orders from {displayName} yet</Text>
               </View>
             ) : (
               buyerOrders!.map((row) => {
@@ -2391,40 +2403,46 @@ function SellerRequestActionPanel({
         Accepting lets them see when you’ve read their messages and message you freely.
       </Text>
       <View style={rs.actionsRow}>
-        <PressableScale
-          style={rs.actionBtn}
-          onPress={onBlock}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Block ${name}`}
-          testID="seller-conversation-request-block"
-        >
-          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
-        </PressableScale>
-        <PressableScale
-          style={rs.actionBtn}
-          onPress={onDelete}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete request from ${name}`}
-          testID="seller-conversation-request-delete"
-        >
-          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
-        </PressableScale>
-        <PressableScale
-          style={[rs.actionBtn, { backgroundColor: theme.accent }]}
-          onPress={onAccept}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Accept message request from ${name}`}
-          testID="seller-conversation-request-accept"
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.onAccent} size="small" />
-          ) : (
-            <Text style={[rs.actionText, { color: theme.onAccent }]}>Accept</Text>
-          )}
-        </PressableScale>
+        <View style={rs.actionCell}>
+          <PressableScale
+            style={rs.actionBtn}
+            onPress={onBlock}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Block ${name}`}
+            testID="seller-conversation-request-block"
+          >
+            <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            style={rs.actionBtn}
+            onPress={onDelete}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete request from ${name}`}
+            testID="seller-conversation-request-delete"
+          >
+            <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            style={[rs.actionBtn, { backgroundColor: theme.accent }]}
+            onPress={onAccept}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Accept message request from ${name}`}
+            testID="seller-conversation-request-accept"
+          >
+            {loading ? (
+              <ActivityIndicator color={theme.onAccent} size="small" />
+            ) : (
+              <Text style={[rs.actionText, { color: theme.onAccent }]}>Accept</Text>
+            )}
+          </PressableScale>
+        </View>
       </View>
     </View>
   );
@@ -2438,8 +2456,11 @@ const requestPanelStyles = StyleSheet.create({
     gap: SP.xs,
   },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
-  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  subline: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, textAlign: 'center', marginBottom: SP.sm },
   actionsRow: { flexDirection: 'row', gap: SP.sm },
+  // PressableScale applies `style` to its inner view, so `flex: 1` on the
+  // button itself never reached the row — each cell carries the flex.
+  actionCell: { flex: 1 },
   actionBtn: {
     flex: 1,
     height: 44,
@@ -2577,8 +2598,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Quoted reply snippet — same shape as app/buyer-conversation.tsx.
   replyQuote: {
     borderLeftWidth: 2,
-    paddingLeft: 8,
-    marginBottom: 4,
+    paddingLeft: SP.sm,
+    marginBottom: SP.xs,
   },
   replyQuoteText: {
     fontSize: FS.xs,
@@ -2591,7 +2612,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginTop: 4,
     gap: 3,
   },
-  bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
+  bubbleTime: { fontSize: FS.xs, fontFamily: FONT.regular },
   receiptChecks: { flexDirection: 'row', marginLeft: 2 },
   // Reaction pill row (item 68) — same treatment as buyer-conversation.tsx.
   reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
@@ -2599,7 +2620,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
   },
-  reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
+  reactionCount: { fontSize: FS.xs, fontFamily: FONT.semibold },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
   // text under the sender's own last message.
   seenReceipt: {

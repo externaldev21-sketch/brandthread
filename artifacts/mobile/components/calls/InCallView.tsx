@@ -109,13 +109,6 @@ export function InCallView() {
             onPress={toggleMute}
             accessibilityLabel={muted ? 'Unmute microphone' : 'Mute microphone'}
           />
-          {isVideo && (
-            <ControlButton
-              icon="refresh-cw"
-              onPress={() => { /* PR2: no real camera to flip in the preview provider yet. */ }}
-              accessibilityLabel="Flip camera"
-            />
-          )}
           <ControlButton
             icon={speakerOn ? 'volume-2' : 'volume-x'}
             active={speakerOn}

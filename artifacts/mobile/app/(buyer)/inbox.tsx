@@ -45,7 +45,7 @@ import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
@@ -78,14 +78,13 @@ const NO_RIPPLE = false;
 type InboxTab = 'inbox' | 'requests';
 
 function InboxPillRow({
-  value, onChange, requestsCount, theme, gutter, onFilterPress,
+  value, onChange, requestsCount, theme, gutter,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
   requestsCount: number;
   theme: ReturnType<typeof useAppTheme>['theme'];
   gutter: number;
-  onFilterPress: () => void;
 }) {
   const pills: { key: InboxTab; label: string; count?: number }[] = [
     { key: 'inbox', label: 'Inbox' },
@@ -93,16 +92,6 @@ function InboxPillRow({
   ];
   return (
     <View style={[pillS.row, { paddingHorizontal: gutter }]}>
-      <PressableScale
-        style={[pillS.iconPill, { borderColor: theme.border }]}
-        onPress={onFilterPress}
-        rippleEnabled={NO_RIPPLE}
-        accessibilityRole="button"
-        accessibilityLabel="Filter messages"
-        testID="inbox-filter-pill"
-      >
-        <Feather name="sliders" size={15} color={theme.text} />
-      </PressableScale>
       {pills.map(pill => {
         const active = value === pill.key;
         return (
@@ -111,7 +100,7 @@ function InboxPillRow({
             style={[
               pillS.pill,
               active
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+                ? { backgroundColor: theme.accent, borderColor: theme.accent }
                 : { backgroundColor: 'transparent', borderColor: theme.border },
             ]}
             onPress={() => onChange(pill.key)}
@@ -120,11 +109,11 @@ function InboxPillRow({
             accessibilityState={{ selected: active }}
             testID={`inbox-tab-${pill.key}`}
           >
-            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
+            <Text style={[pillS.pillLabel, { color: active ? theme.onAccent : theme.muted }]}>
               {pill.label}
             </Text>
             {!!pill.count && pill.count > 0 && (
-              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+              <View style={[pillS.pillCount, { backgroundColor: active ? `${theme.onAccent}26` : theme.cardElevated }]}>
                 <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
                   {pill.count > 99 ? '99+' : pill.count}
                 </Text>
@@ -139,17 +128,13 @@ function InboxPillRow({
 
 const pillS = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  iconPill: {
-    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center', justifyContent: 'center',
-  },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
+  pillCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -389,7 +374,7 @@ export default function InboxScreen() {
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
           seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
-        setMyStoryId(PREVIEW_MY_STORY.id);
+        setMyStoryId(isPreviewDemoMode() ? PREVIEW_MY_STORY.id : null);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
@@ -425,7 +410,7 @@ export default function InboxScreen() {
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
           seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
-        setMyStoryId(PREVIEW_MY_STORY.id);
+        setMyStoryId(isPreviewDemoMode() ? PREVIEW_MY_STORY.id : null);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
@@ -603,7 +588,7 @@ export default function InboxScreen() {
       }
       return true;
     })
-    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    .sort((a, b) => ((b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)) || ((b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0)));
 
   // Joined community group chats live beside DMs (joining is consent), so
   // they are merged in by recency here and never counted as requests.
@@ -614,9 +599,9 @@ export default function InboxScreen() {
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
-  const requestConvs = conversations.filter(conv =>
-    conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
-  );
+  const requestConvs = conversations
+    .filter(conv => conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id))
+    .sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -1025,7 +1010,7 @@ export default function InboxScreen() {
       closeCompose();
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
-      Alert.alert('Couldn’t start conversation', 'Try again.');
+      Alert.alert('Couldn’t start conversation', 'Please try again.');
     } finally {
       setComposeStartingId(null);
     }
@@ -1065,15 +1050,6 @@ export default function InboxScreen() {
     // don't block or roll back the UI on a failed request.
     setSuggestedPeople(prev => prev.filter(p => p.userId !== person.userId));
     dismissSuggestedPerson(person.userId).catch(() => {});
-  }
-
-  function openFilterMenu() {
-    // Alert.alert() is a silent no-op on web (react-native-web has no
-    // native dialog to defer to), so it left this button dead in the web
-    // preview — no dialog, no honest "not available" state, nothing. Use
-    // the screen's existing snackbar (already the pattern for every other
-    // inbox affordance above) so the tap always gives real feedback.
-    showSnackbar('Message filters — coming soon');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1146,6 +1122,9 @@ export default function InboxScreen() {
             onLongPress={() => longPressConversation(conv)}
             activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}
+            accessibilityRole="button"
+            accessibilityLabel={`Open conversation with ${participant.name}${isUnread ? ', unread' : ''}`}
+            accessibilityHint="Long press for more options"
             testID={`inbox-conversation-${conv.id}`}
           >
             {/* Avatar — Threads-style: no unread/online dot chrome on the
@@ -1296,6 +1275,8 @@ export default function InboxScreen() {
             onPress={() => openRequestConversation(conv)}
             activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}
+            accessibilityRole="button"
+            accessibilityLabel={`Open message request from ${participant.name}`}
             testID={`inbox-request-row-${conv.id}`}
           >
             <View style={s.avatarContainer}>
@@ -1356,8 +1337,9 @@ export default function InboxScreen() {
     return (
       <EmptyState
         icon="alert-circle"
-        title="Could not load your inbox"
-        description="Pull to refresh and try again."
+        title="Couldn't load your messages"
+        description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: handleRefresh }}
       />
     );
   }
@@ -1446,7 +1428,7 @@ export default function InboxScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
       {requestConvs.length === 0 ? (
-        <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here" />
+        <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here." />
       ) : (
         <>
           <View style={s.requestsHeaderRow}>
@@ -1487,7 +1469,7 @@ export default function InboxScreen() {
                   // border/box appears on focus, only a very subtle fill
                   // change (never anything boxy). borderWidth is 0 on the
                   // base style itself (searchRow) at both rest and focus.
-                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.10)' : theme.cardElevated,
+                  backgroundColor: messagesSearchFocused ? `${theme.text}1A` : theme.cardElevated,
                 },
               ]}
             >
@@ -1713,7 +1695,6 @@ export default function InboxScreen() {
           requestsCount={requestConvs.length}
           theme={theme}
           gutter={gutter}
-          onFilterPress={openFilterMenu}
         />
       )}
 
@@ -1792,7 +1773,7 @@ export default function InboxScreen() {
               ) : (
                 <View style={s.composeCenter}>
                   <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
-                    {composeQueryLower ? 'No one found' : 'No one to show yet'}
+                    {composeQueryLower ? `No one matches "${composeQuery.trim()}"` : 'Search for someone to message'}
                   </Text>
                 </View>
               )
@@ -1945,7 +1926,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   composeCenter: { paddingVertical: SP.xl, alignItems: 'center' },
   composeResultRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm + SP.xs,
     paddingVertical: SP.sm, minHeight: 52,
   },
   composeAvatar: {
@@ -2087,7 +2068,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     justifyContent: 'center',
   },
   suggestedReason: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     marginTop: 2,
   },
@@ -2118,7 +2099,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     gap: SP.xs,
   },
   requestsHeaderText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     lineHeight: 17,
   },
@@ -2172,7 +2153,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SP.sm,
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
     height: 44,
@@ -2248,7 +2229,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginLeft: SP.sm,
   },
   convPreview: {
-    fontSize: 14,
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
   },
   // Threads-style unread marker: one small dot at the row's right edge,

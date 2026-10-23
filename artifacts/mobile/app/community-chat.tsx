@@ -427,12 +427,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   dayText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   olderSpinner: { paddingVertical: SP.md },
   startNote: { textAlign: 'center', fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.lg, paddingHorizontal: SP.lg },
-  reconnect: { textAlign: 'center', fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.xs },
+  reconnect: { textAlign: 'center', fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.xs },
   pillWrap: { position: 'absolute', left: 0, right: 0, bottom: SP.sm, alignItems: 'center' },
   newPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, height: 34,
     paddingHorizontal: SP.md, borderRadius: radius.sm, backgroundColor: theme.accent,
   },
   newPillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.onAccent },
-  overlayText: { fontSize: 15, fontFamily: FONT.regular, lineHeight: 21 },
+  overlayText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21 },
 });

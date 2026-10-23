@@ -38,7 +38,7 @@ export function SystemLine({
       <View style={s.wrap} testID="system-line-theme">
         <Text style={[s.text, { color: theme.muted }]}>
           {who} changed the theme to {name}.{' '}
-          <Text onPress={onOpenThemePicker} style={[s.link, { color: theme.text }]}>Change</Text>
+          <Text accessibilityRole="link" onPress={onOpenThemePicker} style={[s.link, { color: theme.text }]}>Change</Text>
         </Text>
       </View>
     );
@@ -49,7 +49,7 @@ export function SystemLine({
       <View style={s.wrap} testID="system-line-disappearing-on">
         <Text style={[s.text, { color: theme.muted }]}>
           {who} turned on disappearing messages. New messages will disappear after they've been seen.{' '}
-          <Text onPress={onQuickToggleDisappearing} style={[s.link, { color: theme.text }]}>Change</Text>
+          <Text accessibilityRole="link" onPress={onQuickToggleDisappearing} style={[s.link, { color: theme.text }]}>Change</Text>
         </Text>
       </View>
     );
@@ -60,7 +60,7 @@ export function SystemLine({
       <View style={s.wrap} testID="system-line-disappearing-off">
         <Text style={[s.text, { color: theme.muted }]}>
           {who} turned off disappearing messages.{' '}
-          <Text onPress={onQuickToggleDisappearing} style={[s.link, { color: theme.text }]}>Turn on</Text>
+          <Text accessibilityRole="link" onPress={onQuickToggleDisappearing} style={[s.link, { color: theme.text }]}>Turn on</Text>
         </Text>
       </View>
     );

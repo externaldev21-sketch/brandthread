@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
-} from 'react-native';
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking, Pressable } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
@@ -295,6 +294,7 @@ export default function BuyerConversationScreen() {
   // in-flight Accept, so the Accept/Block/Delete row can't double-fire.
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -407,6 +407,7 @@ export default function BuyerConversationScreen() {
       setIsLoading(false);
       return;
     }
+    setLoadFailed(false);
     try {
       let loadedConv: Conversation | null = null;
       let unreadBeforeRead = 0;
@@ -495,6 +496,7 @@ export default function BuyerConversationScreen() {
       }
     } catch (e) {
       console.error('Failed to load conversation', e);
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -607,7 +609,10 @@ export default function BuyerConversationScreen() {
   const convTheme = getConversationTheme(conv?.themeId);
   const sentBubbleColor = convTheme?.sentBubble ?? theme.accent;
   const sentTextColor = convTheme?.sentText ?? theme.onAccent;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? theme.cardElevated;
+  // The default Monochrome palette's card is the same pure black as the
+  // screen, which left received bubbles with no visible fill at all.
+  const receivedBubbleColor = convTheme?.receivedBubble
+    ?? (theme.cardElevated === theme.background ? `${theme.text}1F` : theme.cardElevated);
   const receivedTextColor = convTheme?.receivedText ?? theme.text;
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
@@ -1114,6 +1119,7 @@ export default function BuyerConversationScreen() {
               style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
               activeOpacity={0.9}
               onPress={() => setViewerUri(uri)}
+              accessibilityLabel={uris.length > 1 ? `View photo ${idx + 1} of ${uris.length}` : 'View photo'}
             >
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
@@ -1334,21 +1340,13 @@ export default function BuyerConversationScreen() {
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       void result;
-    } catch {
-      const { text: replyText } = cannedAgentReply(messageText);
-      setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
-        id: `local-agent-fallback-${Date.now()}`,
-        conversationId: conv.id,
-        fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
-        fromName: displayName,
-        fromInitials: participant?.initials ?? 'BT',
-        fromColor: participant?.color ?? theme.cardElevated,
-        text: replyText,
-        reactions: [],
-        status: 'read',
-        ts: Date.now(),
-        deletedForMe: false,
-      }]);
+    } catch (e) {
+      // A real conversation never gets a canned, client-made-up "agent"
+      // reply on failure (that was fake data presented as the AI's answer)
+      // — drop the unsent bubble, restore the text, and say it failed.
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setText(messageText);
+      Alert.alert('Message not sent', apiErrorMessage(e, 'Brandthread Agent didn’t respond. Please try again.'));
     } finally {
       setAgentTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
@@ -1495,8 +1493,11 @@ export default function BuyerConversationScreen() {
             try {
               const { archiveConversation } = await import('@/services/socialService');
               await archiveConversation(conv.id);
-            } catch {
-              // Best-effort — the conversation simply stays un-archived.
+            } catch (e) {
+              // Used to swallow the failure and navigate back anyway, as if
+              // it had archived — stay on the thread and say so instead.
+              Alert.alert('Couldn’t archive', apiErrorMessage(e, 'Please try again.'));
+              return;
             }
           }
           goBackOr(router);
@@ -1599,7 +1600,7 @@ export default function BuyerConversationScreen() {
     }
     deleteMessageForMe(conv.id, msg.id)
       .then(() => getMessages(conv.id).then(setMessages))
-      .catch(() => {});
+      .catch((e) => Alert.alert('Couldn’t delete message', apiErrorMessage(e, 'Please try again.')));
   }
 
   function sheetReport() {
@@ -1631,7 +1632,7 @@ export default function BuyerConversationScreen() {
       return (
         <View style={s.unreadDividerWrap}>
           <View style={s.unreadDividerLine} />
-          <Text style={s.unreadDividerText}>Unread Messages</Text>
+          <Text style={s.unreadDividerText}>Unread messages</Text>
           <View style={s.unreadDividerLine} />
         </View>
       );
@@ -1712,6 +1713,8 @@ export default function BuyerConversationScreen() {
             style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             activeOpacity={deepLink ? 0.7 : 1}
             onPress={() => { if (deepLink) router.push(deepLink as never); }}
+            accessibilityRole={deepLink ? 'link' : 'text'}
+            accessibilityLabel={[att.title, att.subtitle].filter(Boolean).join(', ') || 'Brandthread Agent card'}
           >
             <View style={[s.agentCardIconCircle, { backgroundColor: theme.accentDim }]}>
               {cardKind === 'thread_cash' ? (
@@ -1762,7 +1765,7 @@ export default function BuyerConversationScreen() {
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
                 celebrateThreadCash({ amount: amountCents, from: displayName });
               } catch (e: any) {
-                Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+                Alert.alert('Couldn’t claim Thread Cash', apiErrorMessage(e, 'Please try again.'));
                 throw e;
               }
             }}
@@ -1771,7 +1774,7 @@ export default function BuyerConversationScreen() {
                 await api.threadCash.cancel({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
               } catch (e: any) {
-                Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+                Alert.alert('Couldn’t cancel Thread Cash', apiErrorMessage(e, 'Please try again.'));
                 throw e;
               }
             } : undefined}
@@ -1822,7 +1825,11 @@ export default function BuyerConversationScreen() {
                 </View>
               ) : (
                 <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                  {participant?.avatarUri ? (
+                    <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatarImage} />
+                  ) : (
+                    <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                  )}
                 </View>
               )
             ) : <View style={s.msgAvatarSpacer} />
@@ -1874,7 +1881,11 @@ export default function BuyerConversationScreen() {
               </View>
             ) : (
               <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                {participant?.avatarUri ? (
+                  <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatarImage} />
+                ) : (
+                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                )}
               </View>
             )
           ) : <View style={s.msgAvatarSpacer} />
@@ -1996,6 +2007,8 @@ export default function BuyerConversationScreen() {
                 onPress={() => { if (conv) void retryMessage(conv.id, msg.id).catch(() => {}); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
+                accessibilityRole="button"
+                accessibilityLabel="Message not sent. Retry"
               >
                 <Feather name="alert-circle" size={11} color={theme.error} />
                 <Text style={[s.retryText, { color: theme.error }]}>Tap to retry</Text>
@@ -2017,6 +2030,9 @@ export default function BuyerConversationScreen() {
                   onPress={() => handleReact(msg, kind)}
                   activeOpacity={0.7}
                   testID={`reaction-chip-${msg.id}-${kind}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${kind} reaction${count > 1 ? `, ${count}` : ''}`}
+                  accessibilityState={{ selected: mine === kind }}
                 >
                   <ReactionGlyph type={kind} size={12} color={mine === kind ? theme.accent : theme.muted} />
                   <Text style={[s.reactionCount, { color: mine === kind ? theme.accent : theme.muted }]}>
@@ -2198,7 +2214,11 @@ export default function BuyerConversationScreen() {
                     </View>
                   ) : (
                     <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      {participant.avatarUri ? (
+                        <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarImage} />
+                      ) : (
+                        <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      )}
                     </View>
                   )}
                   {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
@@ -2217,7 +2237,7 @@ export default function BuyerConversationScreen() {
                   )}
                 </View>
                 {statusLine ? (
-                  <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  <Text style={[s.headerStatusLine, { color: theme.muted }]} numberOfLines={1}>
                     {statusLine}
                   </Text>
                 ) : null}
@@ -2292,7 +2312,13 @@ export default function BuyerConversationScreen() {
             style={s.requestProfilePill}
             onPress={() => {
               hapticPrimaryAction();
-              if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+              // A buyer<->buyer request used to open /seller-profile for a
+              // buyer account; only sellers have a store profile.
+              if (participant.accountType === 'seller') {
+                router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+              } else {
+                openParticipantProfile();
+              }
             }}
             accessibilityRole="button"
             accessibilityLabel={`View ${participant.name}'s profile`}
@@ -2307,8 +2333,14 @@ export default function BuyerConversationScreen() {
       {conv?.type === 'buyer_to_seller_order' && (
         <PressableScale rippleEnabled={false}
           style={s.orderCard}
-          onPress={() => router.navigate('/(buyer)/orders' as never)}
+          onPress={() => {
+            if (conv.contextOrderId) router.push(('/buyer-order-detail?id=' + encodeURIComponent(conv.contextOrderId)) as never);
+            else router.navigate('/(buyer)/orders' as never);
+          }}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`View order ${conv.contextOrderNumber ?? ''}`.trim()}
+          testID="conversation-order-context"
         >
           <Feather name="package" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -2377,6 +2409,30 @@ export default function BuyerConversationScreen() {
         }
         renderItem={renderItem}
         ListFooterComponent={conv?.otherTyping ? <TypingBubble testID="conversation-typing-bubble" /> : null}
+        // Was a blank list while loading and after a failed load (isLoading
+        // was tracked but never rendered) — now a spinner, then an honest
+        // error with Retry.
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={s.listStateWrap} testID="conversation-loading">
+              <ActivityIndicator color={theme.muted} />
+            </View>
+          ) : !conv || loadFailed ? (
+            <View style={s.listStateWrap} testID="conversation-load-error">
+              <Text style={s.listStateTitle}>Couldn’t load this conversation</Text>
+              <PressableScale
+                rippleEnabled={false}
+                style={s.listStateRetry}
+                onPress={() => { setIsLoading(true); void loadData(); }}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading conversation"
+                testID="conversation-load-retry"
+              >
+                <Text style={s.listStateRetryText}>Retry</Text>
+              </PressableScale>
+            </View>
+          ) : null
+        }
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -2609,18 +2665,18 @@ export default function BuyerConversationScreen() {
         onRequestClose={() => setShowMediaSheet(false)}
       >
         <ModalSafeArea>
-          <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+          <Pressable style={s.modalBackdrop} onPress={() => setShowMediaSheet(false)} accessibilityRole="button" accessibilityLabel="Close" />
           <SheetRise style={s.mediaSheet}>
             <View style={s.mediaSheetHandle} />
             <Text style={s.mediaSheetTitle}>Add to message</Text>
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto} accessibilityRole="button" accessibilityLabel="Photos, up to 15 at once">
               <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Photos</Text>
                 <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
               </View>
             </PressableScale>
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo} accessibilityRole="button" accessibilityLabel="Video clip, under 1 minute">
               <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Video clip</Text>
@@ -2628,7 +2684,7 @@ export default function BuyerConversationScreen() {
               </View>
             </PressableScale>
             {isSellerConv && (
-              <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+              <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker} accessibilityRole="button" accessibilityLabel="Product or post">
                 <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
                 <View>
                   <Text style={s.mediaSheetLabel}>Product or post</Text>
@@ -2659,6 +2715,8 @@ export default function BuyerConversationScreen() {
               <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: attachmentTab === 'product' }}
               >
                 <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
@@ -2668,6 +2726,8 @@ export default function BuyerConversationScreen() {
               <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: attachmentTab === 'post' }}
               >
                 <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
@@ -2678,6 +2738,8 @@ export default function BuyerConversationScreen() {
                 <View style={s.attachmentTabCell}><PressableScale rippleEnabled={false}
                   style={[s.attachmentTab, attachmentTab === 'order' && s.attachmentTabActive]}
                   onPress={() => setAttachmentTab('order')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: attachmentTab === 'order' }}
                   testID="attach-tab-order"
                 >
                   <Feather name="package" size={ICON.sm} color={attachmentTab === 'order' ? theme.accent : theme.muted} />
@@ -2693,6 +2755,8 @@ export default function BuyerConversationScreen() {
                   style={s.productOption}
                   onPress={pickLinkedOrder}
                   activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Attach ${conv.contextOrderNumber ?? 'your order'}`}
                   testID="attach-order-row"
                 >
                   <View style={s.productThumbPlaceholder}>
@@ -2735,6 +2799,8 @@ export default function BuyerConversationScreen() {
                         style={s.productOption}
                         onPress={() => pickProduct(product)}
                         activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Attach ${product.name}`}
                       >
                         {product.images?.[0] ? (
                           <CachedImage source={{ uri: product.images[0] }} style={s.productThumb} recyclingKey={product.id} />
@@ -2779,6 +2845,8 @@ export default function BuyerConversationScreen() {
                       style={s.productOption}
                       onPress={() => pickPost(post)}
                       activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Attach post: ${post.caption?.trim() || 'Seller post'}`}
                     >
                       {post.mediaUrl ? (
                         <CachedImage source={{ uri: post.mediaUrl }} style={s.productThumb} recyclingKey={post.id} />
@@ -2832,7 +2900,9 @@ export default function BuyerConversationScreen() {
         menuItems={activeSheetMsg ? (
           [
             { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
-            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            // Copy only when there's text — a photo/voice/card message used
+            // to "copy" an empty string and still toast "Copied".
+            ...(activeSheetMsg.text?.trim() ? [{ key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy }] : []),
             isOwnSheetMsg
               ? { key: 'delete', label: 'Delete for me', icon: 'trash-2', destructive: true, onPress: sheetDelete }
               : { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport },
@@ -2942,43 +3012,49 @@ function RequestActionPanel({
         Accepting lets them see when you’ve read their messages and message you freely.
       </Text>
       <View style={rs.actionsRow}>
-        <PressableScale
-          rippleEnabled={false}
-          style={rs.actionBtn}
-          onPress={onBlock}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Block ${name}`}
-          testID="conversation-request-block"
-        >
-          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
-        </PressableScale>
-        <PressableScale
-          rippleEnabled={false}
-          style={rs.actionBtn}
-          onPress={onDelete}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete request from ${name}`}
-          testID="conversation-request-delete"
-        >
-          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
-        </PressableScale>
-        <PressableScale
-          rippleEnabled={false}
-          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
-          onPress={onAccept}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel={`Accept message request from ${name}`}
-          testID="conversation-request-accept"
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.onAccent} size="small" />
-          ) : (
-            <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
-          )}
-        </PressableScale>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={rs.actionBtn}
+            onPress={onBlock}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Block ${name}`}
+            testID="conversation-request-block"
+          >
+            <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={rs.actionBtn}
+            onPress={onDelete}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete request from ${name}`}
+            testID="conversation-request-delete"
+          >
+            <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+          </PressableScale>
+        </View>
+        <View style={rs.actionCell}>
+          <PressableScale
+            rippleEnabled={false}
+            style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
+            onPress={onAccept}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Accept message request from ${name}`}
+            testID="conversation-request-accept"
+          >
+            {loading ? (
+              <ActivityIndicator color={theme.onAccent} size="small" />
+            ) : (
+              <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
+            )}
+          </PressableScale>
+        </View>
       </View>
     </View>
   );
@@ -2992,8 +3068,11 @@ const requestPanelStyles = StyleSheet.create({
     gap: SP.xs,
   },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
-  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  subline: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, textAlign: 'center', marginBottom: SP.sm },
   actionsRow: { flexDirection: 'row', gap: SP.sm },
+  // PressableScale applies `style` to its inner view, so `flex: 1` on the
+  // button itself never reached the row — each cell carries the flex.
+  actionCell: { flex: 1 },
   actionBtn: {
     flex: 1,
     height: 44,
@@ -3085,7 +3164,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     minWidth: 0,
   },
   headerName: {
-    fontSize: 16,
+    fontSize: FS.base,
     fontFamily: FONT.semibold,
     color: theme.text,
     letterSpacing: -0.2,
@@ -3103,7 +3182,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginLeft: 4,
   },
   headerAiTagText: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
   },
   headerStatusLine: {
@@ -3119,7 +3198,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  headerAvatarImage: { width: 32, height: 32 },
   headerAvatarOfficial: { borderWidth: 1 },
   headerAvatarInitials: {
     fontSize: FS.sm,
@@ -3225,7 +3306,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   listContent: {
     paddingVertical: SP.sm,
     paddingBottom: SP.md,
+    flexGrow: 1,
   },
+  listStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.md },
+  listStateTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
+  listStateRetry: {
+    height: 36, paddingHorizontal: SP.md, borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  listStateRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
 
   // Date separator — plain small gray centered text, no pill (IG-style).
   dateSeparatorWrap: {
@@ -3233,7 +3323,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginVertical: SP.lg,
   },
   dateSeparatorText: {
-    fontSize: 12,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: theme.muted,
   },
@@ -3265,10 +3355,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     marginBottom: 3,
   },
+  msgAvatarImage: { width: AVATAR_SIZE, height: AVATAR_SIZE },
   msgAvatar: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: AVATAR_GAP,
@@ -3280,7 +3372,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: AVATAR_GAP,
   },
   msgAvatarInitials: {
-    fontSize: 11,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
@@ -3299,7 +3391,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 3,
   },
   bubbleTime: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.regular,
   },
   receiptIcon: {
@@ -3410,7 +3502,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Message text — 15pt per spec; emoji font stack biases toward Apple's own
   // emoji glyphs on web instead of the OS-default Noto/Segoe blobs.
   msgText: {
-    fontSize: 15,
+    fontSize: FS.base,
     fontFamily: FONT.regular,
     lineHeight: 21,
     ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),

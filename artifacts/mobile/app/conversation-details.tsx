@@ -15,7 +15,7 @@
  * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -240,7 +240,6 @@ export default function ConversationDetailsScreen() {
     // the "Options" action button completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.
     showActionSheet(displayName, undefined, [
-      { text: 'Cancel', style: 'cancel' },
       {
         text: isBlocked ? `Unblock ${displayName}` : `Block ${displayName}`,
         style: isBlocked ? 'default' : 'destructive',
@@ -253,6 +252,7 @@ export default function ConversationDetailsScreen() {
           if (ok) setIsBlocked((v) => !v);
         },
       },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
@@ -275,11 +275,11 @@ export default function ConversationDetailsScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
         <View style={s.profileBlock}>
-          <View style={[s.bigAvatar, { backgroundColor: params.participantColor ?? theme.accent }]}>
+          <View style={[s.bigAvatar, { backgroundColor: params.participantColor || pickAvatarColor(params.participantUserId ?? params.participantName) }]}>
             {params.participantAvatarUri ? (
               <CachedImage source={{ uri: params.participantAvatarUri }} style={s.bigAvatarImg} />
             ) : (
-              <Text style={s.bigAvatarInitials}>{params.participantInitials ?? '?'}</Text>
+              <Text style={s.bigAvatarInitials}>{params.participantInitials || (params.participantName?.[0] ?? '?').toUpperCase()}</Text>
             )}
           </View>
           <Text style={[s.bigName, { color: theme.text }]} testID="chat-details-name">{displayName}</Text>
@@ -324,6 +324,7 @@ export default function ConversationDetailsScreen() {
               <HapticSwitch
                 value={disappearing}
                 onValueChange={toggleDisappearing}
+                accessibilityLabel="Disappearing messages"
                 testID="chat-details-disappearing-switch"
               />
             )}
@@ -352,7 +353,7 @@ export default function ConversationDetailsScreen() {
       </ScrollView>
 
       <Modal visible={muteVisible} transparent animationType="fade" onRequestClose={() => setMuteVisible(false)}>
-        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setMuteVisible(false)} />
+        <Pressable style={s.modalBackdrop} onPress={() => setMuteVisible(false)} accessibilityRole="button" accessibilityLabel="Close" />
         <SheetRise style={[s.muteSheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={[s.muteSheetTitle, { color: theme.text }]}>Mute notifications</Text>
@@ -361,6 +362,8 @@ export default function ConversationDetailsScreen() {
               key={opt.label}
               style={s.muteOption}
               onPress={() => applyMute(opt.minutes)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mute for ${opt.label.toLowerCase()}`}
               testID={`chat-details-mute-${opt.minutes}`}
             >
               <Text style={[s.muteOptionText, { color: theme.text }]}>{opt.label}</Text>
@@ -456,13 +459,13 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: SP.lg, marginTop: SP.sm },
   actionBtn: { alignItems: 'center', gap: 6, width: 64 },
   actionIconWrap: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+  actionLabel: { fontSize: FS.meta, fontFamily: FONT.medium },
   list: { marginTop: SP.md, borderTopWidth: StyleSheetHairline },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
-  rowSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  rowSubtitle: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, marginRight: SP.sm },
-  pillText: { fontSize: 10, fontFamily: FONT.bold },
+  pillText: { fontSize: FS.xs, fontFamily: FONT.bold },
   modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#00000066' },
   muteSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.sm },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },

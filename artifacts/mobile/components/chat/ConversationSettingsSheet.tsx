@@ -142,7 +142,7 @@ export function ConversationSettingsSheet({
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close conversation settings" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close conversation settings" />
         <SheetRise style={[styles.sheet, { backgroundColor: theme.surface, borderColor: theme.border, paddingBottom: Math.max(insets.bottom, SP.md) + SP.md }]}>
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
           <View style={styles.heading}>
@@ -165,10 +165,10 @@ export function ConversationSettingsSheet({
                     : `Unfollow ${counterpart.name}? You can follow them again later.`}
               </Text>
               <View style={styles.confirmActions}>
-                <PressableScale onPress={() => { setConfirm(null); setError(''); }} disabled={busy} style={[styles.confirmButton, { borderColor: theme.border }]}>
+                <PressableScale onPress={() => { setConfirm(null); setError(''); }} disabled={busy} accessibilityRole="button" accessibilityLabel="Cancel" style={[styles.confirmButton, { borderColor: theme.border }]}>
                   <Text style={[styles.label, { color: theme.text }]}>Cancel</Text>
                 </PressableScale>
-                <PressableScale onPress={applyConfirmation} disabled={busy} style={[styles.confirmButton, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <PressableScale onPress={applyConfirmation} disabled={busy} accessibilityRole="button" accessibilityLabel={confirm === 'block' ? 'Block' : confirm === 'unblock' ? 'Unblock' : 'Unfollow'} style={[styles.confirmButton, { backgroundColor: theme.card, borderColor: theme.border }]}>
                   {busy ? <ActivityIndicator color={theme.text} /> : <Text style={[styles.label, { color: confirm === 'block' ? theme.error : theme.text }]}>
                     {confirm === 'block' ? 'Block' : confirm === 'unblock' ? 'Unblock' : 'Unfollow'}
                   </Text>}

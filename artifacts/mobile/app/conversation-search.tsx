@@ -3,7 +3,7 @@
  * Real search: hits the message list filtered to this conversationId only
  * (GET /api/conversations/:id/messages?q=...), never a global search.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
@@ -33,27 +33,33 @@ export default function ConversationSearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // Searches fire per keystroke; only the newest one may write results.
+  const searchSeq = useRef(0);
   const isPreview = isPreviewConversationId(params.id);
 
   async function runSearch(q: string) {
     setQuery(q);
     const trimmed = q.trim();
-    if (!trimmed) { setResults([]); return; }
+    const seq = ++searchSeq.current;
+    setFailed(false);
+    if (!trimmed) { setResults([]); setLoading(false); return; }
     setLoading(true);
     try {
+      let next: Message[];
       if (isPreview) {
         const all = getPreviewMessages(params.id);
-        setResults(all.filter((m) => m.text.toLowerCase().includes(trimmed.toLowerCase())));
+        next = all.filter((m) => (m.text ?? '').toLowerCase().includes(trimmed.toLowerCase()));
       } else if (params.role === 'seller') {
-        const msgs = await api.conversations.searchMessages(params.id, trimmed);
-        setResults(msgs as Message[]);
+        next = await api.conversations.searchMessages(params.id, trimmed) as Message[];
       } else {
-        setResults(await searchConversationMessages(params.id, trimmed));
+        next = await searchConversationMessages(params.id, trimmed);
       }
+      if (seq === searchSeq.current) setResults(next);
     } catch {
-      setResults([]);
+      if (seq === searchSeq.current) { setResults([]); setFailed(true); }
     } finally {
-      setLoading(false);
+      if (seq === searchSeq.current) setLoading(false);
     }
   }
 
@@ -78,6 +84,8 @@ export default function ConversationSearchScreen() {
             placeholder="Search in this chat"
             placeholderTextColor={theme.muted}
             autoFocus
+            returnKeyType="search"
+            accessibilityLabel="Search in this chat"
             testID="conversation-search-input"
           />
         </View>
@@ -91,7 +99,9 @@ export default function ConversationSearchScreen() {
           data={results}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
-          ListEmptyComponent={query.trim() ? (
+          ListEmptyComponent={failed ? (
+            <Text style={[s.empty, { color: theme.muted }]}>Couldn’t search this chat. Check your connection and try again.</Text>
+          ) : query.trim() ? (
             <Text style={[s.empty, { color: theme.muted }]}>No messages found</Text>
           ) : (
             <Text style={[s.empty, { color: theme.muted }]}>Search this conversation’s messages</Text>
@@ -115,7 +125,7 @@ const makeStyles = () => StyleSheet.create({
   roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   searchPill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: 40, borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
   searchInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, height: 40 },
-  empty: { textAlign: 'center', marginTop: SP.xl, fontFamily: FONT.regular, fontSize: FS.sm },
+  empty: { textAlign: 'center', marginTop: SP.xl, paddingHorizontal: SP.lg, fontFamily: FONT.regular, fontSize: FS.sm },
   resultRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
   resultFrom: { fontFamily: FONT.semibold, fontSize: FS.sm },
   resultText: { fontFamily: FONT.regular, fontSize: FS.sm },

@@ -32,9 +32,7 @@ describe('app/seller-inbox.tsx: Requests tab', () => {
 
   it('filters the Requests tab to isRequest conversations only, excluding archived and pending-delete rows', () => {
     expect(inboxSrc).toContain(
-      'const requestConvs = useMemo(() => convs.filter((c) =>\n' +
-      '    c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id)\n' +
-      '  ), [convs, pendingDeleteIds]);'
+      '.filter((c) => c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id))',
     );
   });
 

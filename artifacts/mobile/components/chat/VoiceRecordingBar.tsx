@@ -91,7 +91,13 @@ export function VoiceRecordingBar({
       </Animated.View>
 
       {isWeb && phase === 'recording' && (
-        <Pressable onPress={onLock} style={rs.webLockRow} testID="voice-lock-web">
+        <Pressable
+          onPress={onLock}
+          style={rs.webLockRow}
+          testID="voice-lock-web"
+          accessibilityRole="button"
+          accessibilityLabel="Keep recording hands-free"
+        >
           <Feather name="lock" size={12} color={theme.muted} />
           <Text style={[rs.webLockText, { color: theme.muted }]}>Tap to keep recording hands-free</Text>
         </Pressable>
@@ -117,5 +123,5 @@ const rs = StyleSheet.create({
   sendBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   micGhost: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', opacity: 0.5 },
   webLockRow: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', paddingTop: 6 },
-  webLockText: { fontFamily: FONT.regular, fontSize: 10 },
+  webLockText: { fontFamily: FONT.regular, fontSize: FS.xs },
 });

@@ -17,6 +17,7 @@ import { isPreviewConversationId } from '@/lib/previewInbox';
 import { setConversationNickname } from '@/services/socialService';
 import { apiErrorMessage } from '@/lib/safety';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function ConversationNicknamesScreen() {
   const { theme } = useAppTheme();
@@ -64,13 +65,14 @@ export default function ConversationNicknamesScreen() {
           Set a nickname for {params.participantName}. Only you will see it.
         </Text>
         <TextInput
-          style={[s.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }]}
+          style={[s.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }, WEB_INPUT_RESET]}
           value={nickname}
           onChangeText={setNickname}
           placeholder={params.participantName}
           placeholderTextColor={theme.muted}
           maxLength={60}
           autoFocus
+          accessibilityLabel={`Nickname for ${params.participantName}`}
           testID="conversation-nicknames-input"
         />
         <Button

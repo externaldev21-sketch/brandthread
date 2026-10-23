@@ -5,6 +5,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { AppleEmoji } from '@/lib/appleEmoji';
 import { reactionAuthorId, reactionAuthorName, reactionKind } from '@/lib/reactionShapes';
 import { radius } from '@/constants/radii';
+import { FONT, FS, SP } from '@/lib/theme';
 
 // Re-exported so existing call sites (app/buyer-conversation.tsx,
 // app/seller-conversation.tsx) keep importing these from this file; the
@@ -63,6 +64,7 @@ export function ReactionChipsRow({
             testID={`${testIDPrefix}-${r.type}`}
             accessibilityRole="button"
             accessibilityLabel={r.label}
+            accessibilityState={{ selected: isSelected }}
             style={[
               s.chip,
               { backgroundColor: isSelected ? theme.accentDim : 'transparent', borderColor: isSelected ? theme.accent : theme.border },
@@ -80,10 +82,10 @@ export function ReactionChipsRow({
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingVertical: SP.sm },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1,
   },
-  chipLabel: { fontSize: 12, fontWeight: '600' },
+  chipLabel: { fontSize: FS.meta, fontFamily: FONT.semibold },
 });

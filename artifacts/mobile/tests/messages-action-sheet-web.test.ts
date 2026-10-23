@@ -67,10 +67,10 @@ describe('Messages "Options" menus use showActionSheet, not the dead-on-web Aler
     expect(sellerConv).toContain('setTranscriptionToast(true)');
   });
 
-  it('inbox "Filter messages" pill gives real feedback instead of a dead Alert.alert', () => {
+  it('inbox has no placeholder "Filter messages" pill (it only ever said "coming soon")', () => {
     const src = read('app/(buyer)/inbox.tsx');
-    const fn = src.slice(src.indexOf('function openFilterMenu()'), src.indexOf('function openFilterMenu()') + 600);
-    expect(fn).toContain('showSnackbar(');
-    expect(fn).not.toMatch(/Alert\.alert\(\s*'/);
+    expect(src).not.toContain('function openFilterMenu()');
+    expect(src).not.toContain('inbox-filter-pill');
+    expect(src).not.toMatch(/coming soon/i);
   });
 });

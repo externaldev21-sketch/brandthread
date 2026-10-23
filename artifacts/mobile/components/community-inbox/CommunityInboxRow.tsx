@@ -20,7 +20,10 @@ function timeAgo(ts?: number): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
+  // Same weekday → date fallback as the DM rows it sits beside in the inbox.
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return new Date(ts).toLocaleDateString(undefined, { weekday: 'short' });
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 interface CommunityInboxRowProps {
@@ -60,7 +63,7 @@ export function CommunityInboxRow({ community, onPress, onToggleMute, horizontal
         onPress={onPress}
         testID={`inbox-community-${community.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`Open ${community.name} group chat${p.loud ? `, ${community.unreadCount} unread` : ''}`}
+        accessibilityLabel={`Open ${community.name} group chat${p.loud ? `, ${community.unreadCount} unread` : ''}${p.showMutedGlyph ? ', muted' : ''}`}
       >
         <View style={styles.avatarSlot}>
           <CommunityAvatar community={community} size={52} />
@@ -109,7 +112,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, minWidth: 0, marginLeft: SP.md },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
   name: { flexShrink: 1, fontSize: FS.base },
-  preview: { fontSize: 14 },
+  preview: { fontSize: FS.sm },
   trailing: { alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginLeft: SP.sm },
   time: { fontSize: FS.sm, fontFamily: FONT.medium },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 20 },

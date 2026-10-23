@@ -127,7 +127,8 @@ function CommunityMessageRowImpl({
               onLongPress={openMenu}
               delayLongPress={280}
               accessibilityRole={photos.length ? 'none' : 'button'}
-              accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
+              // The label replaces the bubble's own text for screen readers, so it has to carry the content.
+              accessibilityLabel={`${isOwn ? 'You' : msg.fromName}: ${msg.text || (photos.length > 1 ? `${photos.length} photos` : photos.length ? 'Photo' : 'Message')}`}
               accessibilityHint="Touch and hold for more actions, or swipe right to reply"
               style={[
                 communityBubbleStyle(theme, isOwn),
@@ -285,7 +286,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, marginRight: AVATAR_GAP, marginBottom: 2 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarSpacer: { width: AVATAR_SIZE, marginRight: AVATAR_GAP },
-  avatarInitials: { fontSize: 11, fontFamily: FONT.bold, color: theme.text },
+  avatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
   column: { maxWidth: BUBBLE_MAX, flexShrink: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3, marginLeft: 4, maxWidth: BUBBLE_MAX },
   name: { flexShrink: 1, fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.muted },
@@ -299,11 +300,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   quoteName: { fontSize: FS.xs, fontFamily: FONT.semibold },
   quoteText: { fontSize: FS.xs, fontFamily: FONT.regular },
   text: {
-    fontSize: 15, fontFamily: FONT.regular, lineHeight: 21,
+    fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21,
     ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),
   },
   meta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4, gap: 4 },
-  time: { fontSize: 10, fontFamily: FONT.regular },
+  time: { fontSize: FS.xs, fontFamily: FONT.regular },
   failedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 6, alignSelf: 'flex-end' },
   failedAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   failedText: { fontSize: FS.xs, fontFamily: FONT.regular },
