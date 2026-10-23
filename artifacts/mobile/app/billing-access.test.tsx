@@ -338,7 +338,7 @@ describe('seller financial role boundaries', () => {
     await selectTab(payouts, 'seller-payouts-tab-settings');
     expect(hasTestId(subscription, 'seller-subscription-manage-billing')).toBe(false);
     expect(hasTestId(payouts, 'seller-payouts-bank-account')).toBe(false);
-    expect(screenText(finance)).not.toContain('Download Statement (CSV)');
+    expect(screenText(finance)).not.toContain('Download statement (CSV)');
   });
 
   it('keeps staff on the locked view for all four financial screens', async () => {
@@ -362,7 +362,7 @@ describe('seller financial role boundaries', () => {
     expect(hasTestId(subscription, 'seller-subscription-change-growth')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-pro')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-cancel')).toBe(true);
-    expect(screenText(finance)).toContain('Download Statement (CSV)');
+    expect(screenText(finance)).toContain('Download statement (CSV)');
 
     await selectTab(subscription, 'seller-subscription-tab-billing');
     await selectTab(payouts, 'seller-payouts-tab-settings');
