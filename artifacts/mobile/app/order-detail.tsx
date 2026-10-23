@@ -1218,10 +1218,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onShipSome, o
               <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
             )}
             {order.sellerCanMarkDelivered ? (
-              <>
-                <SecondaryButton label="Mark as delivered" onPress={onMarkDelivered} icon="check-circle" />
-                <Text style={s.readOnlyNote}>This carrier doesn’t report deliveries, so you can mark the order delivered once it arrives.</Text>
-              </>
+              <SecondaryButton label="Mark as delivered" onPress={onMarkDelivered} icon="check-circle" />
             ) : (
               <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
             )}

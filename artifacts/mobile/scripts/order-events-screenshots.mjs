@@ -130,7 +130,7 @@ async function buyer(browser, images) {
   const progress = await page.evaluate(() => [...document.querySelectorAll('[aria-label^="Order progress"]')].map((el) => el.getAttribute('aria-label')));
   console.log('  [buyer list] progress dots:', JSON.stringify(progress));
   await shot(page, '01-buyer-orders-progress-dots');
-  await scrollTo(page, page.getByText('BT-00042', { exact: false }), 200);
+  await scrollTo(page, page.getByText('BT-00042', { exact: false }), 120);
   await shot(page, '02-buyer-orders-delivered-card');
 
   const delivered = BUYER_ORDERS[2];
@@ -164,8 +164,20 @@ function sellerOrder(overrides = {}) {
 
 async function openSellerOrder(page, activity, order) {
   for (let attempt = 0; ; attempt++) {
-    await openScreen(page, activity, ORIGIN, 'seller', `/order-detail?id=${order.id}`);
-    try { await page.getByText(order.orderNumber).first().waitFor({ timeout: 15_000 }); break; } catch (e) { if (attempt >= 3) throw e; }
+    // Signed in as the demo seller, but outside the signed-out seller preview
+    // (?bt_preview=seller), which refuses every API call by design.
+    // lib/devPreview.ts reads the stored user_role (seller) unless the URL says
+    // otherwise; bt_preview=buyer only lifts that gate, the account stays the seller's.
+    await page.goto(`${ORIGIN}/?bt_preview=buyer`);
+    await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+    await waitForQuietNetwork(activity, 800, 15_000);
+    await page.evaluate((url) => {
+      history.pushState(history.state, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    }, `/order-detail?id=${order.id}&bt_preview=buyer`);
+    try { await page.getByText(order.orderNumber).first().waitFor({ timeout: 15_000 }); break; } catch (e) {
+      if (attempt >= 3) { await page.screenshot({ path: path.join(OUT, '_debug-seller.png') }); console.log(page.url(), (await page.evaluate(() => document.body.innerText)).slice(0, 600)); throw e; }
+    }
   }
   await waitForQuietNetwork(activity);
   await waitForImages(page);
@@ -177,10 +189,17 @@ async function sellerShip(browser, images) {
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin: ORIGIN, images });
   let order = sellerOrder();
   const posted = [];
+  if (process.env.DEBUG_EVENTS) {
+    page.on('console', (m) => { if (m.type() === 'error') console.log('    console:', m.text().slice(0, 300)); });
+    page.on('requestfailed', (r) => console.log('    failed:', r.url(), r.failure()?.errorText));
+    page.on('response', (r) => { if (r.url().includes('/orders/')) console.log('    resp:', r.status(), r.url()); });
+    page.on('pageerror', (e) => console.log('    pageerror:', e.message));
+    page.on('request', (r) => { if (r.url().includes('/orders/')) console.log('    req:', r.method(), r.url(), JSON.stringify(r.headers())); });
+  }
   await context.route(`${API}/**`, async (route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fallback();
-    const p = apiPath(req);
+    const p = apiPath(req); if (process.env.DEBUG_EVENTS) console.log("    route:", req.method(), p);
     if (p === `/api/orders/${order.id}` && req.method() === 'GET') return json(route, order);
     if (p === `/api/orders/${order.id}/ship` && req.method() === 'POST') {
       const body = req.postDataJSON();
@@ -223,6 +242,7 @@ async function sellerDelivered(browser, images) {
   let order = sellerOrder({
     id: '7a2d9c4e-4b7a-4c1e-9a55-2d7f3c9e1b78', orderNumber: 'BT-00042', status: 'shipped',
     carrier: 'Local courier', trackingNumber: 'LC20260914', shippedAt: iso(now - 4 * DAY), sellerCanMarkDelivered: true,
+    paidAt: iso(now - 6 * DAY), createdAt: iso(now - 6 * DAY), updatedAt: iso(now - 4 * DAY),
   });
   await context.route(`${API}/**`, async (route) => {
     const req = route.request();
@@ -234,7 +254,7 @@ async function sellerDelivered(browser, images) {
   });
   page.setDefaultNavigationTimeout(240_000);
   await openSellerOrder(page, activity, order);
-  await scrollTo(page, page.getByRole('button', { name: 'Mark as delivered' }), 420);
+  await scrollTo(page, page.getByRole('button', { name: 'Mark as delivered' }), 330);
   await shot(page, '08-seller-mark-delivered-fallback');
 
   // What the screen shows after POST /api/orders/:id/mark-delivered.
@@ -252,7 +272,10 @@ async function sellerDelivered(browser, images) {
 
 async function run() {
   mkdirSync(OUT, { recursive: true });
-  const browser = await launchBrowser();
+  // PLAYWRIGHT_CHROMIUM=/path runs against a preinstalled Chromium instead of Playwright's own download.
+  const browser = process.env.PLAYWRIGHT_CHROMIUM
+    ? await (await import('playwright')).chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM })
+    : await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
   try {
     if (!process.argv.includes('--skip-build') || !existsSync(path.join(DEFAULT_BUILD_DIR, 'index.html'))) buildPreviewWeb(DEFAULT_BUILD_DIR);

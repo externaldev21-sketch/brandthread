@@ -46,6 +46,8 @@ type DeliveryOrderFields = {
   autoRefundedAt?: string | null;
   disputePausedAt?: string | null;
   deliveredAt?: string | null;
+  /** The carrier can't report delivery, so the seller may mark it delivered (order detail). */
+  sellerCanMarkDelivered?: boolean;
 };
 
 /** Banner above the actions: ship-by deadline, pre-order promise, dispute pause, or the read-only refunded state. */
@@ -88,7 +90,13 @@ export function SellerDeliveryBanner({ order, shipped }: { order: DeliveryOrderF
       {order.disputePausedAt ? (
         <Text style={s.sub}>A dispute is open, so the auto-refund is paused until it is resolved.</Text>
       ) : null}
-      {shipped && !order.deliveredAt ? <Text style={s.sub}>{DELIVERY_CONFIRMED_BY_NOTE}</Text> : null}
+      {shipped && !order.deliveredAt ? (
+        <Text style={s.sub}>
+          {order.sellerCanMarkDelivered
+            ? 'This carrier doesn’t report deliveries, so mark the order delivered once it arrives.'
+            : DELIVERY_CONFIRMED_BY_NOTE}
+        </Text>
+      ) : null}
     </View>
   );
 }
