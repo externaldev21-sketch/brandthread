@@ -26,6 +26,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { THREAD_CASH_GREEN_MID, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import { hapticLight } from '@/lib/haptics';
+import { apiErrorMessage } from '@/lib/safety';
 import { radius } from '@/constants/radii';
 
 const TIP_AMOUNTS_CENTS = [100, 500, 1000, 2000, 5000, 10000];
@@ -52,6 +53,7 @@ export function LiveThreadCashSheet({
   const insets = useSafeAreaInsets();
   const api = useApi();
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [justSentCents, setJustSentCents] = useState<number | null>(null);
@@ -61,6 +63,7 @@ export function LiveThreadCashSheet({
     if (!visible) return;
     setSelected(null);
     setJustSentCents(null);
+    setBalanceError(false);
     // Same short-circuit ChatAttachThreadCash.tsx uses: there's no backend
     // to answer this in the dev-web preview, so attempting the real call
     // first just means a multi-second wait for it to time out before the
@@ -72,7 +75,7 @@ export function LiveThreadCashSheet({
     let cancelled = false;
     api.threadCash.get()
       .then(status => { if (!cancelled) setBalanceCents(status.balanceCents); })
-      .catch(() => { if (!cancelled) setBalanceCents(0); });
+      .catch(() => { if (!cancelled) { setBalanceCents(null); setBalanceError(true); } });
     return () => { cancelled = true; };
   }, [visible, api]);
 
@@ -102,7 +105,7 @@ export function LiveThreadCashSheet({
         });
       } catch (error: any) {
         setSending(false);
-        onSendFailed?.(error?.message ?? 'Could not send Thread Cash. Try again.');
+        onSendFailed?.(apiErrorMessage(error, 'Could not send Thread Cash. Try again.'));
         return;
       }
     }
@@ -115,7 +118,7 @@ export function LiveThreadCashSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close Thread Cash" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close Thread Cash" />
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-thread-cash-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <View style={styles.header}>
@@ -131,13 +134,13 @@ export function LiveThreadCashSheet({
         <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
           <ThreadCashBillIcon size={16} />
           <Text style={[styles.balanceText, { color: theme.text }]} testID="live-thread-cash-balance">
-            {balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
+            {balanceError ? 'Balance unavailable' : balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
           </Text>
         </View>
 
         {justSentCents != null && (
           <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>
-            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)} 🎉</Text>
+            <Text style={[styles.sentBannerText, { color: theme.text }]}>Sent {formatCents(justSentCents)}</Text>
           </Animated.View>
         )}
 

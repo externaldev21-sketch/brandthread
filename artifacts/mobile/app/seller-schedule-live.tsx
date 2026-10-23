@@ -56,7 +56,8 @@ export default function SellerScheduleLiveScreen() {
 
   useEffect(() => {
     if (!signedIn || !showProducts || catalog.length > 0) return;
-    api.products?.list?.().then((r: any) => setCatalog(r?.products ?? [])).catch(() => {});
+    // GET /api/products returns a bare array (not `{ products }`).
+    api.products?.list?.().then((r: any) => setCatalog(Array.isArray(r) ? r : (r?.products ?? []))).catch(() => {});
   }, [signedIn, showProducts, catalog.length, api]);
 
   const day = days.find(d => d.key === dayKey) ?? days[0];
@@ -86,7 +87,8 @@ export default function SellerScheduleLiveScreen() {
   }
 
   async function cancel(id: string) {
-    try { await cancelScheduledLive(id); } catch { /* row stays */ }
+    setError('');
+    try { await cancelScheduledLive(id); } catch { setError('Could not cancel that live. Try again.'); }
     await loadMine();
   }
 
@@ -174,10 +176,11 @@ export default function SellerScheduleLiveScreen() {
                   style={[styles.pickRow, { borderColor: theme.border }]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
+                  accessibilityLabel={p.name}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowText, { color: theme.text }]}>{p.name}</Text>
-                    <Text style={[styles.note, { color: theme.muted }]}>{formatCents(p.priceCents ?? 0)}</Text>
+                    {p.priceCents != null && <Text style={[styles.note, { color: theme.muted }]}>{formatCents(p.priceCents)}</Text>}
                   </View>
                   <View style={[styles.check, { borderColor: on ? theme.text : theme.border, backgroundColor: on ? theme.text : 'transparent' }]}>
                     {on && <Feather name="check" size={13} color={theme.background} />}
@@ -236,7 +239,7 @@ const styles = StyleSheet.create({
   dayCard: { borderWidth: 1.5, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, minWidth: 84 },
   dayLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
   daySub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  note: { fontFamily: FONT.regular, fontSize: FS.xs },
+  note: { fontFamily: FONT.regular, fontSize: FS.meta },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 12 },
   rowText: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.sm },
   scheduledCard: { borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: 4 },

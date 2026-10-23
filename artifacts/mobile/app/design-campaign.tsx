@@ -117,14 +117,14 @@ function MediaThumb({
       {isVideo && (
         <View style={mt.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
       )}
-      <TouchableOpacity style={mt.removeBtn} onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} testID={`media-remove-${index}`}>
+      <TouchableOpacity style={mt.removeBtn} onPress={onRemove} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel={`Remove ${isVideo ? 'video' : `photo ${index + 1}`}`} testID={`media-remove-${index}`}>
         <Feather name="x" size={12} color="#fff" />
       </TouchableOpacity>
       <View style={mt.reorderRow}>
-        <TouchableOpacity style={[mt.reorderBtn, !canMoveLeft && { opacity: 0.3 }]} onPress={onMoveLeft} disabled={!canMoveLeft}>
+        <TouchableOpacity style={[mt.reorderBtn, !canMoveLeft && { opacity: 0.3 }]} onPress={onMoveLeft} disabled={!canMoveLeft} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={`Move photo ${index + 1} earlier`}>
           <Feather name="chevron-left" size={11} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[mt.reorderBtn, !canMoveRight && { opacity: 0.3 }]} onPress={onMoveRight} disabled={!canMoveRight}>
+        <TouchableOpacity style={[mt.reorderBtn, !canMoveRight && { opacity: 0.3 }]} onPress={onMoveRight} disabled={!canMoveRight} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={`Move photo ${index + 1} later`}>
           <Feather name="chevron-right" size={11} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -518,7 +518,9 @@ export default function CreateAdScreen() {
 
     const order = Array.from({ length: localPaths.length }, (_, i) => i);
     [order[from], order[to]] = [order[to], order[from]];
-    try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch { /* revert not needed */ }
+    try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch {
+      Alert.alert('Could not save order', 'Your photo order was not saved. Try moving it again.');
+    }
   }
 
   // ── Launch: validate everything, save, then pay ──────────────────────────
@@ -654,7 +656,7 @@ export default function CreateAdScreen() {
         <Text style={[styles.stageSub, { color: colors.mutedForeground }]}>Verifying your payment…</Text>
         {!nativeRail && (
           <Text style={[styles.stageSub, { fontSize: FS.xs, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.xl }]}>
-            Never activates on redirect alone — confirming with Stripe now.
+            Confirming your payment with Stripe.
           </Text>
         )}
       </View>
@@ -678,8 +680,8 @@ export default function CreateAdScreen() {
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.subtle, fontSize: FS.xs }]}>
             Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
           </Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)}>
-            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Back to Design Studio</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Done">
+            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Done</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -697,7 +699,7 @@ export default function CreateAdScreen() {
           <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
           <Text style={[styles.stageHeading, { color: colors.foreground }]}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>{initError}</Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }} accessibilityRole="button" accessibilityLabel="Go back">
             <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Go back</Text>
           </TouchableOpacity>
         </View>
@@ -793,6 +795,8 @@ export default function CreateAdScreen() {
                 <TouchableOpacity
                   style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: colors.elevated, borderColor: colors.border }]}
                   onPress={() => pickMedia('photos')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add more photos"
                   testID="add-more-photos-btn"
                 >
                   <Feather name="plus" size={20} color={colors.mutedForeground} />
@@ -912,7 +916,7 @@ export default function CreateAdScreen() {
         {/* 5 — Audience & reach (read-only — no audience targeting exists server-side) */}
         <Section title="Audience & reach" colors={colors}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
-            <Feather name="users" size={16} color={colors.success} />
+            <Feather name="users" size={16} color={colors.mutedForeground} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
@@ -927,9 +931,9 @@ export default function CreateAdScreen() {
         <Section title="Budget & duration" subtitle="Slide to set your total spend and how long your ad runs." colors={colors}>
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
-              <Text style={[styles.sliderMin, { color: colors.subtle }]}>${BUDGET_MIN_CENTS / 100}</Text>
+              <Text style={[styles.sliderMin, { color: colors.subtle }]}>${(BUDGET_MIN_CENTS / 100).toLocaleString('en-US')}</Text>
               <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>${budgetDollars}</Text>
-              <Text style={[styles.sliderMax, { color: colors.subtle }]}>${BUDGET_MAX_CENTS / 100}</Text>
+              <Text style={[styles.sliderMax, { color: colors.subtle }]}>${(BUDGET_MAX_CENTS / 100).toLocaleString('en-US')}</Text>
             </View>
             <InlineSlider
               value={budgetCents}
@@ -963,10 +967,10 @@ export default function CreateAdScreen() {
             <Text style={[styles.sliderHint, { color: colors.subtle }]}>1 to 30 days</Text>
           </View>
 
-          <View style={[styles.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]} testID="estimated-reach">
-            <Feather name="trending-up" size={16} color={colors.success} />
+          <View style={[styles.reachCard, { backgroundColor: colors.elevated, borderColor: colors.border }]} testID="estimated-reach">
+            <Feather name="trending-up" size={16} color={colors.mutedForeground} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.reachLabel, { color: colors.success }]}>Estimated reach</Text>
+              <Text style={[styles.reachLabel, { color: colors.mutedForeground }]}>Estimated reach</Text>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
                 Estimate only — based on your budget. Not a guarantee of delivered impressions.

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import type { CaptionTrack } from '@/lib/captions';
 import { RADII } from '@/constants/radii';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -23,7 +24,7 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-type Phase = 'loading' | 'none' | 'pending' | 'ready' | 'failed' | 'unavailable';
+type Phase = 'loading' | 'none' | 'pending' | 'ready' | 'failed' | 'unavailable' | 'missing';
 
 export default function PostCaptionsEditScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
@@ -37,6 +38,8 @@ export default function PostCaptionsEditScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Full-screen editor with a bottom Save bar: keep the floating tab bar off it.
+  useHideTabBar();
 
   const applyTrack = useCallback((next: CaptionTrack) => {
     setTrack(next);
@@ -45,7 +48,7 @@ export default function PostCaptionsEditScreen() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!postId) return;
+    if (!postId) { setPhase('missing'); return; }
     try {
       const res = await api.posts.captions(postId);
       const ready = res.tracks.find((t) => t.status === 'ready');
@@ -133,6 +136,11 @@ export default function PostCaptionsEditScreen() {
               <Button label="Save" onPress={save} loading={saving} disabled={!dirty} fullWidth testID="save-captions" />
             </View>
           </>
+        ) : phase === 'missing' ? (
+          <View style={styles.center}>
+            <Text style={[styles.title, { color: theme.text }]}>Post not found</Text>
+            <Text style={[styles.message, { color: theme.muted }]}>Open captions from one of your video posts.</Text>
+          </View>
         ) : phase === 'unavailable' ? (
           <View style={styles.center}>
             <Text style={[styles.title, { color: theme.text }]}>Captions are not available</Text>

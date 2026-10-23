@@ -70,7 +70,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
 
         <View style={[s.topBar, { paddingTop: insets.top + SP.sm }]}>
           <Glass variant="regular" radius={RADIUS.pill} style={s.glassBtn}>
-            <TouchableOpacity onPress={onClose} accessibilityLabel="Close" style={s.glassBtnInner}>
+            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={s.glassBtnInner}>
               <Feather name="x" size={ICON.md} color="#fff" />
             </TouchableOpacity>
           </Glass>
@@ -79,6 +79,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
             <Glass variant="regular" radius={RADIUS.pill} style={s.glassBtn}>
               <TouchableOpacity
                 onPress={() => setShowBefore((v) => !v)}
+                accessibilityRole="button"
                 accessibilityLabel={showBefore ? 'Show generated photo' : 'Show original photo'}
                 style={s.glassBtnInner}
               >
@@ -99,6 +100,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
                   key={a.label}
                   style={s.actionBarBtn}
                   onPress={() => a.onPress(current)}
+                  accessibilityRole="button"
                   accessibilityLabel={a.label}
                   disabled={loading}
                 >

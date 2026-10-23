@@ -31,7 +31,7 @@ export function LiveStreamOptionsSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close live stream options" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close live stream options" />
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-stream-options-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Text style={[styles.title, { color: theme.muted }]}>{hostName}</Text>

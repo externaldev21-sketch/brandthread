@@ -210,7 +210,7 @@ export function LivePinnedProductCard({
             : <Feather name="shopping-bag" size={18} color="#111" />}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.pinnedEyebrow}>NOW SELLING{product.remainingUnits != null ? ` · ${product.remainingUnits} LEFT` : ''}</Text>
+          <Text style={styles.pinnedEyebrow}>NOW SELLING{product.remainingUnits === 0 ? ' · SOLD OUT' : product.remainingUnits != null ? ` · ${product.remainingUnits} LEFT` : ''}</Text>
           <Text style={styles.pinnedName} numberOfLines={1}>{product.name}</Text>
           <View style={styles.pinnedPriceRow}>
             <Text style={[styles.pinnedPrice, TABULAR_NUMS]}>{formatCents(product.priceCents)}</Text>
@@ -223,6 +223,7 @@ export function LivePinnedProductCard({
         style={styles.buyBtn}
         accessibilityRole="button"
         accessibilityLabel={`Buy ${product.name}`}
+        hitSlop={6}
         testID="live-buy"
       >
         <Text style={styles.buyText}>Buy</Text>
@@ -242,9 +243,13 @@ const RailButton = forwardRef<View, {
 }>(function RailButton({ icon, label, count, onPress, testID, badge }, ref) {
   return (
     <Pressable ref={ref} onPress={onPress} style={styles.railBtn} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
-      <View style={styles.railIcon}>
-        <Glass variant="regular" tint="dark" radius={RAIL_ICON_CIRCLE / 2} style={StyleSheet.absoluteFill} />
-        {icon}
+      {/* Badge sits outside railIcon: railIcon clips to its circle
+          (overflow: hidden, for the glass), which cut the count badge off. */}
+      <View>
+        <View style={styles.railIcon}>
+          <Glass variant="regular" tint="dark" radius={RAIL_ICON_CIRCLE / 2} style={StyleSheet.absoluteFill} />
+          {icon}
+        </View>
         {badge != null && badge > 0 && (
           <View style={styles.railBadge}><Text style={styles.railBadgeText}>{badge}</Text></View>
         )}
@@ -387,17 +392,17 @@ export function LiveCommentBar({
       rightAccessory={hasQuick ? (
         <>
           {onGift && (
-            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={4} testID="live-gift">
+            <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={5} testID="live-gift">
               <ThreadCashBill width={24} />
             </Pressable>
           )}
           {onShare && (
-            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
+            <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={5} testID="live-comment-share">
               <Feather name="share" size={20} color={theme.text} />
             </Pressable>
           )}
           {onMore && (
-            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
+            <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={5} testID="live-comment-more">
               <Feather name="more-horizontal" size={20} color={theme.text} />
             </Pressable>
           )}
@@ -425,7 +430,7 @@ const styles = StyleSheet.create({
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 14, lineHeight: 18, flexShrink: 1 },
   hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
-  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
+  hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12, letterSpacing: 0.8 },
   followBtn: {
@@ -455,11 +460,11 @@ const styles = StyleSheet.create({
   chatList: { gap: 5, justifyContent: 'flex-end', maxWidth: '70%', alignSelf: 'flex-start' },
   chatRow: { alignSelf: 'flex-start', maxWidth: '100%' },
   chatText: {
-    color: '#fff', fontFamily: FONT.regular, fontSize: 13, lineHeight: 17,
+    color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 17,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   chatUser: {
-    color: '#fff', fontFamily: FONT.semibold, fontSize: 13,
+    color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   // Nested inside the chat Text (not a row View) so "username HOST message"
@@ -488,7 +493,7 @@ const styles = StyleSheet.create({
   pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
   pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },
-  pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
+  pinnedCompare: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textDecorationLine: 'line-through' },
   buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
 
@@ -498,7 +503,7 @@ const styles = StyleSheet.create({
     width: RAIL_ICON_CIRCLE, height: RAIL_ICON_CIRCLE, borderRadius: RAIL_ICON_CIRCLE / 2,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
+  railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
   railBadge: {
     position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',

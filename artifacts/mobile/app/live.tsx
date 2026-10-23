@@ -35,7 +35,7 @@ import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
 import { useApi } from '@/lib/api';
-import { confirmBlock, reportHref } from '@/lib/safety';
+import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
 import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/live/useLivePager';
@@ -461,7 +461,7 @@ export default function LiveScreen() {
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
                   try { await pager.sendChat(text); } catch (e: any) {
-                    setNotice(e?.message ? String(e.message) : 'Message not sent');
+                    setNotice(apiErrorMessage(e, 'Message not sent. Try again.'));
                     throw e;
                   }
                 }}
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   topRow: { position: 'absolute', left: 12, right: 12, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
-    position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
+    position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: FS.sm,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,
   },
   railWrap: { position: 'absolute', right: 8 },

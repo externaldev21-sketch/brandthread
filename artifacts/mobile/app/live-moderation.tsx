@@ -116,7 +116,7 @@ export default function LiveModerationScreen() {
         avatar={{ name: u.displayName }}
         title={u.displayName}
         subtitle={u.username ? `@${u.username}` : undefined}
-        right={<View style={s.rowBtn}><Button label={kind === 'muted' ? 'Unmute' : 'Unban'} variant="secondary" size="compact" fullWidth onPress={() => void lift(kind, u)} /></View>}
+        right={<View style={s.rowBtn}><Button label={kind === 'muted' ? 'Unmute' : 'Unban'} variant="secondary" size="compact" fullWidth onPress={() => void lift(kind, u)} accessibilityLabel={`${kind === 'muted' ? 'Unmute' : 'Unban'} ${u.displayName}`} /></View>}
       />
     ));
 
@@ -176,7 +176,7 @@ export default function LiveModerationScreen() {
             <ListRow
               key={w}
               title={w}
-              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => patch({ bannedWords: words.filter((x) => x !== w) })} /></View>}
+              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => patch({ bannedWords: words.filter((x) => x !== w) })} accessibilityLabel={`Remove blocked word ${w}`} /></View>}
             />
           ))}
           <ListRow

@@ -24,8 +24,10 @@ import {
 } from '@/lib/theme';
 import { AI_STYLES, AIStyleKind } from '@/services/designTypes';
 import {
-  generateSketchToDesign, GenerateDesignResult,
+  generateSketchToDesign, GenerateDesignResult, createBrandAsset,
 } from '@/services/designService';
+import { saveImageToCameraRoll, saveAllToCameraRoll } from '@/lib/aiToolMedia';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -102,11 +104,36 @@ export default function UploadSketchScreen() {
       });
       setResults(result);
       setStep('results');
-    } catch {
-      Alert.alert('Generation failed', 'Please try again.');
+    } catch (err) {
+      Alert.alert('Generation failed', aiToolErrorMessage(err, 'Please try again.'));
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleSaveToAssets(uri: string, idx: number) {
+    try {
+      await createBrandAsset({ name: `Cleaned sketch #${idx + 1}`, type: 'graphic', uri, tags: ['ai-generated', 'sketch'] });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
+    }
+  }
+
+  async function handleExport(uri: string) {
+    const saved = await saveImageToCameraRoll(uri, 'sketch');
+    if (saved.ok) return;
+    Alert.alert(
+      saved.reason === 'permission' ? 'Permission required' : 'Save failed',
+      saved.reason === 'permission' ? 'Allow photo library access to save this image.' : 'Could not save this image. Please try again.',
+    );
+  }
+
+  async function handleSaveAll() {
+    if (!results || results.imageUris.length === 0) return;
+    const { succeeded, failed } = await saveAllToCameraRoll(results.imageUris, 'sketch');
+    if (failed === 0) Alert.alert('Saved', `${succeeded} design${succeeded !== 1 ? 's' : ''} saved.`);
+    else Alert.alert('Some saves failed', `${succeeded} of ${results.imageUris.length} designs saved.`);
   }
 
   function reset() {
@@ -133,22 +160,22 @@ export default function UploadSketchScreen() {
           contentContainerStyle={s.content}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.sectionLabel}>Style: {results.style}</Text>
+          <Text style={s.sectionLabel}>Style: {AI_STYLES.find(st => st.value === results.style)?.label ?? results.style}</Text>
           <View style={s.grid}>
             {results.imageUris.map((uri, idx) => (
               <View key={uri} style={s.resultCard}>
                 <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
                 <View style={s.resultActions}>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Saved to project')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => handleSaveToAssets(uri, idx)} hitSlop={4} accessibilityRole="button" accessibilityLabel="Save to Brand Assets">
                     <Feather name="folder-plus" size={ICON.sm} color={PURPLE} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to garment')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to garment')} hitSlop={4} accessibilityRole="button" accessibilityLabel="Add to garment">
                     <Feather name="layers" size={ICON.sm} color={CYAN} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Create product')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Create product')} hitSlop={4} accessibilityRole="button" accessibilityLabel="Create product">
                     <Feather name="package" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Export')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => handleExport(uri)} hitSlop={4} accessibilityRole="button" accessibilityLabel="Save to Photos">
                     <Feather name="download" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                 </View>
@@ -156,11 +183,11 @@ export default function UploadSketchScreen() {
             ))}
           </View>
           <View style={s.footerRow}>
-            <TouchableOpacity style={s.footerBtn} onPress={reset}>
+            <TouchableOpacity style={s.footerBtn} onPress={reset} accessibilityRole="button">
               <Feather name="refresh-cw" size={ICON.sm} color={FG} />
               <Text style={s.footerBtnText}>Try again</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.footerBtn, { borderColor: PURPLE }]} onPress={() => Alert.alert('All saved')}>
+            <TouchableOpacity style={[s.footerBtn, { borderColor: PURPLE }]} onPress={handleSaveAll} accessibilityRole="button">
               <Feather name="save" size={ICON.sm} color={PURPLE} />
               <Text style={[s.footerBtnText, { color: PURPLE }]}>Save all</Text>
             </TouchableOpacity>
@@ -234,6 +261,8 @@ export default function UploadSketchScreen() {
                 key={st.value}
                 style={[s.styleCard, style === st.value && s.styleCardActive]}
                 onPress={() => setStyle(st.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: style === st.value }}
               >
                 <Text style={[s.styleCardText, style === st.value && s.styleCardTextActive]}>
                   {st.label}
@@ -277,7 +306,7 @@ export default function UploadSketchScreen() {
           Upload a hand-drawn sketch or rough design. Our AI will clean and vectorize it.
         </Text>
 
-        <TouchableOpacity style={s.uploadZone} onPress={pickSketch}>
+        <TouchableOpacity style={s.uploadZone} onPress={pickSketch} accessibilityRole="button" accessibilityLabel={sketchUri ? 'Change sketch' : 'Upload sketch'}>
           {sketchUri ? (
             <Image source={{ uri: sketchUri }} style={s.uploadThumb} />
           ) : (
@@ -298,6 +327,8 @@ export default function UploadSketchScreen() {
               <TouchableOpacity
                 style={[s.toggle, cropEnabled && s.toggleActive]}
                 onPress={() => setCropEnabled(!cropEnabled)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: cropEnabled }}
               >
                 <Feather name="crop" size={ICON.sm} color={cropEnabled ? PURPLE_LIGHT : MUTED} />
                 <Text style={[s.toggleText, cropEnabled && { color: PURPLE_LIGHT }]}>Crop</Text>
@@ -305,6 +336,8 @@ export default function UploadSketchScreen() {
               <TouchableOpacity
                 style={[s.toggle, contrastEnabled && s.toggleActive]}
                 onPress={() => setContrastEnabled(!contrastEnabled)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: contrastEnabled }}
               >
                 <Feather name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
                 <Text style={[s.toggleText, contrastEnabled && { color: CYAN }]}>Increase contrast</Text>
@@ -551,7 +584,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: 'rgba(7,7,15,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
     paddingVertical: 2,
@@ -630,7 +663,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   loadingOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(7,7,15,0.92)',
+    backgroundColor: 'rgba(0,0,0,0.92)',
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal, Image } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -14,6 +14,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { DESIGN_STUDIO_ROWS } from '@/lib/firstRunTips/content';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -49,9 +50,14 @@ export default function AIStudioScreen() {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [newCanvasVisible, setNewCanvasVisible] = useState(false);
   const [projects, setProjects] = useState<DesignProject[] | null>(null);
+  const [projectsError, setProjectsError] = useState(false);
+  // Content ends above the floating tab bar (shared app-wide rule).
+  const tabBarClearance = useTabBarClearance(2);
 
   const loadProjects = useCallback(() => {
-    getProjects().then(setProjects).catch(() => setProjects([]));
+    getProjects()
+      .then((p) => { setProjects(p); setProjectsError(false); })
+      .catch(() => { setProjects([]); setProjectsError(true); });
   }, []);
 
   useFocusEffect(useCallback(() => { loadProjects(); }, [loadProjects]));
@@ -71,9 +77,15 @@ export default function AIStudioScreen() {
   }
 
   async function importFromLibrary() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to import artwork.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
+    let res: ImagePicker.ImagePickerResult;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to import artwork.'); return; }
+      res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
+    } catch {
+      Alert.alert("Couldn't open your photos", 'Please try again.');
+      return;
+    }
     if (!res.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push({
@@ -84,9 +96,15 @@ export default function AIStudioScreen() {
   }
 
   async function openFromCamera() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
+    let res: ImagePicker.ImagePickerResult;
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
+      res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
+    } catch {
+      Alert.alert("Couldn't open the camera", 'Please try again.');
+      return;
+    }
     if (!res.canceled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push({
@@ -107,6 +125,9 @@ export default function AIStudioScreen() {
             style={[styles.modeBtn, mode === 'ai' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'ai' }}
+            hitSlop={{ top: 5, bottom: 5 }}
           >
             <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>AI Generate</Text>
@@ -115,6 +136,9 @@ export default function AIStudioScreen() {
             style={[styles.modeBtn, mode === 'manual' && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'manual' }}
+            hitSlop={{ top: 5, bottom: 5 }}
           >
             <Feather name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'manual' ? colors.foreground : colors.mutedForeground }]}>Manual Design</Text>
@@ -125,15 +149,15 @@ export default function AIStudioScreen() {
       {mode === 'manual' ? (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: 100, paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: tabBarClearance, paddingHorizontal: 20 }}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.manualTopRow}>
             <View style={styles.manualLinks}>
-              <TouchableOpacity onPress={importFromLibrary}>
+              <TouchableOpacity onPress={importFromLibrary} accessibilityRole="button" accessibilityLabel="Import artwork" hitSlop={14}>
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Import</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={openFromCamera}>
+              <TouchableOpacity onPress={openFromCamera} accessibilityRole="button" accessibilityLabel="Take a photo" hitSlop={14}>
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Photo</Text>
               </TouchableOpacity>
             </View>
@@ -141,12 +165,22 @@ export default function AIStudioScreen() {
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="New canvas"
             >
               <Feather name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>
 
-          {projects && projects.length === 0 ? (
+          {projectsError ? (
+            <EmptyState
+              icon="alert-circle"
+              title="Couldn't load your designs"
+              description="Check your connection and try again."
+              action={{ label: 'Try again', onPress: loadProjects }}
+              style={{ marginTop: 24 }}
+            />
+          ) : projects && projects.length === 0 ? (
             <EmptyState
               icon="edit-3"
               title="No designs yet"
@@ -164,6 +198,8 @@ export default function AIStudioScreen() {
                     style={styles.canvasCell}
                     activeOpacity={0.8}
                     onPress={() => openProject(p)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${p.name || 'Untitled design'}`}
                   >
                     <View style={[styles.canvasTile, { borderColor: colors.border, backgroundColor: colors.card }]}>
                       <View style={[styles.canvasShape, {
@@ -171,7 +207,11 @@ export default function AIStudioScreen() {
                         backgroundColor: p.canvas.backgroundHex || '#FFFFFF',
                         ...(ratio >= 1 ? { width: '90%' } : { height: '90%' }),
                       }]}>
-                        {!p.thumbnail && <Feather name="image" size={18} color={colors.mutedForeground} />}
+                        {p.thumbnail ? (
+                          <Image source={{ uri: p.thumbnail }} style={styles.canvasThumb} resizeMode="cover" accessibilityIgnoresInvertColors />
+                        ) : (
+                          <Feather name="image" size={18} color={colors.mutedForeground} />
+                        )}
                       </View>
                     </View>
                     <Text style={[styles.canvasLabel, { color: colors.foreground }]} numberOfLines={1}>{p.name || 'Untitled design'}</Text>
@@ -185,7 +225,7 @@ export default function AIStudioScreen() {
       ) : (
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -194,6 +234,7 @@ export default function AIStudioScreen() {
       {STUDIO_TOOLS.map((tool) => (
         <TouchableOpacity
           key={tool.label}
+          accessibilityRole="button"
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (tool.label === 'AI Clothing Mockups') {
@@ -254,7 +295,7 @@ export default function AIStudioScreen() {
         <ModalSafeArea>
           <View style={styles.sheetOverlay}>
             <SheetRise style={[styles.sheetCard, { backgroundColor: colors.card }]}>
-              <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
+              <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)} accessibilityRole="button" hitSlop={14}>
                 <Text style={[styles.sheetCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
               </TouchableOpacity>
 
@@ -268,6 +309,7 @@ export default function AIStudioScreen() {
                 style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
                 activeOpacity={0.7}
                 onPress={() => openCanvas(SCREEN_SIZE)}
+                accessibilityRole="button"
               >
                 <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{SCREEN_SIZE.label}</Text>
                 <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{SCREEN_SIZE.dims}</Text>
@@ -280,6 +322,7 @@ export default function AIStudioScreen() {
                     style={[styles.sheetRow, i > 0 && [styles.sheetRowBorder, { borderTopColor: colors.border }]]}
                     activeOpacity={0.7}
                     onPress={() => openCanvas(p)}
+                    accessibilityRole="button"
                   >
                     <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{p.label}</Text>
                     <View style={styles.sheetRowRight}>
@@ -321,14 +364,15 @@ const styles = StyleSheet.create({
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
   canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  canvasLabel: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  canvasDims: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  canvasThumb: { width: '100%', height: '100%' },
+  canvasLabel: { fontSize: FS.meta, fontFamily: FONT.semibold },
+  canvasDims: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
   toolIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },
   toolLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  toolDesc: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  toolDesc: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   toolBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
 

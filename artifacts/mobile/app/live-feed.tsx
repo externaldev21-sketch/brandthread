@@ -49,6 +49,7 @@ import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { reportHref } from '@/lib/safety';
 import Composer from '@/components/ui/Composer';
 import { radius } from '@/constants/radii';
 
@@ -196,6 +197,7 @@ export default function LiveFeedScreen() {
   // nothing to fetch (see below), so the empty state shows right away
   // instead of behind a placeholder spinner.
   const [loadingReal, setLoadingReal] = useState(!showDemoRooms);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -220,7 +222,7 @@ export default function LiveFeedScreen() {
           })));
         }
       })
-      .catch(() => {})
+      .catch(() => { if (active) setLoadError(true); })
       .finally(() => { if (active) setLoadingReal(false); });
     return () => { active = false; };
   }, [api]);
@@ -277,6 +279,7 @@ export default function LiveFeedScreen() {
             <LiveEmptyState
               upcoming={[]}
               suggested={[]}
+              error={loadError}
               topInset={topInset}
               bottomInset={insets.bottom}
               onRemind={() => {}}
@@ -355,6 +358,7 @@ function LiveRoomPage({
   onClose: () => void;
   onBuy: () => void;
 }) {
+  const router = useRouter();
   const [following, setFollowing] = useState(false);
   const [chat, setChat] = useState(room.isSample ? SAMPLE_CHAT_LINES.slice(0, 2) : []);
   const [message, setMessage] = useState('');
@@ -462,7 +466,7 @@ function LiveRoomPage({
   }
 
   function handleSendThreadCash(amountCents: number) {
-    setChat(prev => [...prev, { user: 'You', text: `sent $${(amountCents / 100).toFixed(2)} Thread Cash` }]);
+    setChat(prev => [...prev, { user: 'You', text: `sent ${formatCents(amountCents)} Thread Cash` }]);
     showToast(`You sent ${formatCents(amountCents)} Thread Cash`, 'info');
   }
 
@@ -476,6 +480,18 @@ function LiveRoomPage({
   }
 
   function handleReport() {
+    // Real rooms file a real report (same reportHref() flow as app/live.tsx);
+    // only the demo sample rooms, which have no real stream, just confirm.
+    if (!room.isSample && room.streamId) {
+      router.push(reportHref({
+        targetType: 'live',
+        targetId: room.streamId,
+        label: room.title || `${room.brandName} live`,
+        ownerId: room.sellerId,
+        ownerName: room.brandName,
+      }) as never);
+      return;
+    }
     showToast('Thanks for the report. Our team will review this live.', 'info');
   }
 
@@ -636,8 +652,11 @@ function LiveRoomPage({
       <LiveThreadCashSheet
         visible={threadCashOpen}
         brandName={room.brandName}
+        recipientId={room.isSample ? undefined : room.sellerId}
+        streamId={room.isSample ? undefined : room.streamId}
         onClose={() => setThreadCashOpen(false)}
         onSent={handleSendThreadCash}
+        onSendFailed={message => showToast(message, 'error')}
       />
       <LiveMoreSheet
         visible={moreOpen}
@@ -743,17 +762,17 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   avatarCircle: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56', overflow: 'hidden',
+    width: 32, height: 32, borderRadius: 16, backgroundColor: '#1A1A1A', overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
   },
   avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
   hostText: { flexShrink: 1 },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  hostName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1 },
+  hostName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, flexShrink: 1 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 2 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
-  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a
   // translucent white outline pill instead of a second color). Fixed
@@ -764,7 +783,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
   },
   followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  followBtnText: { color: '#000', fontFamily: FONT.semibold, fontSize: 13 },
+  followBtnText: { color: '#000', fontFamily: FONT.semibold, fontSize: FS.sm },
   followBtnTextActive: { color: '#fff' },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
@@ -812,10 +831,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
-  productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
+  productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#2A2A2A', overflow: 'hidden' },
   productInfo: { flex: 1 },
-  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
-  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
+  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.base },
+  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: FS.sm, marginTop: 2 },
   buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: radius.sm, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
@@ -823,11 +842,11 @@ const styles = StyleSheet.create({
   chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 20 },
   chatList: { gap: 4, paddingLeft: 2 },
   chatLine: {
-    color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: 13,
+    color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: FS.sm,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   chatUser: {
-    color: 'rgba(230,230,235,0.95)', fontFamily: FONT.semibold, fontSize: 13,
+    color: 'rgba(230,230,235,0.95)', fontFamily: FONT.semibold, fontSize: FS.sm,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 

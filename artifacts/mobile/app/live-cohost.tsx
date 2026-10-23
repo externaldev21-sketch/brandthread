@@ -119,7 +119,7 @@ export default function LiveCohostScreen() {
               avatar={{ uri: c.avatarUrl, name: c.displayName }}
               title={c.displayName}
               subtitle={c.username ? `@${c.username}` : undefined}
-              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => void removeCohost(c)} /></View>}
+              right={<View style={s.rowBtn}><Button label="Remove" variant="secondary" size="compact" fullWidth onPress={() => void removeCohost(c)} accessibilityLabel={`Remove ${c.displayName} from your live`} /></View>}
             />
           ))}
         </>
@@ -142,7 +142,9 @@ export default function LiveCohostScreen() {
           contentContainerStyle={[s.content, { paddingBottom: insets.bottom + SP.xl }]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={s.emptyText}>{failed ? 'Couldn’t load sellers.' : 'No sellers found.'}</Text>
+            <Text style={s.emptyText}>
+              {!live && !demo ? 'Open Co-host from your live broadcast.' : failed ? 'Couldn’t load sellers.' : 'No sellers found.'}
+            </Text>
           }
           renderItem={({ item }) => (
             <ListRow
@@ -158,6 +160,7 @@ export default function LiveCohostScreen() {
                     fullWidth
                     disabled={invited.has(item.userId)}
                     onPress={() => void invite(item)}
+                    accessibilityLabel={invited.has(item.userId) ? `${item.displayName} invited` : `Invite ${item.displayName} to co-host`}
                   />
                 </View>
               }

@@ -155,7 +155,8 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
       </View>
 
       <View style={{ flex: 1 }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        {media.permission === 'denied' ? (
+        {/* Web has no library permission — files come from the browser picker below. */}
+        {media.permission === 'denied' && !media.isWeb ? (
           <View style={s.empty}>
             <Text style={s.emptyTitle}>Allow access to your photos</Text>
             <Text style={s.emptyBody}>Brandthread needs access to show your photos and videos.</Text>
@@ -181,7 +182,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
             onEndReachedThreshold={0.6}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={media.isWeb ? (
-              <Pressable onPress={() => fileInput.current?.click()} style={s.addMore} testID="gallery-add-files"><Text style={s.addMoreText}>+ Add more files</Text></Pressable>
+              <Pressable onPress={() => fileInput.current?.click()} style={s.addMore} accessibilityRole="button" testID="gallery-add-files"><Text style={s.addMoreText}>+ Add more files</Text></Pressable>
             ) : media.loading ? <ActivityIndicator color={CP.white} style={{ margin: 16 }} /> : null}
           />
         ) : null}
@@ -241,7 +242,7 @@ export function GalleryPicker({ mode, onClose, onNext, initialSelection = [], de
           {(media.isWeb ? (destinationOptions ?? []).map((d) => ({ key: d.id, title: d.label, on: d.id === mode, press: () => { onPickDestination?.(d.id); setAlbumPage(false); } }))
             : media.albums.map((a) => ({ key: a.id ?? 'recents', title: a.title, on: a.id === media.album.id, press: () => { media.selectAlbum(a); setAlbumPage(false); } }))
           ).map((row) => (
-            <Pressable key={row.key} style={s.albumRow} onPress={() => { tap(); row.press(); }} accessibilityRole="button" testID={`gallery-option-${row.key}`}>
+            <Pressable key={row.key} style={s.albumRow} onPress={() => { tap(); row.press(); }} accessibilityRole="button" accessibilityState={{ selected: row.on }} testID={`gallery-option-${row.key}`}>
               <Text style={s.albumTitle}>{row.title}</Text>
               {row.on ? <Feather name="check" size={20} color={CP.white} /> : null}
             </Pressable>

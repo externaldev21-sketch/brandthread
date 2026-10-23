@@ -12,6 +12,7 @@ import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ASPECT_RATIO_VALUE, ASPECTS_BY_MODE, type PostAspect } from '@/constants/postLimits';
 import type { SlideDraft } from '@/lib/createPost/types';
 import { CP, IconButton, PillButton, tap } from '@/components/create-post/ui';
@@ -28,6 +29,7 @@ export function SlideEditor({ slides, aspect, activeIndex, onActiveIndex, onAspe
   onSlides: (slides: SlideDraft[]) => void; onBack: () => void; onNext: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const top = useHeaderTopInset();
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const active = slides[Math.min(activeIndex, slides.length - 1)];
   const ratio = ASPECT_RATIO_VALUE[aspect];
@@ -51,7 +53,7 @@ export function SlideEditor({ slides, aspect, activeIndex, onActiveIndex, onAspe
   if (!active) return null;
   return (
     <View style={s.root} testID="slide-editor">
-      <View style={s.topBar}>
+      <View style={[s.topBar, { paddingTop: top + 8 }]}>
         <IconButton icon="arrow-left" label="Back" onPress={onBack} testID="edit-back" />
         <Text style={s.counter} testID="slide-counter">{activeIndex + 1} / {slides.length}</Text>
         <View style={{ width: 44 }} />

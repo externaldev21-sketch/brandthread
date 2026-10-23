@@ -21,7 +21,9 @@ import {
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
-import { applyPromptEdit } from '@/services/designService';
+import { applyPromptEdit, createBrandAsset } from '@/services/designService';
+import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 
@@ -106,9 +108,30 @@ export default function DesignPromptEditScreen() {
       });
       setResult(res);
     } catch {
-      Alert.alert('Error', 'Generation failed. Please try again.');
+      Alert.alert('Generation failed', 'Could not apply this edit. Please try again.');
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleSaveResult() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    const saved = await saveImageToCameraRoll(uri, 'prompt-edit');
+    if (saved.ok) Alert.alert('Saved', 'Saved to Photos.');
+    else if (saved.reason === 'permission') Alert.alert('Permission required', 'Allow photo library access to save this image.');
+    else if (saved.reason === 'unavailable') Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+    else Alert.alert('Save failed', 'Could not save this image. Please try again.');
+  }
+
+  async function handleSaveToBrandAssets() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    try {
+      await createBrandAsset({ name: prompt.trim().slice(0, 40) || 'Prompt edit', type: 'graphic', uri, tags: ['ai-generated', 'prompt-edit'] });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
     }
   }
 
@@ -162,6 +185,8 @@ export default function DesignPromptEditScreen() {
                 onPress={() => setPrompt(ex)}
                 style={[s.chip, prompt === ex && s.chipActive]}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Use example: ${ex}`}
               >
                 <Text style={[s.chipText, prompt === ex && s.chipTextActive]}>{ex}</Text>
               </TouchableOpacity>
@@ -208,9 +233,9 @@ export default function DesignPromptEditScreen() {
               style={s.compToggle}
             />
             <View style={s.resultActions}>
-              <PrimaryButton label="Save result" onPress={() => Alert.alert('Saved', 'Result saved to your gallery.')} icon="save" style={s.actionBtn} />
+              <PrimaryButton label="Save result" onPress={handleSaveResult} icon="save" style={s.actionBtn} />
               <SecondaryButton label="Try again" onPress={handleGenerate} icon="refresh-cw" style={s.actionBtn} />
-              <SecondaryButton label="Save to Brand Assets" onPress={() => Alert.alert('Saved', 'Added to Brand Assets.')} icon="bookmark" style={s.actionBtn} />
+              <SecondaryButton label="Save to Brand Assets" onPress={handleSaveToBrandAssets} icon="bookmark" style={s.actionBtn} />
               <SecondaryButton label="Add to product" onPress={() => Alert.alert('Add to Product', 'Choose a product to attach this image to.')} icon="package" style={s.actionBtn} />
             </View>
           </View>

@@ -31,6 +31,7 @@ export function ReferencePhotoTiles({ uris, max, onAdd, onRemove, label = 'refer
           <TouchableOpacity
             style={s.removeBtn}
             onPress={() => onRemove(idx)}
+            hitSlop={10}
             accessibilityLabel={`Remove ${label} ${idx + 1}`}
             accessibilityRole="button"
           >

@@ -38,7 +38,7 @@ export function LiveEmptyState({
         <View style={[styles.heroIcon, { borderColor: theme.border }]}>
           <Feather name="radio" size={26} color={theme.text} />
         </View>
-        <Text style={[styles.heroTitle, { color: theme.text }]}>No one&apos;s live right now</Text>
+        <Text style={[styles.heroTitle, { color: theme.text }]}>{error ? 'Couldn’t load lives' : <>No one&apos;s live right now</>}</Text>
         <Text style={[styles.heroSub, { color: theme.muted }]}>
           {error
             ? 'We couldn’t load live streams. Check your connection and try again.'
@@ -70,6 +70,7 @@ export function LiveEmptyState({
                   ? { backgroundColor: 'transparent', borderColor: theme.border, borderWidth: 1 }
                   : { backgroundColor: theme.accent }]}
                 accessibilityRole="button"
+                hitSlop={6}
                 accessibilityState={{ selected: u.reminderSet }}
                 accessibilityLabel={u.reminderSet ? `Reminder set for ${u.title}` : `Remind me about ${u.title}`}
               >
@@ -100,6 +101,7 @@ export function LiveEmptyState({
                     ? { borderColor: theme.border, borderWidth: 1 }
                     : { backgroundColor: theme.accent }]}
                   accessibilityRole="button"
+                  hitSlop={7}
                   accessibilityLabel={c.following ? `Following ${c.host.name}` : `Follow ${c.host.name}`}
                 >
                   <Text style={[styles.pillText, { color: c.following ? theme.text : theme.onAccent }]}>{c.following ? 'Following' : 'Follow'}</Text>
@@ -123,13 +125,13 @@ const styles = StyleSheet.create({
   section: { marginTop: SP.lg, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: 2 },
   upRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: RADIUS.md, padding: 10 },
-  upWhen: { fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.8 },
+  upWhen: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   upTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2 },
   upHost: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
   pillBtn: { flexDirection: 'row', alignItems: 'center', height: 32, paddingHorizontal: 12, borderRadius: radius.sm },
   pillText: { fontFamily: FONT.bold, fontSize: FS.xs },
   card: { width: 136, alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.md, padding: 12, gap: 10 },
   cardName: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 8, maxWidth: 110 },
-  cardMeta: { fontFamily: FONT.regular, fontSize: 11, marginTop: 1 },
+  cardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
   cardFollow: { alignSelf: 'stretch', height: 30, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
 });

@@ -31,7 +31,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { Button } from '@/components/ui/Button';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
-import { FONT, FS } from '@/lib/theme';
+import { CREATE_CANVAS, FONT, FS } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { FADE_MS, PRESS_SPRING } from '@/constants/motion';
 import {
@@ -368,7 +368,7 @@ export function CreateCamera({
   const showPrompt = !IS_WEB && !cameraPermission?.granted;
 
   return (
-    <View style={[s.root, { backgroundColor: theme.background }]} testID={testID}>
+    <View style={[s.root, { backgroundColor: CREATE_CANVAS.black }]} testID={testID}>
       {/* ── Live camera (or clean black placeholder) ── */}
       <View ref={cameraWrapRef} style={StyleSheet.absoluteFill} collapsable={false}>
         {hasCamera ? (
@@ -386,7 +386,7 @@ export function CreateCamera({
       {/* ── Native first-run permission card (inline, no OS popup until Allow) ── */}
       {showPrompt ? (
         <View style={s.promptWrap} pointerEvents="box-none">
-          <View style={[s.promptCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          <View style={[s.promptCard, { backgroundColor: CREATE_CANVAS.black, borderColor: theme.border }]}>
             <Feather name="camera" size={22} color={theme.text} />
             <Text style={[s.promptTitle, { color: theme.text }]}>Camera and microphone</Text>
             <Text style={[s.promptBody, { color: theme.muted }]}>Brandthread records video and sound only while you create.</Text>
@@ -454,7 +454,7 @@ export function CreateCamera({
         <Animated.View
           style={[
             s.menu,
-            { top: topInset + 50, backgroundColor: theme.background, borderColor: theme.border },
+            { top: topInset + 50, backgroundColor: CREATE_CANVAS.black, borderColor: theme.border },
             { opacity: menuAnim, transform: [{ scale: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] },
           ]}
           testID="create-camera-mode-menu"
@@ -556,7 +556,7 @@ export function CreateCamera({
           {/* Camera roll (bottom-left) */}
           {!isRecording ? (
             <Pressable
-              style={[s.roll, { borderColor: theme.text, backgroundColor: theme.background }]}
+              style={[s.roll, { borderColor: theme.text, backgroundColor: CREATE_CANVAS.black }]}
               onPress={onOpenLibrary}
               accessibilityLabel="Open camera roll"
               accessibilityRole="button"
@@ -613,7 +613,7 @@ export function CreateCamera({
           {/* Flip (bottom-right) */}
           {!isRecording ? (
             <Pressable
-              style={[s.flip, { borderColor: theme.border, backgroundColor: theme.background }]}
+              style={[s.flip, { borderColor: theme.border, backgroundColor: CREATE_CANVAS.black }]}
               onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))}
               accessibilityLabel="Flip camera"
               accessibilityRole="button"

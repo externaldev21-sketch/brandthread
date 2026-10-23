@@ -83,7 +83,7 @@ export function LiveMoreSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close more options" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close more options" />
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-more-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <Row icon="flag" label="Report" onPress={() => { onClose(); onReport(); }} theme={theme} />

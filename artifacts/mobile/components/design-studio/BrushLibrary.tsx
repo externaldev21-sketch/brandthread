@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -52,6 +53,8 @@ const SWIPE_ACTIONS_WIDTH = 150; // 3 × 50pt action buttons
 export default function BrushLibrary(props: BrushLibraryProps) {
   const { brushes, activeBrushId, strokeColor, onSelectBrush, onDuplicateBrush, onDeleteBrush, onClose } = props;
 
+  // Full-screen modal: clear the status bar / notch and the home indicator.
+  const insets = useSafeAreaInsets();
   const groups = useMemo(() => groupBrushesByCategory(brushes), [brushes]);
   const activeBrush = brushes.find(b => b.id === activeBrushId) ?? brushes[0];
   const [selectedCategory, setSelectedCategory] = useState(activeBrush?.category ?? groups[0]?.category ?? '');
@@ -65,9 +68,9 @@ export default function BrushLibrary(props: BrushLibraryProps) {
 
   return (
     <View style={s.panel} testID="brush-library">
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + SP.lg }]}>
         <Text style={s.title}>Brushes</Text>
-        <TouchableOpacity onPress={onClose} testID="brush-library-done">
+        <TouchableOpacity onPress={onClose} testID="brush-library-done" accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={s.doneLabel}>Done</Text>
         </TouchableOpacity>
       </View>
@@ -80,6 +83,9 @@ export default function BrushLibrary(props: BrushLibraryProps) {
               style={[s.sidebarItem, selectedCategory === g.category && s.sidebarItemActive]}
               onPress={() => { setSelectedCategory(g.category); setOpenSwipeId(null); }}
               testID={`brush-category-${g.category}`}
+              accessibilityRole="tab"
+              accessibilityLabel={g.category}
+              accessibilityState={{ selected: selectedCategory === g.category }}
             >
               <Feather
                 name={CATEGORY_ICONS[g.category] ?? 'edit-3'}
@@ -96,7 +102,7 @@ export default function BrushLibrary(props: BrushLibraryProps) {
           ))}
         </ScrollView>
 
-        <ScrollView style={s.list} contentContainerStyle={s.listContent} testID="brush-library-list">
+        <ScrollView style={s.list} contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + SP.sm }]} testID="brush-library-list">
           {(visibleGroup?.brushes ?? []).map(b => (
             <BrushRow
               key={b.id}
@@ -200,10 +206,10 @@ function BrushRow(props: BrushRowProps) {
   return (
     <View style={s.rowWrap} testID={`brush-row-${brush.id}`}>
       <View style={s.swipeActions} pointerEvents={isSwipeOpen ? 'auto' : 'none'}>
-        <TouchableOpacity style={s.swipeBtn} onPress={onShare} testID={`brush-share-${brush.id}`} accessibilityLabel={`Share ${brush.name}`}>
+        <TouchableOpacity style={s.swipeBtn} onPress={onShare} testID={`brush-share-${brush.id}`} accessibilityLabel={`Share ${brush.name}`} accessibilityRole="button">
           <Feather name="share" size={ICON.sm} color={FG} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.swipeBtn} onPress={onDuplicate} testID={`brush-duplicate-${brush.id}`} accessibilityLabel={`Duplicate ${brush.name}`}>
+        <TouchableOpacity style={s.swipeBtn} onPress={onDuplicate} testID={`brush-duplicate-${brush.id}`} accessibilityLabel={`Duplicate ${brush.name}`} accessibilityRole="button">
           <Feather name="copy" size={ICON.sm} color={FG} />
         </TouchableOpacity>
         <TouchableOpacity
@@ -211,6 +217,8 @@ function BrushRow(props: BrushRowProps) {
           onPress={canDelete ? onDelete : undefined}
           testID={`brush-delete-${brush.id}`}
           accessibilityLabel={`Delete ${brush.name}`}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canDelete }}
         >
           <Feather name="trash-2" size={ICON.sm} color={FG} />
         </TouchableOpacity>
@@ -221,7 +229,14 @@ function BrushRow(props: BrushRowProps) {
         style={[s.row, isActive && s.rowActive, { transform: [{ translateX }] }]}
         testID={`brush-row-card-${brush.id}`}
       >
-        <TouchableOpacity style={{ flex: 1 }} onPress={handleSelectPress} testID={`brush-select-${brush.id}`}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={handleSelectPress}
+          testID={`brush-select-${brush.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={brush.name}
+          accessibilityState={{ selected: isActive }}
+        >
           <Text style={[s.brushName, isActive && s.brushNameActive]} numberOfLines={1}>{brush.name}</Text>
           <Svg width="100%" height={28} viewBox="0 0 80 24" preserveAspectRatio="none">
             <Path
@@ -262,7 +277,7 @@ const s = StyleSheet.create({
   sidebar: { width: 96, flexGrow: 0, flexShrink: 0, borderRightWidth: 1, borderRightColor: BORDER_SUBTLE },
   sidebarItem: { alignItems: 'center', gap: 4, paddingVertical: SP.sm, paddingHorizontal: 4 },
   sidebarItemActive: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  sidebarLabel: { fontFamily: FONT.medium, fontSize: 10, color: SUBTLE, includeFontPadding: false, textAlign: 'center' },
+  sidebarLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: SUBTLE, includeFontPadding: false, textAlign: 'center' },
   sidebarLabelActive: { color: FG },
 
   list: { flex: 1 },

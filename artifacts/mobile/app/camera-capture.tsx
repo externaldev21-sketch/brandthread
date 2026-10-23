@@ -111,9 +111,9 @@ function CameraCaptureWeb() {
         Record multi-clip videos in the mobile app. On the web, choose a video from your device and continue to the same trim editor.
       </Text>
       <TouchableOpacity
+        accessibilityRole="button"
         style={[s.webFallbackButton, { backgroundColor: ACCENT }]}
         onPress={() => goBackOr(router)}
-        accessibilityRole="button"
       >
         <Text style={s.webFallbackButtonText}>Back to upload options</Text>
       </TouchableOpacity>
@@ -295,6 +295,7 @@ export default function CameraCapture() {
           <Text style={s.permTitle}>Camera access required</Text>
           <Text style={s.permSub}>Brandthread needs camera and microphone access to record video clips.</Text>
           <TouchableOpacity
+            accessibilityRole="button"
             style={[s.permBtn, { backgroundColor: ACCENT }]}
             onPress={async () => {
               await requestCameraPermission();
@@ -303,7 +304,7 @@ export default function CameraCapture() {
           >
             <Text style={s.permBtnText}>Grant access</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => goBackOr(router)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => goBackOr(router)} hitSlop={12}>
             <Text style={s.cancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -357,6 +358,7 @@ export default function CameraCapture() {
         <View style={s.topRow}>
           {/* Close / discard */}
           <TouchableOpacity
+            accessibilityRole="button"
             style={s.iconBtn}
             onPress={() => {
               if (clips.length === 0) goBackOr(router);
@@ -373,21 +375,25 @@ export default function CameraCapture() {
           {/* Flash · speed · timer mini row */}
           <View style={s.miniRow}>
             <TouchableOpacity
+              accessibilityRole="button"
               style={s.miniRowItem}
+              hitSlop={12}
               onPress={() => setFlash((v) => v === 'off' ? 'on' : 'off')}
               accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
             >
-              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={flash === 'on' ? '#FBBF24' : FG} />
+              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={FG} />
             </TouchableOpacity>
 
             {captureMode === 'video' ? (
-              <TouchableOpacity style={s.miniRowItem} onPress={cycleSpeed} accessibilityLabel="Change recording speed">
+              <TouchableOpacity accessibilityRole="button" style={s.miniRowItem} hitSlop={12} onPress={cycleSpeed} accessibilityLabel="Change recording speed">
                 <Text style={s.miniRowSpeedText}>{speed}x</Text>
               </TouchableOpacity>
             ) : null}
 
             <TouchableOpacity
+              accessibilityRole="button"
               style={s.miniRowItem}
+              hitSlop={12}
               onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
               accessibilityLabel="Open length and timer options"
             >
@@ -397,6 +403,7 @@ export default function CameraCapture() {
 
           {/* Settings (placeholder — no dedicated settings screen exists yet) */}
           <TouchableOpacity
+            accessibilityRole="button"
             style={s.iconBtn}
             onPress={() => void Haptics.selectionAsync()}
             accessibilityLabel="Camera settings"
@@ -414,6 +421,7 @@ export default function CameraCapture() {
 
         {/* Add audio pill (placeholder — no audio-library feature exists yet) */}
         <TouchableOpacity
+          accessibilityRole="button"
           style={s.addAudioPill}
           onPress={() => void Haptics.selectionAsync()}
           accessibilityLabel="Add audio"
@@ -433,7 +441,9 @@ export default function CameraCapture() {
       {/* ── Left tool rail: Audio · Effects · Layout · Length · Timer ────── */}
       <View style={[s.leftRail, { top: insets.top + 150 }]}>
         <TouchableOpacity
+          accessibilityRole="button"
           style={s.railChevron}
+          hitSlop={8}
           onPress={() => setRailExpanded((v) => !v)}
           accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
         >
@@ -443,13 +453,14 @@ export default function CameraCapture() {
         {railExpanded ? (
           <>
             {/* Audio — placeholder, no audio-library feature exists yet */}
-            <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Audio tools">
+            <TouchableOpacity accessibilityRole="button" style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Audio tools">
               <Feather name="music" size={19} color={FG} />
               <Text style={s.railLabel}>Audio</Text>
             </TouchableOpacity>
 
             {/* Effects — filters + speed */}
             <TouchableOpacity
+              accessibilityRole="button"
               style={s.railBtn}
               onPress={() => setActivePanel((v) => v === 'effects' ? null : 'effects')}
               accessibilityLabel="Effects: filters and speed"
@@ -459,13 +470,14 @@ export default function CameraCapture() {
             </TouchableOpacity>
 
             {/* Layout — placeholder, no multi-photo layout feature exists yet */}
-            <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Layout">
+            <TouchableOpacity accessibilityRole="button" style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Layout">
               <Feather name="grid" size={19} color={FG} />
               <Text style={s.railLabel}>Layout</Text>
             </TouchableOpacity>
 
             {/* Length — clip duration mode */}
             <TouchableOpacity
+              accessibilityRole="button"
               style={s.railBtn}
               onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
               accessibilityLabel="Clip length"
@@ -477,6 +489,7 @@ export default function CameraCapture() {
 
             {/* Timer — toggles the "/ total" readout in the top row */}
             <TouchableOpacity
+              accessibilityRole="button"
               style={s.railBtn}
               onPress={() => setShowRemaining((v) => !v)}
               accessibilityLabel={showRemaining ? 'Hide remaining time' : 'Show remaining time'}
@@ -494,6 +507,7 @@ export default function CameraCapture() {
           <View style={s.filterStrip}>
             {FILTERS.map((item) => (
               <TouchableOpacity
+                accessibilityRole="button"
                 key={item.id}
                 style={[s.filterChip, filter === item.id && s.filterChipActive]}
                 onPress={() => setFilter(item.id)}
@@ -506,6 +520,7 @@ export default function CameraCapture() {
             <View style={[s.filterStrip, { marginTop: SP.xs }]}>
               {SPEEDS.map((value) => (
                 <TouchableOpacity
+                  accessibilityRole="button"
                   key={value}
                   style={[s.filterChip, speed === value && s.filterChipActive]}
                   onPress={() => setSpeed(value)}
@@ -524,6 +539,7 @@ export default function CameraCapture() {
             <View style={s.durationRow}>
               {([15, 30, 60, 600] as DurationMode[]).map((value) => (
                 <TouchableOpacity
+                  accessibilityRole="button"
                   key={value}
                   style={[s.durationBtn, durationMode === value && s.durationBtnActive]}
                   onPress={() => setDurationMode(value)}
@@ -548,7 +564,7 @@ export default function CameraCapture() {
           <View style={s.errorBanner}>
             <Feather name="alert-circle" size={14} color={ERROR} />
             <Text style={s.errorText}>{captureError}</Text>
-            <TouchableOpacity onPress={() => setCaptureError(null)} accessibilityLabel="Dismiss error">
+            <TouchableOpacity accessibilityRole="button" onPress={() => setCaptureError(null)} accessibilityLabel="Dismiss error" hitSlop={14}>
               <Feather name="x" size={14} color={ERROR} />
             </TouchableOpacity>
           </View>
@@ -559,6 +575,7 @@ export default function CameraCapture() {
           <View style={s.clipRow}>
             {clips.map((clip, index) => (
               <TouchableOpacity
+                accessibilityRole="button"
                 key={clip.id}
                 style={s.clipChip}
                 onPress={() => {
@@ -577,6 +594,7 @@ export default function CameraCapture() {
         {/* Tag Product Listing entry — unchanged handoff */}
         {captureMode === 'video' && clips.length > 0 && !isRecording ? (
           <TouchableOpacity
+            accessibilityRole="button"
             style={s.tagProductBtn}
             onPress={() => {
               (global as any).__cameraCaptureResult = {
@@ -597,6 +615,7 @@ export default function CameraCapture() {
         {/* Photo / Video capture-mode toggle */}
         {!isRecording ? (
           <TouchableOpacity
+            accessibilityRole="button"
             style={[s.captureModeToggle, clips.length > 0 && s.captureModeToggleDisabled]}
             disabled={clips.length > 0}
             onPress={() => setCaptureMode((v) => v === 'video' ? 'picture' : 'video')}
@@ -616,6 +635,7 @@ export default function CameraCapture() {
         {/* Shutter row: gallery thumbnail · shutter · flip camera */}
         <View style={s.shutterRow}>
           <TouchableOpacity
+            accessibilityRole="button"
             style={s.galleryThumb}
             onPress={() => goBackOr(router)}
             accessibilityLabel="Back to gallery"
@@ -624,6 +644,7 @@ export default function CameraCapture() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            accessibilityRole="button"
             style={[s.shutter, isRecording && s.shutterRecording]}
             activeOpacity={0.82}
             onPress={captureMode === 'picture' ? handlePhoto : (isRecording ? stopRecording : startRecording)}
@@ -643,6 +664,7 @@ export default function CameraCapture() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            accessibilityRole="button"
             style={[s.flipBtn, isRecording && s.railBtnDisabled]}
             disabled={isRecording}
             onPress={() => setFacing((v) => v === 'back' ? 'front' : 'back')}
@@ -655,7 +677,7 @@ export default function CameraCapture() {
         {/* Thread / Story mode-switcher row */}
         <View style={s.modeSwitchRow}>
           <Text style={[s.modeSwitchLabel, s.modeSwitchLabelActive]}>Thread</Text>
-          <TouchableOpacity onPress={() => router.replace('/buyer-story-create' as never)} accessibilityLabel="Switch to Story">
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/buyer-story-create' as never)} accessibilityLabel="Switch to Story">
             <Text style={s.modeSwitchLabel}>Story</Text>
           </TouchableOpacity>
         </View>
@@ -680,7 +702,7 @@ const s = StyleSheet.create({
   webFallbackTitle: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center', marginBottom: SP.xs },
   webFallbackText: { maxWidth: 520, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', marginBottom: SP.lg },
   webFallbackButton: { borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 14 },
-  webFallbackButtonText: { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
+  webFallbackButtonText: { color: BG, fontSize: FS.base, fontFamily: FONT.bold },
 
   // ── Progress bar ──
   progressTrack: {
@@ -723,7 +745,7 @@ const s = StyleSheet.create({
   timerPillActive: { backgroundColor: 'rgba(0,0,0,0.78)' },
   timerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ERROR, marginRight: 5 },
   timerText: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
-  timerRemaining: { color: MUTED, fontSize: FS.xs },
+  timerRemaining: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
   addAudioPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: GLASS,
@@ -759,7 +781,7 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: SP.sm,
   },
-  panelHint: { color: MUTED, fontSize: FS.xs, textAlign: 'center' },
+  panelHint: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center' },
 
   // ── Framing brackets ──
   framingBox: {
@@ -783,7 +805,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: `${ERROR}55`,
     borderRadius: RADIUS.sm, padding: SP.sm,
   },
-  errorText: { flex: 1, color: FG, fontSize: FS.xs },
+  errorText: { flex: 1, color: FG, fontSize: FS.xs, fontFamily: FONT.medium },
 
   // ── Duration selector ──
   durationRow: { flexDirection: 'row', gap: 6 },
@@ -795,7 +817,7 @@ const s = StyleSheet.create({
   },
   durationBtnActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   durationText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.semibold },
-  durationTextActive: { color: FG },
+  durationTextActive: { color: BG },
 
   // ── Filter / mode strip ──
   filterStrip: {
@@ -882,7 +904,7 @@ const s = StyleSheet.create({
   },
 
   // ── Gesture hint ──
-  gestureHint: { color: 'rgba(255,255,255,0.55)', fontSize: FS.xs },
+  gestureHint: { color: 'rgba(255,255,255,0.55)', fontSize: FS.xs, fontFamily: FONT.regular },
 
   // ── Permissions gate ──
   permBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: SP.md },
@@ -892,8 +914,8 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   permTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },
-  permSub: { color: MUTED, fontSize: FS.sm, textAlign: 'center', lineHeight: 22 },
+  permSub: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 22 },
   permBtn: { paddingHorizontal: 28, paddingVertical: 13, borderRadius: RADIUS.md, marginTop: SP.sm },
-  permBtnText: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
-  cancelText: { color: MUTED, fontSize: FS.sm },
+  permBtnText: { color: BG, fontSize: FS.base, fontFamily: FONT.semibold },
+  cancelText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.semibold },
 });

@@ -142,8 +142,8 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
     try {
       await recoverLegacyDesignProjects();
       setPhase('done');
-    } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : 'Recovery failed. Your original projects were not changed.');
+    } catch {
+      setErrorMsg('Recovery failed. Your original projects were not changed.');
       setPhase('error');
     }
   }
@@ -888,7 +888,7 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="rename-sheet">
-      <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Dismiss rename" />
+      <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Dismiss rename" accessibilityRole="button" />
       <View style={[rn.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
         <View style={sh.handle} />
         {project && (
@@ -941,9 +941,11 @@ interface PreviewModalProps {
 function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModalProps) {
   const insets = useSafeAreaInsets();
   const [masterLoading, setMasterLoading] = useState(false);
+  // Hooks must run before the early return — calling useHeaderTopInset only
+  // when a project is set changes the hook count between renders.
+  const topInset = useHeaderTopInset();
   if (!project) return null;
   const previewSize = Math.min(SCREEN_W - SP.xl * 2, 420);
-  const topInset = useHeaderTopInset();
   const botInset = insets.bottom;
 
   return (
@@ -1030,6 +1032,7 @@ function RecentlyDeletedSection({ expanded, onToggle, onDataChanged, refreshToke
     if (!expanded) return;
     setLoading(true);
     try { setDeleted(await getDeletedProjects()); }
+    catch { Alert.alert('Could not load', 'Recently deleted designs could not be loaded. Try again.'); }
     finally { setLoading(false); }
   }, [expanded, refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1047,14 +1050,20 @@ function RecentlyDeletedSection({ expanded, onToggle, onDataChanged, refreshToke
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert('Delete permanently?', `"${p.name}" will be removed forever.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete Forever', style: 'destructive', onPress: async () => { await deleteProject(p.id); setDeleted(prev => prev.filter(x => x.id !== p.id)); } },
+      { text: 'Delete Forever', style: 'destructive', onPress: async () => {
+        try { await deleteProject(p.id); setDeleted(prev => prev.filter(x => x.id !== p.id)); }
+        catch { Alert.alert('Error', 'Could not delete project.'); }
+      } },
     ]);
   }
 
   async function handlePurgeAll() {
     Alert.alert('Delete all?', 'All items in Recently Deleted will be permanently removed.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete All', style: 'destructive', onPress: async () => { await purgeDeletedProjects(); setDeleted([]); } },
+      { text: 'Delete All', style: 'destructive', onPress: async () => {
+        try { await purgeDeletedProjects(); setDeleted([]); }
+        catch { Alert.alert('Error', 'Could not delete projects.'); }
+      } },
     ]);
   }
 
@@ -1287,7 +1296,7 @@ const g = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3,
   },
-  stackCountText: { fontFamily: FONT.semibold, fontSize: 10, color: FG },
+  stackCountText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
 });
 
 // ─── Selection count pill ─────────────────────────────────────────────────────
@@ -1341,7 +1350,7 @@ function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare
         <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close more options" accessibilityRole="button" />
       </ReanimatedAnimated.View>
       <GestureDetector gesture={panGesture}>
-      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
+      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { paddingHorizontal: SP.lg, paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
         <View style={sh.handle} />
         <Text style={mo.title}>More Options</Text>
         {ROWS.map(row => (
@@ -1396,7 +1405,7 @@ function StackContentsSheet({ visible, projects, onClose, onOpen, onRemove }: St
         <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close stack" accessibilityRole="button" />
       </ReanimatedAnimated.View>
       <GestureDetector gesture={panGesture}>
-      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { maxHeight: '75%', paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
+      <ReanimatedAnimated.View onLayout={onSheetLayout} style={[sh.sheet, { maxHeight: '75%', paddingHorizontal: SP.lg, paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
         <View style={sh.handle} />
         <Text style={mo.title}>{projects.length} design{projects.length === 1 ? '' : 's'} in this stack</Text>
         <FlatList
@@ -1475,6 +1484,8 @@ export default function DesignGalleryScreen() {
       ]);
       setProjects(nextProjects);
       setRecoverableCount(legacyCount);
+    } catch {
+      Alert.alert('Could not load designs', 'Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -1580,7 +1591,11 @@ export default function DesignGalleryScreen() {
   // ── Bulk actions ───────────────────────────────────────────────────────────
 
   async function bulkDuplicate() {
-    for (const id of selectedIds) await duplicateProject(id);
+    try {
+      for (const id of selectedIds) await duplicateProject(id);
+    } catch {
+      Alert.alert('Could not duplicate', 'Some designs could not be duplicated. Try again.');
+    }
     cancelSelection();
     loadData();
   }
@@ -1588,7 +1603,11 @@ export default function DesignGalleryScreen() {
   async function bulkSoftDelete() {
     if (selectedIds.size === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    for (const id of selectedIds) await softDeleteProject(id);
+    try {
+      for (const id of selectedIds) await softDeleteProject(id);
+    } catch {
+      Alert.alert('Could not delete', 'Some designs could not be deleted. Try again.');
+    }
     cancelSelection();
     loadData();
     setDeletedToken(t => t + 1);
@@ -1682,7 +1701,7 @@ export default function DesignGalleryScreen() {
       const asset = result.assets[0];
       let durable: string;
       try { durable = await makeDurableUri(asset.uri); }
-      catch (e: unknown) { Alert.alert('Import failed', e instanceof Error ? e.message : String(e)); return; }
+      catch { Alert.alert('Import failed', 'Could not import that photo. Try another one.'); return; }
       const w = asset.width || 1080, h = asset.height || 1080;
       const proj = await createProject('canvas', 'Photo Canvas', { width: w, height: h, backgroundHex: '#FFFFFF' });
       const now = new Date().toISOString();
@@ -1783,8 +1802,8 @@ export default function DesignGalleryScreen() {
         }],
       });
       router.push(`/design-canvas?id=${proj.id}`);
-    } catch (e: unknown) {
-      Alert.alert('Import failed', e instanceof Error ? e.message : 'Could not import that file.');
+    } catch {
+      Alert.alert('Import failed', 'Could not import that file. Try a PNG, JPG or Brandthread .json file.');
     }
   }
 
@@ -1995,7 +2014,7 @@ export default function DesignGalleryScreen() {
           actual actions live in the header (Delete/More) and the More
           Options sheet now, not a second toolbar duplicating them. */}
       {selectionMode && selectedIds.size > 0 && (
-        <View style={tb.countPill} pointerEvents="none">
+        <View style={[tb.countPill, { bottom: botInset + COMP.tabBarH + SP.lg }]} pointerEvents="none">
           <Text style={tb.countPillText}>{selectedIds.size} selected</Text>
         </View>
       )}
@@ -2050,7 +2069,11 @@ export default function DesignGalleryScreen() {
         projects={stackSheetProjects}
         onClose={() => setStackSheetId(null)}
         onOpen={(project) => { setStackSheetId(null); setPreviewProject(project); }}
-        onRemove={async (projectId) => { await removeFromStack(projectId); loadData(); }}
+        onRemove={async (projectId) => {
+          try { await removeFromStack(projectId); }
+          catch { Alert.alert('Error', 'Could not remove design from stack.'); }
+          loadData();
+        }}
       />
     </View>
   );

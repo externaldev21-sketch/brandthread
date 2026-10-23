@@ -14,6 +14,7 @@ import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ASPECT_RATIO_VALUE, MAX_SLIDES_BY_MODE } from '@/constants/postLimits';
 import { DEFAULT_SLIDE_CROP } from '@/lib/createPost/crop';
@@ -95,6 +96,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
   onSlides: (s: SlideDraft[]) => void; onBack: () => void; onAdd: () => void; onNext: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const top = useHeaderTopInset();
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const [tool, setTool] = useState<Tool>(null);
   const [editKey, setEditKey] = useState<AdjustKey | null>(null);
@@ -131,7 +133,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
 
   return (
     <View style={ed.root} testID="carousel-editor">
-      <View style={ed.top}>
+      <View style={[ed.top, { paddingTop: top + 8 }]}>
         <View style={ed.round}><IconButton icon="arrow-left" label="Back" onPress={onBack} size={22} testID="edit-back" /></View>
         <Pressable
           onPress={() => { tap(); patchActive({ crop: DEFAULT_SLIDE_CROP, adjust: NO_ADJUST }); setDraftValue(null); }}
@@ -235,8 +237,8 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
               testID="edit-slider"
             />
             <View style={ed.sliderActions}>
-              <Pressable onPress={() => { tap(); setDraftValue(null); setEditKey(null); }} accessibilityRole="button" testID="edit-cancel"><Text style={ed.sliderBtn}>Cancel</Text></Pressable>
-              <Pressable onPress={() => { tap(); if (draftValue) setAdjust(draftValue); setDraftValue(null); setEditKey(null); }} accessibilityRole="button" testID="edit-done"><Text style={[ed.sliderBtn, { color: CP.white }]}>Done</Text></Pressable>
+              <Pressable onPress={() => { tap(); setDraftValue(null); setEditKey(null); }} hitSlop={8} accessibilityRole="button" testID="edit-cancel"><Text style={ed.sliderBtn}>Cancel</Text></Pressable>
+              <Pressable onPress={() => { tap(); if (draftValue) setAdjust(draftValue); setDraftValue(null); setEditKey(null); }} hitSlop={8} accessibilityRole="button" testID="edit-done"><Text style={[ed.sliderBtn, { color: CP.white }]}>Done</Text></Pressable>
             </View>
           </View>
         ) : null}

@@ -444,7 +444,7 @@ function BuyerLiveNativeScreen() {
   if (loading) {
     return (
       <View style={[s.root, s.center]}>
-        <ActivityIndicator color={LIVE_RED} size="large" />
+        <ActivityIndicator color={FG} size="large" />
         <Text style={[s.loadingText, { color: MUTED }]}>Joining stream…</Text>
       </View>
     );
@@ -453,13 +453,13 @@ function BuyerLiveNativeScreen() {
   if (ended) {
     return (
       <View style={[s.root, s.center]}>
-        <View style={[s.endedIcon, { backgroundColor: `${LIVE_RED}20` }]}>
-          <Feather name="video-off" size={32} color={LIVE_RED} />
+        <View style={[s.endedIcon, { backgroundColor: BORDER }]}>
+          <Feather name="video-off" size={32} color={FG} />
         </View>
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
         <Text style={[s.endedSub, { color: MUTED }]}>The replay will appear in the feed shortly.</Text>
-        <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
-          <Text style={s.backBtnText}>Back to feed</Text>
+        <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: theme.accent }]} accessibilityRole="button">
+          <Text style={[s.backBtnText, { color: theme.onAccent }]}>Back to feed</Text>
         </PressableScale>
       </View>
     );
@@ -546,7 +546,7 @@ function BuyerLiveNativeScreen() {
                 accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
-                <Feather name="shopping-bag" size={12} color={LIVE_RED} />
+                <Feather name="shopping-bag" size={12} color="#fff" />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
                 <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
               </PressableScale>
@@ -653,14 +653,14 @@ function BuyerLiveNativeScreen() {
                 })}
               </View>
               <Text style={s.fieldLabel}>Delivery</Text>
-              <TextInput value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
-              <TextInput value={buyerName} onChangeText={setBuyerName} placeholder="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
-              <TextInput value={buyerPhone} onChangeText={setBuyerPhone} placeholder="Phone number" placeholderTextColor={SUBTLE} keyboardType="phone-pad" style={s.purchaseInput} />
-              <TextInput value={street} onChangeText={setStreet} placeholder="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" accessibilityLabel="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
+              <TextInput value={buyerName} onChangeText={setBuyerName} placeholder="Full name" accessibilityLabel="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput value={buyerPhone} onChangeText={setBuyerPhone} placeholder="Phone number" accessibilityLabel="Phone number" placeholderTextColor={SUBTLE} keyboardType="phone-pad" style={s.purchaseInput} />
+              <TextInput value={street} onChangeText={setStreet} placeholder="Street address" accessibilityLabel="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
               <View style={s.addressRow}>
-                <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />
-                <TextInput value={region} onChangeText={setRegion} placeholder="State" placeholderTextColor={SUBTLE} autoCapitalize="characters" style={[s.purchaseInput, s.regionInput]} />
-                <TextInput value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
+                <TextInput value={city} onChangeText={setCity} placeholder="City" accessibilityLabel="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />
+                <TextInput value={region} onChangeText={setRegion} placeholder="State" accessibilityLabel="State" placeholderTextColor={SUBTLE} autoCapitalize="characters" style={[s.purchaseInput, s.regionInput]} />
+                <TextInput value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" accessibilityLabel="ZIP code" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
               </View>
               {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
               <PressableScale
@@ -704,18 +704,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   topRight:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill:         { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 4 },
   liveDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.2 },
-  sellerName:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13, flex: 1 },
+  livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.2 },
+  sellerName:       { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm, flex: 1 },
   viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 4 },
   viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
   leaveBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   titleRow:         { position: 'absolute', top: 0, left: 14, right: 60, zIndex: 9 },
-  streamTitle:      { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 13 },
+  streamTitle:      { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: FS.sm },
   productStrip:     { position: 'absolute', bottom: 155, left: 0, right: 0, zIndex: 8 },
   productStripInner:{ paddingHorizontal: 12, gap: 8 },
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
   productChipName:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 90 },
-  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
+  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs },
   bottom:           { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 185, marginHorizontal: 12 },
   commentContent:   { gap: 3, paddingBottom: 6 },
@@ -730,7 +730,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   purchaseHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
   purchaseHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  purchaseEyebrow: { color: LIVE_RED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.1, marginBottom: 4 },
+  purchaseEyebrow: { color: MUTED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.1, marginBottom: 4 },
   purchaseTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
   purchaseClose: { width: 38, height: 38, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: BORDER },
   purchaseScroll: { marginTop: SP.sm },

@@ -75,7 +75,7 @@ export default function AIMockupChatScreen() {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Couldn't create that mockup. Try rewording it.",
+        content: "Couldn't create that mockup. Please try again.",
         error: true,
       };
       setMessages((prev) => [aiMsg, ...prev]);
@@ -154,7 +154,9 @@ export default function AIMockupChatScreen() {
                 <TouchableOpacity
                   key={s}
                   onPress={() => sendMessage(s)}
+                  disabled={loading}
                   activeOpacity={0.75}
+                  accessibilityRole="button"
                   style={[styles.suggestion, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
                   <Text style={[styles.suggestionText, { color: colors.foreground }]}>{s}</Text>
@@ -178,7 +180,7 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
-  loadingText: { fontSize: 13, fontFamily: FONT.regular },
+  loadingText: { fontSize: FS.sm, fontFamily: FONT.regular },
   suggestionList: { gap: 8, paddingBottom: 8 },
   suggestion: { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, maxWidth: 220, alignSelf: 'center' },
   suggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },

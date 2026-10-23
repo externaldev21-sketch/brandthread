@@ -231,7 +231,8 @@ function SellerLiveNativeScreen() {
   async function loadProducts() {
     try {
       const r = await (api as any).products?.list?.() as any;
-      setAllProducts(r?.products ?? []);
+      // GET /api/products returns a bare array (not `{ products }`).
+      setAllProducts(Array.isArray(r) ? r : (r?.products ?? []));
     } catch {}
   }
 
@@ -252,7 +253,11 @@ function SellerLiveNativeScreen() {
         message: msg,
         displayName: user?.firstName ?? user?.username ?? 'Host',
       });
-    } catch {}
+    } catch {
+      // Put the message back so the host doesn't lose what they typed.
+      setCommentText(prev => prev || msg);
+      Alert.alert('Comment not sent', 'Check your connection and try again.');
+    }
   }
 
   async function toggleProduct(product: any) {
@@ -265,10 +270,14 @@ function SellerLiveNativeScreen() {
           productName: product.name,
           priceCents: product.priceCents ?? 0,
         }];
+    const previous = productTags;
     setProductTags(updated);
     try {
       await (api as any).live.updateProducts(params.streamId, updated);
-    } catch {}
+    } catch {
+      setProductTags(previous);
+      Alert.alert('Could not update products', 'Your tagged products did not reach viewers. Please try again.');
+    }
   }
 
   async function highlightProduct(productId: string) {
@@ -352,7 +361,14 @@ function SellerLiveNativeScreen() {
           </View>
           <Text style={s.durationText}>{formatDuration(duration)}</Text>
         </View>
-        <TouchableOpacity onPress={handleEnd} disabled={ending} style={s.endBtn}>
+        <TouchableOpacity
+          onPress={handleEnd}
+          disabled={ending}
+          style={s.endBtn}
+          accessibilityRole="button"
+          accessibilityLabel="End stream"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.endBtnText}>End</Text>}
         </TouchableOpacity>
       </View>
@@ -378,7 +394,7 @@ function SellerLiveNativeScreen() {
       {/* Right action rail */}
       <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
-        <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Tag products">
           <Feather name="shopping-bag" size={22} color="#fff" />
           {productTags.length > 0 && (
             <View style={[s.railBadge, { backgroundColor: LIVE_RED }]}>
@@ -387,7 +403,7 @@ function SellerLiveNativeScreen() {
           )}
         </TouchableOpacity>
         {/* Live-only discount codes */}
-        <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityLabel="Live codes">
+        <TouchableOpacity onPress={() => setShowLiveCodes(true)} style={s.railBtn} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Live codes">
           <Feather name="tag" size={21} color="#fff" />
         </TouchableOpacity>
         {/* Switch camera */}
@@ -395,6 +411,8 @@ function SellerLiveNativeScreen() {
           style={s.railBtn}
           activeOpacity={0.7}
           onPress={() => engineRef.current?.switchCamera?.()}
+          accessibilityRole="button"
+          accessibilityLabel="Flip camera"
         >
           <Feather name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
@@ -437,7 +455,7 @@ function SellerLiveNativeScreen() {
                   { backgroundColor: tag.highlighted ? LIVE_RED : 'rgba(0,0,0,0.65)' },
                 ]}
               >
-                <Feather name="shopping-bag" size={12} color={LIVE_RED} />
+                <Feather name="shopping-bag" size={12} color="#fff" />
                 <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
                 <Text style={s.productChipPrice}>{formatCents(tag.priceCents ?? 0)}</Text>
                 {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
@@ -505,7 +523,7 @@ function SellerLiveNativeScreen() {
           <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>Tag products</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)}>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}>
                 <Feather name="x" size={22} color={FG} />
               </TouchableOpacity>
             </View>
@@ -518,10 +536,13 @@ function SellerLiveNativeScreen() {
                     onPress={() => toggleProduct(p)}
                     activeOpacity={0.7}
                     style={[s.pickerRow, tagged && { backgroundColor: `${PURPLE}12` }]}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: tagged }}
+                    accessibilityLabel={p.name}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                       <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
+                    {p.priceCents != null && <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents)}</Text>}
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
                       {tagged && <Feather name="check" size={13} color={theme.onAccent} />}
@@ -557,14 +578,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   topLeft:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
   liveDot:          { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-  livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1.5 },
-  durationText:     { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 13 },
+  livePillText:     { color: '#fff', fontFamily: FONT.bold, fontSize: FS.meta, letterSpacing: 1.5 },
+  durationText:     { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: FS.sm },
   endBtn:           { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 13 },
+  endBtnText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
   viewerRow:        { position: 'absolute', top: 0, left: 16, zIndex: 9 },
   tipsRow:          { position: 'absolute', top: 0, left: 16, zIndex: 9 },
   viewerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: 12 },
+  viewerText:       { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.meta },
   rightRail:        { position: 'absolute', right: 12, top: 0, zIndex: 10, gap: 16 },
   railBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   railBadge:        { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -572,15 +593,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productStrip:     { position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 8 },
   productStripContent: { paddingHorizontal: 12, gap: 8 },
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 7 },
-  productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
-  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
+  productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.meta, maxWidth: 100 },
+  productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.xs },
   featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   bottomSection:    { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 200, marginHorizontal: 12 },
   commentContent:   { gap: 4, paddingBottom: 8 },
   commentBubble:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingVertical: 4 },
-  commentAuthor:    { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
-  commentText:      { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
+  commentAuthor:    { color: '#fff', fontFamily: FONT.bold, fontSize: FS.meta },
+  commentText:      { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: FS.meta },
   // Product picker
   pickerModal:      { backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20, justifyContent: 'flex-end' },
   pickerSheet:      { backgroundColor: BG, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },

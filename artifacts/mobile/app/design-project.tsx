@@ -16,7 +16,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  SUCCESS, BLUE, ORANGE, GOLD,
+  SUCCESS,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -46,10 +46,10 @@ type ProjectTypeOption = {
 const projectTypeOptions = (theme: ReturnType<typeof useAppTheme>['theme']): ProjectTypeOption[] => [
   { type: 'garment',   icon: 'layers',      label: 'Garment Design',   desc: 'Design apparel — tees, hoodies, hats & more', accent: theme.accent },
   { type: 'canvas',    icon: 'edit-2',      label: 'Free Canvas',      desc: 'Open canvas for any creative work',           accent: theme.secondary },
-  { type: 'mockup',    icon: 'box',         label: 'Product Mockup',   desc: 'Photorealistic product visuals',               accent: ORANGE },
-  { type: 'campaign',  icon: 'trending-up', label: 'Campaign Image',   desc: 'Multi-format marketing content',               accent: BLUE },
+  { type: 'mockup',    icon: 'box',         label: 'Product Mockup',   desc: 'Photorealistic product visuals',               accent: theme.accent },
+  { type: 'campaign',  icon: 'trending-up', label: 'Campaign Image',   desc: 'Multi-format marketing content',               accent: theme.accent },
   { type: 'social',    icon: 'instagram',   label: 'Social Content',   desc: 'Posts, stories & reels content',               accent: theme.accentLight },
-  { type: 'packaging', icon: 'package',     label: 'Packaging',        desc: 'Box, bag & label design',                      accent: GOLD },
+  { type: 'packaging', icon: 'package',     label: 'Packaging',        desc: 'Box, bag & label design',                      accent: theme.accent },
 ];
 
 const BG_OPTIONS: { label: string; value: string; icon: string }[] = [
@@ -65,10 +65,10 @@ function typeAccent(type: DesignProjectType, theme: ReturnType<typeof useAppThem
   switch (type) {
     case 'garment':   return theme.accent;
     case 'canvas':    return theme.secondary;
-    case 'mockup':    return ORANGE;
-    case 'campaign':  return BLUE;
+    case 'mockup':    return theme.accent;
+    case 'campaign':  return theme.accent;
     case 'social':    return theme.accentLight;
-    case 'packaging': return GOLD;
+    case 'packaging': return theme.accent;
     default:          return theme.accent;
   }
 }
@@ -124,7 +124,7 @@ export default function DesignProjectScreen() {
   const [useCustomDims, setUseCustomDims] = useState(false);
   const [backgroundHex, setBackgroundHex] = useState('#000000');
   const [bgMode, setBgMode] = useState<string>('#000000');
-  const [customHex, setCustomHex] = useState('#1A1A2E');
+  const [customHex, setCustomHex] = useState('#C0C0C0');
   const [projectName, setProjectName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -212,6 +212,9 @@ export default function DesignProjectScreen() {
   const options = projectTypeOptions(theme);
   const accent = projectType ? typeAccent(projectType, theme) : PURPLE;
   const canProceedStep2 = projectType === 'garment' ? selectedTemplate !== null : selectedPreset !== null;
+  // Same canvas bounds the gallery's New Canvas sheet enforces (8–16384 px).
+  const dimsValid = [canvasWidth, canvasHeight].every(n => Number.isSafeInteger(n) && n >= 8 && n <= 16384);
+  const bgValid = bgMode !== 'custom' || /^#[0-9A-Fa-f]{6}$/.test(customHex);
   const finalName = projectName || (projectType ? PROJECT_TYPE_LABELS[projectType] : 'New Project');
 
   return (
@@ -230,6 +233,9 @@ export default function DesignProjectScreen() {
                   style={[styles.typeCard, projectType === opt.type && { borderColor: opt.accent }]}
                   onPress={() => selectType(opt.type)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${opt.label}. ${opt.desc}`}
+                  accessibilityState={{ selected: projectType === opt.type }}
                 >
                   <View style={[styles.typeIcon, { backgroundColor: opt.accent + '22' }]}>
                     <Feather name={opt.icon as any} size={ICON.lg} color={opt.accent} />
@@ -261,6 +267,9 @@ export default function DesignProjectScreen() {
                       style={[styles.templateCard, isSelected && { borderColor: accent }]}
                       onPress={() => selectTemplate(tmpl)}
                       activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityLabel={tmpl.label}
+                      accessibilityState={{ checked: isSelected }}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
                         <Feather name="layers" size={ICON.md} color={accent} />
@@ -269,13 +278,13 @@ export default function DesignProjectScreen() {
                       <Text style={styles.templateViews}>{tmpl.views.join(' · ')}</Text>
                       <View style={styles.badgeRow}>
                         {tmpl.hasPrintArea && (
-                          <View style={[styles.badge, { backgroundColor: BLUE + '22' }]}>
-                            <Text style={[styles.badgeText, { color: BLUE }]}>Print</Text>
+                          <View style={[styles.badge, { backgroundColor: accent + '22' }]}>
+                            <Text style={[styles.badgeText, { color: accent }]}>Print</Text>
                           </View>
                         )}
                         {tmpl.hasEmbroideryArea && (
-                          <View style={[styles.badge, { backgroundColor: GOLD + '22' }]}>
-                            <Text style={[styles.badgeText, { color: GOLD }]}>Embroidery</Text>
+                          <View style={[styles.badge, { backgroundColor: accent + '22' }]}>
+                            <Text style={[styles.badgeText, { color: accent }]}>Embroidery</Text>
                           </View>
                         )}
                       </View>
@@ -293,6 +302,9 @@ export default function DesignProjectScreen() {
                       style={[styles.templateCard, isSelected && { borderColor: accent }]}
                       onPress={() => selectPreset(preset)}
                       activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${preset.label}, ${preset.width} by ${preset.height}`}
+                      accessibilityState={{ checked: isSelected }}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
                         <Feather name="crop" size={ICON.md} color={accent} />
@@ -300,7 +312,7 @@ export default function DesignProjectScreen() {
                       <Text style={styles.templateName}>{preset.label}</Text>
                       <Text style={styles.templateViews}>{preset.width} × {preset.height}</Text>
                       {preset.ratio && (
-                        <View style={[styles.badge, { backgroundColor: accent + '22' }]}>
+                        <View style={[styles.badge, { alignSelf: 'flex-start', backgroundColor: accent + '22' }]}>
                           <Text style={[styles.badgeText, { color: accent }]}>{preset.ratio}</Text>
                         </View>
                       )}
@@ -354,6 +366,7 @@ export default function DesignProjectScreen() {
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
+                          accessibilityLabel="Canvas width in pixels"
                         />
                         <Text style={styles.dimUnit}>px</Text>
                       </View>
@@ -369,6 +382,7 @@ export default function DesignProjectScreen() {
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
+                          accessibilityLabel="Canvas height in pixels"
                         />
                         <Text style={styles.dimUnit}>px</Text>
                       </View>
@@ -377,6 +391,9 @@ export default function DesignProjectScreen() {
                   <TouchableOpacity
                     style={styles.customToggle}
                     onPress={() => { setUseCustomDims(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel="Use custom dimensions"
+                    accessibilityState={{ checked: useCustomDims }}
                   >
                     <Feather
                       name={useCustomDims ? 'check-square' : 'square'}
@@ -392,6 +409,7 @@ export default function DesignProjectScreen() {
               <PrimaryButton
                 label="Next"
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep(4); }}
+                disabled={!dimsValid}
                 icon="arrow-right"
               />
             </View>
@@ -411,6 +429,9 @@ export default function DesignProjectScreen() {
                     style={[styles.bgPill, isSelected && { borderColor: accent, backgroundColor: accent + '18' }]}
                     onPress={() => selectBg(opt.value)}
                     activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${opt.label} background`}
+                    accessibilityState={{ checked: isSelected }}
                   >
                     <View style={[styles.bgSwatch, {
                       backgroundColor: opt.value === 'transparent' ? 'transparent' : opt.value === 'custom' ? customHex : opt.value,
@@ -435,10 +456,11 @@ export default function DesignProjectScreen() {
                       setCustomHex(hex);
                       setBackgroundHex(hex);
                     }}
-                    placeholder="1A1A2E"
+                    placeholder="C0C0C0"
                     placeholderTextColor={SUBTLE}
                     maxLength={6}
                     autoCapitalize="characters"
+                    accessibilityLabel="Custom background hex color"
                   />
                   <View style={[styles.hexPreview, { backgroundColor: customHex }]} />
                 </View>
@@ -448,6 +470,7 @@ export default function DesignProjectScreen() {
               <PrimaryButton
                 label="Next"
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep(5); }}
+                disabled={!bgValid}
                 icon="arrow-right"
               />
             </View>
@@ -468,6 +491,7 @@ export default function DesignProjectScreen() {
                 placeholderTextColor={SUBTLE}
                 autoFocus
                 maxLength={80}
+                accessibilityLabel="Project name"
               />
             </BrandthreadCard>
             <View style={styles.nextRow}>
@@ -535,7 +559,6 @@ export default function DesignProjectScreen() {
 // ─── Summary Row ──────────────────────────────────────────────────────────────
 
 function SummaryRow({ label, value, swatch, swatchColor }: { label: string; value: string; swatch?: boolean; swatchColor?: string }) {
-  const styles = createStyles(useAppTheme().theme);
   return (
     <View style={sr.row}>
       <Text style={sr.label}>{label}</Text>
@@ -742,6 +765,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
+    minHeight: 44,
   },
   customToggleText: {
     fontFamily: FONT.medium,

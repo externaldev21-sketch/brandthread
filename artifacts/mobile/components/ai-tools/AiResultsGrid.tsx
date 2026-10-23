@@ -85,7 +85,7 @@ function AiResultTile({
       <View style={[s.tile, s.tileFailed]}>
         <View style={s.failedBody}>
           <Feather name="alert-circle" size={ICON.lg} color={RED} />
-          <Text style={s.failedText}>{slot.error ?? 'Generation failed'}</Text>
+          <Text style={s.failedText} numberOfLines={5}>{slot.error ?? 'Generation failed'}</Text>
           <Button
             label="Retry"
             icon="refresh-cw"
@@ -132,7 +132,10 @@ function AiResultTile({
               key={a.label}
               style={s.actionBtn}
               onPress={a.onPress}
+              hitSlop={5}
+              accessibilityRole="button"
               accessibilityLabel={a.label}
+              accessibilityState={{ disabled: !!a.loading, busy: !!a.loading }}
               disabled={a.loading}
             >
               {a.loading ? <ActivityIndicator size="small" color={FG} /> : <Feather name={a.icon} size={ICON.sm} color={FG} />}

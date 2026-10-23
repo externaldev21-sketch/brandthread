@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { FONT, FS } from '@/lib/theme';
 
 interface Photo {
   id: string;
@@ -121,7 +122,11 @@ export default function TechPackGeneratorScreen() {
   }
 
   function addSize() {
-    const label = `Size ${sizes.length + 1}`;
+    // Size names double as column keys — never add one that already exists
+    // (e.g. after removing a column, `Size ${length + 1}` can repeat).
+    let n = sizes.length + 1;
+    while (sizes.includes(`Size ${n}`)) n += 1;
+    const label = `Size ${n}`;
     setSizes((prev) => [...prev, label]);
   }
   function removeSize(size: string) {
@@ -207,7 +212,7 @@ export default function TechPackGeneratorScreen() {
         setStep('details');
         return;
       }
-      Alert.alert('Something went wrong', 'Could not generate the tech pack. Please try again.');
+      Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -265,7 +270,7 @@ export default function TechPackGeneratorScreen() {
               <View
                 style={[
                   styles.stepDot,
-                  { backgroundColor: i <= stepIndex ? colors.primary : colors.secondary },
+                  { backgroundColor: i <= stepIndex ? colors.primary : colors.mutedForeground },
                 ]}
               />
               {i < STEPS.length - 1 && <View style={[styles.stepLine, { backgroundColor: colors.border }]} />}
@@ -331,8 +336,11 @@ export default function TechPackGeneratorScreen() {
                     style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                     onPress={() => removePhoto(p.id)}
                     activeOpacity={0.8}
+                    hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove photo"
                   >
-                    <Feather name="x" size={11} color="#FFF" />
+                    <Feather name="x" size={11} color={colors.destructiveForeground} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -340,6 +348,8 @@ export default function TechPackGeneratorScreen() {
                 <TouchableOpacity
                   onPress={pickPhotos}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add photos"
                   style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
                   <Feather name="plus" size={20} color={colors.primary} />
@@ -384,12 +394,23 @@ export default function TechPackGeneratorScreen() {
                         onChangeText={(v) => renameSize(size, v)}
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
-                      <TouchableOpacity onPress={() => removeSize(size)} style={{ marginLeft: 4 }}>
+                      <TouchableOpacity
+                        onPress={() => removeSize(size)}
+                        style={{ marginLeft: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove size ${size}`}
+                      >
                         <Feather name="x" size={12} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>
                   ))}
-                  <TouchableOpacity onPress={addSize} style={[styles.tableCell, styles.addColBtn, { borderColor: colors.border }]}>
+                  <TouchableOpacity
+                    onPress={addSize}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add size"
+                    style={[styles.tableCell, styles.addColBtn, { borderColor: colors.border }]}
+                  >
                     <Feather name="plus" size={14} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
@@ -416,7 +437,12 @@ export default function TechPackGeneratorScreen() {
                         />
                       </View>
                     ))}
-                    <TouchableOpacity onPress={() => removeRow(i)} style={[styles.tableCell, styles.addColBtn]}>
+                    <TouchableOpacity
+                      onPress={() => removeRow(i)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove measurement ${row.point || i + 1}`}
+                      style={[styles.tableCell, styles.addColBtn]}
+                    >
                       <Feather name="trash-2" size={13} color={colors.destructive} />
                     </TouchableOpacity>
                   </View>
@@ -426,7 +452,7 @@ export default function TechPackGeneratorScreen() {
 
             <TouchableOpacity onPress={addRow} activeOpacity={0.8} style={[styles.addRowBtn, { borderColor: colors.border }]}>
               <Feather name="plus" size={14} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Add measurement point</Text>
+              <Text style={{ color: colors.primary, fontFamily: FONT.semibold, fontSize: FS.meta }}>Add measurement point</Text>
             </TouchableOpacity>
 
             <View style={styles.navRow}>
@@ -576,19 +602,19 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 6 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: FS.md, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  sectionSubtitle: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
   row2: { flexDirection: 'row', gap: 12 },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  inputLabel: { fontSize: FS.meta, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
+  input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: FS.base, fontFamily: 'Inter_400Regular' },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 15,
   },
-  primaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  primaryBtnText: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
   secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  secondaryBtnText: { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   trayRow: { gap: 10, paddingVertical: 4 },
   trayThumbWrap: { position: 'relative' },
@@ -617,8 +643,8 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 40, paddingHorizontal: 20, gap: 8,
   },
-  resultFilename: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  resultSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  resultFilename: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
+  resultSubtitle: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 8, height: 8, borderRadius: 4, opacity: 0.6 },
 });

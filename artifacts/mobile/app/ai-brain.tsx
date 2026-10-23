@@ -83,6 +83,11 @@ function humanizeAiError(rawMessage?: string): string {
   if (/rate limit reached/i.test(msg)) {
     return "You're sending fast — try again in a minute.";
   }
+  // The credit gate refuses with 402 (services/aiService.ts surfaces it as
+  // "AI request failed (402)."). Retrying can't fix that, so say so.
+  if (/\(402\)/.test(msg)) {
+    return "You're out of AI credits. Add credits to keep chatting.";
+  }
   // Covers "AI service is not configured…", "AI request failed (…)." and any other
   // network / provider / unavailable error.
   return "Couldn't reach Brandthread AI. Tap Retry.";
@@ -170,7 +175,13 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
           <Feather name="check-circle" size={14} color={colors.foreground} />
           <Text style={styles.actionAppliedText}>Applied</Text>
           {card.canUndo && (
-            <TouchableOpacity onPress={() => onUndo(msg.id)} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => onUndo(msg.id)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Undo"
+            >
               <Text style={styles.actionUndoText}>Undo</Text>
             </TouchableOpacity>
           )}
@@ -252,6 +263,9 @@ function MessageBubble({
                 style={styles.retryBtn}
                 onPress={() => onRetry(precedingUserText ?? '')}
                 activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Retry"
               >
                 <Feather name="refresh-cw" size={13} color={colors.destructive} />
                 <Text style={styles.retryText}>Retry</Text>
@@ -270,6 +284,9 @@ function MessageBubble({
                 style={[styles.sourceChip, { borderColor: colors.border }]}
                 onPress={() => router.push(source.route as any)}
                 activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                accessibilityRole="link"
+                accessibilityLabel={source.title}
               >
                 <Feather name="link" size={11} color={colors.primary} />
                 <Text style={[styles.sourceChipText, { color: colors.primary }]} numberOfLines={1}>
@@ -285,7 +302,8 @@ function MessageBubble({
             <TouchableOpacity
               style={styles.msgActionBtn}
               onPress={() => onCopy(msg)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+              accessibilityRole="button"
               accessibilityLabel="Copy message"
             >
               <Feather name="copy" size={13} color={colors.subtle} />
@@ -295,7 +313,8 @@ function MessageBubble({
               <TouchableOpacity
                 style={styles.msgActionBtn}
                 onPress={() => onRetry(precedingUserText)}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+                accessibilityRole="button"
                 accessibilityLabel="Regenerate response"
               >
                 <Feather name="refresh-cw" size={13} color={colors.subtle} />
@@ -359,6 +378,7 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
             style={styles.pill}
             onPress={() => onPillPress(prompt)}
             activeOpacity={0.75}
+            accessibilityRole="button"
           >
             <Text style={styles.pillText} numberOfLines={2}>{prompt}</Text>
           </TouchableOpacity>
@@ -433,6 +453,8 @@ export default function AiBrainScreen() {
   const [streamingText, setStreamingText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
+  /** True only when the person tapped Stop, so a real abort stays silent. */
+  const userStoppedRef = useRef(false);
 
   // Track the last user/store context so we can reload on switch.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
@@ -488,6 +510,9 @@ export default function AiBrainScreen() {
             (textSoFar) => setStreamingText(textSoFar),
           );
           setSession(result.session);
+        } catch {
+          setErrorMsg(humanizeAiError());
+          setInputText(text);
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -525,6 +550,9 @@ export default function AiBrainScreen() {
             (textSoFar) => setStreamingText(textSoFar),
           );
           setSession(result.session);
+        } catch {
+          setErrorMsg(humanizeAiError());
+          setInputText(text);
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -545,6 +573,7 @@ export default function AiBrainScreen() {
         return;
       }
 
+      userStoppedRef.current = false;
       try {
         const result = await sendMessageStream(
           { userText: text, session, authToken: token, userId, storeContext },
@@ -552,7 +581,9 @@ export default function AiBrainScreen() {
         );
         setSession(result.session);
       } catch (err: unknown) {
-        const isAbort = (err as Error)?.name === 'AbortError';
+        // services/aiService.ts reports a dropped connection (XHR status 0)
+        // as an AbortError too — only a Stop tap is a silent, intended abort.
+        const isAbort = (err as Error)?.name === 'AbortError' && userStoppedRef.current;
         if (!isAbort) {
           setErrorMsg(humanizeAiError((err as Error)?.message));
           // Restore user text so they can retry without retyping.
@@ -580,6 +611,7 @@ export default function AiBrainScreen() {
   // ─── Stop generation ────────────────────────────────────────────────────────
 
   const handleStop = useCallback(() => {
+    userStoppedRef.current = true;
     cancelGeneration();
     setIsGenerating(false);
     setStreamingText('');
@@ -785,6 +817,9 @@ export default function AiBrainScreen() {
               onPress={() => handleRetry(pendingRetryText)}
               style={styles.retryBannerBtn}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Retry"
             >
               <Text style={styles.retryBannerText}>Retry</Text>
             </TouchableOpacity>

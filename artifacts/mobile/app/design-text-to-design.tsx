@@ -34,6 +34,7 @@ import {
 } from '@/services/designService';
 import type { PlacementType } from '@/services/designTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export default function AiDesignChatScreen() {
       setTurns(prev => [...prev, { id: uid('turn'), role: 'assistant', versionId: version.id }]);
       if (!base) { setGarment(null); setColour(null); setPlacement(null); setReferenceUri(null); }
     } catch (err: any) {
-      const message = err?.message ?? 'Design generation failed. Please try again.';
+      const message = aiToolErrorMessage(err, 'Design generation failed. Please try again.');
       setTurns(prev => [...prev, { id: uid('turn'), role: 'assistant', error: message }]);
     } finally {
       setIsGenerating(false);
@@ -217,7 +218,7 @@ export default function AiDesignChatScreen() {
         ],
       );
     } catch {
-      Alert.alert('Error', 'Could not send to Design Studio. Please try again.');
+      Alert.alert("Couldn't send to Design Studio", 'Please try again.');
     }
   }
 
@@ -228,7 +229,7 @@ export default function AiDesignChatScreen() {
       file.write(b64, { encoding: 'base64' });
       router.push({ pathname: '/design-mockup-to-model', params: { seedMockupUri: file.uri } } as any);
     } catch {
-      Alert.alert('Error', 'Could not send to Mockup to Model. Please try again.');
+      Alert.alert("Couldn't send to Mockup to Model", 'Please try again.');
     }
   }
 
@@ -250,7 +251,7 @@ export default function AiDesignChatScreen() {
       >
         <Text style={[s.chipText, active && s.chipTextActive]} numberOfLines={1}>{value ?? label}</Text>
         {active ? (
-          <Pressable hitSlop={8} onPress={onClear} accessibilityLabel={`Clear ${label}`}>
+          <Pressable hitSlop={8} onPress={onClear} accessibilityRole="button" accessibilityLabel={`Clear ${label}`}>
             <Feather name="x" size={13} color={colors.background} />
           </Pressable>
         ) : (
@@ -268,7 +269,7 @@ export default function AiDesignChatScreen() {
           ? COLOURS.map(c => ({ id: c, label: c, selected: colour === c, onPress: () => { setColour(c); setOpenChip(null); } }))
           : PLACEMENTS.map(p => ({ id: p.key as string, label: p.label, selected: placement === p.key, onPress: () => { setPlacement(p.key); setOpenChip(null); } }))
       ).map(o => (
-        <Pressable key={o.id} onPress={o.onPress} style={[s.option, o.selected && s.optionSelected]} accessibilityRole="button" accessibilityLabel={o.label}>
+        <Pressable key={o.id} onPress={o.onPress} style={[s.option, o.selected && s.optionSelected]} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button" accessibilityLabel={o.label} accessibilityState={{ selected: o.selected }}>
           <Text style={[s.optionText, o.selected && s.optionTextSelected]}>{o.label}</Text>
         </Pressable>
       ))}
@@ -334,7 +335,7 @@ export default function AiDesignChatScreen() {
           <View style={[s.assistantBubble, s.errorBubble]}>
             <Feather name="alert-circle" size={14} color={colors.destructive} />
             <Text style={s.errorText}>{item.error}</Text>
-            <TouchableOpacity onPress={handleRetry} style={s.retryBtn}>
+            <TouchableOpacity onPress={handleRetry} style={s.retryBtn} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Retry">
               <Feather name="refresh-cw" size={12} color={theme.accent} />
               <Text style={[s.retryText, { color: theme.accent }]}>Retry</Text>
             </TouchableOpacity>
@@ -349,7 +350,7 @@ export default function AiDesignChatScreen() {
 
     return (
       <View style={s.resultCard} testID="ai-design-result-card">
-        <TouchableOpacity activeOpacity={0.92} onPress={() => setCurrentId(version.id)}>
+        <TouchableOpacity activeOpacity={0.92} onPress={() => setCurrentId(version.id)} accessibilityRole="button" accessibilityLabel="Select this version to refine" accessibilityState={{ selected: isCurrent }}>
           <Image
             source={{ uri: version.imageUri }}
             style={[s.resultImage, { width: cardSize, height: cardSize }, isCurrent && { borderColor: theme.accent }]}
@@ -462,6 +463,9 @@ export default function AiDesignChatScreen() {
                 style={[s.historyCard, item.id === currentId && { borderColor: theme.accent }]}
                 onPress={() => { setCurrentId(item.id); setShowHistory(false); }}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Open version: ${item.prompt}`}
+                accessibilityState={{ selected: item.id === currentId }}
               >
                 <Image source={{ uri: item.imageUri }} style={s.historyThumb} resizeMode="cover" />
                 <Text style={s.historyPrompt} numberOfLines={2}>{item.prompt}</Text>

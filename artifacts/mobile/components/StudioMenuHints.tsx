@@ -50,7 +50,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 
 // ─── Edge chevrons ────────────────────────────────────────────────────────────
 
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   coachCopy: {
     color: '#FFFFFF',
     fontFamily: FONT.semibold,
-    fontSize: 17,
+    fontSize: FS.md,
     letterSpacing: -0.2,
     textAlign: 'center',
   },

@@ -53,9 +53,13 @@ export default function DesignBrandAssetsScreen() {
   // ── Load assets ────────────────────────────────────────────────────────────
   async function loadAssets() {
     setLoading(true);
-    const all = await getBrandAssets();
-    setAssets(all);
-    setLoading(false);
+    try {
+      setAssets(await getBrandAssets());
+    } catch {
+      Alert.alert('Could not load assets', 'Try again in a moment.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadAssets(); }, []);
@@ -91,11 +95,20 @@ export default function DesignBrandAssetsScreen() {
       {
         text: 'Brand Color',
         onPress: () => {
-          Alert.prompt('Brand Color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
+          Alert.prompt('Brand Color', 'Enter hex color (e.g. #C0C0C0):', async (hex) => {
             if (!hex?.trim()) return;
-            const color = hex.startsWith('#') ? hex : '#' + hex;
-            const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
-            setAssets(prev => [newAsset, ...prev]);
+            const trimmed = hex.trim();
+            const color = trimmed.startsWith('#') ? trimmed : '#' + trimmed;
+            if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+              Alert.alert('Invalid color', 'Enter a 6-digit hex color, like #C0C0C0.');
+              return;
+            }
+            try {
+              const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
+              setAssets(prev => [newAsset, ...prev]);
+            } catch {
+              Alert.alert('Error', 'Could not save this color.');
+            }
           });
         },
       },
@@ -104,8 +117,12 @@ export default function DesignBrandAssetsScreen() {
         onPress: () => {
           Alert.prompt('Font Name', 'Enter font family name:', async (name) => {
             if (!name?.trim()) return;
-            const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
-            setAssets(prev => [newAsset, ...prev]);
+            try {
+              const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
+              setAssets(prev => [newAsset, ...prev]);
+            } catch {
+              Alert.alert('Error', 'Could not save this font.');
+            }
           });
         },
       },
@@ -115,9 +132,13 @@ export default function DesignBrandAssetsScreen() {
 
   async function saveImageAsset(uri: string, type: BrandAssetType) {
     const name = type.charAt(0).toUpperCase() + type.slice(1) + ' ' + (assets.length + 1);
-    const newAsset = await addBrandAsset({ name, type, uri, tags: [] });
-    setAssets(prev => [newAsset, ...prev]);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      const newAsset = await addBrandAsset({ name, type, uri, tags: [] });
+      setAssets(prev => [newAsset, ...prev]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Error', 'Could not save this asset.');
+    }
   }
 
   // ── Asset long press ───────────────────────────────────────────────────────
@@ -129,8 +150,12 @@ export default function DesignBrandAssetsScreen() {
         onPress: () => {
           Alert.prompt('Rename', 'New name:', async (name) => {
             if (!name?.trim()) return;
-            await renameBrandAsset(asset.id, name.trim());
-            setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name: name.trim() } : a));
+            try {
+              await renameBrandAsset(asset.id, name.trim());
+              setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name: name.trim() } : a));
+            } catch {
+              Alert.alert('Error', 'Could not rename this asset.');
+            }
           }, 'plain-text', asset.name);
         },
       },
@@ -154,13 +179,13 @@ export default function DesignBrandAssetsScreen() {
         },
       },
       {
-        text: 'Download',
+        text: 'Share',
         onPress: async () => {
           const uri = (asset as any).uri ?? (asset as any).thumbnailUrl ?? '';
           try {
             await Share.share({ message: asset.name, url: uri });
           } catch {
-            Alert.alert('Download', 'Could not share this asset.');
+            Alert.alert('Share', 'Could not share this asset.');
           }
         },
       },
@@ -173,8 +198,12 @@ export default function DesignBrandAssetsScreen() {
             {
               text: 'Delete', style: 'destructive',
               onPress: async () => {
-                await deleteBrandAsset(asset.id);
-                setAssets(prev => prev.filter(a => a.id !== asset.id));
+                try {
+                  await deleteBrandAsset(asset.id);
+                  setAssets(prev => prev.filter(a => a.id !== asset.id));
+                } catch {
+                  Alert.alert('Error', 'Could not delete this asset.');
+                }
               },
             },
           ]);
@@ -189,9 +218,13 @@ export default function DesignBrandAssetsScreen() {
     return (
       <TouchableOpacity
         style={bas.assetCard}
+        onPress={() => handleLongPress(item)}
         onLongPress={() => handleLongPress(item)}
         activeOpacity={0.8}
         delayLongPress={400}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.type.replace('_', ' ')}`}
+        accessibilityHint="Opens asset options"
       >
         {/* Thumbnail */}
         {item.type === 'color' && item.color ? (
@@ -236,11 +269,14 @@ export default function DesignBrandAssetsScreen() {
 
       {/* ── CATEGORY TABS ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bas.tabsScroll} contentContainerStyle={bas.tabsContent}>
-        {BRAND_ASSET_TYPES.map(tab => (
+        {[{ key: 'all', label: 'All' }, ...BRAND_ASSET_TYPES].map(tab => (
           <TouchableOpacity
             key={tab.key}
             style={[bas.tab, activeTab === tab.key && bas.tabActive]}
             onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.key); }}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: activeTab === tab.key }}
           >
             <Text style={[bas.tabText, activeTab === tab.key && { color: PURPLE_LIGHT }]}>{tab.label}</Text>
           </TouchableOpacity>
@@ -256,9 +292,11 @@ export default function DesignBrandAssetsScreen() {
         <View style={{ flex: 1 }}>
           <EmptyState
             icon="star"
-            title="No assets yet"
-            description="Save logos, colors, graphics, and reusable assets."
-            action={{ label: 'Add Your First Asset', onPress: handleAddAsset, icon: 'plus' }}
+            title={assets.length === 0 ? 'No assets yet' : 'No matching assets'}
+            description={assets.length === 0 ? 'Save logos, colors, graphics, and reusable assets.' : 'Try a different search or category.'}
+            action={assets.length === 0
+              ? { label: 'Add Your First Asset', onPress: handleAddAsset, icon: 'plus' }
+              : { label: 'Show All Assets', onPress: () => { setSearch(''); setActiveTab('all'); } }}
           />
         </View>
       ) : (
@@ -278,6 +316,8 @@ export default function DesignBrandAssetsScreen() {
         style={[bas.fab, { bottom: insets.bottom + SP.lg }]}
         onPress={handleAddAsset}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Upload asset"
       >
         <Feather name="upload" size={ICON.md} color={theme.onAccent} />
         <Text style={bas.fabText}>Upload Asset</Text>
@@ -320,7 +360,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:          { flex: 1, backgroundColor: 'transparent' },
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
-  tabsScroll:    { flexGrow: 0 },
+  tabsScroll:    { flexGrow: 0, flexShrink: 0 },
   tabsContent:   { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.sm },
   tab:           { paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   tabActive:     { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },

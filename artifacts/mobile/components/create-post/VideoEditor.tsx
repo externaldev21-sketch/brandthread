@@ -12,6 +12,7 @@ import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT } from '@/lib/theme';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { MAX_VIDEO_SECONDS } from '@/constants/postLimits';
 import type { VideoDraft } from '@/lib/createPost/types';
 import { CP, IconButton, PillButton } from '@/components/create-post/ui';
@@ -24,6 +25,7 @@ export function VideoEditor({ video, onChange, onBack, onNext }: {
   video: VideoDraft; onChange: (v: VideoDraft) => void; onBack: () => void; onNext: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const top = useHeaderTopInset();
   const [trackW, setTrackW] = useState(0);
   const [paused, setPaused] = useState(false);
   const [now, setNow] = useState(video.trimStart);
@@ -85,7 +87,7 @@ export function VideoEditor({ video, onChange, onBack, onNext }: {
 
   return (
     <View style={s.root} testID="video-editor">
-      <View style={s.topBar}>
+      <View style={[s.topBar, { paddingTop: top + 8 }]}>
         <IconButton icon="arrow-left" label="Back" onPress={onBack} testID="edit-back" />
         <View style={{ width: 44 }} />
       </View>

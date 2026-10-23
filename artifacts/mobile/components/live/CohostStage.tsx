@@ -49,6 +49,7 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
   const [comments, setComments] = useState<Array<{ id: string; display_name: string; message: string }>>([]);
   const [leaving, setLeaving] = useState(false);
   const engineRef = useRef<any>(null);
+  const chatRef = useRef<ScrollView>(null);
   const doneRef = useRef(false);
 
   function finish() {
@@ -130,7 +131,12 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
       </View>
 
       <View style={[s.chat, { paddingBottom: insets.bottom + SP.md }]} pointerEvents="none">
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.chatContent}>
+        <ScrollView
+          ref={chatRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.chatContent}
+          onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
+        >
           {comments.map((c) => (
             <Text key={c.id} style={s.chatLine}>
               <Text style={s.chatName}>{c.display_name} </Text>{c.message}
@@ -156,13 +162,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: LIVE_RED,
   },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.onAccent },
-  livePillText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1.5 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.text },
+  livePillText: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.meta, letterSpacing: 1.5 },
   countPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: RADIUS.pill,
     paddingHorizontal: 10, paddingVertical: 5, backgroundColor: theme.card,
   },
-  countText: { color: theme.text, fontFamily: FONT.semibold, fontSize: 12 },
+  countText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.meta },
   chat: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: 220, paddingHorizontal: SP.md },
   chatContent: { gap: 4 },
   chatLine: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.meta },

@@ -74,14 +74,16 @@ function SellerGoLiveNativeScreen() {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsFailed, setProductsFailed] = useState(false);
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setProductsLoading(true);
     (api as any).products?.list?.()
-      .then((r: any) => { if (!cancelled) setAllProducts(r?.products ?? []); })
-      .catch(() => {})
+      // GET /api/products returns a bare array (not `{ products }`).
+      .then((r: any) => { if (!cancelled) setAllProducts(Array.isArray(r) ? r : (r?.products ?? [])); })
+      .catch(() => { if (!cancelled) setProductsFailed(true); })
       .finally(() => { if (!cancelled) setProductsLoading(false); });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -206,7 +208,7 @@ function SellerGoLiveNativeScreen() {
               <Text style={[s.permBtnText, { color: theme.onAccent }]}>Allow camera</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => goBackOr(router)}>
+          <TouchableOpacity onPress={() => goBackOr(router)} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}>
             <Text style={s.permCancel}>Not now</Text>
           </TouchableOpacity>
         </View>
@@ -237,7 +239,7 @@ function SellerGoLiveNativeScreen() {
         <View style={s.topRight}>
           {facing === 'back' && (
             <TouchableOpacity onPress={toggleTorch} style={s.iconBtn} accessibilityLabel={torch ? 'Turn flash off' : 'Turn flash on'}>
-              <Feather name={torch ? 'zap' : 'zap-off'} size={19} color={torch ? '#FBBF24' : FG} />
+              <Feather name={torch ? 'zap' : 'zap-off'} size={19} color={FG} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={flipCamera} style={s.iconBtn} accessibilityLabel="Flip camera">
@@ -252,7 +254,7 @@ function SellerGoLiveNativeScreen() {
         style={s.bottomGradient}
         pointerEvents="box-none"
       >
-        <View style={s.fields} pointerEvents="box-none">
+        <View style={[s.fields, { paddingBottom: insets.bottom + SP.md }]} pointerEvents="box-none">
           <TextInput
             value={title}
             onChangeText={setTitle}
@@ -324,7 +326,7 @@ function SellerGoLiveNativeScreen() {
           <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>Feature products</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)} accessibilityLabel="Done">
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}>
                 <Feather name="x" size={22} color={FG} />
               </TouchableOpacity>
             </View>
@@ -344,7 +346,7 @@ function SellerGoLiveNativeScreen() {
               <FlatList
                 data={allProducts}
                 keyExtractor={p => p.id}
-                ListEmptyComponent={<Text style={s.pickerEmptyText}>No products found. Add products to your store first.</Text>}
+                ListEmptyComponent={<Text style={s.pickerEmptyText}>{productsFailed ? 'Couldn’t load your products. Close and try again.' : 'No products found. Add products to your store first.'}</Text>}
                 renderItem={({ item: p }) => {
                   const tagged = featuredProducts.some(t => t.id === p.id);
                   return (
@@ -352,6 +354,9 @@ function SellerGoLiveNativeScreen() {
                       onPress={() => toggleFeaturedProduct(p)}
                       activeOpacity={0.7}
                       style={[s.pickerRow, tagged && s.pickerRowActive]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: tagged }}
+                      accessibilityLabel={p.name}
                     >
                       {p.imageUrl ? (
                         <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
@@ -362,7 +367,7 @@ function SellerGoLiveNativeScreen() {
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={s.pickerRowName} numberOfLines={1}>{p.name}</Text>
-                        <Text style={s.pickerRowPrice}>${((p.priceCents ?? 0) / 100).toFixed(2)}</Text>
+                        {p.priceCents != null && <Text style={s.pickerRowPrice}>${(p.priceCents / 100).toFixed(2)}</Text>}
                       </View>
                       <View style={[s.checkbox, tagged && s.checkboxActive]}>
                         {tagged && <Feather name="check" size={13} color="#000" />}
@@ -407,7 +412,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
     pickerTitle:        { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
     pickerLoading:      { paddingVertical: SP.xl, alignItems: 'center' },
-    pickerEmptyText:    { color: 'rgba(255,255,255,0.6)', fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.md },
+    pickerEmptyText:    { color: 'rgba(255,255,255,0.6)', fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.md },
     pickerRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
     pickerRowActive:    { backgroundColor: 'rgba(255,255,255,0.06)' },
     pickerRowThumb:     { width: 40, height: 40, borderRadius: RADIUS.sm },
@@ -423,9 +428,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     permBox:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: SP.md },
     permIconWrap:      { width: 68, height: 68, borderRadius: RADIUS.xl, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
     permTitle:         { color: FG, fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },
-    permSub:           { color: 'rgba(255,255,255,0.65)', fontSize: FS.sm, textAlign: 'center', lineHeight: 22 },
+    permSub:           { color: 'rgba(255,255,255,0.65)', fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 22 },
     permBtn:           { paddingHorizontal: 28, paddingVertical: 13, borderRadius: RADIUS.md, marginTop: SP.sm },
     permBtnText:       { fontSize: FS.base, fontFamily: FONT.semibold },
-    permCancel:        { color: 'rgba(255,255,255,0.55)', fontSize: FS.sm },
+    permCancel:        { color: 'rgba(255,255,255,0.55)', fontSize: FS.sm, fontFamily: FONT.medium },
   });
 };

@@ -125,7 +125,6 @@ import {
   ALL_ITEMS,
   type ControlCenterItem,
 } from '@/lib/sellerControlCenter';
-import { radius } from '@/constants/radii';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
 import { STUDIO_MENU_ORIGIN, subscribeStudioMenuReturn } from '@/lib/navigation/studioMenuReturn';
@@ -1597,6 +1596,8 @@ export default function SellerStudioRadialMenu({
                 accessibilityRole="button"
                 accessibilityLabel="Close Studio tools"
                 testID="seller-studio-menu-close"
+                // 32pt visual circle — hitSlop brings the touch target to 44pt.
+                hitSlop={6}
                 style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
               >
                 <Feather name="x" size={20} color={theme.text} />
@@ -1712,36 +1713,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // shorter than its row siblings.
   headerTextBlock: { flex: 1, justifyContent: 'center', gap: 4 },
   storeName: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  // A small secondary link, never the title itself — shown only until the
-  // seller sets a real store name (the title already reads their account
-  // name/username in the meantime, never a grey placeholder).
-  setStoreNameLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  // A thin silver progress bar replaces the old tiny "X% set up" text —
-  // Dev: clean, no clutter. Tappable (opens the setup checklist), and
-  // hidden entirely once setup reaches 100% (see storeIsLive in the
-  // component) or before any progress has been made at all.
-  setupBarTrack: {
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: theme.border,
-    overflow: 'hidden',
-    alignSelf: 'stretch',
-  },
-  setupBarFill: { height: '100%', backgroundColor: theme.text, borderRadius: 1.5 },
-  // Compact, unfilled text+icon button — Dev's own call: the old solid
-  // white pill was "too big and eye-catching". No background, a hairline
-  // border only, ~32pt tall, matching the avatar's own vertical center.
-  viewStoreBtn: {
-    height: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  viewStoreLabel: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
   closeBtn: {
     width: 32,
     height: 32,

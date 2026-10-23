@@ -36,7 +36,7 @@ export function LiveProductsSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close products" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close products" />
       <SheetRise style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.md }]} testID="live-products-sheet">
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
         <View style={styles.header}>
@@ -76,6 +76,11 @@ export function LiveProductsSheet({
               })}
             </View>
           )}
+          {products.length === 0 && (
+            <Text style={[styles.sub, { color: theme.muted, textAlign: 'center', paddingVertical: SP.lg }]}>
+              No pieces added to this live yet.
+            </Text>
+          )}
           {products.map((p, i) => {
             const live = p.productId === pinnedProductId;
             return (
@@ -98,6 +103,7 @@ export function LiveProductsSheet({
                   style={[styles.buy, { backgroundColor: theme.accent }]}
                   accessibilityRole="button"
                   accessibilityLabel={`Buy ${p.name}`}
+                  hitSlop={6}
                 >
                   <Text style={[styles.buyText, { color: theme.onAccent }]}>Buy</Text>
                 </Pressable>
@@ -122,7 +128,7 @@ const styles = StyleSheet.create({
   index: { fontFamily: FONT.semibold, fontSize: FS.xs, width: 14, textAlign: 'center' },
   thumb: { width: 56, height: 56, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   liveChip: { alignSelf: 'flex-start', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, marginBottom: 3 },
-  liveChipText: { fontFamily: FONT.bold, fontSize: 8.5, letterSpacing: 0.8 },
+  liveChipText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
   price: { fontFamily: FONT.bold, fontSize: FS.sm, marginTop: 2 },
   buy: { height: 32, paddingHorizontal: 16, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },

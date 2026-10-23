@@ -81,7 +81,10 @@ export default function DesignExportScreen() {
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    getProject(projectId)
+      .then(p => setProject(p))
+      .catch(() => Alert.alert('Could not load project', 'Try again in a moment.'))
+      .finally(() => setLoading(false));
   }, [projectId]);
 
   const handleExport = useCallback(async () => {
@@ -92,7 +95,7 @@ export default function DesignExportScreen() {
     setExporting(true);
     try {
       await exportProject(project.id, 'png');
-      Alert.alert('Export complete!', 'File saved to your device.');
+      Alert.alert('Export complete', 'File saved to your device.');
     } catch {
       Alert.alert('Error', 'Export failed. Please try again.');
     } finally {
@@ -146,6 +149,9 @@ export default function DesignExportScreen() {
             key={fmt.id}
             onPress={() => selectFormat(fmt.id)}
             activeOpacity={0.8}
+            accessibilityRole="radio"
+            accessibilityLabel={`${fmt.label}, ${fmt.desc}`}
+            accessibilityState={{ checked: selectedFormat === fmt.id }}
           >
             <BrandthreadCard
               style={[styles.formatCard, selectedFormat === fmt.id && styles.formatCardActive]}
@@ -175,6 +181,9 @@ export default function DesignExportScreen() {
             key={sz.id}
             onPress={() => selectSize(sz.id)}
             activeOpacity={0.8}
+            accessibilityRole="radio"
+            accessibilityLabel={`${sz.label}, ${sz.desc}`}
+            accessibilityState={{ checked: selectedSize === sz.id }}
           >
             <BrandthreadCard
               style={[styles.sizeCard, selectedSize === sz.id && styles.formatCardActive]}
@@ -228,8 +237,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: SCREEN_W - SP.md * 2, height: 160,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
   },
-  thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: '#FFF' },
-  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  // Text sits on theme.primaryGradient (white in the default theme), so it
+  // must use the theme's on-accent color — a fixed white was invisible.
+  thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.onAccent },
+  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.onAccent, opacity: 0.7, marginTop: 4 },
 
   sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
 

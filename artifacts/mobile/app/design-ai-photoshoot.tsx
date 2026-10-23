@@ -33,6 +33,7 @@ import { AiSlimComposer } from '@/components/ai-tools/AiSlimComposer';
 import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
 import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleKind } from '@/services/designTypes';
 import { generatePhotoshootShot, createBrandAsset } from '@/services/designService';
@@ -219,7 +220,7 @@ export default function AIPhotoshootScreen() {
     setSlots(prev => prev.map((slot, i) => {
       const r = results[i];
       if (r.status === 'fulfilled') return { ...slot, status: 'done', imageUri: r.value };
-      return { ...slot, status: 'failed', error: r.reason?.message ?? 'Generation failed. Please try again.' };
+      return { ...slot, status: 'failed', error: aiToolErrorMessage(r.reason, 'Generation failed. Please try again.') };
     }));
     setIsGenerating(false);
   }
@@ -234,7 +235,7 @@ export default function AIPhotoshootScreen() {
       });
       setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'done', imageUri: uri } : s));
     } catch (err: any) {
-      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'failed', error: err?.message ?? 'Retry failed. Please try again.' } : s));
+      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'failed', error: aiToolErrorMessage(err, 'Retry failed. Please try again.') } : s));
     }
   }
 
@@ -286,6 +287,8 @@ export default function AIPhotoshootScreen() {
       }
       setPickerProducts(active);
       setShowProductPicker(true);
+    } catch {
+      Alert.alert("Couldn't load products", 'Try again.');
     } finally {
       setLoadingPickerProducts(false);
     }
@@ -327,6 +330,11 @@ export default function AIPhotoshootScreen() {
               <>
                 <ActivityIndicator size="small" color={FG} />
                 <Text style={s.progressText}>Generating {slots.filter(sl => sl.status === 'generating').length} shot{slots.filter(sl => sl.status === 'generating').length !== 1 ? 's' : ''}…</Text>
+              </>
+            ) : successCount === 0 ? (
+              <>
+                <Feather name="alert-circle" size={ICON.sm} color={FG} />
+                <Text style={[s.progressText, { color: FG }]}>No shots were created. Tap Retry to try again.</Text>
               </>
             ) : (
               <>
@@ -428,6 +436,7 @@ export default function AIPhotoshootScreen() {
                   onPress={() => toggleProduct(p.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${p.name}`}
+                  accessibilityState={{ selected }}
                 >
                   {thumb ? (
                     <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
@@ -484,6 +493,7 @@ export default function AIPhotoshootScreen() {
                 onPress={() => setSceneStyle(opt.value)}
                 accessibilityRole="button"
                 accessibilityLabel={`Scene: ${opt.label}`}
+                accessibilityState={{ selected: active }}
               >
                 <LinearGradient
                   colors={active ? ['#4a4a4a', '#1c1c1c'] : ['#2e2e2e', '#101010']}
@@ -501,7 +511,7 @@ export default function AIPhotoshootScreen() {
 
         <View style={[s.chipRow, { marginTop: SP.md }]}>
           {MODEL_STYLES.slice(0, 5).map((opt) => (
-            <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} onPress={() => setModelStyle(opt.value)}>
+            <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} onPress={() => setModelStyle(opt.value)} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button" accessibilityState={{ selected: modelStyle === opt.value }}>
               <Text style={[s.chipText, modelStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
@@ -512,7 +522,7 @@ export default function AIPhotoshootScreen() {
             <Text style={s.optionLabel}>Aspect ratio</Text>
             <View style={s.chipRow}>
               {RATIOS.map((r) => (
-                <TouchableOpacity key={r.value} style={[s.chip, ratio === r.value && s.chipActive]} onPress={() => setRatio(r.value)}>
+                <TouchableOpacity key={r.value} style={[s.chip, ratio === r.value && s.chipActive]} onPress={() => setRatio(r.value)} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button" accessibilityLabel={`Aspect ratio ${r.label}`} accessibilityState={{ selected: ratio === r.value }}>
                   <Text style={[s.chipText, ratio === r.value && s.chipTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -524,7 +534,7 @@ export default function AIPhotoshootScreen() {
             <Text style={s.optionLabel}>Number of shots</Text>
             <View style={s.chipRow}>
               {SHOT_COUNTS.map((n) => (
-                <TouchableOpacity key={n} style={[s.chip, shotCount === n && s.chipActive]} onPress={() => setShotCount(n)}>
+                <TouchableOpacity key={n} style={[s.chip, shotCount === n && s.chipActive]} onPress={() => setShotCount(n)} hitSlop={{ top: 6, bottom: 6 }} accessibilityRole="button" accessibilityLabel={`${n} shot${n !== 1 ? 's' : ''}`} accessibilityState={{ selected: shotCount === n }}>
                   <Text style={[s.chipText, shotCount === n && s.chipTextActive]}>{n}</Text>
                 </TouchableOpacity>
               ))}
@@ -565,7 +575,7 @@ function ProductPickerModal({ visible, loading, products, onClose, onSelect }: {
             keyExtractor={p => p.id}
             contentContainerStyle={{ padding: SP.md }}
             renderItem={({ item }) => (
-              <TouchableOpacity style={s.productRow} onPress={() => onSelect(item)} activeOpacity={0.82}>
+              <TouchableOpacity style={s.productRow} onPress={() => onSelect(item)} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={`Use for ${item.name}`}>
                 {item.media?.[0]?.uri ? (
                   <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                 ) : (
@@ -617,7 +627,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md,
     padding: SP.md, marginBottom: SP.lg, borderWidth: 1, borderColor: BORDER,
   },
-  progressText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  progressText: { flexShrink: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   footerRow: { marginTop: SP.lg, gap: SP.sm },
   pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: BG, zIndex: 10 },
   pickerSheet: { flex: 1 },

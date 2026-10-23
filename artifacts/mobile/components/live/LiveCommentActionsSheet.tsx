@@ -60,7 +60,7 @@ export function LiveCommentActionsSheet({
             accessibilityLabel={r.label}
           >
             <Feather name={r.icon} size={19} color={theme.text} style={styles.rowIcon} />
-            <Text style={[styles.rowLabel, { color: theme.text }]}>{r.label}</Text>
+            <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>{r.label}</Text>
           </Pressable>
         ))}
         <View style={[styles.divider, { backgroundColor: theme.border }]} />

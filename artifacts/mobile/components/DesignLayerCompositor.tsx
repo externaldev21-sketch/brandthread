@@ -327,7 +327,9 @@ export default function DesignLayerCompositor({
             style={{
               width: cw * Math.min(displaySize / cw, displaySize / ch),
               height: ch * Math.min(displaySize / cw, displaySize / ch),
-              backgroundColor: '#FFFFFF',
+              // The canvas's own background (a black canvas is not a white
+              // artboard); only a transparent canvas falls back to white.
+              backgroundColor: bgHex === 'transparent' ? '#FFFFFF' : bgHex,
             }}
           />
         </View>

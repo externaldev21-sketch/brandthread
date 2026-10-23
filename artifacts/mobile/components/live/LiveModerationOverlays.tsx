@@ -68,5 +68,5 @@ const styles = StyleSheet.create({
   tile: { width: 92, height: 136, borderRadius: RADIUS.md, overflow: 'hidden' },
   tileFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tileName: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 3 },
-  tileNameText: { fontFamily: FONT.semibold, fontSize: 11 },
+  tileNameText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });
