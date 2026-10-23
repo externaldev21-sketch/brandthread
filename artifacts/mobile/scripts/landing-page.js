@@ -34,8 +34,6 @@ const ROUTES = {
 const LEGAL_LINKS = [
   ['Privacy', ROUTES.privacy],
   ['Terms', ROUTES.terms],
-  ['Community guidelines', ROUTES.guidelines],
-  ['Support', ROUTES.support],
 ];
 
 // Same-origin: the server proxies /api to the API server.
@@ -249,7 +247,7 @@ function waitlistBlock(id) {
           <input id="${id}-email" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" required aria-describedby="${id}-consent ${id}-status" />
           <button class="btn solid" type="submit">Notify me</button>
         </form>
-        <p class="consent" id="${id}-consent" hidden>By submitting, you agree Brandthread may email you once about our launch. See our <a href="${ROUTES.privacy}">Privacy policy</a>.</p>
+        <p class="consent" id="${id}-consent" hidden>By submitting, you agree Brandthread may email you once about our launch. See our Privacy policy in the footer.</p>
         <p class="status" id="${id}-status" role="status" aria-live="polite"></p>
       </div>`;
 }

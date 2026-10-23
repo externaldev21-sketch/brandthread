@@ -36,6 +36,7 @@ import { giveawayLanding } from "./routes/giveawayLanding";
 import { aiUsageContext } from "./lib/aiUsage";
 import { normalizeGatePath } from "./lib/gatePath";
 import { responseCompression } from "./middlewares/compression";
+import { isPublicAppSealed } from "../../mobile/server/prelaunchGate.cjs";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -54,6 +55,20 @@ app.use(
   }),
 );
 app.use(normalizeErrorResponses);
+
+// Public HTML routes owned by the API (/bio, /g, /l, storefronts, IP forms)
+// must not bypass the production cover. API/websocket/association traffic
+// remains untouched, including the launch waitlist and Stripe webhooks.
+app.use((req, res, next) => {
+  if (isPublicAppSealed(process.env, req.headers)
+    && !/^\/(?:api|ws)(?:\/|$)/.test(req.path)
+    && !req.path.startsWith("/.well-known/")) {
+    res.setHeader("Cache-Control", "no-store");
+    res.redirect(302, "/");
+    return;
+  }
+  next();
+});
 
 // iOS/Android app-link verification files. Served at the site root (not
 // under /api), unauthenticated, before CORS/body parsing — platforms fetch

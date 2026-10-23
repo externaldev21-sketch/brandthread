@@ -15,12 +15,18 @@ run = "pnpm --filter @workspace/app-tour run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/app-tour", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/app-tour/dist/public"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run]
+args = [ "node", "artifacts/mobile/server/serve.js" ]
+
+[services.production.run.env]
+NODE_ENV = "production"
+PORT = "18205"
+BASE_PATH = "/app-tour"
+EXPO_WEB_BUILD_DIR = "../app-tour/dist/public"
+
+[services.production.health.startup]
+path = "/status"
 
 [services.env]
 PORT = "18205"

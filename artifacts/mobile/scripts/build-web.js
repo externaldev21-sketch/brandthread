@@ -10,6 +10,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { writeLandingPage } = require('./landing-page');
+const { writePrelaunchLegalPages } = require('./prelaunch-legal');
 const { addIconFontPreloads } = require('./icon-font-web');
 const { addTextFontPreloads } = require('./text-font-web');
 
@@ -302,5 +303,6 @@ if (!workspacePreview) {
   // served directly rather than through the session-aware landing handler.
   fs.copyFileSync(path.join(outputDir, 'index.html'), path.join(outputDir, 'app-shell.html'));
   fs.writeFileSync(path.join(outputDir, 'index.html'), landingHtml);
+  writePrelaunchLegalPages(outputDir, projectRoot);
 }
 console.log('Web export complete.');

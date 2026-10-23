@@ -103,15 +103,16 @@ describe('pre-launch landing page content', () => {
     expect(html).not.toMatch(/<link[^>]+stylesheet/i);
   });
 
-  it('has no sign-up, sign-in, search, pricing or app-entry links; only anchors, legal and support', () => {
+  it('has no app-entry links; only the two permitted legal links', () => {
     const hrefs = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
-    const allowed = new Set([ROUTES.privacy, ROUTES.terms, ROUTES.guidelines, ROUTES.support]);
+    const allowed = new Set([ROUTES.privacy, ROUTES.terms]);
     for (const href of hrefs) expect(href.startsWith('#') || allowed.has(href), href).toBe(true);
-    for (const route of [ROUTES.privacy, ROUTES.terms, ROUTES.guidelines]) {
+    for (const route of [ROUTES.privacy, ROUTES.terms]) {
       expect(html).toContain(`href="${route}"`);
       expect(fs.existsSync(path.join(projectRoot, 'app', `${route.slice(1)}.tsx`)), route).toBe(true);
     }
-    expect(html).toContain('href="mailto:support@brandthread.app"');
+    expect(html).not.toContain('href="/community-guidelines"');
+    expect(html).not.toContain('href="mailto:support@brandthread.app"');
     expect(html).not.toMatch(/\/onboarding|\/sign-in|\/sign-up|\/discover|\/buyer-search|\/pricing|data-flow|role="search"/);
     expect(html).not.toMatch(/>(Sign up|Log in|Get started|Start selling|Shop)</);
     expect(html).not.toMatch(/<form[^>]+action=/);

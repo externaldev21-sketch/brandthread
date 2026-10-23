@@ -15,12 +15,18 @@ run = "pnpm --filter @workspace/manufacturer-portal run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/manufacturer-portal", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/manufacturer-portal/dist/public"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run]
+args = [ "node", "artifacts/mobile/server/serve.js" ]
+
+[services.production.run.env]
+NODE_ENV = "production"
+PORT = "24728"
+BASE_PATH = "/manufacturers"
+EXPO_WEB_BUILD_DIR = "../manufacturer-portal/dist/public"
+
+[services.production.health.startup]
+path = "/status"
 
 [services.env]
 PORT = "24728"

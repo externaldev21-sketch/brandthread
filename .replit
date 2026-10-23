@@ -38,6 +38,7 @@ REVENUECAT_TEST_STORE_APP_ID = "app644e4c59dc"
 APPLE_PAY_ENABLED = "true"
 CHECKOUT_ENABLED = "true"
 GOOGLE_PAY_ENABLED = "true"
+PUBLIC_APP_ENABLED = "false"
 
 [userenv.development]
 EXPO_PUBLIC_DEV_PREVIEW = "buyer"

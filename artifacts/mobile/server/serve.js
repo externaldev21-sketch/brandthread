@@ -12,6 +12,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { renderSharePreview, apiBase } = require('./sharePreview');
 const { landingPathFor, pricingPathFor, shouldServeLanding, shouldServePricing } = require('./landing');
+const { prelaunchAction, isPublicAppSealed, isProductionDeployment } = require('./prelaunchGate.cjs');
 const { legacyRedirectTarget } = require('./legacyRedirects');
 const { appLinkFile } = require('./appLinks');
 const { dynamicSitemap } = require('./sitemap');
@@ -231,6 +232,26 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Before storefront proxies, session checks, legacy routes or SPA fallback:
+  // no cookie, preview query or direct HTML/JS URL can enter the published app.
+  const effectiveSealAction = prelaunchAction(pathname, process.env, req.headers);
+  if (effectiveSealAction === 'redirect') {
+    res.writeHead(302, { location: '/', 'cache-control': 'no-store' });
+    res.end();
+    return;
+  }
+  if (effectiveSealAction === 'cover' || effectiveSealAction === 'legal') {
+    const pagePath = path.join(STATIC_ROOT, effectiveSealAction === 'cover'
+      ? 'landing.html' : `${pathname.replace(/\//g, '')}.html`);
+    if (!fs.existsSync(pagePath)) {
+      send(res, 503, 'This page is temporarily unavailable.');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(req.method === 'HEAD' ? undefined : fs.readFileSync(pagePath));
+    return;
+  }
+
   // Universal link / App Link verification files: served before any redirect
   // (Apple and Google refuse redirected association files).
   const appLink = appLinkFile(pathname);
@@ -355,7 +376,9 @@ const server = http.createServer(async (req, res) => {
   // Signed-out visits to "/" (and "/welcome") get the static marketing page.
   // Session cookies and explicit development previews keep app access.
   // Tracking/unknown query strings must not bypass the pre-launch cover.
-  if (shouldServeLanding({
+  const publicAppOpened = process.env.PUBLIC_APP_ENABLED === 'true'
+    && isProductionDeployment(process.env, req.headers);
+  if (!(requestedPath === '/' && publicAppOpened) && shouldServeLanding({
     method: req.method,
     pathname: requestedPath,
     searchParams: requestUrl.searchParams,
@@ -416,6 +439,12 @@ const server = http.createServer(async (req, res) => {
   // `res.ok`/status code would misread as success.
   if (/^\/api(\/|-|$)/i.test(requestedPath)) {
     send(res, 404, JSON.stringify({ code: 'NOT_FOUND', message: `No route exists for ${requestedPath}.` }), 'application/json; charset=utf-8');
+    return;
+  }
+
+  // A missing allowed cover asset must never fall through to the app shell.
+  if (isPublicAppSealed(process.env, req.headers)) {
+    send(res, 404, 'Not Found');
     return;
   }
 

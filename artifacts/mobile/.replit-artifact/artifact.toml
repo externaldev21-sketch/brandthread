@@ -23,6 +23,7 @@ args = [ "node", "artifacts/mobile/server/serve.js" ]
 [services.production.run.env]
 PORT = "18115"
 BASE_PATH = "/"
+NODE_ENV = "production"
 
 [services.production.health.startup]
 path = "/status"
