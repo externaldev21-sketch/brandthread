@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  TextInput, Alert,
+  TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,7 +31,8 @@ export default function MutedAccountsScreen() {
   const [query, setQuery] = useState('');
   const [unmuting, setUnmuting] = useState<string | null>(null);
 
-  const load = useCallback(() => getMutedUsers().then(setMuted), []);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => getMutedUsers().then(setMuted).catch(() => {}).finally(() => setLoading(false)), []);
   const pull = usePullToRefresh(load);
 
   useEffect(() => { load(); }, [load]);
@@ -45,9 +46,14 @@ export default function MutedAccountsScreen() {
         onPress: async () => {
           hapticDestructiveConfirm();
           setUnmuting(user.id);
-          await unmuteUser(user.mutedUserId);
-          setUnmuting(null);
-          load();
+          try {
+            await unmuteUser(user.mutedUserId);
+            load();
+          } catch {
+            Alert.alert('Couldn’t unmute', 'Try again.');
+          } finally {
+            setUnmuting(null);
+          }
         },
       },
     ]);
@@ -64,7 +70,7 @@ export default function MutedAccountsScreen() {
 
       <View style={styles.intro}>
         <Text style={styles.introText}>
-          Muted accounts won't know they've been muted. You'll remain friends and can still message them.
+          Muted accounts won’t know you muted them. Their posts and stories are hidden on this device, and you can still message them.
         </Text>
       </View>
 
@@ -86,14 +92,23 @@ export default function MutedAccountsScreen() {
         refreshControl={pull.refreshControl}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 40 }}
-        ListEmptyComponent={
+        ListEmptyComponent={loading ? (
+          <ActivityIndicator color={theme.muted} style={{ marginTop: SPACING.lg }} />
+        ) : query.trim() && muted.length > 0 ? (
+          <EmptyState
+            icon="search"
+            title="No results"
+            description={`No muted accounts match “${query.trim()}”.`}
+            style={{ marginTop: SPACING.lg }}
+          />
+        ) : (
           <EmptyState
             icon="volume-x"
             title="No muted accounts"
             description="Muted accounts will appear here."
             style={{ marginTop: SPACING.lg }}
           />
-        }
+        )}
         renderItem={({ item }) => (
           <ListRow
             avatar={{ name: item.mutedUserName }}

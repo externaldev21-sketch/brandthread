@@ -5,7 +5,7 @@
  * to clear. Measurements save when a field loses focus.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -113,8 +113,10 @@ export default function BuyerMySizes() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom, tabInset) + 32 }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {status === 'loading' && <ActivityIndicator color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />}
         {status === 'unavailable' && <RetryRow label="Couldn't load your sizes" onRetry={() => { void retry(); }} />}
         {status === 'signed-out' && <Text style={s.hint}>Sign in to save your sizes.</Text>}
 

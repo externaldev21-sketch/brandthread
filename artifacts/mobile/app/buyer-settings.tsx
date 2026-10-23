@@ -3,10 +3,11 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
+import Constants from 'expo-constants';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
 import { hapticSuccess } from '@/lib/haptics';
@@ -62,10 +63,12 @@ export default function BuyerSettingsScreen() {
     try {
       await signOut();
       hapticSuccess();
+      setSignOutVisible(false);
       router.replace('/sign-in' as never);
+    } catch {
+      Alert.alert("Couldn't sign out", 'Check your connection and try again.');
     } finally {
       setSigningOut(false);
-      setSignOutVisible(false);
     }
   }
 
@@ -111,7 +114,7 @@ export default function BuyerSettingsScreen() {
           </View>
         ))}
 
-        <Text style={s.version}>Brandthread v1.0.0</Text>
+        <Text style={s.version}>Brandthread v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
       </ScrollView>
 
       <ConfirmSheet
@@ -133,6 +136,6 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     group: { marginBottom: SP.lg },
     card: { padding: 0, paddingHorizontal: SP.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-    version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
+    version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: SP.xs },
   });
 }

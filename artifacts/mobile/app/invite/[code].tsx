@@ -8,7 +8,7 @@
  * - Signed in: friendly note only. Existing members can't redeem an invite.
  */
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +48,7 @@ export default function InviteDeepLinkScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.lg }]}>
-      <Text style={[styles.title, { color: theme.text }]}>You are already on Brandthread</Text>
+      <Text style={[styles.title, { color: theme.text }]}>You’re already on Brandthread</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
         Invite links are for new members. Share yours and you both get $10 Thread Cash.
       </Text>
@@ -57,6 +57,10 @@ export default function InviteDeepLinkScreen() {
         onPress={() => router.replace('/buyer-invite' as never)}
         style={{ alignSelf: 'stretch', marginTop: SP.lg }}
       />
+      {/* Opened from a deep link there's no screen behind this one, so offer a way out. */}
+      <Pressable onPress={() => router.replace('/' as never)} accessibilityRole="button" hitSlop={8} style={{ marginTop: SP.md, padding: SP.sm }}>
+        <Text style={[styles.body, { color: theme.text, marginTop: 0, fontFamily: FONT.semibold }]}>Not now</Text>
+      </Pressable>
     </View>
   );
 }

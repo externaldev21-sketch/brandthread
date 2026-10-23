@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  FlatList, RefreshControl, Modal,
+  FlatList, RefreshControl, Modal, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import type { BuyerPost } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { radius } from '@/constants/radii';
 
 const { width } = Dimensions.get('window');
@@ -41,10 +42,19 @@ export default function BuyerArchive() {
   const [archivedPosts, setArchivedPosts] = useState<BuyerPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BuyerPost | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadData = useCallback(async () => {
-    const all = await getMyPosts();
-    setArchivedPosts(all.filter(p => p.isArchived));
+    try {
+      const all = await getMyPosts();
+      setArchivedPosts(all.filter(p => p.isArchived));
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -57,18 +67,36 @@ export default function BuyerArchive() {
 
   const handleRestore = async () => {
     if (!selectedPost) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await unarchivePost(selectedPost.id);
-    setSelectedPost(null);
-    await loadData();
+    try {
+      await unarchivePost(selectedPost.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSelectedPost(null);
+      await loadData();
+    } catch {
+      Alert.alert('Couldn’t restore this post', 'Try again.');
+    }
   };
 
   const handleDelete = async () => {
     if (!selectedPost) return;
+    const post = selectedPost;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    await deletePost(selectedPost.id);
-    setSelectedPost(null);
-    await loadData();
+    Alert.alert('Delete this post?', 'It will be removed permanently. This can’t be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deletePost(post.id);
+            setSelectedPost(null);
+            await loadData();
+          } catch {
+            Alert.alert('Couldn’t delete this post', 'Try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const postTypeIcon = (type: BuyerPost['type']): keyof typeof Feather.glyphMap => {
@@ -94,6 +122,9 @@ export default function BuyerArchive() {
         onPress={() => { Haptics.selectionAsync(); router.push(`/buyer-post-viewer?${qs}` as never); }}
         onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setSelectedPost(item); }}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={item.caption ? `Archived post: ${item.caption}` : 'Archived post'}
+        accessibilityHint="Long press to restore or delete"
       >
         <LinearGradient
           colors={(item.mediaColors?.length >= 2 ? item.mediaColors : [SURFACE, BG]) as [string, string]}
@@ -122,6 +153,8 @@ export default function BuyerArchive() {
             key={t}
             style={[styles.tabPill, tab === t && styles.tabPillActive]}
             onPress={() => setTab(t)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === t }}
           >
             <Feather
               name={t === 'posts' ? 'grid' : 'clock'}
@@ -136,7 +169,11 @@ export default function BuyerArchive() {
       </View>
 
       {tab === 'posts' ? (
-        archivedPosts.length === 0 ? (
+        loading ? (
+          <ActivityIndicator color={MUTED} style={{ marginTop: SP.lg }} />
+        ) : loadFailed && archivedPosts.length === 0 ? (
+          <ErrorState message="Couldn’t load your archive." onRetry={() => { setLoading(true); void loadData(); }} />
+        ) : archivedPosts.length === 0 ? (
           <EmptyState
             icon="archive"
             title="No archived posts"
@@ -147,7 +184,7 @@ export default function BuyerArchive() {
             data={archivedPosts}
             keyExtractor={p => p.id}
             numColumns={3}
-            contentContainerStyle={styles.grid}
+            contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + SP.xl }]}
             columnWrapperStyle={{ gap: GAP }}
             renderItem={renderPost}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
@@ -174,7 +211,7 @@ export default function BuyerArchive() {
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle} numberOfLines={1}>{selectedPost?.caption || 'Archived post'}</Text>
 
-              <TouchableOpacity style={styles.sheetRow} onPress={handleRestore}>
+              <TouchableOpacity style={styles.sheetRow} onPress={handleRestore} accessibilityRole="button">
                 <Feather name="rotate-ccw" size={20} color={PURPLE} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sheetRowLabel}>Restore to profile</Text>
@@ -184,7 +221,7 @@ export default function BuyerArchive() {
 
               <View style={styles.sheetDivider} />
 
-              <TouchableOpacity style={styles.sheetRow} onPress={handleDelete}>
+              <TouchableOpacity style={styles.sheetRow} onPress={handleDelete} accessibilityRole="button">
                 <Feather name="trash-2" size={20} color={RED} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.sheetRowLabel, { color: RED }]}>Delete permanently</Text>
@@ -206,7 +243,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabTextActive: { color: theme.accent },
-  grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
+  grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP },
   cell: { width: CELL, height: CELL, borderRadius: RADIUS.sm, overflow: 'hidden' },
   cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
   cellCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },

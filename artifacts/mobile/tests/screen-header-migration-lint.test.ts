@@ -122,6 +122,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/product-store.tsx',
   'app/profile-products.tsx',
   'app/profile-videos.tsx',
+  'app/push-notifications.tsx',
   'app/return-request.tsx',
   'app/seller-conversation.tsx',
   'app/seller-drop-preview.tsx',
@@ -163,7 +164,6 @@ function isRouteFile(full: string, entry: string): boolean {
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
   'app/design-bg-replace.tsx',
-  'app/help.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
   'components/SellerTutorialOverlay.tsx',

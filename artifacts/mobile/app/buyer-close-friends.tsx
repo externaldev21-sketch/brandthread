@@ -6,7 +6,7 @@
  * cache that is the fallback when the server can't be reached.
  */
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -38,11 +38,12 @@ export default function BuyerCloseFriends() {
   const [closeFriends, setCloseFriends] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadFriends = useCallback(async () => {
     const [list, localIds, followers, following, remote] = await Promise.all([
-      getAcceptedFriends(),
-      getCloseFriendIds(),
+      getAcceptedFriends().catch(() => []),
+      getCloseFriendIds().catch(() => []),
       api.social.followers().catch(() => []),
       api.social.following().catch(() => []),
       api.closeFriends.get().catch(() => null),
@@ -64,6 +65,7 @@ export default function BuyerCloseFriends() {
     const ids = remote ? remote.friendIds : localIds;
     setCloseFriends(new Set(ids));
     if (remote) void saveCloseFriendIds(ids).catch(() => {});
+    setLoading(false);
   }, [api]);
   const pull = usePullToRefresh(loadFriends);
 
@@ -98,7 +100,7 @@ export default function BuyerCloseFriends() {
       hapticSuccessAction();
       goBackOr(router);
     } catch {
-      Alert.alert("Couldn't save", 'Your Close Friends list was kept on this device but not saved to your account. Try again.');
+      Alert.alert("Couldn't save", 'Your close friends list was kept on this device but not saved to your account. Try again.');
     } finally {
       setSaving(false);
     }
@@ -165,7 +167,9 @@ export default function BuyerCloseFriends() {
         renderItem={renderFriend}
         refreshControl={pull.refreshControl}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
-        ListEmptyComponent={
+        ListEmptyComponent={loading ? (
+          <ActivityIndicator color={colors.mutedForeground} style={{ marginTop: SPACING.lg }} />
+        ) : (
           <EmptyState
             icon="users"
             title={friends.length === 0 ? 'No friends yet' : 'No results'}
@@ -173,10 +177,10 @@ export default function BuyerCloseFriends() {
               ? 'Add friends to create a close friends list.'
               : 'Try a different search term.'}
             action={friends.length === 0
-              ? { label: 'Find friends', onPress: () => router.push('/buyer-friend-requests' as never) }
+              ? { label: 'Find friends', onPress: () => router.push('/buyer-friend-requests?tab=suggested' as never) }
               : undefined}
           />
-        }
+        )}
         ItemSeparatorComponent={() => <View style={s.separator} />}
       />
 

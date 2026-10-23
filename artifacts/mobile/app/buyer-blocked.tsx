@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, ActivityIndicator,
+  Alert, View, Text, FlatList, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,8 +79,12 @@ export default function BlockedAndMutedScreen() {
 
   async function unmute(record: MuteRecord) {
     hapticToggle();
-    await unmuteUser(record.mutedUserId);
-    setMuted((prev) => prev.filter((row) => row.id !== record.id));
+    try {
+      await unmuteUser(record.mutedUserId);
+      setMuted((prev) => prev.filter((row) => row.id !== record.id));
+    } catch {
+      Alert.alert('Couldn’t unmute', 'Try again.');
+    }
   }
 
   const header = (
@@ -124,12 +128,14 @@ export default function BlockedAndMutedScreen() {
     <View style={s.root}>
       <ScreenHeader title="Blocked & muted" />
 
-      <SegmentedControl
-        options={[{ id: 'blocked', label: 'Blocked' }, { id: 'muted', label: 'Muted' }]}
-        selectedId={tab}
-        onChange={(id) => setTab(id as Tab)}
-        testID="blocked-muted-tabs"
-      />
+      <View style={{ paddingHorizontal: SPACING.md }}>
+        <SegmentedControl
+          options={[{ id: 'blocked', label: 'Blocked' }, { id: 'muted', label: 'Muted' }]}
+          selectedId={tab}
+          onChange={(id) => setTab(id as Tab)}
+          testID="blocked-muted-tabs"
+        />
+      </View>
 
       {loading ? (
         <View style={s.loading}><ActivityIndicator color={theme.text} /></View>
@@ -144,7 +150,7 @@ export default function BlockedAndMutedScreen() {
             <ListRow
               avatar={{ uri: item.avatarUrl, name: item.name }}
               title={item.name}
-              subtitle={`${[item.handle, item.accountType === 'seller' ? 'Seller' : null].filter(Boolean).join(' · ')}\nBlocked ${shortRelativeTime(item.blockedAt)}`}
+              subtitle={[[item.handle, item.accountType === 'seller' ? 'Seller' : null].filter(Boolean).join(' · '), `Blocked ${shortRelativeTime(item.blockedAt)}`].filter(Boolean).join('\n')}
               subtitleNumberOfLines={2}
               right={(
                 <Button

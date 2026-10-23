@@ -55,6 +55,7 @@ export function SettingsProfileCard({
         hapticLight();
         onPress();
       }}
+      accessibilityRole="button"
       accessibilityLabel="Edit profile"
     >
       <View style={[s.profileAvatar, { backgroundColor: colors.primary }]}>
@@ -104,7 +105,7 @@ export function SettingsSearchBar({
         onBlur={() => setFocused(false)}
       />
       {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Clear search">
           <Feather name="x-circle" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       )}

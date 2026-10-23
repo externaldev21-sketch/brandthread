@@ -4,7 +4,8 @@
  * notification settings screens).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
@@ -12,6 +13,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow } from '@/components/ui/ListRow';
 import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { BrandedLoadingState } from '@/components/BrandthreadUI';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { hapticToggle } from '@/lib/haptics';
 import { BUYER_NOTIFICATION_TYPES, SELLER_NOTIFICATION_TYPES } from '@/lib/notificationTypes';
@@ -35,15 +38,24 @@ export default function NotificationChannelsScreen() {
   const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [channels, setChannels] = useState<ChannelState>({ inApp: {}, email: {} });
 
-  useEffect(() => {
+  const insets = useSafeAreaInsets();
+  // Until the saved preferences arrive the switches would show defaults as if
+  // they were the person's choices, so the list waits for a real answer.
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading');
+
+  const load = useCallback(() => {
+    setLoadState('loading');
     api.notificationPrefs.get()
       .then((data) => {
         setRole(data.role);
         setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
         setChannels({ inApp: data.channels?.inApp ?? {}, email: data.channels?.email ?? {} });
+        setLoadState('ready');
       })
-      .catch(() => { /* rows render with their defaults */ });
-  }, []);
+      .catch(() => setLoadState('error'));
+  }, [api]);
+
+  useEffect(() => { load(); }, [load]);
 
   const change = useCallback(async (channel: Channel, key: string, value: boolean) => {
     hapticToggle();
@@ -54,6 +66,7 @@ export default function NotificationChannelsScreen() {
       setChannels({ inApp: result.channels.inApp, email: result.channels.email });
     } catch {
       setChannels(prior);
+      Alert.alert('Couldn’t update notifications', 'Check your connection and try again.');
     }
   }, [api, channels]);
 
@@ -66,6 +79,7 @@ export default function NotificationChannelsScreen() {
       });
     } catch {
       setQuietHours(prior);
+      Alert.alert('Couldn’t update quiet hours', 'Check your connection and try again.');
     }
   }, [api, quietHours]);
 
@@ -74,7 +88,10 @@ export default function NotificationChannelsScreen() {
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Email & in-app" divider={false} onBack={() => goBackOr(router, '/notifications-settings')} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+      {loadState === 'loading' ? <BrandedLoadingState /> : loadState === 'error' ? (
+        <ErrorState message="Couldn’t load your notification settings." onRetry={load} />
+      ) : (
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge }} showsVerticalScrollIndicator={false}>
         {SECTIONS.map(({ channel, title }) => (
           <View key={channel} style={s.section}>
             <Text style={[TYPE_SCALE.footnote, s.sectionTitle, { color: colors.foreground }]}>{title}</Text>
@@ -100,6 +117,7 @@ export default function NotificationChannelsScreen() {
           <QuietHoursRow start={quietHours.start} end={quietHours.end} onChange={changeQuietHours} />
         </View>
       </ScrollView>
+      )}
     </View>
   );
 }

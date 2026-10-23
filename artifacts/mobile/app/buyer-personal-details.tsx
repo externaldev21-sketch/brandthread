@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { Alert, View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { BrandedLoadingState } from '@/components/BrandthreadUI';
 import { Card, ListRow, StickyBottomCTA } from '@/components/ui';
 import { hapticSuccess } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -29,13 +30,12 @@ type FieldDef = {
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
 };
 
-// email and birthday are managed in Login methods and locked in the UI.
+// Email is verified through Change email below and locked here.
 const FIELDS: FieldDef[] = [
   { key: 'name',     label: 'Name',      placeholder: 'Your name',         icon: 'user' },
   { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign' },
   { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false },
   { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad' },
-  { key: 'birthday', label: 'Birthday',  placeholder: 'Set in Login methods', icon: 'calendar', editable: false },
   { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
 ];
 
@@ -56,6 +56,7 @@ export default function BuyerPersonalDetails() {
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     // Seed from BOTH sources; social profile is authoritative for shared identity.
@@ -66,8 +67,9 @@ export default function BuyerPersonalDetails() {
         username: local.username || social.username || DEFAULT_BUYER_PROFILE.username,
         pronouns: local.pronouns || social.pronouns,
       });
-      setLoaded(true);
-    });
+    }).catch(() => {
+      // Keep the defaults editable; saving still works once the network is back.
+    }).finally(() => setLoaded(true));
   }, []);
 
   function set(key: string, val: string) {
@@ -77,13 +79,12 @@ export default function BuyerPersonalDetails() {
 
   function getValue(key: string): string {
     if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress);
-    if (key === 'birthday') return '';
     const val = (fields as unknown as Record<string, unknown>)[key];
     return typeof val === 'string' ? val : '';
   }
 
   async function handleSave() {
-    hapticSuccess();
+    if (saving) return;
     // Persist locally; only sync non-empty shared identity fields to the social
     // profile so saving an unrelated field (e.g. phone) never overwrites an
     // already-set name or username with an empty string.
@@ -91,22 +92,37 @@ export default function BuyerPersonalDetails() {
     if (fields.name.trim()) socialPatch.name = fields.name;
     if (fields.username.trim()) socialPatch.username = fields.username;
     if (fields.pronouns.trim()) socialPatch.pronouns = fields.pronouns;
-    await Promise.all([
-      saveBuyerProfile(fields),
-      Object.keys(socialPatch).length > 0 ? updateMyProfile(socialPatch) : Promise.resolve(),
-    ]);
-    goBackOr(router);
+    setSaving(true);
+    try {
+      await Promise.all([
+        saveBuyerProfile(fields),
+        Object.keys(socialPatch).length > 0 ? updateMyProfile(socialPatch) : Promise.resolve(),
+      ]);
+      hapticSuccess();
+      goBackOr(router);
+    } catch {
+      Alert.alert("Couldn't save your details", 'Check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  if (!loaded) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
+  if (!loaded) {
+    return (
+      <View style={s.page}>
+        <ScreenHeader title="Personal details" />
+        <BrandedLoadingState />
+      </View>
+    );
+  }
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Personal Details" />
+      <ScreenHeader title="Personal details" />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
-          Keep your details up to date. Email and birthday are managed by your sign-in provider.
+          Keep your details up to date. Your email is verified when you change it below.
         </Text>
 
         <Card style={s.card}>
@@ -140,7 +156,7 @@ export default function BuyerPersonalDetails() {
         <View style={s.note}>
           <Feather name="info" size={14} color={palette.mutedForeground} />
           <Text style={s.noteText}>
-            Change your email in Login methods.
+            To change your email or phone number, use the options below.
           </Text>
         </View>
 
@@ -152,7 +168,7 @@ export default function BuyerPersonalDetails() {
       </ScrollView>
 
       {hasChanges && (
-        <StickyBottomCTA label="Save Changes" onPress={() => { void handleSave(); }} />
+        <StickyBottomCTA label="Save changes" loading={saving} onPress={() => { void handleSave(); }} />
       )}
     </View>
   );
@@ -165,7 +181,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typ
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
-  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
   inputDisabled: { color: palette.mutedForeground },
   note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },

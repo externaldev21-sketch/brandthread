@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,9 +24,10 @@ export default function BuyerQRCode() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    getMyProfile().then(setProfile);
+    getMyProfile().then(setProfile).catch(() => {}).finally(() => setLoaded(true));
   }, []);
 
   const handle = profile?.username ? `@${profile.username}` : null;
@@ -37,6 +38,8 @@ export default function BuyerQRCode() {
   const qrValue = canonicalUrl ?? 'https://brandthread.app';
 
   async function handleShare() {
+    // Nothing real to share until the profile has a username.
+    if (!canonicalUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({
@@ -50,11 +53,11 @@ export default function BuyerQRCode() {
   return (
     <View style={s.page}>
       <ScreenHeader
-        title="QR Code"
-        actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }]}
+        title="QR code"
+        actions={canonicalUrl ? [{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }] : []}
       />
 
-      <View style={s.body}>
+      <ScrollView contentContainerStyle={[s.body, { paddingBottom: insets.bottom + SP.lg }]} showsVerticalScrollIndicator={false}>
         {/* Card */}
         <View style={s.card}>
           {/* Gradient top strip */}
@@ -76,6 +79,10 @@ export default function BuyerQRCode() {
                 />
               </View>
             </View>
+          ) : !loaded ? (
+            <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
+              <ActivityIndicator color={MUTED} />
+            </View>
           ) : (
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
               <Feather name="user-x" size={40} color={MUTED} />
@@ -93,14 +100,21 @@ export default function BuyerQRCode() {
           ) : null}
 
           {/* Hint */}
-          <Text style={s.hint}>Point a camera at this code to visit my profile</Text>
+          {canonicalUrl ? <Text style={s.hint}>Point a camera at this code to visit my profile</Text> : null}
         </View>
 
         {/* Share button */}
-        <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={s.shareBtnWrap}>
+        <TouchableOpacity
+          onPress={handleShare}
+          disabled={!canonicalUrl}
+          activeOpacity={0.85}
+          style={[s.shareBtnWrap, !canonicalUrl && { opacity: 0.4 }]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canonicalUrl }}
+        >
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
             <Feather name="share-2" size={18} color={theme.onAccent} />
-            <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR Code</Text>
+            <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR code</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -109,16 +123,16 @@ export default function BuyerQRCode() {
           <View style={s.infoRow}>
             <Feather name="user" size={17} color={PURPLE} />
             <Text style={s.infoLabel}>Profile</Text>
-            <Text style={s.infoValue}>{profile?.name ?? 'Your Name'}</Text>
+            <Text style={s.infoValue}>{profile?.name || '—'}</Text>
           </View>
           <View style={s.divider} />
           <View style={s.infoRow}>
             <Feather name="link" size={17} color={PURPLE} />
             <Text style={s.infoLabel}>Link</Text>
-            <Text style={s.infoValue} numberOfLines={1}>{qrValue}</Text>
+            <Text style={s.infoValue} numberOfLines={1}>{canonicalUrl ?? '—'}</Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -126,7 +140,7 @@ export default function BuyerQRCode() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
 
-  body: { flex: 1, padding: SP.md, alignItems: 'center' },
+  body: { flexGrow: 1, padding: SP.md, alignItems: 'center' },
 
   card: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.lg },
   cardTop: { paddingVertical: 12, alignItems: 'center' },

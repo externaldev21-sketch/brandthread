@@ -34,12 +34,12 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     title: 'Account',
     items: [
       { label: 'Edit profile', description: 'Name, photo, bio, and public profile', aliases: ['profile', 'personal details', 'name', 'photo', 'bio'], icon: 'user', route: '/(buyer)/edit-profile', audience: 'buyer' },
-      { label: 'Accounts Center', description: 'Password, email, phone, and sign-in methods', aliases: ['password', 'email', 'phone', 'sign in', 'security', 'account ownership'], icon: 'key', route: '/buyer-account-center', audience: 'buyer' },
+      { label: 'Accounts Center', description: 'Password, email, phone, and sign-in', aliases: ['password', 'email', 'phone', 'sign in', 'security', 'account ownership'], icon: 'key', route: '/buyer-account-center', audience: 'buyer' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/buyer-login-activity', audience: 'buyer' },
-      { label: 'Account type', description: 'Switch between buyer and seller account experiences', aliases: ['role', 'buyer seller', 'account role'], icon: 'layers', route: '/account-type-settings', audience: 'buyer' },
-      { label: 'Your activity', description: 'Likes, comments, searches, and time spent', aliases: ['activity', 'history'], icon: 'activity', route: '/buyer-your-activity', audience: 'buyer' },
+      { label: 'Account type', description: 'Switch between buyer and seller', aliases: ['role', 'buyer seller', 'account role'], icon: 'layers', route: '/account-type-settings', audience: 'buyer' },
+      { label: 'Your activity', description: 'Likes, comments, and searches', aliases: ['activity', 'history'], icon: 'activity', route: '/buyer-your-activity', audience: 'buyer' },
       { label: 'Archive', description: 'Archived posts and stories', aliases: ['archived'], icon: 'archive', route: '/buyer-archive', audience: 'buyer' },
-      { label: 'Saved', description: 'Posts, products, and collections you saved', aliases: ['bookmarks'], icon: 'bookmark', route: '/buyer-saved', audience: 'buyer' },
+      { label: 'Saved', description: 'Saved products and collections', aliases: ['bookmarks'], icon: 'bookmark', route: '/buyer-saved', audience: 'buyer' },
       { label: 'QR code', description: 'Share your Brandthread profile', aliases: ['qr', 'scan'], icon: 'grid', route: '/buyer-qr-code', audience: 'buyer' },
       { label: 'Invite friends', description: 'Give $10, get $10 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
       { label: 'Following brands', description: 'Brands and creators you follow', aliases: ['following', 'brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
@@ -48,56 +48,56 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Orders & returns',
     items: [
-      { label: 'Orders and returns', description: 'View purchases, returns, and order support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
-      { label: 'Shopping preferences', description: 'Sizes, fit, favorite categories, and recommendations', aliases: ['shopping', 'sizes', 'fit', 'recommendations'], icon: 'shopping-bag', route: '/shopping-preferences', audience: 'buyer' },
+      { label: 'Orders and returns', description: 'Purchases, returns, and support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
+      { label: 'Shopping preferences', description: 'Fit, categories, and drop alerts', aliases: ['shopping', 'sizes', 'fit', 'recommendations'], icon: 'shopping-bag', route: '/shopping-preferences', audience: 'buyer' },
       { label: 'My sizes', description: 'Sizes and measurements', aliases: ['sizes', 'size', 'measurements', 'fit', 'height'], icon: 'maximize-2', route: '/buyer-my-sizes', audience: 'buyer' },
     ],
   },
   {
     title: 'Addresses',
     items: [
-      { label: 'Shipping addresses', description: 'Manage saved addresses for faster checkout', aliases: ['address', 'delivery', 'shipping'], icon: 'map-pin', route: '/buyer-addresses', audience: 'buyer' },
+      { label: 'Shipping addresses', description: 'Saved addresses for faster checkout', aliases: ['address', 'delivery', 'shipping'], icon: 'map-pin', route: '/buyer-addresses', audience: 'buyer' },
     ],
   },
   {
     title: 'Payment methods',
     items: [
-      { label: 'Payment methods', description: 'Cards and payment methods saved with your account', aliases: ['cards', 'billing', 'checkout payment'], icon: 'credit-card', route: '/buyer-payment-methods', audience: 'buyer' },
+      { label: 'Payment methods', description: 'Cards saved to your account', aliases: ['cards', 'billing', 'checkout payment'], icon: 'credit-card', route: '/buyer-payment-methods', audience: 'buyer' },
     ],
   },
   {
     title: 'Thread Cash',
     items: [
-      { label: 'Thread Cash', description: 'Your Brandthread wallet, streaks, and store credit', aliases: ['wallet', 'credit', 'balance', 'streak', 'rewards'], icon: 'dollar-sign', route: '/thread-cash', audience: 'buyer' },
+      { label: 'Thread Cash', description: 'Your wallet, streaks, and credit', aliases: ['wallet', 'credit', 'balance', 'streak', 'rewards'], icon: 'dollar-sign', route: '/thread-cash', audience: 'buyer' },
     ],
   },
   {
     title: 'Notifications',
     items: [
-      { label: 'Notifications', description: 'Manage push notification preferences', aliases: ['alerts', 'push'], icon: 'bell', route: '/push-notifications', audience: 'buyer' },
+      { label: 'Notifications', description: 'Push, email, and in-app alerts', aliases: ['alerts', 'push'], icon: 'bell', route: '/buyer-settings-detail?section=notifications', audience: 'buyer' },
     ],
   },
   {
     title: 'Privacy & safety',
     items: [
-      { label: 'Privacy & activity', description: 'Account privacy and who can see your content', aliases: ['privacy', 'activity', 'visibility'], icon: 'lock', route: '/buyer-privacy-settings', audience: 'buyer' },
-      { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
-      { label: 'Muted accounts', description: 'Accounts whose posts and comments are muted', aliases: ['mute', 'muted'], icon: 'volume-x', route: '/buyer-muted', audience: 'buyer' },
-      { label: 'Restricted accounts', description: 'Accounts with limited interaction with you', aliases: ['restrict', 'restricted'], icon: 'user-x', route: '/buyer-restricted', audience: 'buyer' },
-      { label: 'Follow requests', description: 'Confirm or delete requests to follow your private account', aliases: ['requests', 'follow requests', 'private account'], icon: 'user-plus', route: '/buyer-friend-requests', audience: 'buyer' },
-      { label: 'Close Friends', description: 'The people who see your close friends posts', aliases: ['close friends'], icon: 'star', route: '/buyer-close-friends', audience: 'buyer' },
-      { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
-      { label: 'Who can message and see me', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
-      { label: 'Content you see', description: 'Favorites, content preferences, and suggested content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
+      { label: 'Privacy & activity', description: 'Who can see and contact you', aliases: ['privacy', 'activity', 'visibility'], icon: 'lock', route: '/buyer-privacy-settings', audience: 'buyer' },
+      { label: 'Blocked accounts', description: 'See and unblock people', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
+      { label: 'Muted accounts', description: 'People whose posts you muted', aliases: ['mute', 'muted'], icon: 'volume-x', route: '/buyer-muted', audience: 'buyer' },
+      { label: 'Restricted accounts', description: 'Limit how people interact with you', aliases: ['restrict', 'restricted'], icon: 'user-x', route: '/buyer-restricted', audience: 'buyer' },
+      { label: 'Follow requests', description: 'Requests to follow your private account', aliases: ['requests', 'follow requests', 'private account'], icon: 'user-plus', route: '/buyer-friend-requests', audience: 'buyer' },
+      { label: 'Close friends', description: 'Who sees your close friends posts', aliases: ['close friends'], icon: 'star', route: '/buyer-close-friends', audience: 'buyer' },
+      { label: 'Muted words', description: 'Hide posts and comments by keyword', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
+      { label: 'Who can message and see me', description: 'Message requests and read receipts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
+      { label: 'Content you see', description: 'Recommendations and sensitive content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
     ],
   },
   {
     title: 'Appearance',
     items: [
       { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
-      { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
+      { label: 'App Lock', description: 'Require Face ID or fingerprint to open', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
-      { label: 'Accessibility & data usage', description: 'Media quality, data usage, and accessibility options', aliases: ['accessibility', 'media quality', 'data usage', 'wifi'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
+      { label: 'Accessibility', description: 'Reduce motion and captions', aliases: ['accessibility', 'media quality', 'data usage', 'wifi'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
       { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
     ],
   },
@@ -106,18 +106,18 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Report a problem', description: 'Tell us about a bug or an issue', aliases: ['bug', 'issue', 'feedback'], icon: 'alert-triangle', route: '/buyer-problem-report', audience: 'buyer' },
-      { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
-      { label: 'About Brandthread', description: 'App version, licenses, and more', aliases: ['about', 'version', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
+      { label: 'Download my data', description: 'Profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
+      { label: 'About Brandthread', description: 'App version and policies', aliases: ['about', 'version', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
     ],
   },
   {
     title: 'Legal',
     items: [
       { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
-      { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
-      { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
+      { label: 'Terms of Service', description: 'The agreement for using Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
+      { label: 'Privacy Policy', description: 'How we use and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
       { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
-      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
+      { label: 'Seller Agreement', description: 'Fees, payouts, and selling rules', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
     ],
   },
   {
@@ -129,7 +129,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Danger zone',
     items: [
-      { label: 'Delete account', description: 'Permanently erase your account and private data', aliases: ['remove account', 'close account'], icon: 'trash-2', action: 'delete-account', destructive: true, audience: 'shared' },
+      { label: 'Delete account', description: 'Permanently erase your account', aliases: ['remove account', 'close account'], icon: 'trash-2', action: 'delete-account', destructive: true, audience: 'shared' },
     ],
   },
 ];

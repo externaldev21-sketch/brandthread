@@ -21,14 +21,14 @@ type Row = {
 };
 
 const ROWS: Row[] = [
-  { label: 'Personal details', icon: 'user', sub: 'Name, email, phone and birthday', route: '/buyer-personal-details' },
-  { label: 'Password and security', icon: 'shield', sub: 'Password, two-factor authentication and login alerts', route: '/buyer-security' },
-  { label: 'Login methods', icon: 'link', sub: 'Apple, Google and email', route: '/login-methods' },
-  { label: 'Biometric unlock', icon: 'unlock', sub: 'Face ID, Touch ID or device biometrics', route: '/biometric-unlock' },
-  { label: "Where you're logged in", icon: 'smartphone', sub: 'Review active sessions', route: '/buyer-login-activity' },
+  { label: 'Personal details', icon: 'user', sub: 'Name, username, email, and phone', route: '/buyer-personal-details' },
+  { label: 'Password and security', icon: 'shield', sub: 'Password and two-factor sign-in', route: '/buyer-security' },
+  { label: 'Login methods', icon: 'link', sub: 'Apple, Google, and email', route: '/login-methods' },
+  { label: 'App Lock', icon: 'unlock', sub: 'Face ID, Touch ID, or fingerprint', route: '/biometric-unlock' },
+  { label: 'Login activity', icon: 'smartphone', sub: 'Review active sessions', route: '/buyer-login-activity' },
   { label: 'Download your information', icon: 'download', sub: 'Get a copy of your data', route: '/buyer-download-data' },
-  { label: 'Ad and recommendation preferences', icon: 'sliders', sub: 'Control personalisation', route: '/buyer-settings-detail?section=content' },
-  { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
+  { label: 'Recommendation preferences', icon: 'sliders', sub: 'Control personalization', route: '/buyer-settings-detail?section=content' },
+  { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account', route: '/delete-account', destructive: true },
 ];
 
 export default function BuyerAccountCenter() {
@@ -77,11 +77,11 @@ export default function BuyerAccountCenter() {
 
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
-  hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: 16, marginBottom: 16 },
+  hero: { flexDirection: 'row', gap: SP.md, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
   logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontFamily: FONT.bold, fontSize: FS.xl },
-  heroTitle: { fontFamily: FONT.bold, fontSize: 15 },
-  heroSub: { fontFamily: FONT.regular, fontSize: 11.5, lineHeight: 16, marginTop: 3 },
+  heroTitle: { fontFamily: FONT.bold, fontSize: FS.base },
+  heroSub: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, marginTop: SP.xs },
   card: { padding: 0, paddingHorizontal: SP.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });

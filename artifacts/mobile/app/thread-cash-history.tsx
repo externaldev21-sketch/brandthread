@@ -7,7 +7,8 @@
  * dashboard row, so the numbers never drift.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -44,6 +45,7 @@ export default function ThreadCashHistoryScreen() {
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const balance = useSellerThreadCashBalance();
   const { history, loading, error, reload } = useSellerThreadCashHistory(100);
+  const insets = useSafeAreaInsets();
 
   // History is newest-first; walk backward from the current balance so each
   // row shows the balance immediately AFTER that entry took effect.
@@ -61,7 +63,7 @@ export default function ThreadCashHistoryScreen() {
       <View style={[styles.balanceRow, { borderBottomColor: theme.borderSubtle }]}>
         <ThreadCashBillIcon size={16} />
         <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-history-balance">
-          {balance.loading ? '···' : formatCents(balance.balanceCents ?? 0)} balance
+          {balance.loading ? '···' : balance.error ? '—' : formatCents(balance.balanceCents ?? 0)} balance
         </Text>
       </View>
 
@@ -80,7 +82,8 @@ export default function ThreadCashHistoryScreen() {
           message="Live gifts and message payments from buyers will show up here."
         />
       ) : (
-        <View style={styles.list} testID="thread-cash-history-list">
+        // Up to 100 rows: the list scrolls and clears the home indicator.
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.lg }]} testID="thread-cash-history-list">
           {rows.map(({ entry, balanceAfter }, index) => {
             const glyph = historyGlyph(entry, theme);
             const isLast = index === rows.length - 1;
@@ -110,7 +113,7 @@ export default function ThreadCashHistoryScreen() {
               </View>
             );
           })}
-        </View>
+        </ScrollView>
       )}
     </View>
   );

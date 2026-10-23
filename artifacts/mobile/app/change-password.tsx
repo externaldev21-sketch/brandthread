@@ -61,7 +61,7 @@ export default function ChangePassword() {
       <SecurityBody>
         {done ? (
           <SecuritySuccess
-            title="Password changed"
+            title={hasPassword ? 'Password changed' : 'Password added'}
             body={signOutOthers ? 'You were signed out of your other devices.' : undefined}
             onDone={() => goBackOr(router)}
           />

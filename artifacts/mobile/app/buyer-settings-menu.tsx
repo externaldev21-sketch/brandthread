@@ -21,9 +21,10 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { hapticLight, hapticDestructiveConfirm } from '@/lib/haptics';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
@@ -46,6 +47,7 @@ type MenuSection = {
 export default function BuyerSettingsMenuScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const [query, setQuery] = useState('');
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
@@ -61,8 +63,12 @@ export default function BuyerSettingsMenuScreen() {
         style: 'destructive',
         onPress: async () => {
           hapticDestructiveConfirm();
-          try { await signOut(); } catch {}
-          router.replace('/sign-in' as never);
+          try {
+            await signOut();
+            router.replace('/sign-in' as never);
+          } catch {
+            Alert.alert("Couldn't sign out", 'Check your connection and try again.');
+          }
         },
       },
     ]);
@@ -96,7 +102,7 @@ export default function BuyerSettingsMenuScreen() {
         { key: 'orders', icon: 'package', label: 'Orders', onPress: () => router.push('/(buyer)/orders') },
         { key: 'rewards', icon: 'gift', label: 'Rewards', onPress: () => router.push('/loyalty' as any) },
         { key: 'thread-cash', icon: 'credit-card', label: 'Thread Cash wallet', onPress: () => router.push('/thread-cash' as any) },
-        { key: 'gift-cards', icon: 'gift', label: 'Gift cards', onPress: () => router.push('/buyer-gift-cards' as any) },
+        { key: 'gift-cards', icon: 'tag', label: 'Gift cards', onPress: () => router.push('/buyer-gift-cards' as any) },
       ],
     },
     {
@@ -109,9 +115,9 @@ export default function BuyerSettingsMenuScreen() {
     {
       title: 'More',
       rows: [
-        { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => router.push('/settings' as any) },
+        { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => router.push('/buyer-settings' as any) },
         { key: 'help', icon: 'help-circle', label: 'Help', onPress: () => router.push('/help' as any) },
-        { key: 'log-out', icon: 'log-out', label: 'Log out', destructive: true, onPress: handleSignOut },
+        { key: 'log-out', icon: 'log-out', label: 'Sign out', destructive: true, onPress: handleSignOut },
       ],
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,7 +157,7 @@ export default function BuyerSettingsMenuScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SP.xl }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {filteredSections.map((section) => (
           <View key={section.title} style={s.section}>
             <Text style={[s.sectionHeader, { color: theme.subtle }]}>{section.title.toUpperCase()}</Text>
@@ -192,20 +198,20 @@ function styles(theme: ReturnType<typeof useAppTheme>['theme']) {
     searchWrap: { paddingHorizontal: SIDE_INSET, paddingBottom: SP.sm },
     searchField: {
       flexDirection: 'row', alignItems: 'center', gap: SP.xs,
-      height: 38, borderRadius: 10, paddingHorizontal: SP.sm,
+      height: 38, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm,
     },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 0 },
     scrollContent: { paddingBottom: SP.xl },
     section: { marginTop: SP.md },
     sectionHeader: {
-      fontSize: 12, fontFamily: FONT.semibold, letterSpacing: 0.2,
+      fontSize: FS.meta, fontFamily: FONT.semibold, letterSpacing: 0.2,
       paddingHorizontal: SIDE_INSET, marginBottom: 2,
     },
     row: {
       flexDirection: 'row', alignItems: 'center', gap: ICON_LABEL_GAP,
       height: ROW_HEIGHT, paddingHorizontal: SIDE_INSET,
     },
-    rowLabel: { flex: 1, fontSize: 15, fontFamily: FONT.semibold },
+    rowLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold },
     rowValue: { fontSize: FS.sm, fontFamily: FONT.regular },
     divider: {
       position: 'absolute', left: SIDE_INSET + ROW_ICON_SIZE + ICON_LABEL_GAP, right: 0, bottom: 0,

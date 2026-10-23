@@ -79,11 +79,13 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   contactSync: false,
   showShoppingActivity: false,
   personalizedRecommendations: true,
-  sizeTops: 'M',
-  sizeBottoms: '32',
-  sizeShoes: '10',
+  // Sizes and styles start empty so nothing looks like a choice the person
+  // never made; Shopping preferences shows them unselected until picked.
+  sizeTops: '',
+  sizeBottoms: '',
+  sizeShoes: '',
   preferredFit: 'regular',
-  styleCategories: ['streetwear', 'vintage'],
+  styleCategories: [],
   language: 'English',
   theme: 'system',
   reduceMotion: false,

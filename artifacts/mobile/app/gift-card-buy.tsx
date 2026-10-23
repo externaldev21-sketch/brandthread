@@ -21,13 +21,13 @@ import { GiftCardFace } from '@/components/giftCards/GiftCardFace';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, MUTED, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORE_INFO } from '@/lib/giftCardsPreview';
 import { amountTextToCents, giftCardPurchaseIssue, type GiftCardStoreInfo } from '@/lib/giftCards';
 
-type Done = { cardId: string; code: string | null; email: string; storeName: string; amountCents: number };
+type Done = { cardId: string; code: string | null; email: string; storeName: string; amountCents: number; paid: boolean };
 
 export default function GiftCardBuyScreen() {
   const params = useLocalSearchParams<{ sellerId?: string; name?: string }>();
@@ -127,7 +127,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
         if (confirmed?.status === 'paid') break;
         await new Promise(resolve => setTimeout(resolve, 1200));
       }
-      setDone({ cardId: giftCardId, code: confirmed?.code ?? null, email: email.trim(), storeName: info.storeName, amountCents });
+      setDone({ cardId: giftCardId, code: confirmed?.code ?? null, email: email.trim(), storeName: info.storeName, amountCents, paid: confirmed?.status === 'paid' });
     } finally {
       setPaying(false);
     }
@@ -137,8 +137,12 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
     return (
       <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         <GiftCardFace storeName={done.storeName} amountText={formatCents(done.amountCents)} />
-        <Text style={s.doneTitle}>Gift card sent</Text>
-        <Text style={s.plain}>We emailed it to {done.email}. They can add it under Menu, Gift cards, or enter the code at checkout.</Text>
+        <Text style={s.doneTitle}>{done.paid ? 'Gift card sent' : 'Payment received'}</Text>
+        <Text style={s.plain}>
+          {done.paid
+            ? `We emailed it to ${done.email}. They can add it under Menu, Gift cards, or enter the code at checkout.`
+            : `We’re finishing up and will email the gift card to ${done.email} shortly. They can add it under Menu, Gift cards, or enter the code at checkout.`}
+        </Text>
         {done.code ? (
           <View style={s.codeBox}>
             <Text style={s.codeLabel}>Code (shown once)</Text>
@@ -159,7 +163,7 @@ function BuyForm({ info, signedIn, preview }: { info: GiftCardStoreInfo; signedI
   return (
     <StripePaymentProvider amountCents={amountCents ?? info.minCents}>
     <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
-      <GiftCardFace storeName={info.storeName} amountText={amountCents ? formatCents(amountCents) : '$0'} />
+      <GiftCardFace storeName={info.storeName} amountText={formatCents(amountCents || 0)} />
 
       <CheckoutSection title="Amount" first style={s.section}>
         <View style={s.chips}>
@@ -251,7 +255,7 @@ function Chip({ label, selected, onPress, ck }: { label: string; selected: boole
 
 const styles = StyleSheet.create({
   center: { paddingHorizontal: GUTTER, paddingTop: SP.xl, alignItems: 'center' },
-  plain: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, color: '#8A8A8A', textAlign: 'center' },
+  plain: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, color: MUTED, textAlign: 'center' },
 });
 
 function makeStyles(ck: CheckoutColors) {

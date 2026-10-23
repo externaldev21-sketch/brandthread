@@ -8,8 +8,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  OVERLAY,
-  FONT, ICON, SHADOW_SM,
+  OVERLAY, BG,
+  FONT, FS, ICON, SHADOW_SM,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import { formatCents } from '@/lib/money';
 import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, ThemedRefreshControl } from '@/components/ui';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -89,6 +90,7 @@ export default function BuyerSaved() {
   const [newCollectionModal, setNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [creatingCollection, setCreatingCollection] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -96,7 +98,9 @@ export default function BuyerSaved() {
       const [savedRows, collectionRows] = await Promise.all([getSavedItems(), getCollections()]);
       setItems(savedRows);
       setCollections(collectionRows);
+      setLoadFailed(false);
     } catch (error) {
+      setLoadFailed(true);
       reportNetworkError(error, () => load());
     } finally {
       setLoading(false);
@@ -181,7 +185,7 @@ export default function BuyerSaved() {
         hapticSuccessAction();
         setActionsFor(null);
       } else {
-        Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+        Alert.alert('Couldn’t add to cart', result.message ?? 'Please try again.');
       }
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -335,12 +339,14 @@ export default function BuyerSaved() {
         <View style={styles.gridContent}>
           <GridSkeleton columns={2} cardWidth={TILE_SIZE} rows={3} gap={GAP} />
         </View>
+      ) : loadFailed && items.length === 0 && collections.length === 0 ? (
+        <ErrorState message="Couldn’t load your saved items." onRetry={() => { void load(); }} />
       ) : mainTab === 'collections' ? (
         collections.length === 0 ? (
           <EmptyState
             icon="folder"
             title="No collections yet"
-            description="Save something, then organize it into a board — like a Pinterest for your wishlist."
+            description="Save something, then organize it into a board for your wishlist."
             action={{ label: 'New collection', onPress: () => setNewCollectionModal(true) }}
             style={{ marginTop: SPACING.xxl }}
           />
@@ -350,7 +356,7 @@ export default function BuyerSaved() {
             keyExtractor={c => c.id}
             numColumns={2}
             columnWrapperStyle={{ gap: GAP }}
-            contentContainerStyle={styles.gridContent}
+            contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + SPACING.xxl }]}
             refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             renderItem={renderCollectionTile}
             ListFooterComponent={newCollectionTile}
@@ -374,7 +380,7 @@ export default function BuyerSaved() {
           keyExtractor={item => item.id}
           numColumns={2}
           columnWrapperStyle={{ gap: GAP }}
-          contentContainerStyle={styles.gridContent}
+          contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + SPACING.xxl }]}
           renderItem={renderProductTile}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
@@ -384,8 +390,8 @@ export default function BuyerSaved() {
       <BottomSheet visible={!!actionsFor} onClose={() => setActionsFor(null)}>
         <View style={styles.actionsContent}>
           <Text style={styles.actionsTitle} numberOfLines={1}>{actionsFor?.title}</Text>
-          <ListRow icon="zap" title="Buy Now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
-          <ListRow icon="shopping-cart" title="Add to Cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
+          <ListRow icon="zap" title="Buy now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
+          <ListRow icon="shopping-cart" title="Add to cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
           <ListRow
             icon="folder"
             title="Move to collection"
@@ -457,7 +463,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 const bs = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADII.pill, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
-  badgeText: { color: '#0A0A0B', fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
+  badgeText: { color: BG, fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
@@ -483,7 +489,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
     backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
   },
   badgeRow: { position: 'absolute', left: SPACING.xs, top: SPACING.xs, right: SPACING.xs, flexDirection: 'row', flexWrap: 'wrap' },
-  tileInfo: { paddingHorizontal: SPACING.sm, paddingTop: SPACING.xs + 2, paddingBottom: SPACING.sm, gap: 2 },
+  tileInfo: { paddingHorizontal: SPACING.sm, paddingTop: SPACING.xs, paddingBottom: SPACING.sm, gap: 2 },
   tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: FONT.semibold },
   tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },

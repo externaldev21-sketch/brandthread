@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { createProblemReport } from '@/services/cartService';
@@ -21,7 +22,7 @@ import { BuyerOrderView } from '@/services/orderTypes';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
-  SUCCESS, ON_DARK,
+  SUCCESS, ON_DARK, OVERLAY,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP,
@@ -95,7 +96,22 @@ export default function BuyerProblemReportScreen() {
   }
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Report a problem" onBack={() => goBackOr(router)} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
+      </View>
+    );
+  }
+
+  if (!isGeneralReport && !order) {
+    // The order couldn't be loaded, so a report can't be attached to it.
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Report a problem" onBack={() => goBackOr(router)} />
+        <ErrorState message="We couldn’t load this order. Go back and try again." />
+      </View>
+    );
   }
 
   if (submitted) {
@@ -104,7 +120,7 @@ export default function BuyerProblemReportScreen() {
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
-        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+        <PrimaryButton label={isGeneralReport ? 'Done' : 'Back to Order'} onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );
   }
@@ -150,7 +166,6 @@ export default function BuyerProblemReportScreen() {
           />
         </View>
 
-        {/* Evidence note */}
         {/* Evidence photos */}
         <TouchableOpacity
           style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
@@ -169,10 +184,13 @@ export default function BuyerProblemReportScreen() {
                 <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                   <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
                   <TouchableOpacity
-                    style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
+                    style={{ position: 'absolute', top: 2, right: 2, backgroundColor: OVERLAY, borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove photo ${idx + 1}`}
                   >
-                    <Feather name="x" size={10} color="#fff" />
+                    <Feather name="x" size={10} color={ON_DARK} />
                   </TouchableOpacity>
                 </View>
               ))}

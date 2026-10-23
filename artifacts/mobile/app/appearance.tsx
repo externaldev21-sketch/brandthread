@@ -176,12 +176,12 @@ const styles = StyleSheet.create({
 
   followRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, marginTop: SP.lg },
   followTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
-  followSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  followSubtitle: { fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 2 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: SP.lg },
   item: { width: '23%', alignItems: 'center' },
   iconRing: { width: '100%', aspectRatio: 1, borderRadius: 22, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   icon: { width: '100%', height: '100%', borderRadius: 18 },
   selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
-  label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
+  label: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6, textAlign: 'center' },
 });

@@ -22,7 +22,7 @@ function dateLabel(iso: string | null | undefined): string {
 }
 
 export function statusCopy(job: DataExportJob | null, emailEnabled: boolean): { title: string; body: string } {
-  if (!job) return { title: '', body: 'We’ll email you a link when it’s ready.' };
+  if (!job) return { title: '', body: 'Get a download link by email instead.' };
   switch (job.status) {
     case 'queued':
     case 'running':

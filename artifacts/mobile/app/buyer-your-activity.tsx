@@ -83,13 +83,13 @@ export default function BuyerYourActivity() {
 
   const activityItems = [
     { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: theme.accent },
-    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
-    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.warning },
+    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Posts, products, and stores', color: theme.accentLight },
+    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.accent },
   ];
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Your Activity" />
+      <ScreenHeader title="Your activity" />
 
       <ScrollView
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + SPACING.xxxl }}

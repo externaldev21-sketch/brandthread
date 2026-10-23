@@ -9,7 +9,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -37,7 +36,6 @@ function fmtDate(iso: string) {
 export default function LoyaltyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -119,8 +117,11 @@ export default function LoyaltyScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: headerTopInset }]}>
-        <ActivityIndicator color={theme.accent} />
+      <View style={s.root}>
+        <ScreenHeader title="Rewards" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accent} />
+        </View>
       </View>
     );
   }
@@ -147,7 +148,7 @@ export default function LoyaltyScreen() {
           <Text style={[s.heroLabel, { color: theme.accentLight }]}>YOUR BALANCE</Text>
           <Text style={s.heroBalance}>{balance.toLocaleString()}</Text>
           <Text style={[s.heroUnit, { color: theme.accentLight }]}>points</Text>
-          {balance > 0 && (
+          {balance >= 100 && (
             <View style={[s.heroValuePill, { backgroundColor: theme.accentDim }]}>
               <Text style={[s.heroValueText, { color: theme.accentLight }]}>≈ {formatCents(valueCents)} off your next order</Text>
             </View>
@@ -202,7 +203,7 @@ export default function LoyaltyScreen() {
           >
              {redeeming
                ? <ActivityIndicator color={theme.onAccent} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }]}>Use points in Cart</Text>
+               : <Text style={[s.redeemBtnText, { color: theme.onAccent }]}>Use points in cart</Text>
             }
           </TouchableOpacity>
           <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>
@@ -240,7 +241,7 @@ export default function LoyaltyScreen() {
         {history.length === 0 && !loading && (
           <View style={{ alignItems: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.xl }}>
             <Feather name="star" size={32} color={theme.border} />
-            <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No points yet</Text>
+            <Text style={{ marginTop: SP.md, marginBottom: SP.xs, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' }}>No points yet</Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 }}>
               Make a purchase or refer a friend to start earning rewards.
             </Text>

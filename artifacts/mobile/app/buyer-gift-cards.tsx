@@ -100,7 +100,7 @@ export default function BuyerGiftCardsScreen() {
       </PressableScale>
       {openId === card.id ? (
         <View style={s.history}>
-          {card.role === 'owner' ? <Text style={s.fine}>Works only at {card.storeName}. {formatCents(card.initialCents)} to start.</Text> : null}
+          {card.role === 'owner' ? <Text style={s.fine}>Works only at {card.storeName || 'this store'}. {formatCents(card.initialCents)} to start.</Text> : null}
           {history.map(entry => (
             <View key={entry.id} style={s.historyRow}>
               <View style={{ flex: 1 }}>
@@ -176,7 +176,7 @@ function makeStyles(ck: CheckoutColors) {
     center: { alignItems: 'center', paddingTop: SP.xl, gap: SP.xs },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
     label: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, textTransform: 'uppercase', color: ck.muted },
-    total: { fontFamily: FONT.bold, fontSize: 34, color: ck.text, marginTop: SP.xs },
+    total: { fontFamily: FONT.bold, fontSize: FS.h2, color: ck.text, marginTop: SP.xs },
     fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
     cardWrap: { marginTop: SP.md },
     history: { paddingTop: SP.sm, gap: SP.sm },

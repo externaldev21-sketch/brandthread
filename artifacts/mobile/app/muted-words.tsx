@@ -47,11 +47,13 @@ export default function MutedWordsScreen() {
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     if (!authLoaded) return;
     const generation = ++loadGeneration.current;
     setError(null);
+    setLoadFailed(false);
     // Signing in/out swaps the source of truth; never show the other
     // identity's list while the new one loads.
     const owner = guestMode ? 'guest' : 'account';
@@ -77,6 +79,7 @@ export default function MutedWordsScreen() {
     } catch (err) {
       if (loadGeneration.current === generation) {
         setError(guestMode && err instanceof Error ? err.message : apiErrorMessage(err, 'We couldn’t load your muted words.'));
+        setLoadFailed(true);
       }
     } finally {
       if (loadGeneration.current === generation) setLoading(false);
@@ -162,7 +165,7 @@ export default function MutedWordsScreen() {
             style={s.input}
             value={draft}
             onChangeText={(value) => setDraft(value.slice(0, MAX_LENGTH))}
-            placeholder="Add a word, phrase, #hashtag or @handle"
+            placeholder="Add a word, #tag, or @handle"
             placeholderTextColor={theme.subtle}
             autoCapitalize="none"
             autoCorrect={false}
@@ -183,13 +186,20 @@ export default function MutedWordsScreen() {
           </PressableScale>
         </View>
         <Text style={s.hint}>
-          Matches whole words, so muting “art” won’t hide “party”. {words.length}/{limit} used.
+          {atLimit
+            ? `You’ve reached the limit of ${limit}. Remove a word to add another.`
+            : `Matches whole words, so muting “art” won’t hide “party”. ${words.length}/${limit} used.`}
         </Text>
 
         {error ? (
           <View style={s.errorCard}>
             <Feather name="alert-circle" size={16} color={theme.error} />
             <Text style={s.errorText}>{error}</Text>
+            {loadFailed ? (
+              <PressableScale onPress={() => { void load(); }} accessibilityRole="button" accessibilityLabel="Retry loading muted words" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.retryText}>Retry</Text>
+              </PressableScale>
+            ) : null}
           </View>
         ) : null}
 
@@ -210,7 +220,7 @@ export default function MutedWordsScreen() {
         <Text style={s.sectionLabel}>{words.length ? `MUTED (${words.length})` : 'MUTED'}</Text>
         {loading ? (
           <ActivityIndicator color={theme.text} style={{ marginTop: SP.lg }} />
-        ) : words.length === 0 ? (
+        ) : words.length === 0 && !loadFailed ? (
           <View style={s.empty}>
             <View style={s.emptyIcon}><Feather name="volume-x" size={22} color={theme.text} /></View>
             <Text style={s.emptyTitle}>No muted words yet</Text>
@@ -254,13 +264,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   input: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, height: '100%' },
   addBtn: { height: 40, paddingHorizontal: 16, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' },
   addText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
-  hint: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 8 },
+  hint: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: SP.sm },
   errorCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md, padding: SP.md,
     borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.error + '55', backgroundColor: theme.card,
   },
   errorText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  retryText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   suggestion: {
     flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 12,

@@ -7,7 +7,8 @@
  *    shows again from a fresh state next time its screen is opened.
  */
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -22,6 +23,7 @@ export default function FirstRunTipsSettingsScreen() {
   const colors = useColors();
   const router = useRouter();
   const controller = useFirstRunTipsController();
+  const insets = useSafeAreaInsets();
   const [replayVisible, setReplayVisible] = useState(false);
   const [replaying, setReplaying] = useState(false);
   const [replayedAt, setReplayedAt] = useState<number | null>(null);
@@ -40,6 +42,8 @@ export default function FirstRunTipsSettingsScreen() {
       await controller.replayTips();
       hapticSuccess();
       setReplayedAt(Date.now());
+    } catch {
+      Alert.alert('Couldn’t reset tips', 'Check your connection and try again.');
     } finally {
       setReplaying(false);
       setReplayVisible(false);
@@ -49,7 +53,7 @@ export default function FirstRunTipsSettingsScreen() {
   return (
     <View style={[styles.page, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Tips" onBack={() => goBackOr(router, '/general-settings')} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             First-run tips walk you through a screen's gestures and controls the first time you open it.
@@ -59,12 +63,13 @@ export default function FirstRunTipsSettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]}>Skip all tips</Text>
               <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>
-                Turn off first-run tips everywhere in the app
+                {controller.skipAll ? 'Tips are off. Use Replay tips to turn them back on.' : 'Turn off first-run tips everywhere in the app'}
               </Text>
             </View>
             <HapticSwitch
               value={controller.skipAll}
               onValueChange={toggleSkipAll}
+              disabled={controller.skipAll}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={controller.skipAll ? colors.primaryForeground : colors.foreground}
               accessibilityLabel="Skip all tips"
@@ -103,12 +108,11 @@ export default function FirstRunTipsSettingsScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingTop: 18 },
-  sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: 18, lineHeight: 18 },
-  // padding: 16 (not SP.md's 14) — the audit's text-fit check flags
-  // anything under 16px inner padding on a card-sized container; see
-  // docs/audit/README.md.
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, padding: 16, minHeight: 60 },
+  section: { paddingHorizontal: SP.md, paddingTop: SP.md },
+  sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: SP.md, lineHeight: 18 },
+  // 16px inner padding — the audit's text-fit check flags anything less on
+  // a card-sized container; see docs/audit/README.md.
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, minHeight: 60 },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
-  rowSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, lineHeight: 15 },
+  rowSub: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2, lineHeight: 16 },
 });

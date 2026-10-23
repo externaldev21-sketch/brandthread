@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -27,11 +28,11 @@ interface Faq {
 const FAQS: Faq[] = [
   { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.', category: 'General', popular: true },
   { q: 'When does my payment get charged?', a: 'For in-stock items your card is charged at checkout. For pre-order drops your card is charged immediately, but the brand only receives funds once your order ships — we hold the money in escrow to protect you.', category: 'Billing', popular: true },
-  { q: 'How do I track my order?', a: 'Go to your Profile → My Orders and tap any order to see its tracking number and live delivery status.', category: 'General', popular: true },
-  { q: 'Can I return or exchange an item?', a: 'Returns and exchanges are handled per-brand. Tap "Get Help" or "Return / Exchange" on any delivered order in My Orders to start the process with that brand.', category: 'General' },
+  { q: 'How do I track my order?', a: 'Open your profile menu → Orders and tap any order to see its tracking number and live delivery status.', category: 'General', popular: true },
+  { q: 'Can I return or exchange an item?', a: 'Returns and exchanges are handled per-brand. Open a delivered order in Orders and tap "Request Return" or "Report a Problem" to start the process with that brand.', category: 'General' },
   { q: 'How do I follow a brand?', a: 'Tap a brand\'s name anywhere in the app to view their profile, then tap "Follow". You\'ll see their drops in your Feed.', category: 'General' },
   { q: 'What is escrow protection?', a: 'Escrow protection means your payment is held by Brandthread and only released to the brand after your order ships. If something goes wrong before shipping you can get a full refund.', category: 'Billing', popular: true },
-  { q: 'How do I delete my account?', a: 'Go to Settings → Account → Delete Account. Your account is hidden right away and permanently deleted after 30 days. Sign back in during those 30 days to restore it. Order, payment and tax records are kept, without your personal details, for as long as the law requires.', category: 'Account' },
+  { q: 'How do I delete my account?', a: 'Go to Settings → Delete account. Your account is hidden right away and permanently deleted after 30 days. Sign back in during those 30 days to restore it. Order, payment and tax records are kept, without your personal details, for as long as the law requires.', category: 'Account' },
 ];
 
 const CATEGORIES: { key: Category; icon: keyof typeof Feather.glyphMap }[] = [
@@ -54,6 +55,7 @@ export default function HelpScreen() {
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const insets = useSafeAreaInsets();
   const [article, setArticle] = useState<Faq | null>(null);
 
   // Ticket form state
@@ -90,10 +92,11 @@ export default function HelpScreen() {
   }
 
   const filtered = FAQS.filter((f) => {
-    const matchesQuery = !query.trim()
-      || f.q.toLowerCase().includes(query.toLowerCase())
-      || f.a.toLowerCase().includes(query.toLowerCase())
-      || f.category.toLowerCase().includes(query.toLowerCase());
+    const q = query.trim().toLowerCase();
+    const matchesQuery = !q
+      || f.q.toLowerCase().includes(q)
+      || f.a.toLowerCase().includes(q)
+      || f.category.toLowerCase().includes(q);
     const matchesCategory = !activeCategory || f.category === activeCategory;
     return matchesQuery && matchesCategory;
   });
@@ -107,7 +110,7 @@ export default function HelpScreen() {
   return (
     <View style={s.root}>
       <ScreenHeader
-        title="Help & Support"
+        title="Help & support"
         actions={[
           { icon: 'life-buoy', onPress: scrollToContact, accessibilityLabel: 'Jump to contact support' },
         ]}
@@ -115,7 +118,7 @@ export default function HelpScreen() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ padding: SP.md, paddingBottom: 100, gap: SP.lg }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100, gap: SP.lg }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -151,7 +154,12 @@ export default function HelpScreen() {
                       key={c.key}
                       style={s.categoryCard}
                       activeOpacity={0.85}
-                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveCategory(c.key); }}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        // No articles yet ("Contact us"): go straight to the form with this topic picked.
+                        if (count === 0) { setCategory(c.key); scrollToContact(); return; }
+                        setActiveCategory(c.key);
+                      }}
                     >
                       <View style={[s.categoryIconWrap, { backgroundColor: theme.accent + '18' }]}>
                         <Feather name={c.icon} size={ICON.md} color={theme.accent} />
@@ -213,15 +221,15 @@ export default function HelpScreen() {
         <View style={s.contactRow}>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:support@brandthread.app')} activeOpacity={0.8}>
             <Feather name="mail" size={ICON.md} color={theme.accent} />
-            <Text style={s.contactLabel}>Email Us</Text>
+            <Text style={s.contactLabel}>Email us</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={scrollToContact} activeOpacity={0.8}>
             <Feather name="message-circle" size={ICON.md} color={theme.accent} />
-            <Text style={s.contactLabel}>Live Chat</Text>
+            <Text style={s.contactLabel}>Message us</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
             <Feather name="book-open" size={ICON.md} color={theme.accent} />
-            <Text style={s.contactLabel}>Full Docs</Text>
+            <Text style={s.contactLabel}>Full docs</Text>
           </TouchableOpacity>
         </View>
 
@@ -238,7 +246,7 @@ export default function HelpScreen() {
               <View style={s.submittedBadge}>
                 <Feather name="check-circle" size={ICON.sm} color={theme.success} />
                 <Text style={s.submittedText}>Got it! We'll be in touch shortly.</Text>
-                <TouchableOpacity onPress={() => setSubmitted(false)}>
+                <TouchableOpacity onPress={() => setSubmitted(false)} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <Text style={s.sendAnotherText}>Send another</Text>
                 </TouchableOpacity>
               </View>
@@ -268,7 +276,7 @@ export default function HelpScreen() {
                   multiline
                 />
                 <PrimaryButton
-                  label={submitting ? 'Sending…' : 'Send Message'}
+                  label={submitting ? 'Sending…' : 'Send message'}
                   onPress={handleSubmitTicket}
                   disabled={!subject.trim() || !ticketBody.trim() || submitting}
                   loading={submitting}
@@ -291,7 +299,7 @@ export default function HelpScreen() {
           <View style={s.sheetCard}>
             <SheetHandle />
             {article && (
-              <ScrollView contentContainerStyle={{ padding: SP.md, paddingTop: SP.xs, gap: SP.sm, paddingBottom: SP.xl }} showsVerticalScrollIndicator={false}>
+              <ScrollView contentContainerStyle={{ padding: SP.md, paddingTop: SP.xs, gap: SP.sm, paddingBottom: insets.bottom + SP.xl }} showsVerticalScrollIndicator={false}>
                 <View style={s.sheetCategoryPill}>
                   <Text style={[s.sheetCategoryText, { color: theme.accent }]}>{article.category}</Text>
                 </View>

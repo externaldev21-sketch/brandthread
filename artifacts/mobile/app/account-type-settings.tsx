@@ -101,11 +101,11 @@ export default function AccountTypeSettingsScreen() {
               setCurrentType(selectedType);
               Alert.alert(
                 'Account type updated',
-                `You are now a ${accountInfo[selectedType].title}. Restart the app to apply all changes.`,
+                `You're now using a ${accountInfo[selectedType].title.toLowerCase()} account. Restart the app to apply every change.`,
                 [{ text: 'OK', onPress: () => goBackOr(router, '/buyer-settings-menu') }],
               );
             } catch {
-              Alert.alert('Error', 'Could not update account type. Please try again.');
+              Alert.alert("Couldn't switch account type", 'Check your connection and try again.');
             } finally {
               setSaving(false);
             }
@@ -157,7 +157,7 @@ export default function AccountTypeSettingsScreen() {
                   <View style={{ flex: 1, marginLeft: SP.sm }}>
                     <Text style={s.typeTitle}>{info.title}</Text>
                     {isCurrent && (
-                      <Text style={[s.currentTag, { color: info.color }]}>Current plan</Text>
+                      <Text style={[s.currentTag, { color: info.color }]}>Current</Text>
                     )}
                   </View>
                   <View style={[s.radioOuter, isSelected && { borderColor: info.color }]}>
@@ -225,5 +225,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   saveBtnDisabled:{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   saveBtnText:    { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.bold },
 
-  disclaimer: { fontSize: FS.xs, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: SP.md },
+  disclaimer: { fontSize: FS.meta, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: SP.md },
 });

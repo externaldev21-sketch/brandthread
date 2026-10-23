@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CARD, BORDER, FG, MUTED, OVERLAY,
   FONT, FS, SP, RADIUS, COMP,
@@ -43,6 +44,7 @@ export default function BuyerCollection() {
   const router = useRouter();
   const { collectionId } = useLocalSearchParams<{ collectionId: string }>();
 
+  const insets = useSafeAreaInsets();
   const [collection, setCollection] = useState<SavedCollection | null>(null);
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export default function BuyerCollection() {
   const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async (silent = false) => {
-    if (!collectionId) return;
+    if (!collectionId) { setLoadFailed(true); setLoading(false); return; }
     if (!silent) setLoading(true);
     try {
       const data = await getCollectionItems(collectionId);
@@ -72,14 +74,16 @@ export default function BuyerCollection() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function togglePublic(value: boolean) {
-    if (!collection) return;
+  async function togglePublic(value: boolean): Promise<boolean> {
+    if (!collection) return false;
     setCollection({ ...collection, isPublic: value });
     try {
       await updateCollection(collection.id, { isPublic: value });
+      return true;
     } catch {
       setCollection({ ...collection, isPublic: !value });
       Alert.alert('Couldn’t update', 'Try again.');
+      return false;
     }
   }
 
@@ -106,7 +110,7 @@ export default function BuyerCollection() {
         'This collection is currently private. Turn it public so anyone with the link can view it.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Make public & share', onPress: async () => { await togglePublic(true); shareLink(link); } },
+          { text: 'Make public & share', onPress: async () => { if (await togglePublic(true)) shareLink(link); } },
         ],
       );
       return;
@@ -176,6 +180,9 @@ export default function BuyerCollection() {
         onPress={() => openItem(item)}
         onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); removeItem(item); }}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+        accessibilityHint="Long press to remove from this collection"
       >
         <View style={styles.tileImageWrap}>
           {item.image ? (
@@ -213,7 +220,7 @@ export default function BuyerCollection() {
           </View>
           <HapticSwitch
             value={collection.isPublic}
-            onValueChange={togglePublic}
+            onValueChange={(v) => { void togglePublic(v); }}
           />
         </View>
       )}
@@ -235,7 +242,7 @@ export default function BuyerCollection() {
           keyExtractor={item => item.id}
           numColumns={2}
           columnWrapperStyle={{ gap: GAP }}
-          contentContainerStyle={styles.gridContent}
+          contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + SP.xxl }]}
           refreshControl={pull.refreshControl}
           renderItem={renderTile}
         />
@@ -243,7 +250,7 @@ export default function BuyerCollection() {
 
       <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
         <ModalSafeArea>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
           <View style={styles.centerModal}>
             <View style={styles.renameCard}>
               <Text style={styles.renameTitle}>Rename collection</Text>
@@ -282,7 +289,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   publicLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  publicDesc: { color: MUTED, fontSize: FS.xs, marginTop: 1 },
+  publicDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 1 },
   gridContent: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: SP.xxl },
   tile: { width: TILE_SIZE, marginBottom: GAP },
   tileImageWrap: { width: TILE_SIZE, aspectRatio: 1, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },

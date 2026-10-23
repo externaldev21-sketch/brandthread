@@ -152,7 +152,7 @@ export default function AppLockSettingsScreen() {
                 })}
               </View>
               <Text style={s.footnote}>
-                Brandthread always locks when it’s opened fresh. Apps in the background for less than the time you choose open without asking.
+                Brandthread always locks when it’s opened fresh. If it was in the background for less than the time you choose, it opens without asking.
               </Text>
             </>
           ) : null}
@@ -182,10 +182,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, minHeight: 60 },
   rowDivider: { borderTopWidth: 1, borderTopColor: theme.borderSubtle },
   rowTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
-  rowSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  rowSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 2 },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: theme.text },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.accent },
-  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: SP.sm },
+  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, marginTop: SP.sm },
 });

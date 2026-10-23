@@ -12,7 +12,7 @@ import { SectionHeader } from '@/components/BrandthreadUI';
 import { ListSkeleton } from '@/components/layout/Skeleton';
 import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/components/ui';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
-import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
+import { DEFAULT_PRIVACY_SETTINGS, PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
 const AUDIENCE_LABEL: Record<AudienceOption, string> = {
@@ -59,7 +59,7 @@ export default function BuyerPrivacySettings() {
 
   useFocusEffect(
     useCallback(() => {
-      getPrivacySettings().then(setSettings);
+      getPrivacySettings().then(setSettings).catch(() => setSettings(DEFAULT_PRIVACY_SETTINGS));
       // Load server-side DM privacy setting
       api.privacy.get().then(({ dmPrivacy: p, isPrivate }) => {
         setDmPrivacy(p);
@@ -74,8 +74,8 @@ export default function BuyerPrivacySettings() {
     setHasChanges(true);
   }
 
-  async function saveSettings(showConfirmation: boolean) {
-    if (!settings) return;
+  async function saveSettings(showConfirmation: boolean): Promise<boolean> {
+    if (!settings) return true;
     try {
       // Save local settings (stored in AsyncStorage)
       await updatePrivacySettings(settings);
@@ -83,10 +83,12 @@ export default function BuyerPrivacySettings() {
       await api.privacy.update({ dmPrivacy });
       setHasChanges(false);
       setSaveError(null);
+      return true;
     } catch {
-      if (showConfirmation) setSaveError("Couldn't save. Try again.");
-      // On silent (back-navigation) saves, leave hasChanges set so the user
-      // isn't told their change was saved when it wasn't.
+      // Back-navigation saves surface the error too: leaving would drop the
+      // unsaved change without telling the person.
+      setSaveError("Couldn't save. Try again.");
+      return false;
     }
   }
 
@@ -114,7 +116,7 @@ export default function BuyerPrivacySettings() {
   }
 
   async function handleBack() {
-    if (hasChanges) await saveSettings(false);
+    if (hasChanges && !(await saveSettings(false))) return;
     goBackOr(router, '/buyer-settings-menu');
   }
 
@@ -138,7 +140,7 @@ export default function BuyerPrivacySettings() {
         rightElement={hasChanges ? <Button label="Save" size="small" onPress={() => saveSettings(true)} /> : undefined}
       />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + SP.xxl }} showsVerticalScrollIndicator={false}>
         {saveError ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title={saveError} disabled /></Card> : null}
 
         {/* PROFILE VISIBILITY */}
@@ -262,7 +264,7 @@ export default function BuyerPrivacySettings() {
                 ? 'Only people you follow can message you'
                 : 'Others go to your requests inbox until you accept'
             }
-            value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone'}
+            value={dmPrivacy === 'followers_only' ? 'People you follow' : 'Everyone'}
             chevron
             onPress={() => setPicker('dmPrivacy')}
           />
@@ -344,7 +346,7 @@ export default function BuyerPrivacySettings() {
         description="Others can always see your profile, but direct messages from non-followers are handled based on this setting."
         options={[
           { id: 'requests', label: 'Everyone', description: 'Non-followers go to your requests inbox', icon: 'inbox' },
-          { id: 'followers_only', label: 'Followers only', description: 'Block direct messages from everyone else', icon: 'user-check' },
+          { id: 'followers_only', label: 'People you follow', description: 'Block direct messages from everyone else', icon: 'user-check' },
         ]}
         selectedId={dmPrivacy}
         onSelect={(id) => { setDmPrivacy(id as DmPrivacy); setHasChanges(true); setPicker(null); }}

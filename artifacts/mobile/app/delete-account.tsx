@@ -141,8 +141,8 @@ export default function DeleteAccountScreen() {
       <View style={[s.root, { paddingTop: headerTopInset + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
           <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
-          <Text style={s.title}>Your account is scheduled for deletion</Text>
-          <Text style={s.lead}>
+          <Text style={[s.title, { textAlign: 'center' }]}>Your account is scheduled for deletion</Text>
+          <Text style={[s.lead, { textAlign: 'center' }]}>
             {`Your account is hidden and you’ve been signed out on every device. It will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then to cancel.`}
           </Text>
         </View>
@@ -292,7 +292,7 @@ export default function DeleteAccountScreen() {
 
             {usesCode ? (
               <>
-                <Text style={s.fieldLabel}>Enter the 6-digit code we email you</Text>
+                <Text style={s.fieldLabel}>Enter the 6-digit code we emailed you</Text>
                 <TextInput
                   style={s.input}
                   value={code}
@@ -401,7 +401,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: theme.borderSubtle,
   },
   blockerTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
-  blockerDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, marginTop: 2 },
+  blockerDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, marginTop: 2 },
   blockerBtn: {
     paddingHorizontal: 12, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
@@ -414,11 +414,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
   readyText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
   listCard: { padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, gap: 10 },
   listRow: { flexDirection: 'row', gap: SP.sm },
   listText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: SP.sm },
+  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, marginTop: SP.sm },
   exportRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.lg, padding: SP.md,
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,

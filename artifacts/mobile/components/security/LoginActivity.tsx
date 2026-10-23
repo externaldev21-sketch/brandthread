@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
@@ -170,6 +170,7 @@ export default function LoginActivity() {
             try {
               if (others.length > 0 && !(isSellerDevPreview() || isBuyerDevPreview())) await api.auth.revokeOtherSessions();
               await signOut();
+              router.replace('/sign-in' as never);
             } catch (err) {
               Alert.alert('Couldn’t sign out everywhere', apiErrorMessage(err, 'Try again.'));
               setBusyId(null);
@@ -294,7 +295,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   lead: { color: theme.muted, ...TYPE_SCALE.callout, marginTop: SPACING.xs },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1, marginTop: SPACING.lg, marginBottom: SPACING.sm },
   card: { backgroundColor: theme.card, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.md, paddingVertical: 14 },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.borderSubtle },
@@ -306,7 +307,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   device: { color: theme.text, ...TYPE_SCALE.body, fontFamily: FONT.semibold, flexShrink: 1 },
   currentPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADII.pill, backgroundColor: theme.success + '22' },
-  currentText: { color: theme.success, fontFamily: FONT.semibold, fontSize: 11 },
+  currentText: { color: theme.success, fontFamily: FONT.semibold, fontSize: FS.xs },
   meta: { color: theme.muted, ...TYPE_SCALE.footnote, marginTop: 2 },
   metaSub: { color: theme.subtle, ...TYPE_SCALE.caption, marginTop: 1 },
   emptyCard: {

@@ -17,6 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, Card, IconButton } from '@/components/ui';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { hapticDestructiveConfirm, hapticLight, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -59,9 +60,13 @@ export default function BuyerPaymentMethodsScreen() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
+  const [loadError, setLoadError] = useState(false);
+  const loadedOnce = React.useRef(false);
 
   const load = async () => {
-    setLoading(true);
+    // Only the first load swaps the list for a spinner; refocusing refreshes in place.
+    if (!loadedOnce.current) setLoading(true);
+    setLoadError(false);
     if (!userId) {
       setPaymentMethods([]);
       setLoading(false);
@@ -70,8 +75,9 @@ export default function BuyerPaymentMethodsScreen() {
     try {
       const data = await api.reviews.paymentMethods() as any;
       setPaymentMethods(data.paymentMethods ?? []);
+      loadedOnce.current = true;
     } catch {
-      setPaymentMethods([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -125,6 +131,8 @@ export default function BuyerPaymentMethodsScreen() {
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+      ) : loadError && paymentMethods.length === 0 ? (
+        <ErrorState message="Couldn’t load your payment methods." onRetry={() => { void load(); }} />
       ) : (
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: insets.bottom + 40 }]}
@@ -138,7 +146,7 @@ export default function BuyerPaymentMethodsScreen() {
             <EmptyState
               icon="credit-card"
               title="No saved payment methods"
-              description="Payment methods are saved automatically when you complete a purchase. Your card details are stored securely by Stripe — Brandthread never sees your full card number."
+              description="Payment methods are saved automatically when you complete a purchase."
               compact
               style={{ marginBottom: SPACING.xl }}
             />
@@ -164,7 +172,7 @@ export default function BuyerPaymentMethodsScreen() {
                       </Text>
                       {!pm.isDefault && (
                         <Button
-                          label="Make default"
+                          label="Set as default"
                           onPress={() => setDefault(pm)}
                           variant="tertiary"
                           size="small"

@@ -23,18 +23,19 @@ export default function BuyerSecurity() {
     loadBuyerSettings().then(loadedSettings => {
       setLoginAlerts(loadedSettings.loginAlerts);
       setSaveLogin(loadedSettings.saveLoginInfo);
-      setLoaded(true);
-    });
+    }).catch(() => {
+      // Fall back to the defaults so the screen still renders.
+    }).finally(() => setLoaded(true));
   }, []);
 
   async function onToggleLoginAlerts(v: boolean) {
     setLoginAlerts(v);
-    await patchBuyerSettings({ loginAlerts: v });
+    try { await patchBuyerSettings({ loginAlerts: v }); } catch { setLoginAlerts(!v); }
   }
 
   async function onToggleSaveLogin(v: boolean) {
     setSaveLogin(v);
-    await patchBuyerSettings({ saveLoginInfo: v });
+    try { await patchBuyerSettings({ saveLoginInfo: v }); } catch { setSaveLogin(!v); }
   }
 
   if (!loaded) {
@@ -57,7 +58,7 @@ export default function BuyerSecurity() {
           <ListRow
             icon="shield"
             title="Two-factor authentication"
-            subtitle="Add a second step when you sign in."
+            subtitle="Add a second step when you sign in"
             chevron
             onPress={() => router.push('/login-methods' as never)}
           />
@@ -90,7 +91,7 @@ export default function BuyerSecurity() {
           <View style={s.divider} />
           <ListRow
             icon="smartphone"
-            title="Where you're logged in"
+            title="Login activity"
             subtitle="Review active sessions"
             chevron
             onPress={() => router.push('/buyer-login-activity' as never)}

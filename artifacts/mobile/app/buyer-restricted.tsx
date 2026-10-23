@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  TextInput, Modal, Pressable,
+  TextInput, Modal, Pressable, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,7 +35,8 @@ export default function RestrictedAccountsScreen() {
   const [query, setQuery] = useState('');
   const [confirmUser, setConfirmUser] = useState<RestrictRecord | null>(null);
 
-  const loadRestricted = useCallback(() => getRestrictedUsers().then(setRestricted), []);
+  const [loading, setLoading] = useState(true);
+  const loadRestricted = useCallback(() => getRestrictedUsers().then(setRestricted).catch(() => {}).finally(() => setLoading(false)), []);
   const pull = usePullToRefresh(loadRestricted);
 
   useFocusEffect(useCallback(() => {
@@ -44,9 +45,14 @@ export default function RestrictedAccountsScreen() {
 
   const handleUnrestrict = async (user: RestrictRecord) => {
     hapticDestructiveConfirm();
-    await unrestrictUser(user.restrictedUserId);
-    setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
-    setConfirmUser(null);
+    try {
+      await unrestrictUser(user.restrictedUserId);
+      setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
+    } catch {
+      Alert.alert('Couldn’t unrestrict', 'Try again.');
+    } finally {
+      setConfirmUser(null);
+    }
   };
 
   const filtered = restricted.filter(u =>
@@ -60,7 +66,7 @@ export default function RestrictedAccountsScreen() {
 
       <View style={styles.intro}>
         <Text style={styles.introText}>
-          When you restrict someone, their comments on your posts are only visible to them. They won't know they've been restricted.
+          When you restrict someone, their comments on your posts are only visible to them. They won’t know they’ve been restricted.
         </Text>
       </View>
 
@@ -82,14 +88,23 @@ export default function RestrictedAccountsScreen() {
         refreshControl={pull.refreshControl}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 40 }}
-        ListEmptyComponent={
+        ListEmptyComponent={loading ? (
+          <ActivityIndicator color={theme.muted} style={{ marginTop: SPACING.lg }} />
+        ) : query.trim() && restricted.length > 0 ? (
+          <EmptyState
+            icon="search"
+            title="No results"
+            description={`No restricted accounts match “${query.trim()}”.`}
+            style={{ marginTop: SPACING.lg }}
+          />
+        ) : (
           <EmptyState
             icon="user-x"
             title="No restricted accounts"
             description="Restricted accounts will appear here."
             style={{ marginTop: SPACING.lg }}
           />
-        }
+        )}
         renderItem={({ item }) => (
           <ListRow
             avatar={{ name: item.restrictedUserName }}

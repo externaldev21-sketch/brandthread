@@ -10,7 +10,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Platform,
   ScrollView,
   StatusBar,
@@ -33,7 +32,6 @@ import { ONBOARDING_OWNER_KEY } from './_layout';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const EXPLAINER_SEEN_PREFIX = 'thread_explainer_seen:';
-const { width: SW } = Dimensions.get('window');
 
 function explainerSeenKey(userId: string): string {
   return `${EXPLAINER_SEEN_PREFIX}${userId}`;
@@ -70,6 +68,8 @@ const THREAD_FEATURES = [
 export default function ThreadExplainerScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  // Called before the early return below so hook order never changes.
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { isSignedIn, userId } = useAuth();
 
@@ -132,7 +132,7 @@ export default function ThreadExplainerScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: useHeaderTopInset() }]}>
+    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: headerTopInset }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Background gradient */}
@@ -222,10 +222,10 @@ const styles = StyleSheet.create({
     marginBottom: SP.xl - SP.xs,
   },
   headline: {
-    fontSize: FS.h1 + 4,
+    fontSize: FS.h1,
     fontFamily: FONT.bold,
     letterSpacing: -1.5,
-    lineHeight: 46,
+    lineHeight: 42,
     marginBottom: SP.sm,
   },
   sub: {

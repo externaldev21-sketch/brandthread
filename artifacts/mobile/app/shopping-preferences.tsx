@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, } from 'react-native';
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,7 +18,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { HapticSwitch } from '@/components/BrandthreadUI';
+import { BrandedLoadingState, HapticSwitch } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 import { radius } from '@/constants/radii';
@@ -88,19 +88,31 @@ export default function ShoppingPreferences() {
   useFocusEffect(useCallback(() => {
     loadBuyerSettings().then(s => {
       setSettings(s);
-      setSelectedCats(new Set(s.styleCategories ?? ['streetwear', 'vintage']));
+      // Nothing is pre-picked: only categories the person chose are selected.
+      setSelectedCats(new Set(s.styleCategories ?? []));
+    }).catch(() => {
+      Alert.alert('Couldn’t load your preferences', 'Check your connection and try again.');
     });
   }, []));
 
   async function patch(updates: Partial<BuyerSettingsState>) {
-    const next = await patchBuyerSettings(updates);
-    setSettings(next);
-    setHasChanges(true);
+    try {
+      const next = await patchBuyerSettings(updates);
+      setSettings(next);
+      setHasChanges(true);
+    } catch {
+      Alert.alert('Couldn’t save that change', 'Try again.');
+    }
   }
 
   async function save() {
     // Persist selected style categories alongside other preferences
-    await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
+    try {
+      await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
+    } catch {
+      Alert.alert('Couldn’t save your preferences', 'Try again.');
+      return;
+    }
     setHasChanges(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     goBackOr(router);
@@ -116,18 +128,25 @@ export default function ShoppingPreferences() {
     setHasChanges(true);
   }
 
-  if (!settings) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
+  if (!settings) {
+    return (
+      <View style={s.page}>
+        <ScreenHeader title="Shopping preferences" />
+        <BrandedLoadingState />
+      </View>
+    );
+  }
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Shopping Preferences" />
+      <ScreenHeader title="Shopping preferences" />
 
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Sizes */}
-        <Text style={s.sectionTitle}>Your Sizes</Text>
+        <Text style={s.sectionTitle}>Your sizes</Text>
         <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
         <View style={s.card}>
           <SizeSelector label="Tops" options={TOPS} selected={settings.sizeTops} onSelect={v => patch({ sizeTops: v })} />
@@ -138,7 +157,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Fit */}
-        <Text style={s.sectionTitle}>Preferred Fit</Text>
+        <Text style={s.sectionTitle}>Preferred fit</Text>
         <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
         <View style={s.card}>
           {FIT_OPTIONS.map((opt, i) => (
@@ -162,7 +181,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Categories */}
-        <Text style={s.sectionTitle}>Style Categories</Text>
+        <Text style={s.sectionTitle}>Style categories</Text>
         <Text style={s.sectionDesc}>Select all that apply — we'll personalize your Discover feed.</Text>
         <View style={s.catGrid}>
           {CATEGORIES.map(cat => (
@@ -238,7 +257,7 @@ export default function ShoppingPreferences() {
       <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
         <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Preferences</Text>
+            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save preferences</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -250,7 +269,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   page: { flex: 1, backgroundColor: 'transparent' },
 
   sectionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.lg, marginBottom: 4 },
-  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm, lineHeight: 18 },
+  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.meta, marginBottom: SP.sm, lineHeight: 18 },
 
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: BORDER, marginLeft: 16 },
@@ -269,7 +288,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   fitRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   fitRadioFill: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   fitLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  fitDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  fitDesc: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED, marginTop: 2 },
 
   // Categories
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
@@ -282,7 +301,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   // Alerts
   alertRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
   alertLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  alertSub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  alertSub: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED, marginTop: 2 },
 
   // Save
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },

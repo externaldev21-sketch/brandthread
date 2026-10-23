@@ -278,7 +278,7 @@ export default function ThreadCashScreen() {
               })}
             </View>
             <Text style={[styles.streakSub, TABULAR_NUMS, { color: theme.muted }]}>
-              Longest streak: {status?.streak.longestStreak ?? 0} days{'\n'}
+              Longest streak: {status?.streak.longestStreak ?? 0} {(status?.streak.longestStreak ?? 0) === 1 ? 'day' : 'days'}{'\n'}
               Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)} a day, ${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
             </Text>
           </BrandthreadCard>
@@ -370,7 +370,7 @@ export default function ThreadCashScreen() {
 }
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
-  balanceCard: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 20, marginTop: SP.sm },
+  balanceCard: { alignItems: 'center', paddingVertical: SP.lg, paddingHorizontal: SP.lg, marginTop: SP.sm },
   // A small stack of two bills, fanned like the owner's stacked-bills art:
   // a duller, more-rotated bill behind, the crisp one tilted slightly on top.
   balanceStack: {
@@ -381,12 +381,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  balanceLabel: { fontSize: 13, fontFamily: FONT.medium, color: theme.muted },
+  balanceLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   // Balance snaps to the `display` type-scale role (44/48 Bold) via tabularType('display')
   // applied at the call site, rather than the old one-off fontSize: 40 (see design doc audit).
   balanceValue: { marginTop: 2 },
   balanceHint: {
-    fontSize: 12, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 16,
+    fontSize: FS.meta, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 16,
     marginTop: SP.xs, paddingHorizontal: SP.md,
     color: 'rgba(255,255,255,0.7)', // theme-exempt: fixed dark hero card per spec
   },
@@ -402,7 +402,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   streakDay: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   streakDayText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   streakSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 16 },
-  sectionTitle: { fontSize: 20, fontFamily: FONT.semibold, marginTop: SP.lg, marginBottom: SP.sm },
+  sectionTitle: { fontSize: FS.xl, fontFamily: FONT.semibold, marginTop: SP.lg, marginBottom: SP.sm },
   historyList: { marginBottom: SP.sm },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, minHeight: 60 },
   historyIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

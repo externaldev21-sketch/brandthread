@@ -5,14 +5,15 @@
  * and an empty state with "Clear all" disabled once it's gone.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT } from '@/lib/theme';
+import { FONT, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { hapticDestructiveConfirm, hapticSelection } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -22,6 +23,7 @@ export default function BuyerSearchHistoryScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [terms, setTerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,8 +68,14 @@ export default function BuyerSearchHistoryScreen() {
           style: 'destructive',
           onPress: async () => {
             hapticDestructiveConfirm();
+            const before = terms;
             setTerms([]);
-            try { await api.public.clearRecent(); } catch { /* already cleared locally */ }
+            try {
+              await api.public.clearRecent();
+            } catch {
+              setTerms(before);
+              Alert.alert('Couldn’t clear your searches', 'Check your connection and try again.');
+            }
           },
         },
       ],
@@ -79,7 +87,7 @@ export default function BuyerSearchHistoryScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScreenHeader
-        title="Recent Searches"
+        title="Recent searches"
         rightElement={
           <PressableScale
             onPress={() => { hapticSelection(); confirmClearAll(); }}
@@ -93,7 +101,9 @@ export default function BuyerSearchHistoryScreen() {
           </PressableScale>
         }
       />
-      {!loading && !hasTerms && failed ? (
+      {loading && !hasTerms ? (
+        <ActivityIndicator color={theme.muted} style={{ marginTop: SP.lg }} />
+      ) : !loading && !hasTerms && failed ? (
         <ErrorState message="Couldn't load your searches." onRetry={() => { void load(); }} style={{ flex: 1 }} />
       ) : !loading && !hasTerms ? (
         <EmptyState icon="clock" title="No search history" description="Searches you make will show up here." />
@@ -102,6 +112,7 @@ export default function BuyerSearchHistoryScreen() {
           data={terms}
           refreshControl={pull.refreshControl}
           keyExtractor={(term) => term}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SP.lg }}
           renderItem={({ item }) => (
             <RecentSearchRow term={item} onPress={() => submitTerm(item)} onRemove={() => removeTerm(item)} />
           )}

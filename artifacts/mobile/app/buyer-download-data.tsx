@@ -32,6 +32,7 @@ export default function BuyerDownloadData() {
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
   const [categories, setCategories] = useState<DataCategory[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(false);
+  const [fileUri, setFileUri] = useState<string | null>(null);
 
   function toggleCat(key: string) {
     hapticToggle();
@@ -47,17 +48,20 @@ export default function BuyerDownloadData() {
       const file = new File(Paths.cache, `brandthread-my-data-${Date.now()}.json`);
       file.write(JSON.stringify(data, null, 2));
       if (await Sharing.isAvailableAsync()) {
+        setFileUri(file.uri);
         await Sharing.shareAsync(file.uri, {
           mimeType: 'application/json',
           dialogTitle: 'Download my Brandthread data',
         });
       } else {
-        Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
+        setFileUri(null);
+        Alert.alert('Sharing isn’t available', 'This device can’t save the file directly. Use “Email me a download link” instead.');
+        return;
       }
       hapticSuccess();
       setRequestedAt(data.exportedAt);
       setRequested(true);
-    } catch (err: any) {
+    } catch {
       hapticError();
       Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
     } finally {
@@ -84,6 +88,15 @@ export default function BuyerDownloadData() {
             <Text style={s.successDesc}>
               Your data is ready. Save it or send it anywhere.
             </Text>
+            {fileUri ? (
+              <Button
+                label="Share file"
+                onPress={() => { void Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'Download my Brandthread data' }).catch(() => {}); }}
+                variant="secondary"
+                size="small"
+                style={s.againBtn}
+              />
+            ) : null}
             <Button label="Generate another export" onPress={() => setRequested(false)} variant="tertiary" size="small" style={s.againBtn} />
           </View>
         ) : (

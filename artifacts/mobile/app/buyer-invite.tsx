@@ -23,8 +23,9 @@ import { isPreviewDemoMode } from '@/lib/devPreview';
 import { PrimaryButton, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { RetryRow } from '@/components/ui/RetryRow';
 import {
-  REFERRAL_HEADLINE, REFERRAL_STEPS, REFERRAL_SUBHEAD, referralStatusLabel,
+  REFERRAL_GET_CENTS, REFERRAL_HEADLINE, REFERRAL_STEPS, REFERRAL_SUBHEAD, referralStatusLabel,
 } from '@/lib/referralCopy';
 
 type InviteData = {
@@ -134,6 +135,11 @@ export default function BuyerInviteScreen() {
         <View style={styles.loadingState}>
           <ActivityIndicator color={theme.text} />
         </View>
+      ) : !invite ? (
+        // Without a code nothing on this screen works (copy, share, totals).
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load your invite" onRetry={() => { void load(); }} />
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SP.xl }]}
@@ -204,7 +210,7 @@ export default function BuyerInviteScreen() {
                     </View>
                     <Text style={[styles.joinedDate, rewarded && { color: theme.success }]}>
                       {rewarded
-                        ? `+${formatCents(r.rewardCents ?? 1000)}`
+                        ? `+${formatCents(r.rewardCents ?? REFERRAL_GET_CENTS)}`
                         : new Date(r.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
@@ -245,7 +251,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm,
   },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  codeText: { fontSize: 32, fontFamily: FONT.bold, color: theme.text, letterSpacing: 6 },
+  codeText: { fontSize: FS.h2, fontFamily: FONT.bold, color: theme.text, letterSpacing: 6 },
   copyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: theme.accentDim, paddingHorizontal: 14, paddingVertical: SP.sm, borderRadius: RADIUS.pill,

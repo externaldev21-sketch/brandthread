@@ -128,14 +128,14 @@ export default function BuyerAddressesScreen() {
       await load();
       handleCancel();
     } catch (e: any) {
-      Alert.alert('Error', "Couldn't save this address. Try again.");
+      Alert.alert("Couldn't save address", 'Check the details and try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure you want to remove this address?', [
+    Alert.alert('Delete address', 'Are you sure you want to remove this address?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
@@ -214,8 +214,8 @@ export default function BuyerAddressesScreen() {
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
-                  <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
+                  <Text style={styles.label}>ZIP / postal code</Text>
+                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>
@@ -242,7 +242,7 @@ export default function BuyerAddressesScreen() {
                 <Text style={styles.defaultToggleText}>Set as default address</Text>
               </TouchableOpacity>
 
-              <Button label="Save Address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
+              <Button label="Save address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
             </View>
           ) : (
             <>
