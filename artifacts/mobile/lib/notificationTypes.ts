@@ -15,8 +15,8 @@ export const BUYER_NOTIFICATION_TYPES: NotificationTypeRow[] = [
   { key: 'messages',        label: 'Messages',              description: 'Direct and group chats' },
   { key: 'friend_activity', label: 'Social',                description: 'Follows, likes, and comments' },
   { key: 'new_drops',       label: 'Drops and live',        description: 'Drops and live from brands' },
-  { key: 'saved_alerts',    label: 'Saved items alerts',    description: 'Restocks and price drops on saved items' },
-  { key: 'price_alerts',    label: 'Launch alerts',         description: 'Product launches from brands you follow' },
+  { key: 'saved_alerts',    label: 'Saved items alerts',    description: 'Restocks and price drops' },
+  { key: 'price_alerts',    label: 'Launch alerts',         description: 'Launches you follow' },
   { key: 'cart_reminders',  label: 'Cart reminders',        description: 'Items left in your cart' },
 ];
 
