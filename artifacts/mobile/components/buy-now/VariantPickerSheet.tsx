@@ -156,7 +156,7 @@ export function VariantPickerSheet({
                   <Text style={s.productPrice}>{formatCents(price)}</Text>
                   {lowStock && (
                     <View style={s.lowStockRow}>
-                      <Feather name="alert-circle" size={11} color={theme.warning} />
+                      <Feather name="alert-circle" size={11} color={theme.text} />
                       <Text style={s.lowStockText}>Only {variant!.inventoryQuantity} left</Text>
                     </View>
                   )}
@@ -277,12 +277,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   productPrice: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.accent, marginTop: 3 },
   lowStockRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  lowStockText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
+  lowStockText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
   optionSection: { marginBottom: SP.lg },
   optionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   optionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textTransform: 'uppercase', letterSpacing: 0.4 },
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
-  optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
+  optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   chipUnavail: { borderStyle: 'dashed', borderColor: theme.border, backgroundColor: 'transparent' },
   colorSwatch: {

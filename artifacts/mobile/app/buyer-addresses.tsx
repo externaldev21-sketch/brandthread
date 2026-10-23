@@ -106,8 +106,12 @@ export default function BuyerAddressesScreen() {
   };
 
   const handleSave = async () => {
-    if (!label || !recipientName || !street || !city || !state || !postalCode || !country) {
-      Alert.alert('Missing fields', 'Please fill out all required fields.');
+    const missing = [
+      [label, 'label'], [recipientName, 'recipient name'], [street, 'street address'],
+      [city, 'city'], [state, 'state'], [postalCode, 'ZIP / postal code'], [country, 'country'],
+    ].filter(([value]) => !value.trim()).map(([, name]) => name);
+    if (missing.length > 0) {
+      Alert.alert('Missing fields', `Please add: ${missing.join(', ')}.`);
       return;
     }
 
@@ -128,14 +132,14 @@ export default function BuyerAddressesScreen() {
       await load();
       handleCancel();
     } catch (e: any) {
-      Alert.alert('Error', "Couldn't save this address. Try again.");
+      Alert.alert("Couldn't save this address", 'Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure you want to remove this address?', [
+    Alert.alert('Delete address', 'Are you sure you want to remove this address?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
@@ -143,7 +147,7 @@ export default function BuyerAddressesScreen() {
           await api.buyer.addresses.delete(id);
           await load();
         } catch {
-          Alert.alert('Error', 'Could not delete address.');
+          Alert.alert("Couldn't delete this address", 'Please try again.');
         }
       }}
     ]);
@@ -155,11 +159,16 @@ export default function BuyerAddressesScreen() {
       await api.buyer.addresses.setDefault(id);
       await load();
     } catch {
-      Alert.alert('Error', 'Could not set default address.');
+      Alert.alert("Couldn't set your default address", 'Please try again.');
     }
   };
 
   const showForm = isCreating || editingId;
+  // The first address, and the current default, must stay default (the
+  // checkbox used to lock on after any tap, with no way to undo it).
+  const defaultLocked = isCreating
+    ? addresses.length === 0
+    : !!addresses.find(a => a.id === editingId)?.isDefault;
 
   if (loading) {
     return (
@@ -188,53 +197,53 @@ export default function BuyerAddressesScreen() {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={styles.label}>Label (e.g. Home, Office)</Text>
-                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" />
+                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" accessibilityLabel="Label" placeholderTextColor={palette.mutedForeground} returnKeyType="next" />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Recipient name</Text>
-                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" />
+                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" accessibilityLabel="Recipient name" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="name" autoComplete="name" returnKeyType="next" />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Street address</Text>
-                <TextInput value={street} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine1" autoComplete="street-address" returnKeyType="next" />
+                <TextInput value={street} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" accessibilityLabel="Street address" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine1" autoComplete="street-address" returnKeyType="next" />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Apt, Suite, etc. (optional)</Text>
-                <TextInput value={line2} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine2" returnKeyType="next" />
+                <TextInput value={line2} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" accessibilityLabel="Apartment, suite, etc. (optional)" placeholderTextColor={palette.mutedForeground} textContentType="streetAddressLine2" returnKeyType="next" />
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>City</Text>
-                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
+                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" accessibilityLabel="City" placeholderTextColor={palette.mutedForeground} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>State / Province</Text>
-                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" />
+                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" accessibilityLabel="State or province" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="addressState" returnKeyType="next" />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
-                  <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
+                  <Text style={styles.label}>ZIP / postal code</Text>
+                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" accessibilityLabel="ZIP or postal code" placeholderTextColor={palette.mutedForeground} keyboardType="number-pad" textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>
-                  <TextInput value={country} onChangeText={setCountry} style={styles.input} placeholder="US" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="countryName" returnKeyType="next" />
+                  <TextInput value={country} onChangeText={setCountry} style={styles.input} placeholder="US" accessibilityLabel="Country" placeholderTextColor={palette.mutedForeground} autoCapitalize="characters" textContentType="countryName" returnKeyType="next" />
                 </View>
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Phone (optional)</Text>
-                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={palette.mutedForeground} textContentType="telephoneNumber" autoComplete="tel" returnKeyType="done" />
+                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" accessibilityLabel="Phone (optional)" placeholderTextColor={palette.mutedForeground} textContentType="telephoneNumber" autoComplete="tel" returnKeyType="done" />
               </View>
 
               <TouchableOpacity
                 style={styles.defaultToggle}
-                onPress={() => setIsDefault(true)}
-                disabled={isDefault}
+                onPress={() => setIsDefault(v => !v)}
+                disabled={defaultLocked}
                 activeOpacity={0.7}
                 accessibilityRole="checkbox"
                 accessibilityLabel="Set as default address"
-                accessibilityState={{ checked: isDefault, disabled: isDefault }}
+                accessibilityState={{ checked: isDefault, disabled: defaultLocked }}
               >
                 <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
                   {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
@@ -242,7 +251,7 @@ export default function BuyerAddressesScreen() {
                 <Text style={styles.defaultToggleText}>Set as default address</Text>
               </TouchableOpacity>
 
-              <Button label="Save Address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
+              <Button label="Save address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
             </View>
           ) : (
             <>

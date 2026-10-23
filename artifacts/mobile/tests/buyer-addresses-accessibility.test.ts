@@ -20,7 +20,7 @@ describe('buyer shipping-address accessibility contract', () => {
     expect(iconButton).toContain('accessibilityRole="button"');
     expect(header).toContain('accessibilityRole="button"');
     expect(source).toContain('accessibilityRole="checkbox"');
-    expect(source).toContain('accessibilityState={{ checked: isDefault, disabled: isDefault }}');
+    expect(source).toContain('accessibilityState={{ checked: isDefault, disabled: defaultLocked }}');
   });
 
   it('keeps icon and default-address targets at least 44 points tall and wide where needed', () => {

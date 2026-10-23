@@ -151,7 +151,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
   return {
     id:                 row.id,
     sellerId:           row.ownerId,
-    sellerName:         row.sellerDisplayName ?? 'Independent Seller',
+    sellerName:         row.sellerDisplayName ?? 'Independent seller',
     sellerHandle:       '',
     name:               row.name,
     description:        row.description ?? '',
@@ -162,8 +162,10 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     isPreOrder:           row.isPreOrder           ?? false,
     preOrderClosingDate:  row.preOrderClosingDate ? new Date(row.preOrderClosingDate).toISOString() : undefined,
     preOrderEstShipDate:  row.preOrderEstShipDate ? new Date(row.preOrderEstShipDate).toISOString() : undefined,
-    cancellationPolicy:   'All sales final. Returns accepted only for damaged or incorrect items.',
-    refundPolicy:       'Contact the seller within 7 days of delivery to start a return.',
+    // The public product API carries no seller policy text; leave these
+    // empty (their rows are hidden) instead of showing invented terms.
+    cancellationPolicy:   '',
+    refundPolicy:       '',
     options,
     variants,
     isActive:           true,
@@ -429,7 +431,7 @@ function OptionPicker({ product, option, selections, onSelect, recommendedLabel 
                 activeOpacity={0.8}
                 accessibilityRole="radio"
                 accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
-                accessibilityState={{ selected: isSelected, disabled: !available }}
+                accessibilityState={{ checked: isSelected, disabled: !available }}
               >
                 <View style={[op.colorDot, { backgroundColor: val.colorHex }]} />
                 {!available && <View style={op.slashOverlay}><Text style={op.slash}>✕</Text></View>}
@@ -483,7 +485,7 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colorDot: { width: 28, height: 28, borderRadius: RADII.chip - 2 },
   unavail: { opacity: 0.4 },
   slashOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  slash: { fontSize: 18, color: RED, fontFamily: FONT.bold },
+  slash: { fontSize: FS.md, color: theme.subtle, fontFamily: FONT.bold },
   });
 };
 
@@ -757,7 +759,7 @@ export default function BuyerProductDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
-          <Feather name="alert-circle" size={ICON.xl} color={RED} />
+          <Feather name="alert-circle" size={ICON.xl} color={MUTED} />
           <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'Product not found'}</Text>
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
             {loadFailed ? 'Check your connection and try again.' : 'This product may be unavailable or the link may have expired.'}
@@ -786,7 +788,11 @@ export default function BuyerProductDetailScreen() {
   const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
-  const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
+  // A product with no size/color options is ready to buy as soon as it has a
+  // variant (it used to read "Select options" forever with nothing to select).
+  const allSelected = product.options.length === 0
+    ? !!variant
+    : Object.keys(selections).length === product.options.length;
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const paymentUnavailable = sellerPaymentReady === false;
@@ -821,7 +827,7 @@ export default function BuyerProductDetailScreen() {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
       Alert.alert("You're on the waitlist", "We'll notify you the moment this drops back in stock.");
-    } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
+    } catch { Alert.alert("Couldn't join the waitlist", 'Please try again.'); }
     finally { setWaitlistLoading(false); }
   }
 
@@ -836,8 +842,8 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).buyer.reserve(product.id);
       setReserved(true);
-      Alert.alert('Reserved!', "Spot secured. We'll notify you once production is confirmed.");
-    } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
+      Alert.alert('Reserved', "Your spot is secured. We'll notify you once production is confirmed.");
+    } catch { Alert.alert("Couldn't reserve this item", 'Please try again.'); }
     finally { setReserveLoading(false); }
   }
 
@@ -867,7 +873,7 @@ export default function BuyerProductDetailScreen() {
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
       addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
-      Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+      Alert.alert("Couldn't add to cart", result.message ?? 'Please try again.');
     }
   }
 
@@ -921,7 +927,7 @@ export default function BuyerProductDetailScreen() {
       return;
     }
     if (!allSelected) {
-      Alert.alert('Select Options', 'Please select all options before continuing.');
+      Alert.alert('Select options', 'Please select all options before continuing.');
       return;
     }
     if (!variant) return;
@@ -936,7 +942,7 @@ export default function BuyerProductDetailScreen() {
           const status = await api.buyer.sellerPaymentStatus(sellerId);
           if (!status.ready) {
             Alert.alert(
-              'Payments Unavailable',
+              'Payments unavailable',
               status.reason ?? 'This seller can\'t accept payments right now. Please try again later.',
               [{ text: 'OK' }],
             );
@@ -958,7 +964,7 @@ export default function BuyerProductDetailScreen() {
         router.push('/buyer-checkout?source=buynow' as never);
       }
     } catch (e) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert("Couldn't start checkout", 'Something went wrong. Please try again.');
     }
     setBuyingNow(false);
   }
@@ -1068,7 +1074,9 @@ export default function BuyerProductDetailScreen() {
             (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
             <View style={{ marginBottom: SP.md, gap: 6 }}>
               {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
-                <DemandBadge demandCount={demandCount} accent={theme.accent} />
+                <View style={{ alignSelf: 'flex-start' }}>
+                  <DemandBadge demandCount={demandCount} accent={theme.accent} />
+                </View>
               )}
               <ClaimedRemainingLabel
                 claimedUnits={demandClaimedUnits}
@@ -1113,7 +1121,7 @@ export default function BuyerProductDetailScreen() {
             <View style={s.preOrderCard}>
               <View style={s.preOrderRow}>
                 <Feather name="clock" size={ICON.sm} color={CYAN} />
-                <Text style={s.preOrderTitle}>Pre-Order Item</Text>
+                <Text style={s.preOrderTitle}>Pre-order item</Text>
               </View>
               {product.preOrderClosingDate && (
                 <Text style={s.preOrderDetail}>
@@ -1150,8 +1158,8 @@ export default function BuyerProductDetailScreen() {
                 />
                 {isUnselected && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.sm, marginBottom: SP.sm }}>
-                    <Feather name="alert-circle" size={12} color={RED} />
-                    <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: RED }}>
+                    <Feather name="alert-circle" size={12} color={FG} />
+                    <Text style={{ fontSize: FS.meta, fontFamily: FONT.semibold, color: FG }}>
                       Please select a {option.name.toLowerCase()}
                     </Text>
                   </View>
@@ -1171,6 +1179,7 @@ export default function BuyerProductDetailScreen() {
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Size guide"
+              hitSlop={{ top: 12, bottom: 12, left: 4, right: 12 }}
               testID="product-size-guide-link"
             >
               <Feather name="maximize" size={13} color={PURPLE_LIGHT} />
@@ -1246,7 +1255,7 @@ export default function BuyerProductDetailScreen() {
                 accessibilityLabel="Size chart"
                 accessibilityState={{ expanded: sizeChartOpen }}
               >
-                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
+                <Text style={[sz.label, { color: theme.text }]}>Size chart</Text>
                 <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
               </TouchableOpacity>
               {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
@@ -1289,9 +1298,9 @@ export default function BuyerProductDetailScreen() {
           <ProductVideo productId={product.id} />
 
           {/* Returns & cancellation */}
-          <View style={s.divider} />
-          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
-          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+          {product.refundPolicy || product.cancellationPolicy ? <View style={s.divider} /> : null}
+          {product.refundPolicy ? <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} /> : null}
+          {product.cancellationPolicy ? <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} /> : null}
 
           {/* Purchase protection — exactly once (it also rendered, compact,
               under the seller row). */}
@@ -1430,16 +1439,19 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
         {addedToCart ? (
+          <View style={s.buyNowBtn}>
           <Button
             label="In your bag"
             icon="check"
             variant="secondary"
             onPress={() => router.push('/(buyer)/cart' as never)}
             accessibilityLabel="In your bag. View cart"
-            style={s.buyNowBtn}
+            fullWidth
             testID="product-view-cart"
           />
+          </View>
         ) : (
+          <View style={s.buyNowBtn}>
           <Button
             label="Add to cart"
             variant="secondary"
@@ -1447,27 +1459,32 @@ export default function BuyerProductDetailScreen() {
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
-            style={s.buyNowBtn}
+            fullWidth
             testID="product-add-to-cart"
           />
+          </View>
         )}
 
         {product.isPreOrder ? (
+          <View style={s.buyNowBtn}>
           <Button
-            label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
+            label={reserved ? 'Reserved' : 'Reserve (no charge)'}
+            icon={reserved ? 'check' : undefined}
             onPress={handleReserve}
             variant={reserved ? 'secondary' : 'primary'}
             loading={reserveLoading}
             disabled={reserveLoading || reserved || launching}
             accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
-            style={s.buyNowBtn}
+            fullWidth
           />
+          </View>
         ) : (
+          <View style={s.buyNowBtn}>
           <Button
             label={
               paymentUnavailable ? 'Payments unavailable'
-                : !allSelected ? 'Select options'
-                : !inStock ? 'Sold Out'
+                : !allSelected ? (product.options.length > 0 ? 'Select options' : 'Unavailable')
+                : !inStock ? 'Sold out'
                 : 'Buy now'
             }
             icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
@@ -1475,8 +1492,9 @@ export default function BuyerProductDetailScreen() {
             variant="primary"
             loading={buyingNow}
             disabled={buyingNow || launching || !inStock || !allSelected || paymentUnavailable}
-            style={s.buyNowBtn}
+            fullWidth
           />
+          </View>
         )}
       </View>
       </StickyFooter>
@@ -1770,6 +1788,8 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
             key={p.id}
             style={{ width: 140 }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.name}, ${formatCents(lowestPriceCents)}`}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               if (usesThreadPull) {
@@ -1790,7 +1810,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
             </View>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
             <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
-              {p.sellerDisplayName || 'Independent Seller'}
+              {p.sellerDisplayName || 'Independent seller'}
             </Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
           </TouchableOpacity>
@@ -1878,15 +1898,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute', top: -4, right: 0, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center',
   },
-  cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
+  cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 13 },
   cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: CARD },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
-  saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
+  saleBadge: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
@@ -1929,9 +1949,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
-  priceSale: { color: SUCCESS },
+  priceSale: { color: FG },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
-  savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
+  savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   preOrderCard: { backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: `${CYAN}40`, marginBottom: SP.md, gap: 4 },
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   preOrderTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
@@ -1974,7 +1994,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 const makeWaitlistStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight, BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, minHeight: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   joined: { borderColor: SUCCESS + '44', backgroundColor: 'transparent' },
   text:   { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
   });
@@ -1982,6 +2002,6 @@ const makeWaitlistStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
 // Size chart toggle styles
 const sz = StyleSheet.create({
-  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm },
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm, minHeight: 44 },
   label:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
 });

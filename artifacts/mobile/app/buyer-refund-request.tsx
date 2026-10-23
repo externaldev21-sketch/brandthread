@@ -25,7 +25,7 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
-import { PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, PrimaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 const REFUND_REASONS = [
@@ -69,19 +69,22 @@ export default function BuyerRefundRequestScreen() {
     }
   }
 
+  const [reloadTick, setReloadTick] = useState(0);
   useEffect(() => {
-    if (!orderId) return;
+    // No order id: stop loading and show the not-found state below.
+    if (!orderId) { setLoading(false); return; }
+    setLoading(true);
     getBuyerOrder(orderId).then(o => {
       setOrder(o ?? null);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [orderId]);
+  }, [orderId, reloadTick]);
 
   const totalCents = order?.payment.totalCents ?? 0;
 
   async function handleSubmit() {
-    if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
-    if (!description.trim()) { Alert.alert('Add Details', 'Please describe why you are requesting a refund.'); return; }
+    if (!reason) { Alert.alert('Choose a reason', 'Please select a refund reason.'); return; }
+    if (!description.trim()) { Alert.alert('Add details', 'Please describe why you are requesting a refund.'); return; }
     if (!order) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
@@ -98,7 +101,7 @@ export default function BuyerRefundRequestScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSubmitted(true);
     } catch {
-      Alert.alert('Error', 'Could not submit your refund request. Please try again.');
+      Alert.alert("Couldn't send your request", 'Please try again.');
     }
     setSubmitting(false);
   }
@@ -106,7 +109,7 @@ export default function BuyerRefundRequestScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request a refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>
       </View>
     );
@@ -115,14 +118,31 @@ export default function BuyerRefundRequestScreen() {
   if (submitted) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request a refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
-          <Text style={s.successTitle}>Refund Request Submitted</Text>
+          <View style={s.successIcon}><Feather name="check" size={32} color={theme.onAccent} /></View>
+          <Text style={s.successTitle}>Refund request sent</Text>
           <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
-          <Text style={s.successNote}>Refund updates will appear here.</Text>
-          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+          <Text style={s.successNote}>We'll notify you when there's an update on your order.</Text>
+          <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} style={s.doneBtn} />
         </View>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request a refund" />
+        <EmptyState
+          icon="package"
+          title="Couldn’t load this order"
+          description="Check your connection and try again."
+          action={orderId
+            ? { label: 'Try again', onPress: () => setReloadTick(n => n + 1) }
+            : { label: 'Go back', onPress: () => goBackOr(router) }}
+          secondaryAction={orderId ? { label: 'Go back', onPress: () => goBackOr(router) } : undefined}
+        />
       </View>
     );
   }
@@ -130,7 +150,7 @@ export default function BuyerRefundRequestScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScreenHeader
-        title="Request Refund"
+        title="Request a refund"
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
@@ -144,7 +164,7 @@ export default function BuyerRefundRequestScreen() {
         {/* Order */}
         {order && (
           <View style={s.card}>
-            <Text style={s.sectionTitle}>Order Items</Text>
+            <Text style={s.sectionTitle}>Order items</Text>
             {order.lineItems.map((item, idx) => (
               <View key={idx} style={[s.itemRow, idx > 0 && s.itemBorder]}>
                 <Feather name="package" size={14} color={MUTED} />
@@ -160,9 +180,17 @@ export default function BuyerRefundRequestScreen() {
 
         {/* Reason */}
         <View style={s.card}>
-          <Text style={s.sectionTitle}>Refund Reason</Text>
+          <Text style={s.sectionTitle}>Refund reason</Text>
           {REFUND_REASONS.map(r => (
-            <TouchableOpacity key={r} style={s.optionRow} onPress={() => { Haptics.selectionAsync(); setReason(r); }} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={r}
+              style={s.optionRow}
+              onPress={() => { Haptics.selectionAsync(); setReason(r); }}
+              activeOpacity={0.7}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: reason === r }}
+              accessibilityLabel={r}
+            >
               <View style={[s.radio, reason === r && s.radioSelected]}>
                 {reason === r && <View style={s.radioDot} />}
               </View>
@@ -183,6 +211,7 @@ export default function BuyerRefundRequestScreen() {
             multiline
             numberOfLines={5}
             textAlignVertical="top"
+            accessibilityLabel="Refund details"
           />
         </View>
 
@@ -191,6 +220,8 @@ export default function BuyerRefundRequestScreen() {
           style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
           onPress={pickEvidence}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Add photo evidence, ${evidencePhotos.length} of 5 added`}
         >
           <Feather name="camera" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>
@@ -206,6 +237,9 @@ export default function BuyerRefundRequestScreen() {
                   <TouchableOpacity
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove photo ${idx + 1}`}
                   >
                     <Feather name="x" size={10} color="#fff" />
                   </TouchableOpacity>
@@ -216,12 +250,12 @@ export default function BuyerRefundRequestScreen() {
         )}
 
         <Text style={s.disclaimer}>
-          Submitting a refund request does not guarantee approval. Do not claim a refund is approved until the seller or payment provider confirms it.
+          Submitting a request doesn’t guarantee a refund. We’ll let you know once the seller or payment provider confirms it.
         </Text>
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <PrimaryButton label="Submit Refund Request" onPress={handleSubmit} loading={submitting} disabled={submitting} />
+        <PrimaryButton label="Send refund request" onPress={handleSubmit} loading={submitting} disabled={submitting} />
       </View>
     </View>
   );
@@ -241,7 +275,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   itemName: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  optionRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8, minHeight: 44 },
   radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: PURPLE },
   radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
@@ -254,7 +288,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
   submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
   submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
-  successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
+  successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
   successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.sm },
   successNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },

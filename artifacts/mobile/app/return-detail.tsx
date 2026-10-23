@@ -248,16 +248,22 @@ export default function ReturnDetailScreen() {
                   testID="return-decline-reason"
                 />
                 <View style={s.row}>
-                  <Button label="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => { setShowDenyForm(false); setDenyReason(''); }} />
-                  <Button
-                    label="Decline return"
-                    variant="primary"
-                    style={{ flex: 1 }}
-                    loading={acting === 'deny'}
-                    disabled={!denyReason.trim() || acting !== null}
-                    onPress={() => { void updateStatus('denied', denyReason.trim()); }}
-                    testID="return-decline-submit"
-                  />
+                  {/* flex lives on a wrapper: Button applies `style` to its inner
+                      face, where flex: 1 collapsed it to the label's height. */}
+                  <View style={{ flex: 1 }}>
+                    <Button label="Cancel" variant="secondary" fullWidth onPress={() => { setShowDenyForm(false); setDenyReason(''); }} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      label="Decline return"
+                      variant="primary"
+                      fullWidth
+                      loading={acting === 'deny'}
+                      disabled={!denyReason.trim() || acting !== null}
+                      onPress={() => { void updateStatus('denied', denyReason.trim()); }}
+                      testID="return-decline-submit"
+                    />
+                  </View>
                 </View>
               </View>
             )}
@@ -346,13 +352,13 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
   actions: { gap: SP.sm, marginTop: SP.md },
   row: { flexDirection: 'row', gap: SP.sm },
-  fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.xs + 1, color: theme.muted },
+  fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.meta, color: theme.muted },
   input: {
     backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
     padding: SP.md, minHeight: 90, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, textAlignVertical: 'top',
   },
   inlineError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: SP.sm },
-  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.xs + 1, color: theme.text, lineHeight: 18 },
+  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 18 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },

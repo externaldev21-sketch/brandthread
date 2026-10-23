@@ -238,7 +238,7 @@ export function BuyNowFlow({
       <View style={[s.sheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.handle} />
         <View style={s.header}>
-          <Text style={[s.title, { color: theme.text }]}>Buy Now</Text>
+          <Text style={[s.title, { color: theme.text }]}>Buy now</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
             <Feather name="x" size={18} color={theme.text} />
           </TouchableOpacity>
@@ -302,7 +302,7 @@ export function BuyNowFlow({
                 accessibilityRole="button"
                 accessibilityLabel="Continue to checkout"
               >
-                <Text style={[s.payBtnText, { color: theme.onAccent }]}>Continue to Checkout</Text>
+                <Text style={[s.payBtnText, { color: theme.onAccent }]}>Continue to checkout</Text>
               </TouchableOpacity>
             )}
           </>

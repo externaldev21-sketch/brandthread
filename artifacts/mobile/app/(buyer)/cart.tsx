@@ -235,7 +235,7 @@ function CartItemRow({
         {/* Unavailable warning — prominent, backed by CartItem.isAvailable */}
         {!item.isAvailable && (
           <View style={ir.unavailBadge} accessibilityRole="alert">
-             <Feather name="alert-circle" size={11} color={theme.error} />
+             <Feather name="alert-circle" size={11} color={theme.text} />
             <Text style={ir.unavailText}>{item.unavailableReason ?? 'Unavailable — remove or save for later'}</Text>
           </View>
         )}
@@ -243,9 +243,9 @@ function CartItemRow({
         {/* Low stock warning — inline, only when actually available */}
         {isLowStock && (
           <View style={[ir.stockWarnRow, isCriticalStock && ir.stockWarnCritical]}>
-             <Feather name="alert-triangle" size={10} color={theme.warning} />
+             <Feather name="alert-triangle" size={10} color={theme.text} />
             <Text style={[ir.stockWarn, isCriticalStock && ir.stockWarnCriticalText]}>
-              {isCriticalStock ? 'Last one left!' : `Only ${item.maxQuantity} left`}
+              {isCriticalStock ? 'Only 1 left' : `Only ${item.maxQuantity} left`}
             </Text>
           </View>
         )}
@@ -335,23 +335,24 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
   unavailBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: `${theme.error}26`, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill,
     paddingHorizontal: 8, paddingVertical: 3,
     alignSelf: 'flex-start', marginBottom: 4,
   },
-  unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, flex: 1, flexShrink: 1 },
+  unavailText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, flexShrink: 1 },
   stockWarnRow: {
     flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4,
-    backgroundColor: `${theme.warning}26`, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill,
     paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start',
   },
-  stockWarnCritical: { backgroundColor: `${theme.error}26` },
-  stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
-  stockWarnCriticalText: { color: theme.error },
+  // Monochrome (as on the product page): urgency is carried by weight, not color.
+  stockWarnCritical: { borderColor: theme.text },
+  stockWarn: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
+  stockWarnCriticalText: { fontFamily: FONT.bold },
   priceBlock: { alignItems: 'flex-end' },
   comparePrice: { fontSize: FS.meta, ...TABULAR_NUMS, fontFamily: FONT.medium, color: theme.subtle, textDecorationLine: 'line-through' },
   price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
-  priceDiscounted: { color: theme.success },
+  priceDiscounted: { color: theme.text },
   qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   // Grey 13pt text links, each a 44pt-tall target, left-aligned.
   textActions: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginLeft: -SP.xs },
@@ -540,7 +541,9 @@ function SavedItemRow({ item, onMove, onRemove }: {
   return (
     <View style={si.root}>
       <View style={si.img}>
-        <Feather name="bookmark" size={ICON.md} color={theme.muted} />
+        {item.imageUri
+          ? <CachedImage source={{ uri: item.imageUri }} style={si.productImage} contentFit="contain" recyclingKey={item.imageUri} />
+          : <Feather name="bookmark" size={ICON.md} color={theme.muted} />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>
@@ -573,11 +576,12 @@ function SavedItemRow({ item, onMove, onRemove }: {
 
 const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
-  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  productImage: { width: '100%', height: '100%' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   variant: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
-  unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
+  unavail: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
 });
 
@@ -599,7 +603,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
   return (
     <CheckoutSection title="Order summary" testID="cart-order-summary">
       <Row label="Subtotal" value={fmtPrice(subtotal)} />
-      <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? theme.success : undefined} />
+      <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} />
       <Row label="Shipping & fees" value={fmtPrice(shipping)} small />
       <Row label="Est. tax" value={fmtPrice(tax)} small />
       <View style={sum.divider} />
@@ -983,7 +987,7 @@ export default function CartScreen() {
       await createCheckoutSession(cart, true, items, loyaltyToApply, threadCashToApply);
       push(('/thread-checkout?source=cart') as never);
     } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert("Couldn't start checkout", 'Something went wrong. Please try again.');
     }
     setBusy(false);
   }
@@ -1170,7 +1174,7 @@ export default function CartScreen() {
                          −{fmtPrice(loyaltyRedemption.discountCents)} at secure checkout
                       </Text>
                     </View>
-                    <Feather name="check-circle" size={19} color={theme.success} />
+                    <Feather name="check-circle" size={19} color={theme.text} />
                   </View>
                 ) : (
                   <>
@@ -1275,6 +1279,7 @@ export default function CartScreen() {
                   style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Checkout"
+                  accessibilityState={{ disabled: selectedItems.length === 0 || validating, busy: validating }}
                   accessibilityHint="Reviews shipping and opens secure payment"
                 >
                   {validating ? (
@@ -1319,7 +1324,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   selectAllRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingBottom: SP.xs,
+    paddingHorizontal: SP.md, paddingBottom: SP.xs, minHeight: 44,
   },
   selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
@@ -1338,8 +1343,8 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   // The checkout's dark field with a hairline border.
   pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
   pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
-  appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
-  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
+  appliedPoints: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
+  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
   // Sticky checkout bar: total on the left, a white pill on the right —

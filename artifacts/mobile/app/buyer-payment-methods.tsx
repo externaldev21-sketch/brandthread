@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useApi } from '@/lib/api';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
@@ -20,6 +20,7 @@ import { Button, Card, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { hapticDestructiveConfirm, hapticLight, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 
@@ -39,13 +40,14 @@ function CardBrand({ brand }: { brand: string }) {
   const upper = brand.charAt(0).toUpperCase() + brand.slice(1);
   return (
     <View style={[cb.wrap, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-      <Text style={[cb.text, { color: theme.accent }]}>{upper}</Text>
+      <Text style={[cb.text, { color: theme.accent }]} numberOfLines={1}>{upper}</Text>
     </View>
   );
 }
 const cb = StyleSheet.create({
-  wrap: { borderRadius: RADII.chip, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
-  text: { fontSize: 11, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  // Fixed width so every card number lines up, whatever the brand name length.
+  wrap: { width: 116, alignItems: 'center', borderRadius: RADII.chip, paddingHorizontal: 6, paddingVertical: 4, borderWidth: 1 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
 });
 
 export default function BuyerPaymentMethodsScreen() {
@@ -56,6 +58,7 @@ export default function BuyerPaymentMethodsScreen() {
   const api = useApi();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
@@ -67,11 +70,13 @@ export default function BuyerPaymentMethodsScreen() {
       setLoading(false);
       return;
     }
+    setLoadFailed(false);
     try {
       const data = await api.reviews.paymentMethods() as any;
       setPaymentMethods(data.paymentMethods ?? []);
     } catch {
       setPaymentMethods([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -87,7 +92,7 @@ export default function BuyerPaymentMethodsScreen() {
       await api.reviews.setDefaultPaymentMethod(pm.id);
       setPaymentMethods(prev => prev.map(p => ({ ...p, isDefault: p.id === pm.id })));
     } catch {
-      Alert.alert('Error', 'Could not make this card your default. Please try again.');
+      Alert.alert("Couldn't change your default card", 'Please try again.');
     } finally {
       setSettingDefault(null);
     }
@@ -109,7 +114,7 @@ export default function BuyerPaymentMethodsScreen() {
               await api.reviews.removePaymentMethod(pm.id) as any;
               setPaymentMethods(prev => prev.filter(p => p.id !== pm.id));
             } catch {
-              Alert.alert('Error', 'Could not remove this card. Please try again.');
+              Alert.alert("Couldn't remove this card", 'Please try again.');
             } finally {
               setRemoving(null);
             }
@@ -134,11 +139,15 @@ export default function BuyerPaymentMethodsScreen() {
             Payment methods saved from your Brandthread purchases. Cards are stored securely by Stripe.
           </Text>
 
-          {paymentMethods.length === 0 ? (
+          {loadFailed ? (
+            <View style={{ marginBottom: SPACING.xl }}>
+              <RetryRow label="Couldn't load your saved cards" onRetry={() => void load()} />
+            </View>
+          ) : paymentMethods.length === 0 ? (
             <EmptyState
               icon="credit-card"
               title="No saved payment methods"
-              description="Payment methods are saved automatically when you complete a purchase. Your card details are stored securely by Stripe — Brandthread never sees your full card number."
+              description="Cards are saved automatically when you complete a purchase."
               compact
               style={{ marginBottom: SPACING.xl }}
             />
@@ -167,7 +176,7 @@ export default function BuyerPaymentMethodsScreen() {
                           label="Make default"
                           onPress={() => setDefault(pm)}
                           variant="tertiary"
-                          size="small"
+                          size="compact"
                           loading={settingDefault === pm.id}
                           disabled={settingDefault !== null}
                           style={s.setDefaultBtn}
@@ -215,7 +224,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   defaultBadge: { backgroundColor: `${theme.success}26`, borderRadius: RADII.pill, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: theme.success },
   pmMeta: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginTop: 2 },
-  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 6, minWidth: 0, paddingHorizontal: 0, height: 24 },
+  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 2, minWidth: 0, paddingHorizontal: 0 },
   securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
   securityNoteText: { flex: 1, ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18 },
 });

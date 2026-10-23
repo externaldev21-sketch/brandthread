@@ -113,7 +113,14 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
   const thumbs = order.lineItems.slice(0, 4);
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress} disabled={isPreview}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.82}
+      onPress={onPress}
+      disabled={isPreview}
+      accessibilityRole="button"
+      accessibilityLabel={`Order ${order.orderNumber} from ${order.sellerName}, ${statusBadgeLabel(order.status).toLowerCase()}, ${formatCents(order.payment.totalCents)}`}
+    >
       {/* Top row */}
       <View style={styles.cardTopRow}>
         <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -164,7 +171,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
       <View style={{ marginTop: SP.sm }}>
         {firstItem && (
           <Text style={styles.itemText} numberOfLines={1}>
-            {firstItem.productName} ({firstItem.variant}) × {firstItem.quantity}
+            {firstItem.productName}{firstItem.variant ? ` (${firstItem.variant})` : ''} × {firstItem.quantity}
           </Text>
         )}
         {extraCount > 0 && (
@@ -207,7 +214,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
           <Feather name="truck" size={ICON.xs} color={theme.secondary} />
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
-            {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
+            {order.estimatedDelivery ? ` · Est. ${fmtDate(order.estimatedDelivery)}` : ''}
             {isPreview && order.trackingNumber ? ` · ${order.trackingNumber}` : ''}
           </Text>
         </View>
@@ -215,17 +222,19 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onReo
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview}>
-          <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8} disabled={isPreview} accessibilityRole="button" accessibilityLabel={`View order ${order.orderNumber} details`}>
+          <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View order details</Text>
         </TouchableOpacity>
         {order.trackingNumber && !isPreview && (
           <TouchableOpacity
              style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Track shipment for order ${order.orderNumber}`}
           >
             <Feather name="map-pin" size={12} color={theme.secondary} />
-            <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
+            <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track shipment</Text>
           </TouchableOpacity>
         )}
         {onReorder && canReorderStatus(order.status) && (
@@ -412,7 +421,7 @@ export default function BuyerOrdersScreen() {
   return (
     <BrandthreadScreen noSafeBottom noSafeTop>
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
-      <Header title="My Orders" largeTitle showBack={false} />
+      <Header title="My orders" largeTitle showBack={false} />
 
       {/* Filter chips — horizontal scroll, edge-to-edge. The screen's own
           gutter (`centeredPadding`) on the content container is what lets
@@ -453,7 +462,7 @@ export default function BuyerOrdersScreen() {
             loadError ? (
               <EmptyState
                 icon="alert-triangle"
-                title="Couldn't load your orders."
+                title="Couldn't load your orders"
                 description="Pull to refresh, or tap try again."
                 action={{
                   label: 'Try again',
@@ -466,10 +475,10 @@ export default function BuyerOrdersScreen() {
               <EmptyState
                 icon="shopping-bag"
                 illustration="tee"
-                title="Your first find is still out there."
+                title="Your first find is still out there"
                 description="When something catches your eye, every update from checkout to doorstep will live here."
                 action={{
-                  label: 'Discover Products',
+                  label: 'Discover products',
                   icon: 'compass',
                   onPress: () => router.navigate('/(buyer)/discover' as never),
                 }}
@@ -538,7 +547,7 @@ function cardStyles(theme: AppThemePreset) {
       color: theme.text,
     },
     orderMeta: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.regular,
       color: theme.muted,
       marginTop: 1,
@@ -573,7 +582,7 @@ function cardStyles(theme: AppThemePreset) {
       color: theme.text,
     },
     moreText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.regular,
       color: theme.muted,
       marginTop: 2,
@@ -617,7 +626,7 @@ function cardStyles(theme: AppThemePreset) {
       letterSpacing: 0.2,
     },
     cancellationReason: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.medium,
       color: theme.muted,
     },
@@ -646,7 +655,7 @@ function cardStyles(theme: AppThemePreset) {
       marginTop: SP.xs,
     },
     trackingText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.medium,
       color: theme.secondary,
     },
@@ -661,6 +670,7 @@ function cardStyles(theme: AppThemePreset) {
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 10,
+      minHeight: 44,
       borderRadius: RADIUS.sm,
       backgroundColor: theme.cardElevated,
       borderWidth: 1,
@@ -678,7 +688,7 @@ function cardStyles(theme: AppThemePreset) {
       borderColor: theme.border,
     },
     actionBtnText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.semibold,
       color: theme.text,
     },
