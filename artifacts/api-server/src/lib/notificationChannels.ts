@@ -20,6 +20,7 @@ export const BUYER_PREF_KEYS = [
   "new_drops",
   "friend_activity",
   "price_alerts",
+  "saved_alerts",
   "return_updates",
   "cart_reminders",
 ] as const;
@@ -40,6 +41,7 @@ const EMAIL_OFF_BY_DEFAULT = new Set<string>([
   "new_drops",
   "friend_activity",
   "price_alerts",
+  "saved_alerts",
   "customer_messages",
   "inventory_alerts",
 ]);

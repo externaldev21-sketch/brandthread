@@ -52,7 +52,10 @@ export type PushEventCategory =
   | "live"
   | "cart"
   | "announcement"
-  | "giveaway";
+  | "giveaway"
+  // Saved items alerts (restock / price drop). Published with feed category
+  // "stock" and an explicit pushCategory, so it has no feed-category alias.
+  | "saved";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -144,6 +147,7 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
     live: "new_drops",
     cart: "cart_reminders",
     announcement: "seller_announcements",
+    saved: "saved_alerts",
   };
   return buyerPreferences[category] ?? null;
 }

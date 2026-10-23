@@ -42,7 +42,8 @@ const BUYER_ROWS: NotifRow[] = [
   { key: 'messages',        icon: 'message-circle', label: 'Messages',          description: 'Sellers and friends' },
   { key: 'new_drops',       icon: 'zap',             label: 'Drops',             description: 'Drops from brands you follow' },
   { key: 'friend_activity', icon: 'users',           label: 'Social',            description: 'Follows, likes, and comments' },
-  { key: 'price_alerts',    icon: 'tag',             label: 'Price & stock alerts', description: 'Price drops and restocks' },
+  { key: 'saved_alerts',    icon: 'bookmark',        label: 'Saved items alerts', description: 'Restocks and price drops on saved items' },
+  { key: 'price_alerts',    icon: 'tag',             label: 'Launch alerts',     description: 'Product launches from brands you follow' },
   { key: 'return_updates',  icon: 'refresh-ccw',     label: 'Returns',           description: 'Return and refund requests' },
   { key: 'seller_announcements', icon: 'bell', label: 'Brand announcements', description: 'Pushes that brands you follow send to their followers' },
 ];

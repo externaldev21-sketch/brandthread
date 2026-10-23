@@ -28,6 +28,7 @@ const BUYER_DEFAULTS = {
   order_updates: true,
   friend_activity: true,
   price_alerts: true,
+  saved_alerts: true,
   return_updates: true,
   cart_reminders: true,
   seller_announcements: true,
