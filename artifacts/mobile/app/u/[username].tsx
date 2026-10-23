@@ -47,6 +47,7 @@ import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { radius } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -146,7 +147,6 @@ function PublicProfileLanding({
         style={{ width: layout.columnWidth }}
         contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
         showsVerticalScrollIndicator={false}
-        accessible
       >
         {/* Hero */}
         <View style={[styles.landingHero, { height: layout.heroHeight }]}>
@@ -362,7 +362,7 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={styles.root} accessibilityLabel="Loading profile" accessible>
+      <View style={styles.root}>
         <ScreenHeader title="Profile" onBack={() => goBackOr(router)} />
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>
@@ -411,7 +411,9 @@ export default function PublicProfileRoute() {
       <View style={styles.root}>
         <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
         <View style={styles.center}>
-          <Feather name="wifi-off" size={40} color={theme.muted} />
+          <View style={styles.iconBox}>
+            <Feather name="wifi-off" size={40} color={theme.muted} />
+          </View>
           <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
           <Text style={styles.notFoundDesc}>{state.message}</Text>
           <PressableScale
@@ -501,7 +503,7 @@ function makeStyles(theme: AppThemePreset) {
   homeBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
-    paddingVertical: 14,
+    paddingVertical: SPACING.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
@@ -514,7 +516,7 @@ function makeStyles(theme: AppThemePreset) {
   retryBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
-    paddingVertical: 14,
+    paddingVertical: SPACING.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.text,
@@ -614,7 +616,7 @@ function makeStyles(theme: AppThemePreset) {
   verifiedInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: SP.xs,
   },
   verifiedText: {
     fontFamily: FONT.medium,
@@ -707,7 +709,7 @@ function makeStyles(theme: AppThemePreset) {
   // Fine print
   finePrint: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: theme.subtle,
     marginTop: SP.xl,
     textAlign: 'center',

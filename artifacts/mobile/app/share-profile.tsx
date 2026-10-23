@@ -34,6 +34,7 @@ import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { radius } from '@/constants/radii';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@ interface ResolvedProfile {
 
 export default function ShareProfileScreen() {
   const insets = useSafeAreaInsets();
+  // The seller floating tab bar stays mounted over this route — keep the
+  // last row (hint) clear of it, never less than the home-indicator pad.
+  const tabBarClearance = useTabBarClearance(2);
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
@@ -150,7 +154,7 @@ export default function ShareProfileScreen() {
         Platform.OS === 'ios'
           ? { message, url: canonicalUrl }
           : { message },
-        { dialogTitle: 'Share Profile' },
+        { dialogTitle: 'Share profile' },
       );
     } catch {
       // Dismissed.
@@ -169,10 +173,10 @@ export default function ShareProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Share Profile" />
+      <ScreenHeader title="Share profile" />
 
       <ScrollView
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + SP.xxl }]}
+        contentContainerStyle={[styles.body, { paddingBottom: Math.max(insets.bottom + SP.xxl, tabBarClearance) }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
@@ -212,7 +216,7 @@ export default function ShareProfileScreen() {
               accessibilityLabel="Set username in profile settings"
             >
               <Feather name="edit-3" size={ICON.sm} color={theme.onAccent} />
-              <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Set Username</Text>
+              <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Set username</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -278,7 +282,7 @@ export default function ShareProfileScreen() {
                 color={theme.onAccent}
               />
               <Text style={[styles.copyBtnText, { color: theme.onAccent }]}>
-                {(copied || autoCopied) ? 'Link Copied!' : 'Copy Link'}
+                {(copied || autoCopied) ? 'Link copied' : 'Copy link'}
               </Text>
             </TouchableOpacity>
 
@@ -292,7 +296,7 @@ export default function ShareProfileScreen() {
               accessibilityHint="Opens the system share sheet to share your profile link"
             >
               <Feather name="share-2" size={ICON.sm} color={theme.text} />
-              <Text style={styles.shareBtnText}>Share Profile</Text>
+              <Text style={styles.shareBtnText}>Share profile</Text>
             </TouchableOpacity>
 
             {/* Hint */}
@@ -396,6 +400,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   qrWrapper: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.md,
+    overflow: 'hidden',
     padding: 0,
     // The QRCode quietZone prop handles the internal padding.
   },
@@ -442,7 +447,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   hint: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: theme.muted,
     textAlign: 'center',
     lineHeight: 18,

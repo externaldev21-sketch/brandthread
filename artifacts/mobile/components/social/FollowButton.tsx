@@ -68,7 +68,7 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
 
   const label = state.isFollowing
     ? (state.isMutual ? 'Friends' : 'Following')
-    : (state.isFollowedBy ? 'Follow Back' : 'Follow');
+    : (state.isFollowedBy ? 'Follow back' : 'Follow');
   const isPrimary = !state.isFollowing;
 
   return (
@@ -76,6 +76,8 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       testID="follow-button"
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!(disabled || busy), busy }}
+      hitSlop={size === 'compact' ? { top: 6, bottom: 6 } : undefined}
       disabled={disabled || busy}
       onPress={handlePress}
       style={({ pressed }) => [
@@ -114,5 +116,5 @@ const makeStyles = (theme: AppThemePreset, size: 'default' | 'compact') => Style
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.5 },
   icon: { marginRight: 4 },
-  label: { fontFamily: FONT.semibold, fontSize: size === 'compact' ? FS.xs : FS.sm },
+  label: { fontFamily: FONT.semibold, fontSize: size === 'compact' ? FS.meta : FS.sm },
 });

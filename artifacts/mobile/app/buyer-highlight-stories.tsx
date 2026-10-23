@@ -140,8 +140,10 @@ export default function BuyerHighlightStories() {
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : failed ? (
-        <EmptyState icon="alert-circle" title="Couldn't load your stories" description="Check your connection and try again."
-          action={{ label: 'Try again', onPress: () => { load(); } }} />
+        <View style={s.fill}>
+          <EmptyState icon="alert-circle" title="Couldn’t load your stories" description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { load(); } }} />
+        </View>
       ) : (
         <FlatList
           data={stories}
@@ -160,6 +162,7 @@ export default function BuyerHighlightStories() {
         label={selected.size > 0 ? `Done (${selected.size})` : 'Done'}
         onPress={() => { void save(); }}
         loading={saving}
+        disabled={loading || failed}
       />
     </View>
   );
@@ -168,10 +171,11 @@ export default function BuyerHighlightStories() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], cell: number) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  fill: { flex: 1 },
   cell: { width: cell, height: cell * (16 / 9) * 0.8, backgroundColor: theme.cardElevated, overflow: 'hidden' },
   date: {
     position: 'absolute', left: SPACING.xs, bottom: SPACING.xs, color: theme.text, backgroundColor: theme.background,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADII.chip, overflow: 'hidden',
+    paddingHorizontal: SPACING.xs, paddingVertical: 3, borderRadius: RADII.chip, overflow: 'hidden',
     fontFamily: FONT.semibold, ...TYPE_SCALE.caption,
   },
   check: {

@@ -37,6 +37,7 @@ export function StoryRing({
   showPlusBadge,
   closeFriendsOnly,
   testID,
+  name,
 }: {
   size?: number;
   seen: boolean;
@@ -50,6 +51,8 @@ export function StoryRing({
    *  Friends toggle) instead of recoloring the ring itself. */
   closeFriendsOnly?: boolean;
   testID?: string;
+  /** Spoken name for the ring's accessibility label (falls back to initials). */
+  name?: string;
 }) {
   const { theme } = useAppTheme();
   const ringWidth = 2.5;
@@ -61,7 +64,7 @@ export function StoryRing({
       activeOpacity={0.8}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={showPlusBadge ? 'Your story' : `${initials}'s story, ${seen ? 'seen' : 'unseen'}`}
+      accessibilityLabel={showPlusBadge ? 'Your story' : `${name || initials}'s story, ${seen ? 'seen' : 'unseen'}`}
       style={[
         styles.ring,
         {
@@ -157,6 +160,7 @@ export default function StoryTray({ myAvatarUrl, myInitials, onCreateStory, onOp
             seen={entry.seen}
             color={entry.authorColor}
             initials={entry.authorInitials}
+            name={entry.authorName}
             closeFriendsOnly={entry.closeFriendsOnly}
             onPress={() => onOpenAuthor(entry)}
           />
@@ -199,5 +203,5 @@ const styles = StyleSheet.create({
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   scroll: { paddingHorizontal: SP.md, gap: SP.md, paddingVertical: SP.sm },
   item: { alignItems: 'center', width: RING_SIZE + 12 },
-  label: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 4 },
+  label: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: SP.xs },
 });

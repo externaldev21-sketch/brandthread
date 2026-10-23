@@ -57,6 +57,7 @@ import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 import { radius } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
 
 type ContentTab = 'Posts' | 'Tagged';
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
@@ -313,8 +314,26 @@ export default function BuyerOtherProfileScreen() {
       .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
       .catch(() => {});
   };
-  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
-  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); };
+  const handleMute = async () => {
+    setMoreSheetOpen(false);
+    try {
+      await muteUser({ userId: canonicalUserId, name: displayName, handle: displayHandle, initials: displayInitials, color });
+      hapticSuccess();
+      setSnackbar(`Muted ${displayName}`);
+    } catch {
+      Alert.alert("Couldn't mute", 'Try again.');
+    }
+  };
+  const handleRestrict = async () => {
+    setMoreSheetOpen(false);
+    try {
+      await restrictUser({ userId: canonicalUserId, name: displayName, handle: displayHandle, initials: displayInitials, color });
+      hapticSuccess();
+      setSnackbar(`Restricted ${displayName}`);
+    } catch {
+      Alert.alert("Couldn't restrict", 'Try again.');
+    }
+  };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     const subject = { userId: canonicalUserId, name: displayName };
@@ -390,6 +409,8 @@ export default function BuyerOtherProfileScreen() {
       {isMutual && threadCashSendEnabled ? (
         <ThreadCashAttachButton
           recipientId={canonicalUserId}
+          recipientName={displayName}
+          recipientHandle={profile?.username ?? undefined}
           onSent={() => {}}
           renderTrigger={(open) => (
             <PressableScale
@@ -619,7 +640,7 @@ function MoreRow({ icon, label, onPress, destructive }: { icon: keyof typeof Fea
 }
 
 const moreRowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 50, paddingHorizontal: SP.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 50, paddingHorizontal: SP.xs },
   text: { fontFamily: FONT.medium, fontSize: FS.base },
 });
 
@@ -637,11 +658,11 @@ function makeStyles(theme: AppThemePreset) {
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
     followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     blockedBanner: {
-      flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.sm,
-      padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm,
+      padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
     },
-    blockedBannerText: { flex: 1, color: theme.muted, fontSize: FS.xs, lineHeight: 18 },
-    blockedBannerAction: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },
+    blockedBannerText: { flex: 1, color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 18 },
+    blockedBannerAction: { color: theme.text, fontSize: FS.meta, fontFamily: FONT.semibold },
     moreBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' }, // theme-exempt: modal scrim
     moreSheet: {
       backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,

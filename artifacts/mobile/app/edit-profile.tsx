@@ -26,6 +26,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { formatHandleCooldown } from '@/lib/accountSecurityErrors';
 import { Avatar } from '@/components/ui/Avatar';
+import { FS, SP } from '@/lib/theme';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -403,7 +404,7 @@ export default function EditProfileScreen() {
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
     } catch {
-      Alert.alert('Error', 'Could not save profile. Please try again.');
+      Alert.alert('Could not save', 'Could not save profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -427,7 +428,7 @@ export default function EditProfileScreen() {
         title="Edit profile"
         onBack={handleBackPress}
         rightElement={
-          <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Save profile">
             {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
               <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { opacity: 0.4 }]}>Save</Text>
             )}
@@ -517,7 +518,7 @@ export default function EditProfileScreen() {
         <View style={styles.avatarSection}>
           <View style={styles.avatarLogoRow}>
             <View style={styles.avatarColumn}>
-              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar}>
+              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar} accessibilityRole="button" accessibilityLabel="Change avatar">
                 <View style={styles.avatarWrap}>
                   <Avatar uri={avatarUri} name={fields.name || fields.username} size={84} />
                   {uploading.avatar && (
@@ -538,7 +539,7 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.avatarColumn}>
-              <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
+              <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo} accessibilityRole="button" accessibilityLabel="Change logo">
                 <View style={styles.avatarWrap}>
                   {logoUri ? (
                     <Image source={{ uri: logoUri }} style={styles.avatar} />
@@ -598,8 +599,7 @@ export default function EditProfileScreen() {
           </View>
           <Divider theme={theme} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel} />
-            <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
+            <Text style={[styles.rowValue, { flex: 1, textAlign: 'right' }]} numberOfLines={1}>
               {username ? `brandthread.app/u/${username}` : 'Add a username to get your link'}
             </Text>
             <TouchableOpacity accessibilityLabel="Copy profile link" accessibilityRole="button" onPress={handleCopyLink} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={!username}>
@@ -615,7 +615,8 @@ export default function EditProfileScreen() {
             <Text style={styles.rowLabel}>Bio</Text>
             <View style={{ flex: 1 }}>
               <TextInput
-                style={[styles.rowInput, { height: 74, textAlignVertical: 'top' }]}
+                accessibilityLabel="Bio"
+                style={[styles.rowInput, { flex: 0, height: 74, textAlignVertical: 'top' }]}
                 value={fields.bio}
                 onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
                 placeholder="Write a short description about your brand"
@@ -648,7 +649,7 @@ export default function EditProfileScreen() {
 
         {/* Quick links to existing seller settings — never duplicated here */}
         <Text style={styles.sectionLabel}>Store settings</Text>
-        <View style={{ gap: 8, paddingHorizontal: 14 }}>
+        <View style={{ gap: 8, paddingHorizontal: SP.md }}>
           {QUICK_LINKS.map(link => (
             <NavigationCard
               key={link.route}
@@ -696,8 +697,8 @@ function Divider({ theme }: { theme: AppThemePreset }) {
 
 function RetryLink({ onPress, theme }: { onPress: () => void; theme: AppThemePreset }) {
   return (
-    <TouchableOpacity onPress={onPress} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-      <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: theme.error, marginTop: 2 }}>Retry</Text>
+    <TouchableOpacity onPress={onPress} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Retry upload">
+      <Text style={{ fontSize: FS.meta, fontFamily: 'Inter_600SemiBold', color: theme.error, marginTop: 2 }}>Retry</Text>
     </TouchableOpacity>
   );
 }
@@ -719,6 +720,7 @@ function FieldRow({
       <View style={styles.row}>
         <Text style={styles.rowLabel}>{label}</Text>
         <TextInput
+          accessibilityLabel={label}
           style={[styles.rowInput, error && { color: theme.error }]}
           value={value}
           onChangeText={onChange}
@@ -750,9 +752,9 @@ function ImageUploadRow({
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={[styles.card, { marginBottom: 8 }]}>
-      <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading}>
+      <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading} accessibilityRole="button" accessibilityLabel={`Change ${label.toLowerCase()}`} accessibilityHint={hint}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowLabel, { width: undefined, color: theme.text, fontFamily: 'Inter_500Medium' }]}>{label}</Text>
+          <Text style={[styles.rowLabel, { width: 'auto', color: theme.text, fontFamily: 'Inter_500Medium' }]}>{label}</Text>
           <Text style={styles.rowHint}>{uploading ? `Uploading… ${progress}%` : hint}</Text>
           {error && <Text style={styles.inlineErrorNoIndent}>{error} · Tap to retry</Text>}
         </View>
@@ -784,12 +786,12 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   sectionLabel: {
     fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.muted,
-    paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
   },
 
   // Storefront header preview
   previewCard: {
-    marginHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: theme.border,
+    marginHorizontal: SP.md, borderRadius: 16, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.card, overflow: 'hidden', paddingBottom: 14,
   },
   previewBannerWrap: { width: '100%', height: 88 },
@@ -802,7 +804,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   previewLogoText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: theme.onAccent },
   previewInfo: { paddingHorizontal: 14, paddingTop: 8, gap: 2 },
   previewName: { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
-  previewMeta: { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: theme.muted },
+  previewMeta: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', color: theme.muted },
 
   bannerPreviewSlot: { marginLeft: 8 },
   bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
@@ -822,11 +824,11 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 42,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 2, // theme-exempt: scrim over avatar media
   },
-  imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  editPhotoLink: { fontSize: 12.5, fontFamily: 'Inter_500Medium', color: theme.accentLight },
+  imageOverlayText: { color: '#FFF', fontSize: FS.xs, fontFamily: 'Inter_600SemiBold' },
+  editPhotoLink: { fontSize: FS.sm, fontFamily: 'Inter_500Medium', color: theme.accentLight },
 
   card: {
-    backgroundColor: theme.card, marginHorizontal: 14, borderRadius: 12,
+    backgroundColor: theme.card, marginHorizontal: SP.md, borderRadius: 12,
     borderWidth: 1, borderColor: theme.border, overflow: 'hidden',
   },
 
@@ -835,7 +837,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 100,
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 120,
   },
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
   rowValue: {
@@ -845,7 +847,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
     padding: 0, textAlign: 'right',
   },
-  charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },
-  inlineError: { fontSize: 11.5, fontFamily: 'Inter_400Regular', color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
-  inlineErrorNoIndent: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.error, marginTop: 2 },
+  charCounter: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },
+  inlineError: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  inlineErrorNoIndent: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', color: theme.error, marginTop: 2 },
 });

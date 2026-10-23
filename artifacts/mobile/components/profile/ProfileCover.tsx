@@ -180,7 +180,7 @@ function Sheet({ visible, onClose, children, testID }: { visible: boolean; onClo
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: `${theme.background}B3` }]} onPress={onClose} accessibilityLabel="Close" />
+      <Pressable style={[styles.backdrop, { backgroundColor: `${theme.background}B3` }]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
       <View style={styles.sheetHost} pointerEvents="box-none">
         <Animated.View
           testID={testID}

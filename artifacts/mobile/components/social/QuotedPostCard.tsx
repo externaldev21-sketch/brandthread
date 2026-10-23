@@ -10,6 +10,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
 import { FONT, FS } from '@/lib/theme';
 import type { QuotedPostSummary } from '@/services/socialTypes';
 
@@ -28,10 +29,13 @@ interface Props {
 export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card' }: Props) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  // A broken/unreachable thumbnail falls back to the media-type icon instead
+  // of an empty grey square.
+  const [thumbFailed, setThumbFailed] = React.useState(false);
 
   if ('unavailable' in quotedPost) {
     return (
-      <View style={[styles.card, styles.unavailable]} testID={`${testID}-unavailable`} accessibilityLabel="This post is unavailable">
+      <View style={[styles.card, styles.unavailable]} testID={`${testID}-unavailable`} accessible accessibilityLabel="This post is unavailable">
         <Feather name="slash" size={18} color={theme.muted} />
         <Text style={styles.unavailableText}>This post is unavailable</Text>
       </View>
@@ -41,8 +45,8 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
   const name = quotedAuthorName(quotedPost);
   const body = (
     <>
-      {quotedPost.thumbnailUrl ? (
-        <Image source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors />
+      {quotedPost.thumbnailUrl && !thumbFailed ? (
+        <Image source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors onError={() => setThumbFailed(true)} />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
           <Feather name={quotedPost.mediaType === 'video' ? 'video' : 'image'} size={20} color={theme.muted} />
@@ -75,9 +79,9 @@ const makeStyles = (theme: { surface: string; border: string; text: string; mute
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     borderRadius: RADII.card,
     borderWidth: 1,
     borderColor: theme.border,
@@ -85,9 +89,9 @@ const makeStyles = (theme: { surface: string; border: string; text: string; mute
   },
   thumb: { width: THUMB, height: THUMB, borderRadius: RADII.chip, backgroundColor: theme.border },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
-  text: { flex: 1, gap: 4 },
+  text: { flex: 1, gap: SPACING.xxs },
   author: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
   caption: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.muted },
-  unavailable: { paddingVertical: 16 },
+  unavailable: { paddingVertical: SPACING.md },
   unavailableText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
 });

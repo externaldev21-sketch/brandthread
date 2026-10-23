@@ -34,7 +34,7 @@ export function RemoveFollowerSheet({ person, busy, onCancel, onConfirm }: {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={!!person} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={busy ? undefined : onCancel} accessibilityLabel="Close">
+      <Pressable style={styles.backdrop} onPress={busy ? undefined : onCancel} accessibilityRole="button" accessibilityLabel="Close">
         <Pressable
           style={[styles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.lg }]}
           onPress={() => {}}
@@ -63,7 +63,7 @@ export function RemoveFollowerSheet({ person, busy, onCancel, onConfirm }: {
               action-sheet structure Instagram's own confirm sheet uses: a
               hairline divider above each full-width row. */}
           <PressableScale
-            style={styles.removeBtn}
+            style={[styles.removeBtn, { borderTopColor: theme.border }]}
             onPress={onConfirm}
             disabled={busy}
             accessibilityRole="button"
@@ -74,7 +74,7 @@ export function RemoveFollowerSheet({ person, busy, onCancel, onConfirm }: {
             )}
           </PressableScale>
           <PressableScale
-            style={styles.cancelBtn}
+            style={[styles.cancelBtn, { borderTopColor: theme.border }]}
             onPress={onCancel}
             disabled={busy}
             accessibilityRole="button"
@@ -105,7 +105,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
   },
   removeText: { fontFamily: FONT.semibold, fontSize: FS.md },
   cancelBtn: {
@@ -113,7 +112,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
   },
   cancelText: { fontFamily: FONT.semibold, fontSize: FS.md },
 });

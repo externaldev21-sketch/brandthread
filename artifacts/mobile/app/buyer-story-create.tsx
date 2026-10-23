@@ -603,6 +603,7 @@ export default function StoryComposer() {
   const [createColor, setCreateColor] = useState('#FFFFFF');
   const [createFontIdx, setCreateFontIdx] = useState(0);
   const [createAlign, setCreateAlign] = useState<Align>('center');
+  const createInputRef = useRef<TextInput>(null);
 
   // ── Edit-screen state ──
   const [overlays, setOverlays] = useState<StoryOverlay[]>(() => (isReshare ? [{
@@ -844,8 +845,9 @@ export default function StoryComposer() {
   const addOverlay = useCallback((patch: Partial<StoryOverlay> & { type: StoryOverlayType }) => {
     setOverlays((prev) => [...prev, {
       id: `ov_${Date.now()}_${prev.length}`,
+      // Nudge each new sticker down a little so two placed in a row never sit exactly on top of each other.
       x: W / 2 - 60,
-      y: H / 2 - 40,
+      y: H / 2 - 40 + (prev.length % 5) * 44,
       rotation: 0,
       scale: 1,
       ...patch,
@@ -1073,7 +1075,7 @@ export default function StoryComposer() {
     let cancelled = false;
     setAlsoShareSearching(true);
     const t = setTimeout(() => {
-      void searchProfiles(q).then((results) => { if (!cancelled) setAlsoShareResults(results); }).finally(() => { if (!cancelled) setAlsoShareSearching(false); });
+      void searchProfiles(q).then((results) => { if (!cancelled) setAlsoShareResults(results); }).catch(() => { if (!cancelled) setAlsoShareResults([]); }).finally(() => { if (!cancelled) setAlsoShareSearching(false); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [alsoShareOpen, alsoShareQuery]);
@@ -1126,6 +1128,7 @@ export default function StoryComposer() {
             </Text>
             <TouchableOpacity
               style={[styles.permBtn, { backgroundColor: theme.accent }]}
+              accessibilityRole="button"
               onPress={() => {
                 // On native, once the OS prompt has already been declined
                 // it can't be re-shown — the only way back in is Settings.
@@ -1156,7 +1159,7 @@ export default function StoryComposer() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.camIconBtn}
-            onPress={() => Alert.alert('Story settings', 'Audience, replies and close friends can be adjusted after you capture.')}
+            onPress={() => router.push('/buyer-privacy-settings' as never)}
             accessibilityLabel="Story settings"
             accessibilityRole="button"
           >
@@ -1221,7 +1224,7 @@ export default function StoryComposer() {
           {gridPopoverOpen && (
             <View style={styles.gridPopover}>
               {GRID_SPECS.map((spec) => (
-                <TouchableOpacity key={spec.id} style={styles.gridOption} onPress={() => selectGrid(spec)} accessibilityRole="button" accessibilityLabel={`Grid ${spec.cols} by ${spec.rows}`}>
+                <TouchableOpacity key={spec.id} style={styles.gridOption} onPress={() => selectGrid(spec)} hitSlop={4} accessibilityRole="button" accessibilityLabel={`Grid ${spec.cols} by ${spec.rows}`}>
                   <GridIcon spec={spec} active={gridSpec?.id === spec.id} />
                 </TouchableOpacity>
               ))}
@@ -1251,6 +1254,7 @@ export default function StoryComposer() {
                 <TouchableOpacity
                   key={m}
                   style={styles.modeItem}
+                  hitSlop={{ top: 6, bottom: 6 }}
                   onLayout={(e) => {
                     const { x, width } = e.nativeEvent.layout;
                     setModeLayouts((prev) => ({ ...prev, [m]: { x, width } }));
@@ -1317,19 +1321,12 @@ export default function StoryComposer() {
                 {compositing ? (
                   <ActivityIndicator color="#000" />
                 ) : gridSpec ? (
-                  <Feather name="grid" size={22} color="#000" />
+                  <Feather name="grid" size={22} color={ON_DARK} />
                 ) : (
                   <View style={[styles.shutterInner, isRecording && { backgroundColor: '#F87171' }]} />
                 )}
               </View>
             </Pressable>
-            {gridSpec && (
-              <View style={styles.gridDots}>
-                {gridCells.map((c, i) => (
-                  <View key={i} style={[styles.gridDot, c && { backgroundColor: theme.accent }]} />
-                ))}
-              </View>
-            )}
 
             {/* Flip camera */}
             <TouchableOpacity
@@ -1342,6 +1339,13 @@ export default function StoryComposer() {
               <Feather name="refresh-cw" size={28} color={isRecording ? 'rgba(255,255,255,0.35)' : ON_DARK} />
             </TouchableOpacity>
           </View>
+          {gridSpec && (
+            <View style={styles.gridDots}>
+              {gridCells.map((c, i) => (
+                <View key={i} style={[styles.gridDot, c && { backgroundColor: theme.accent }]} />
+              ))}
+            </View>
+          )}
 
           <Text style={styles.hint}>
             {gridSpec ? `Cell ${gridCells.filter(Boolean).length + 1} of ${gridCells.length}`
@@ -1397,7 +1401,7 @@ export default function StoryComposer() {
               <View style={styles.shareRowAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.shareRowTitle}>Your story</Text>
-                <Text style={styles.shareRowSubtitle}>Sharing options</Text>
+                <Text style={styles.shareRowSubtitle}>Everyone who can see your stories</Text>
               </View>
               <View style={[styles.radioOuter, !closeFriendsOnly && styles.radioOuterActive]}>
                 {!closeFriendsOnly && <View style={styles.radioInner} />}
@@ -1415,7 +1419,7 @@ export default function StoryComposer() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.shareRowTitle}>Close Friends</Text>
-                <Text style={styles.shareRowSubtitle}>Add people</Text>
+                <Text style={styles.shareRowSubtitle}>Only people on your Close Friends list</Text>
               </View>
               <View style={[styles.radioOuter, closeFriendsOnly && styles.radioOuterActive]}>
                 {closeFriendsOnly && <View style={styles.radioInner} />}
@@ -1430,9 +1434,9 @@ export default function StoryComposer() {
       <Modal visible={alsoShareOpen} transparent animationType="slide" onRequestClose={finishAlsoShare}>
         <ModalSafeArea>
           <View style={[styles.alsoShareSheet, { paddingTop: topInset + SP.md, paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.textToolTop}>
+            <View style={[styles.textToolTop, { paddingHorizontal: 0 }]}>
               <Text style={styles.sheetTitle}>Also share to</Text>
-              <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">
+              <TouchableOpacity onPress={finishAlsoShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Done">
                 <Text style={styles.textToolDone}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -1444,6 +1448,7 @@ export default function StoryComposer() {
                 placeholderTextColor={MUTED}
                 value={alsoShareQuery}
                 onChangeText={setAlsoShareQuery}
+                accessibilityLabel="Search people"
               />
             </View>
             {/* Highlights aren't in this app yet (shipping in a follow-up PR),
@@ -1465,6 +1470,7 @@ export default function StoryComposer() {
                         style={[styles.alsoShareSendBtn, sent && styles.alsoShareSendBtnSent]}
                         onPress={() => void sendAlsoShareTo(p)}
                         disabled={sent || alsoShareSendingId === p.userId}
+                        hitSlop={{ top: 8, bottom: 8 }}
                         accessibilityRole="button"
                         accessibilityLabel={sent ? `Sent to ${p.name}` : `Send to ${p.name}`}
                       >
@@ -1479,6 +1485,9 @@ export default function StoryComposer() {
                 })}
                 {!alsoShareQuery.trim() && (
                   <Text style={styles.alsoShareHint}>Search for people to send this story to.</Text>
+                )}
+                {!!alsoShareQuery.trim() && !alsoShareResults.length && (
+                  <Text style={styles.alsoShareHint}>No people found.</Text>
                 )}
               </ScrollView>
             )}
@@ -1514,8 +1523,9 @@ export default function StoryComposer() {
         </View>
         {isPosting && <PostingToast percent={postingPercent} topInset={topInset} />}
 
-        <Pressable style={styles.createCenter} onPress={() => {}} accessibilityRole="none">
+        <Pressable style={styles.createCenter} onPress={() => createInputRef.current?.focus()} accessibilityRole="none">
           <TextInput
+            ref={createInputRef}
             style={[
               styles.createInput,
               {
@@ -1555,6 +1565,7 @@ export default function StoryComposer() {
               key={c}
               style={[styles.colorCircle, { backgroundColor: c }, createColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
               onPress={() => { hapticToggle(); setCreateColor(c); }}
+              noMinHeight
               accessibilityRole="button"
               accessibilityLabel={`Text color ${c}`}
               accessibilityState={{ selected: createColor === c }}
@@ -1674,14 +1685,6 @@ export default function StoryComposer() {
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setDrawOpen((v) => !v); }} accessibilityLabel="Draw" accessibilityRole="button">
             <Feather name="edit-2" size={20} color={drawOpen ? theme.accent : ON_DARK} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.camIconBtn}
-            onPress={() => Alert.alert('More tools', 'Additional tools are coming soon.')}
-            accessibilityLabel="More tools"
-            accessibilityRole="button"
-          >
-            <Feather name="more-horizontal" size={20} color={ON_DARK} />
-          </TouchableOpacity>
         </View>
       </View>
       {isPosting && <PostingToast percent={postingPercent} topInset={topInset} />}
@@ -1690,15 +1693,15 @@ export default function StoryComposer() {
       {drawOpen ? (
         <View style={[styles.drawBar, { top: topInset + 60 }]}>
           {['#FFFFFF', '#000000', '#F87171', '#FBBF24', '#34D399', '#60A5FA'].map((c) => (
-            <TouchableOpacity key={c} style={[styles.drawColorDot, { backgroundColor: c }, drawColor === c && styles.drawColorDotActive]} onPress={() => setDrawColor(c)} accessibilityLabel={`Draw color ${c}`} accessibilityRole="button" />
+            <TouchableOpacity key={c} style={[styles.drawColorDot, { backgroundColor: c }, drawColor === c && styles.drawColorDotActive]} onPress={() => setDrawColor(c)} hitSlop={{ top: 11, bottom: 11, left: 4, right: 4 }} accessibilityLabel={`Draw color ${c}`} accessibilityRole="button" />
           ))}
           <View style={styles.drawDivider} />
           {[2, 4, 8].map((w) => (
-            <TouchableOpacity key={w} style={styles.drawWidthBtn} onPress={() => setDrawWidth(w)} accessibilityLabel={`Brush size ${w}`} accessibilityRole="button">
+            <TouchableOpacity key={w} style={styles.drawWidthBtn} onPress={() => setDrawWidth(w)} hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }} accessibilityLabel={`Brush size ${w}`} accessibilityRole="button">
               <View style={{ width: w + 4, height: w + 4, borderRadius: 8, backgroundColor: drawWidth === w ? theme.accent : 'rgba(255,255,255,0.6)' }} />
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.drawUndo} disabled={!strokes.length} onPress={() => setStrokes((p) => p.slice(0, -1))} accessibilityLabel="Undo last stroke" accessibilityRole="button">
+          <TouchableOpacity style={styles.drawUndo} disabled={!strokes.length} onPress={() => setStrokes((p) => p.slice(0, -1))} hitSlop={8} accessibilityLabel="Undo last stroke" accessibilityRole="button">
             <Feather name="rotate-ccw" size={16} color={strokes.length ? ON_DARK : 'rgba(255,255,255,0.3)'} />
           </TouchableOpacity>
         </View>
@@ -1751,7 +1754,7 @@ export default function StoryComposer() {
                 <Text style={styles.reshareUnavailableTitle}>Story unavailable</Text>
                 <Text style={styles.reshareUnavailableSub}>This story expired or you can no longer share it.</Text>
               </View>
-              <TouchableOpacity onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Close">
+              <TouchableOpacity onPress={() => goBackOr(router)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Close">
                 <Text style={styles.reshareNotNow}>Close</Text>
               </TouchableOpacity>
             </View>
@@ -1795,6 +1798,7 @@ export default function StoryComposer() {
           onChangeText={setCaptionDraft}
           placeholder="Add a caption…"
           placeholderTextColor="rgba(255,255,255,0.5)"
+          accessibilityLabel="Caption"
           maxLength={200}
         />
         <View style={styles.audienceRow}>
@@ -1805,6 +1809,7 @@ export default function StoryComposer() {
           <TouchableOpacity
             style={[styles.closeFriendsChip, closeFriendsOnly && { backgroundColor: ON_DARK }]}
             onPress={() => { hapticToggle(); setCloseFriendsOnly((v) => !v); }}
+            hitSlop={{ top: 9, bottom: 9 }}
             accessibilityRole="button"
             accessibilityLabel="Toggle Close Friends only"
             accessibilityState={{ selected: closeFriendsOnly }}
@@ -1819,7 +1824,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityLabel={isPosting ? 'Posting story' : 'Send story'}
           >
-            {isPosting ? <Feather name="loader" size={20} color="#000" /> : <Feather name="arrow-up" size={20} color="#000" />}
+            {isPosting ? <ActivityIndicator size="small" color="#000" /> : <Feather name="arrow-up" size={20} color="#000" />}
           </PressableScale>
         </View>
       </View>
@@ -1834,10 +1839,10 @@ export default function StoryComposer() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
         >
           <View style={[styles.textToolTop, { paddingTop: topInset + SP.sm }]}>
-            <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Close" accessibilityRole="button">
+            <TouchableOpacity onPress={() => setTextToolOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Close" accessibilityRole="button">
               <Feather name="x" size={22} color={ON_DARK} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={commitTextOverlay} accessibilityLabel="Done" accessibilityRole="button">
+            <TouchableOpacity onPress={commitTextOverlay} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Done" accessibilityRole="button">
               <Text style={styles.textToolDone}>Done</Text>
             </TouchableOpacity>
           </View>
@@ -1973,6 +1978,7 @@ export default function StoryComposer() {
                   key={c}
                   style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
                   onPress={() => { hapticToggle(); setTextDraftColor(c); }}
+                  noMinHeight
                   accessibilityRole="button"
                   accessibilityLabel={`Text color ${c}`}
                   accessibilityState={{ selected: textDraftColor === c }}
@@ -1991,7 +1997,7 @@ export default function StoryComposer() {
           <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Text animation</Text>
-            <Text style={styles.sheetSubtitle}>Plays back when story-viewer animation support ships — selection is saved now.</Text>
+            <Text style={styles.sheetSubtitle}>Animations don’t play back in stories yet. Your choice is saved with this text.</Text>
             <View style={styles.animationGrid}>
               {['Emphasize', 'Drift Up', 'Loud', 'Speedy', 'Fall', 'Headline', 'Slide Up'].map((a) => {
                 const active = textDraftAnimation === a;
@@ -2165,6 +2171,7 @@ export default function StoryComposer() {
                     <TouchableOpacity
                       style={styles.alsoShareSendBtn}
                       onPress={() => { if (ov) removeOverlay(ov.id); }}
+                      hitSlop={{ top: 8, bottom: 8 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${p.handle}`}
                     >
@@ -2190,16 +2197,19 @@ export default function StoryComposer() {
                 onChangeText={setShopUrlDraft}
                 placeholder="https://your-shop.com/…"
                 placeholderTextColor="rgba(255,255,255,0.35)"
+                accessibilityLabel="Shop link URL"
                 autoFocus
                 autoCapitalize="none"
                 keyboardType="url"
               />
               <View style={styles.overlayModalActions}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShopModalOpen(false)}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShopModalOpen(false)} accessibilityRole="button" hitSlop={{ top: 6, bottom: 6 }}>
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalAddBtn, { backgroundColor: theme.accent }]}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 6, bottom: 6 }}
                   onPress={() => {
                     if (shopUrlDraft.trim()) addOverlay({ type: 'shop', shopUrl: shopUrlDraft.trim(), shopLabel: 'Visit shop' });
                     setShopModalOpen(false);
@@ -2312,7 +2322,7 @@ const styles = StyleSheet.create({
   // the X icon's center instead of sitting ~4pt further right.
   railBtn: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44, marginBottom: SP.sm },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
-  railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.medium },
+  railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.meta, fontFamily: FONT.medium },
   gridPopover: {
     position: 'absolute', left: 50, top: 100, backgroundColor: 'rgba(30,30,34,0.95)',
     borderRadius: RADIUS.md, padding: SP.sm, flexDirection: 'row', flexWrap: 'wrap', width: 92,
@@ -2323,7 +2333,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
   },
-  changeGridText: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
+  changeGridText: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.semibold },
   gridDots: { flexDirection: 'row', gap: 4, marginTop: SP.xs, justifyContent: 'center' },
   gridDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
   gridComposite: { position: 'absolute', left: -9999, top: 0, backgroundColor: '#000' },
@@ -2367,7 +2377,7 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  hint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.xs },
+  hint: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: FS.meta, marginBottom: SP.xs },
 
   // Create mode
   createCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
@@ -2395,9 +2405,9 @@ const styles = StyleSheet.create({
   },
   taggedChipText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
   mentionControls: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', paddingHorizontal: SP.sm, paddingVertical: 6 },
-  mentionControlsLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+  mentionControlsLabel: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.semibold, textTransform: 'capitalize' },
   mentionOpacityRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  mentionOpacityValue: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, width: 34, textAlign: 'right' },
+  mentionOpacityValue: { color: MUTED, fontSize: FS.meta, fontFamily: FONT.medium, width: 34, textAlign: 'right' },
 
   reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.md, paddingHorizontal: SP.md },
   reshareActionOutline: { borderWidth: 1, borderColor: 'rgba(192,192,192,0.5)' },
@@ -2427,10 +2437,10 @@ const styles = StyleSheet.create({
   audienceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   myStoryChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
   myAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
-  myAvatarText: { color: ON_DARK, fontSize: 10, fontFamily: FONT.bold },
-  myStoryLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
+  myAvatarText: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.bold },
+  myStoryLabel: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.semibold },
   closeFriendsChip: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6 },
-  closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
+  closeFriendsLabel: { color: 'rgba(255,255,255,0.75)', fontSize: FS.meta, fontFamily: FONT.medium, flex: 1 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: ON_DARK, alignItems: 'center', justifyContent: 'center' },
 
   // Text tool
@@ -2444,7 +2454,7 @@ const styles = StyleSheet.create({
   textToolRow: { flexDirection: 'row', gap: SP.sm },
   textToolChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textToolChipText: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
-  textToolChipGlyph: { color: ON_DARK, fontSize: 13, fontFamily: FONT.bold },
+  textToolChipGlyph: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.bold },
   textToolColorRow: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   colorWheelDot: { width: 22, height: 22, borderRadius: 11 },
   fontChipRow: { maxHeight: 34 },
@@ -2455,7 +2465,7 @@ const styles = StyleSheet.create({
   textAccessoryLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.medium },
   textAccessoryDivider: { width: StyleSheet.hairlineWidth, height: 16, backgroundColor: 'rgba(255,255,255,0.25)' },
   textColorSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.md },
-  sheetSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: -SP.sm, marginBottom: SP.md },
+  sheetSubtitle: { color: MUTED, fontSize: FS.meta, fontFamily: FONT.regular, marginTop: -SP.sm, marginBottom: SP.md },
   animationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
   animationChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.1)' },
   animationChipText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
@@ -2463,7 +2473,7 @@ const styles = StyleSheet.create({
   sizeSliderTrack: { width: 3, flex: 1, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   sizeSliderThumb: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: ON_DARK, borderWidth: 2, borderColor: '#000' },
   hsbPicker: { marginTop: SP.md, gap: SP.sm },
-  hsbLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
+  hsbLabel: { color: MUTED, fontSize: FS.meta, fontFamily: FONT.medium },
   hsbTrack: { height: 28, borderRadius: 14, justifyContent: 'center' },
   hsbThumb: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', borderWidth: 2, borderColor: '#000', top: 3 },
 
@@ -2474,7 +2484,7 @@ const styles = StyleSheet.create({
   sheetTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginBottom: SP.md },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   stickerTile: { width: Math.floor((W - SP.md * 2 - SP.sm * 3) / 4), height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  stickerTileLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.medium },
+  stickerTileLabel: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.medium },
   emptyText: { color: MUTED, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   productRowText: { color: FG, fontSize: FS.base, fontFamily: FONT.medium },
@@ -2484,7 +2494,7 @@ const styles = StyleSheet.create({
   shareRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
-  shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  shareRowSubtitle: { color: MUTED, fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: ON_DARK },
   radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },

@@ -25,6 +25,7 @@ import { isUUID } from '@/lib/engagementUtils';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { QUOTE_MAX_LENGTH, quoteErrorMessage } from '@/lib/quotePost';
 import { RADII } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
 import { FONT, FS } from '@/lib/theme';
 import type { QuotedPostSummary } from '@/services/socialTypes';
 
@@ -42,7 +43,9 @@ export default function QuotePostScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const postId = typeof params.postId === 'string' ? params.postId : '';
-  const original: QuotedPostSummary = useMemo(() => ({
+  // No post id means there's nothing to quote — show the card's unavailable
+  // state instead of an empty "Brandthread" placeholder with a dead Post button.
+  const original: QuotedPostSummary = useMemo(() => (!postId ? { unavailable: true as const } : {
     id: postId,
     userId: '',
     author: { displayName: params.author ?? null, brandName: null, username: null },
@@ -98,7 +101,7 @@ export default function QuotePostScreen() {
         <QuotedPostCard quotedPost={original} testID="quote-original-card" />
         {error ? <Text style={styles.error} testID="quote-error">{error}</Text> : null}
       </ScrollView>
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.sm) }]}>
         <Button label="Post" onPress={() => void submit()} loading={busy} disabled={!canPost} accessibilityLabel="Post quote" />
       </View>
     </KeyboardAvoidingView>
@@ -107,10 +110,10 @@ export default function QuotePostScreen() {
 
 const makeStyles = (theme: { background: string; surface: string; border: string; text: string; muted: string; error?: string }) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 12 },
+  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs, paddingBottom: SPACING.xl, gap: SPACING.sm },
   input: {
     minHeight: 132,
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 14,
     borderRadius: RADII.input,
     borderWidth: 1,
@@ -122,7 +125,7 @@ const makeStyles = (theme: { background: string; surface: string; border: string
     lineHeight: 22,
     textAlignVertical: 'top',
   },
-  counter: { alignSelf: 'flex-end', fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },
+  counter: { alignSelf: 'flex-end', fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted },
   error: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.error ?? theme.text },
-  footer: { paddingHorizontal: 16, paddingTop: 8, backgroundColor: theme.background },
+  footer: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs, backgroundColor: theme.background },
 });

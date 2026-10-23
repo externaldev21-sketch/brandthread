@@ -103,5 +103,5 @@ const styles = StyleSheet.create({
   },
   newCircle: { borderStyle: 'dashed' },
   emoji: { fontSize: 22 },
-  label: { width: CELL, textAlign: 'center', fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
+  label: { width: CELL, textAlign: 'center', fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 16 },
 });

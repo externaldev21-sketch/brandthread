@@ -49,7 +49,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useBuyerTabBarTopInset, useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -114,6 +114,7 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 import { radius } from '@/constants/radii';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
@@ -577,6 +578,10 @@ export default function ActivityCenterScreen() {
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
+  // Once scrolled to the very end, the last row (and "Suggested for you")
+  // must clear the floating tab bar instead of resting under it — the small
+  // `screenPadding.bottom` above alone left the final row behind the bar.
+  const tabBarClearance = useTabBarClearance(role === 'seller' ? 2 : 1);
   const api = useApi();
   const { user } = useUser();
   // "Story mentions" rail above the feed (Activity is the same screen for
@@ -1116,7 +1121,17 @@ export default function ActivityCenterScreen() {
       buttons.push({ text: 'Remove follower', style: 'destructive', onPress: () => setRemoveFollowerTarget(row) });
     }
     if (actor?.id) {
-      buttons.push({ text: 'Block', style: 'destructive', onPress: () => { void handleBlockFromMenu(row); } });
+      // Blocking is drastic (hides both people from each other everywhere),
+      // so it gets the same "Block name?" confirm every other Block entry
+      // point in the app shows, not a one-tap action.
+      buttons.push({
+        text: 'Block',
+        style: 'destructive',
+        onPress: () => showActionSheet(`Block ${actor.name}?`, BLOCK_EXPLAINER, [
+          { text: 'Block', style: 'destructive', onPress: () => { void handleBlockFromMenu(row); } },
+          { text: 'Cancel', style: 'cancel' },
+        ]),
+      });
     }
     buttons.push({ text: 'Cancel', style: 'cancel' });
     showActionSheet(undefined, undefined, buttons);
@@ -1331,7 +1346,7 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: screenPadding.bottom + SP.xl },
+            { paddingBottom: Math.max(screenPadding.bottom + SP.xl, tabBarClearance) },
             sections.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}

@@ -481,7 +481,15 @@ export default function StoryMentionViewerScreen() {
               <Text style={styles.avatarText} allowFontScaling={false}>{tagger.initials}</Text>
             )}
           </View>
-          <Pressable style={styles.headerText} onLongPress={openReportSheet} delayLongPress={400}>
+          <Pressable
+            style={styles.headerText}
+            onLongPress={openReportSheet}
+            delayLongPress={400}
+            accessibilityLabel={`${tagName} mentioned you`}
+            accessibilityHint="Long press to report this story"
+            accessibilityActions={[{ name: 'longpress', label: 'Report story' }]}
+            onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'longpress') openReportSheet(); }}
+          >
             <Text style={styles.name} numberOfLines={1}>{tagName}</Text>
             <Text style={styles.sub} numberOfLines={1}>Mentioned you · {relativeTime(current.mentionedAt)}</Text>
           </Pressable>

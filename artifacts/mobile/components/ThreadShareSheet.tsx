@@ -266,7 +266,7 @@ export function ThreadShareSheet({
           <View style={styles.header}>
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
-            <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu" testID="thread-share-close">
+            <Pressable onPress={onClose} style={styles.close} hitSlop={5} accessibilityRole="button" accessibilityLabel="Close share menu" testID="thread-share-close">
               <Feather name="x" size={20} color={theme.text} />
             </Pressable>
           </View>
@@ -291,7 +291,7 @@ export function ThreadShareSheet({
                 icon="search"
                 onPress={() => {
                   onClose();
-                  void Linking.openURL(ExpoLinking.createURL('/(buyer)/friends'));
+                  router.push('/(buyer)/friends' as never);
                 }}
               />
             </ScrollView>
@@ -336,6 +336,7 @@ export function ThreadShareSheet({
             <Text style={styles.progressText}>{savingProgress}% Saving…</Text>
             <Pressable
               onPress={() => abortRef.current?.abort()}
+              hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel="Cancel saving video"
               testID="thread-share-save-cancel"
@@ -379,7 +380,7 @@ function ShareAction({
       testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
-         {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
+         {busy ? <ActivityIndicator color={theme.text} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
            <Feather name={icon ?? 'send'} size={22} color={theme.text} />
@@ -412,13 +413,13 @@ const makeStyles = (theme: { background: string; card: string; border: string; t
   action: { width: 66, alignItems: 'center', gap: 7 },
   actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
   actionCircleMuted: { backgroundColor: theme.background },
-  actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13, textAlign: 'center' },
+  actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 15, textAlign: 'center' },
   avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
   progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: theme.background, paddingTop: 8 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 7 },
-  progressText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.xs },
-  cancelText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.xs },
+  progressText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.meta },
+  cancelText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.meta },
   progressTrack: { height: 3, backgroundColor: theme.border },
   progressFill: { height: 3 },
 });

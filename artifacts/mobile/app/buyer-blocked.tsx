@@ -112,11 +112,13 @@ export default function BlockedAndMutedScreen() {
           <PressableScale onPress={() => load(true)} accessibilityRole="button"><Text style={s.retry}>Retry</Text></PressableScale>
         </View>
       ) : null}
+      {(tab === 'blocked' ? blocked.length : muted.length) > 0 ? (
       <Text style={s.sectionLabel}>
         {tab === 'blocked'
           ? `${blocked.length} BLOCKED ACCOUNT${blocked.length === 1 ? '' : 'S'}`
           : `${muted.length} MUTED ACCOUNT${muted.length === 1 ? '' : 'S'}`}
       </Text>
+      ) : null}
     </View>
   );
 
@@ -129,6 +131,7 @@ export default function BlockedAndMutedScreen() {
         selectedId={tab}
         onChange={(id) => setTab(id as Tab)}
         testID="blocked-muted-tabs"
+        style={s.tabs}
       />
 
       {loading ? (
@@ -174,6 +177,7 @@ export default function BlockedAndMutedScreen() {
           keyExtractor={(item) => item.id}
           ListHeaderComponent={header}
           contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xxl }}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
           renderItem={({ item }) => (
             <ListRow
               avatar={{ name: item.mutedUserName }}
@@ -206,6 +210,7 @@ export default function BlockedAndMutedScreen() {
 
 const makeStyles = (theme: AppThemePreset, palette: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
+  tabs: { marginHorizontal: SPACING.md },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   explainer: {
     flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start',

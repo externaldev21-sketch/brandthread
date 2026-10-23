@@ -59,7 +59,7 @@ export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
         <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>Story mentions</Text>
         <Pressable
           onPress={onSeeAll}
-          hitSlop={8}
+          hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="See all story mentions"
           testID="story-mentions-see-all"
@@ -133,7 +133,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { color: theme.background, fontFamily: FONT.bold, fontSize: 10 },
+  countText: { color: theme.background, fontFamily: FONT.bold, fontSize: FS.xs },
   label: { marginTop: SP.xs + 2, maxWidth: RING_SIZE + 8, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta },
   labelUnseen: { color: theme.text },
 });

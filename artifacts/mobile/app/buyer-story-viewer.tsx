@@ -272,8 +272,8 @@ export default function BuyerStoryViewer() {
     let cancelled = false;
     setViewersLoading(true);
     api.social.storyViewers(currentStory.id)
-      .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (!myUserId ? PREVIEW_STORY_VIEWERS : [])); })
-      .catch(() => { if (!cancelled) setServerViewers(!myUserId ? PREVIEW_STORY_VIEWERS : []); })
+      .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : [])); })
+      .catch(() => { if (!cancelled) setServerViewers(isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []); })
       .finally(() => { if (!cancelled) setViewersLoading(false); });
     return () => { cancelled = true; };
   }, [currentStory?.id, myUserId]);
@@ -528,7 +528,15 @@ export default function BuyerStoryViewer() {
         throw err;
       }
     },
-    notify: async (dropId: string) => { hapticLight(); await api.publicDrops.subscribe(dropId); },
+    notify: async (dropId: string) => {
+      hapticLight();
+      try {
+        await api.publicDrops.subscribe(dropId);
+      } catch (err) {
+        Alert.alert('Couldn’t turn on drop alerts', 'Try again.');
+        throw err;
+      }
+    },
     openProduct: (productId: string, name: string) => {
       hapticLight();
       router.push(`/thread-product-detail?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(name)}` as never);
@@ -572,9 +580,9 @@ export default function BuyerStoryViewer() {
     setViewersLoading(true);
     try {
       const rows = await api.social.storyViewers(currentStory.id);
-      setServerViewers(rows);
+      setServerViewers(rows.length ? rows : (isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []));
     } catch {
-      setServerViewers([]);
+      setServerViewers(isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []);
     } finally {
       setViewersLoading(false);
     }
@@ -684,12 +692,14 @@ export default function BuyerStoryViewer() {
           <Pressable
             style={styles.tapLeft}
             onPress={retreatSlide}
+            accessibilityLabel="Previous"
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
           <Pressable
             style={styles.tapRight}
             onPress={advanceSlide}
+            accessibilityLabel="Next"
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
@@ -773,9 +783,9 @@ export default function BuyerStoryViewer() {
         <View style={[styles.avatar, { backgroundColor: currentStory.authorColor }]}>
           <Text style={styles.avatarText}>{currentStory.authorInitials}</Text>
         </View>
-        <View style={{ marginLeft: SP.sm }}>
-          <Text style={styles.authorName}>{currentStory.authorName}</Text>
-          <Text style={styles.authorTime}>{timeAgo(currentStory.createdAt)}</Text>
+        <View style={{ marginLeft: SP.sm, flexShrink: 1 }}>
+          <Text style={styles.authorName} numberOfLines={1}>{currentStory.authorName}</Text>
+          <Text style={styles.authorTime} numberOfLines={1}>{timeAgo(currentStory.createdAt)}</Text>
         </View>
         <View style={{ flex: 1 }} />
         {currentSlide.productTagId && (
@@ -797,7 +807,7 @@ export default function BuyerStoryViewer() {
             accessibilityLabel={`Shop ${currentSlide.productTagName ?? 'this product'}`}
           >
             <Feather name="shopping-bag" size={ICON.sm} color={PURPLE} />
-            <Text style={styles.productTagText}>{currentSlide.productTagName}</Text>
+            <Text style={styles.productTagText} numberOfLines={1}>{currentSlide.productTagName}</Text>
           </Pressable>
         )}
         {currentStory.authorId !== myUserId && currentStory.authorId !== 'me' ? (
@@ -817,25 +827,30 @@ export default function BuyerStoryViewer() {
                 {
                   text: `Mute ${currentStory.authorName}`,
                   onPress: async () => {
-                    await muteUser({
-                      userId: currentStory.authorId,
-                      name: currentStory.authorName,
-                      handle: currentStory.authorHandle,
-                      initials: currentStory.authorInitials,
-                      color: currentStory.authorColor,
-                    });
-                    goBackOr(router);
+                    try {
+                      await muteUser({
+                        userId: currentStory.authorId,
+                        name: currentStory.authorName,
+                        handle: currentStory.authorHandle,
+                        initials: currentStory.authorInitials,
+                        color: currentStory.authorColor,
+                      });
+                      goBackOr(router);
+                    } catch {
+                      Alert.alert('Couldn’t mute', 'Try again.');
+                      setIsPaused(false);
+                    }
                   },
                 },
                 {
                   text: 'Report story',
-                  onPress: () => router.push(reportHref({
+                  onPress: () => { setIsPaused(false); router.push(reportHref({
                     targetType: 'story',
                     targetId: currentStory.id,
                     label: `${currentStory.authorName}'s story`,
                     ownerId: currentStory.authorId,
                     ownerName: currentStory.authorName,
-                  }) as never),
+                  }) as never); },
                 },
                 {
                   text: `Block ${currentStory.authorName}`,
@@ -846,7 +861,7 @@ export default function BuyerStoryViewer() {
                   },
                 },
                 { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
-              ]);
+              ], { cancelable: true, onDismiss: () => setIsPaused(false) });
             }}
           />
         ) : null}
@@ -886,7 +901,7 @@ export default function BuyerStoryViewer() {
               style={styles.seenByRow}
               onPress={() => { hapticLight(); openViewersModal(); }}
               accessibilityRole="button"
-              accessibilityLabel={`Seen by ${seenByCount}`}
+              accessibilityLabel={seenByCount > 0 ? `Seen by ${seenByCount}` : 'No viewers yet'}
             >
               <View style={styles.seenByStack}>
                 {serverViewers.slice(0, 3).map((v, i) => (
@@ -903,7 +918,7 @@ export default function BuyerStoryViewer() {
                 ))}
               </View>
               <Text style={styles.seenByText}>
-                Seen by {seenByCount}
+                {seenByCount > 0 ? `Seen by ${seenByCount}` : 'No viewers yet'}
               </Text>
             </PressableScale>
             <View style={{ flex: 1 }} />
@@ -930,7 +945,7 @@ export default function BuyerStoryViewer() {
                     text: 'Tagged people',
                     onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
                   }] : []),
-                  {
+                  ...(currentSlide.imageUri && currentSlide.type !== 'text' ? [{
                     text: 'Save to device',
                     onPress: async () => {
                       try {
@@ -949,22 +964,31 @@ export default function BuyerStoryViewer() {
                         setIsPaused(false);
                       }
                     },
-                  },
+                  }] : []),
                   {
                     text: 'Delete story',
                     style: 'destructive',
-                    onPress: async () => {
-                      try {
-                        await api.social.deleteStory(currentStory.id);
-                        goBackOr(router);
-                      } catch {
-                        Alert.alert('Couldn’t delete', 'Try again.');
-                        setIsPaused(false);
-                      }
+                    onPress: () => {
+                      Alert.alert('Delete this story?', 'It will be removed for everyone who can see it.', [
+                        { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await api.social.deleteStory(currentStory.id);
+                              goBackOr(router);
+                            } catch {
+                              Alert.alert('Couldn’t delete', 'Try again.');
+                              setIsPaused(false);
+                            }
+                          },
+                        },
+                      ], { cancelable: true, onDismiss: () => setIsPaused(false) });
                     },
                   },
                   { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
-                ]);
+                ], { cancelable: true, onDismiss: () => setIsPaused(false) });
               }}
               style={styles.likeBtn}
               accessibilityRole="button"
@@ -1099,11 +1123,15 @@ export default function BuyerStoryViewer() {
               renderItem={({ item }) => (
                 <View style={styles.viewerRow}>
                   <View style={[styles.viewerAvatar, { backgroundColor: PURPLE }]}>
-                    <Text style={styles.viewerInitials}>{item.name.charAt(0).toUpperCase()}</Text>
+                    {item.avatarUrl ? (
+                      <CachedImage source={{ uri: item.avatarUrl }} style={StyleSheet.absoluteFill} />
+                    ) : (
+                      <Text style={styles.viewerInitials}>{item.name.charAt(0).toUpperCase()}</Text>
+                    )}
                   </View>
                   <View style={{ marginLeft: SP.sm, flex: 1 }}>
-                    <Text style={styles.viewerName}>{item.name}</Text>
-                    <Text style={styles.viewerHandle}>{item.handle}</Text>
+                    <Text style={styles.viewerName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.viewerHandle} numberOfLines={1}>{item.handle}</Text>
                   </View>
                   <Text style={styles.viewerTime}>{timeAgo(new Date(item.viewedAt).getTime())}</Text>
                 </View>
@@ -1238,6 +1266,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     zIndex: 1,
   },
   productTag: {
+    flexShrink: 1,
+    maxWidth: 160,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
@@ -1252,6 +1282,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
+    flexShrink: 1,
   },
   tapZoneRow: {
     position: 'absolute',
@@ -1322,7 +1353,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   seenByInitials: {
     color: ON_DARK,
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
   },
   seenByText: {
@@ -1381,6 +1412,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   viewerInitials: {
     color: ON_DARK,
@@ -1394,12 +1426,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   viewerHandle: {
     color: MUTED,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
   },
   viewerTime: {
     color: SUBTLE,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
   },
   noViewers: {

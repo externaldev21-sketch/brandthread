@@ -241,7 +241,7 @@ export default function ConnectionsScreen() {
   // (Mobbin: Instagram's Following list, per-row "..."/state button).
   const handleFollowingPillPress = useCallback((row: ConnectionUser) => {
     if (!followStateFor(row)) { void handleFollow(row); return; }
-    showActionSheet(undefined, undefined, [
+    showActionSheet(`Unfollow ${row.name}?`, undefined, [
       {
         text: 'Unfollow',
         style: 'destructive',
@@ -287,6 +287,9 @@ export default function ConnectionsScreen() {
 
     return (
       <View style={styles.row}>
+        {/* PressableScale applies `style` to its inner view, so the flex:1
+            that pushes the trailing pill to the row's edge lives on a wrapper. */}
+        <View style={styles.rowTapWrap}>
         <PressableScale
           style={styles.rowTap}
           activeOpacity={0.8}
@@ -319,6 +322,7 @@ export default function ConnectionsScreen() {
             </>
           )}
         </PressableScale>
+        </View>
 
         {isMe ? (
           <Feather name="chevron-right" size={16} color={theme.muted} />
@@ -450,6 +454,7 @@ function TabButton({ label, active, onPress, theme }: {
   label: string; active: boolean; onPress: () => void; theme: AppThemePreset;
 }) {
   return (
+    <View style={tabStyles.tabWrap}>
     <PressableScale
       onPress={onPress}
       style={[tabStyles.tab, active && { borderBottomColor: theme.text, borderBottomWidth: 2 }]}
@@ -462,10 +467,12 @@ function TabButton({ label, active, onPress, theme }: {
         </Text>
       )}
     </PressableScale>
+    </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
+  tabWrap: { flex: 1 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: FS.sm },
 });
@@ -482,6 +489,7 @@ function FollowPill({
     <PressableScale
       onPress={onPress}
       disabled={disabled}
+      noMinHeight
       accessibilityRole="button"
       accessibilityLabel={following ? `${label}, tap to unfollow` : label}
       accessibilityState={{ selected: following, disabled: !!disabled }}
@@ -507,6 +515,7 @@ function RemovePill({ onPress, theme }: { onPress: () => void; theme: AppThemePr
   return (
     <PressableScale
       onPress={onPress}
+      noMinHeight
       accessibilityRole="button"
       accessibilityLabel="Remove follower"
       style={[pillStyles.pill, { backgroundColor: 'transparent', borderColor: theme.border, borderWidth: 1 }]}
@@ -518,7 +527,7 @@ function RemovePill({ onPress, theme }: { onPress: () => void; theme: AppThemePr
 
 const pillStyles = StyleSheet.create({
   pill: { height: 32, paddingHorizontal: 14, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  text: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  text: { fontFamily: FONT.semibold, fontSize: FS.meta },
 });
 
 function makeStyles(theme: AppThemePreset) {
@@ -527,15 +536,16 @@ function makeStyles(theme: AppThemePreset) {
     pad:    { padding: SP.md },
     headerExtras: { gap: SP.sm, paddingBottom: SP.xs },
     tabsRow: { flexDirection: 'row' },
-    search: { marginTop: 2 },
+    search: { marginTop: 2, marginHorizontal: SP.md },
     sortRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingVertical: SP.xs,
+      paddingVertical: SP.xs, paddingHorizontal: SP.md,
     },
-    sortLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+    sortLabel: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted },
     sortValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    sortValue: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
+    sortValue: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.text },
     row:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, minHeight: 64, paddingVertical: SP.sm },
+    rowTapWrap: { flex: 1, minWidth: 0 },
     rowTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rowCopy: { flex: 1, minWidth: 0 },
     rowTags: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4 },
@@ -546,8 +556,8 @@ function makeStyles(theme: AppThemePreset) {
     },
     avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
     name:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-    username: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-    mutualTag: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
-    separator: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: 72 },
+    username: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+    mutualTag: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted },
+    separator: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: SP.md + 44 + SP.sm },
   });
 }

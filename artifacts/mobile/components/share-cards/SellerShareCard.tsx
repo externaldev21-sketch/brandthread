@@ -92,5 +92,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   thumbImg: { width: '100%', height: '100%' },
-  tagline: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.lg, textAlign: 'center' },
+  tagline: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: SP.lg, textAlign: 'center' },
 });

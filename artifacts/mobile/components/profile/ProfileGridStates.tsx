@@ -72,7 +72,7 @@ export function ProfileGridPlaceholder({
   if (error) {
     return (
       <View style={fill} testID="profile-grid-error">
-        <ErrorState message="Couldn't load these videos." onRetry={onRetry} />
+        <ErrorState message="Couldn't load this tab." onRetry={onRetry} />
       </View>
     );
   }

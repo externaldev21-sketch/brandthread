@@ -33,6 +33,7 @@ import { getSellerFollowState, setSellerFollowing } from '@/services/socialServi
 import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { SPACING } from '@/constants/spacing';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -159,6 +160,8 @@ export default function SellerProfileScreen() {
   const sellsGiftCards = useStoreGiftCards(seller?.sellerId);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
+  // A 404 / missing id is "not found", not a connection problem (no Retry).
+  const [profileNotFound, setProfileNotFound] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -213,6 +216,7 @@ export default function SellerProfileScreen() {
     (async () => {
       if (reloadTick === 0) setProfileLoading(true);
       setProfileError(false);
+      setProfileNotFound(false);
       try {
         let view: SellerView;
         if (loadOwnProfile) {
@@ -239,8 +243,11 @@ export default function SellerProfileScreen() {
         if (view.likesCount != null) setLikes(view.likesCount);
         if (view.followersCount != null) setFollowers((count) => count ?? view.followersCount);
         if (view.followingCount != null) setFollowing((count) => count ?? view.followingCount);
-      } catch {
-        if (active && reloadTick === 0) setProfileError(true);
+      } catch (err) {
+        if (active && reloadTick === 0) {
+          setProfileError(true);
+          setProfileNotFound(!loadOwnProfile && (!routeSellerId || (err as { status?: number } | null)?.status === 404));
+        }
       } finally {
         if (active) { setProfileLoading(false); setRefreshing(false); }
       }
@@ -555,12 +562,21 @@ export default function SellerProfileScreen() {
         <View style={styles.errorBar}>
           <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         </View>
-        <EmptyState
-          icon="alert-triangle"
-          title="Couldn't load this profile"
-          description="Check your connection and try again."
-          action={{ label: 'Retry', onPress: () => { setProfileLoading(true); setProfileError(false); setReloadTick((tick) => tick + 1); } }}
-        />
+        {profileNotFound ? (
+          <EmptyState
+            icon="user-x"
+            title="Profile not found"
+            description="This profile doesn't exist or is no longer available."
+            action={{ label: 'Go back', onPress: goBack }}
+          />
+        ) : (
+          <EmptyState
+            icon="alert-triangle"
+            title="Couldn't load this profile"
+            description="Check your connection and try again."
+            action={{ label: 'Retry', onPress: () => { setProfileLoading(true); setProfileError(false); setReloadTick((tick) => tick + 1); } }}
+          />
+        )}
       </View>
     );
   }
@@ -624,7 +640,7 @@ export default function SellerProfileScreen() {
         <FollowMorphButton
           following={isFollowing}
           onChange={handleFollow}
-          disabled={previewAsVisitor || followPending || !canonicalSellerId || !userId}
+          disabled={previewAsVisitor || followPending || !canonicalSellerId}
           style={styles.followBtn}
           labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
         />
@@ -641,7 +657,7 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
-      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} reviews`} icon="star" /> : null}
+      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} ${rating.totalCount === 1 ? 'review' : 'reviews'}`} icon="star" /> : null}
       {caps.showPlanChip && plan ? (
         <ProfileChip
           label={planChipLabel(plan)}
@@ -741,10 +757,10 @@ export default function SellerProfileScreen() {
             }}
             layout={layout}
             icon={(tabEmpty?.icon ?? videosEmpty.icon) as never}
-            title={tabEmpty?.title ?? videosEmpty.title}
+            title={tabEmpty?.title ?? (isOwner ? videosEmpty.title : 'No posts yet')}
             description={tabEmpty
               ? tabEmpty.message
-              : isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted any videos yet.`}
+              : isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted yet.`}
             action={(tabEmpty ?? videosEmpty).cta ? { label: (tabEmpty ?? videosEmpty).cta!.label, onPress: () => router.push((tabEmpty ?? videosEmpty).cta!.route as never) } : undefined}
             testID={`seller-profile-${activeTab.toLowerCase()}-empty`}
           />
@@ -758,7 +774,7 @@ export default function SellerProfileScreen() {
 
       {/* ── Owner post actions (long-press a tile) ── */}
       <Modal visible={!!selectedPost} transparent animationType="slide" onRequestClose={() => setSelectedPost(null)}>
-        <PressableScale style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setSelectedPost(null)} accessibilityLabel="Close post actions" />
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSelectedPost(null)} accessibilityRole="button" accessibilityLabel="Close post actions" />
         {selectedPost ? (
           <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.sheetHandle} />
@@ -815,7 +831,7 @@ function SheetRow({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMa
 }
 
 const sheetRowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SP.md, minHeight: 52 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SP.md, minHeight: 52 },
   label: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base },
 });
 
@@ -838,8 +854,8 @@ function makeStyles(theme: AppThemePreset) {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,
     },
-    vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+    vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: SP.xs },
+    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 18 },
     errorRoot: { flex: 1, backgroundColor: theme.background },
     errorBar: { paddingHorizontal: SP.md, alignItems: 'flex-start' },
     sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: modal scrim
@@ -848,7 +864,7 @@ function makeStyles(theme: AppThemePreset) {
       backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
       borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border,
     },
-    sheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: SP.sm },
+    sheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: SPACING.sm, marginBottom: SP.sm },
     sheetTitle: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   });
 }

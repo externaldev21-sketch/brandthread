@@ -17,6 +17,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -135,6 +136,7 @@ function DraftsFolderTile({
 export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
+  const insets = useSafeAreaInsets();
   const hasUnreadActivity = useSellerActivityUnread();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
   const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
@@ -788,9 +790,10 @@ export default function ProfileScreen() {
             style={s.sheetBackdrop}
             activeOpacity={1}
             onPress={closeProfileEditor}
+            accessibilityRole="button"
             accessibilityLabel="Close profile editor"
           />
-          <SheetRise style={s.sheet}>
+          <SheetRise style={[s.sheet, { paddingBottom: Math.max(26, insets.bottom + SP.md) }]}>
             <View style={s.sheetHandle} />
             <View style={s.sheetHeader}>
               <View>
@@ -801,6 +804,7 @@ export default function ProfileScreen() {
                 style={s.sheetClose}
                 onPress={closeProfileEditor}
                 disabled={savingProfile}
+                accessibilityRole="button"
                 accessibilityLabel="Close profile editor"
               >
                 <Feather name="x" size={18} color={FG} />
@@ -872,7 +876,7 @@ export default function ProfileScreen() {
       <ShareProfileSheet
         visible={shareSheetVisible}
         onClose={() => setShareSheetVisible(false)}
-        avatarUrl={profile?.profileImageUrl ?? null}
+        avatarUrl={profile?.avatarPosterUrl || profile?.profileImageUrl || null}
         sellerExtra={{
           rating: null,
           products: sellerPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.thumbnailUri ?? p.mediaUris?.[0] })),
@@ -898,7 +902,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   draftsTileTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-  draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED },
 
   // Profile editor sheet
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },
@@ -914,7 +918,7 @@ const s = StyleSheet.create({
   sheetClose: { width: 44, height: 44, borderRadius: 22, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
   inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
   bioLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
-  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm },
+  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.meta, marginBottom: SP.sm },
   textInput: {
     minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
     backgroundColor: SURFACE, color: FG, fontFamily: FONT.regular, fontSize: FS.base,

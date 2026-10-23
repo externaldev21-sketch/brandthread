@@ -22,7 +22,7 @@ import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/prof
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { SP } from '@/lib/theme';
+import { FS, SP } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
@@ -85,6 +85,9 @@ function GenderPicker({
               key={option}
               style={[styles.pickerRow, current === option && { backgroundColor: theme.accentDim }]}
               onPress={() => { onSelect(option); onClose(); }}
+              accessibilityRole="button"
+              accessibilityLabel={option}
+              accessibilityState={{ selected: current === option }}
             >
               <Text style={[styles.pickerRowText, { color: theme.text }, current === option && { color: theme.accent }]}>{option}</Text>
               {current === option && <Feather name="check" size={16} color={theme.accent} />}
@@ -496,6 +499,8 @@ export default function BuyerEditProfileScreen() {
               onPress={handleSave}
               disabled={!isDirty || saving || avatarUploading}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Save profile"
             >
               {saving ? (
                 <ActivityIndicator size="small" color={theme.accent} />
@@ -514,7 +519,7 @@ export default function BuyerEditProfileScreen() {
         <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>
+            <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading} accessibilityRole="button" accessibilityLabel="Change profile photo or video">
               <View style={styles.avatarWrap}>
                 <Avatar uri={avatarUri} name={fields.name} size={96} />
                 {avatarUploading && (
@@ -530,7 +535,7 @@ export default function BuyerEditProfileScreen() {
                 )}
               </View>
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading}>
+            <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading} accessibilityRole="button">
               <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
                 {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo or video'}
               </Text>
@@ -538,7 +543,7 @@ export default function BuyerEditProfileScreen() {
             {avatarError && (
               <View style={styles.retryRow}>
                 <Text style={[styles.errorText, { color: theme.error }]}>{avatarError}</Text>
-                <TouchableOpacity onPress={pickAvatar}>
+                <TouchableOpacity onPress={pickAvatar} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Retry upload">
                   <Text style={[styles.retryLink, { color: theme.accentLight }]}>Retry</Text>
                 </TouchableOpacity>
               </View>
@@ -573,6 +578,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Name</Text>
                 <TextInput
+                  accessibilityLabel="Name"
                   style={[styles.rowInput, { color: theme.text }]}
                   value={fields.name}
                   onChangeText={v => set('name', v)}
@@ -592,6 +598,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Username</Text>
                 <TextInput
+                  accessibilityLabel="Username"
                   style={[
                     styles.rowInput,
                     { color: theme.text },
@@ -637,6 +644,7 @@ export default function BuyerEditProfileScreen() {
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Bio</Text>
               <View style={{ flex: 1 }}>
                 <TextInput
+                  accessibilityLabel="Bio"
                   style={[styles.rowInput, { color: theme.text, textAlignVertical: 'top', minHeight: 60 }]}
                   value={fields.bio}
                   onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
@@ -656,6 +664,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Link</Text>
                 <TextInput
+                  accessibilityLabel="Link"
                   style={[styles.rowInput, { color: theme.text }, errors.link && { color: theme.error }]}
                   value={fields.link}
                   onChangeText={v => set('link', v)}
@@ -678,6 +687,8 @@ export default function BuyerEditProfileScreen() {
               style={styles.row}
               activeOpacity={0.7}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setGenderPickerOpen(true); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Gender, ${extra.gender || 'not set'}`}
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>
@@ -690,6 +701,7 @@ export default function BuyerEditProfileScreen() {
                 <Text style={[styles.rowHint, { color: theme.muted }]}>Add this label if your content often uses AI.</Text>
               </View>
               <HapticSwitch
+                accessibilityLabel="AI creator"
                 value={extra.aiCreator}
                 onValueChange={v => setExtra(prev => ({ ...prev, aiCreator: v }))}
               />
@@ -703,6 +715,7 @@ export default function BuyerEditProfileScreen() {
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Show badge</Text>
               <HapticSwitch
+                accessibilityLabel="Show style badge"
                 value={badge.enabled}
                 onValueChange={v => setBadge(b => ({ ...b, enabled: v }))}
               />
@@ -711,6 +724,7 @@ export default function BuyerEditProfileScreen() {
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Emoji</Text>
               <TextInput
+                accessibilityLabel="Badge emoji"
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.emoji}
                 onChangeText={v => setBadge(b => ({ ...b, emoji: v }))}
@@ -723,6 +737,7 @@ export default function BuyerEditProfileScreen() {
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Label</Text>
               <TextInput
+                accessibilityLabel="Badge label"
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.label}
                 onChangeText={v => setBadge(b => ({ ...b, label: v }))}
@@ -764,13 +779,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   saveText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', paddingHorizontal: 20, paddingTop: 16 },
-  sectionHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
-  card: { marginHorizontal: 14, marginTop: 8, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  sectionHint: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
+  card: { marginHorizontal: SP.md, marginTop: 8, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12 },
   rowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', width: 90 },
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
   rowInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
-  chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
+  chevronLabel: { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
   cameraBadge: {
@@ -784,17 +799,17 @@ const styles = StyleSheet.create({
   avatarOverlayText: { color: '#FFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   editPhotoLink: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   coverSection: { alignItems: 'center', gap: 4, paddingBottom: 12 },
-  coverHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 20 },
+  coverHint: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 20 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  errorText: { fontSize: 12.5, fontFamily: 'Inter_400Regular' },
-  retryLink: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold' },
-  inlineError: { fontSize: 11.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
-  charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 4 },
+  errorText: { fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
+  retryLink: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
+  inlineError: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  charCounter: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 4 },
   previewLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8 },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   previewEmoji: { fontSize: 14 },
   previewText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  usernameHint: { fontSize: 11.5, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0, marginTop: -6 },
+  usernameHint: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', paddingHorizontal: 16, paddingBottom: 10, paddingTop: 0, marginTop: -6 },
   toast: {
     position: 'absolute', top: 56, alignSelf: 'center', zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 24,

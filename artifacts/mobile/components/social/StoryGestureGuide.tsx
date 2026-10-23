@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   tapToKeepWatching: {
     color: ON_DARK_MUTED,
     fontFamily: FONT.medium,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     marginTop: SP.xxl,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

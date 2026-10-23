@@ -834,7 +834,7 @@ export default function ProfileScreen() {
           accessibilityLabel="Profile options"
           testID="buyer-profile-more"
         />
-        <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
+        <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="Menu" />
       </ProfileTopBarIconRow>
     </>
   );
@@ -894,7 +894,7 @@ export default function ProfileScreen() {
             size="compact"
             fullWidth
             onPress={() => router.push('/(buyer)/edit-profile')}
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             testID="profile-edit-button"
           />
         </View>
@@ -906,7 +906,7 @@ export default function ProfileScreen() {
             fullWidth
             onPress={handleShareProfile}
             accessibilityHint="Opens your shareable profile link and QR code"
-            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             testID="profile-share-button"
           />
         </View>
@@ -917,7 +917,7 @@ export default function ProfileScreen() {
           size="compact"
           accessibilityLabel="Discover people"
           onPress={() => router.push('/(buyer)/friends' as any)}
-          style={[styles.actionButton, styles.actionSquare, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+          style={[styles.actionButton, styles.actionSquare, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
           testID="profile-discover-people"
         />
       </View>
@@ -958,7 +958,7 @@ export default function ProfileScreen() {
         renderItem={renderRow as any}
         keyExtractor={keyForRow as any}
         numColumns={numColumns}
-        columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
+        columnWrapperStyle={numColumns > 1 ? (activeTab === 'Saved' ? [styles.gridRow, styles.savedRow] : styles.gridRow) : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={(
           // `emptyArea` (computeEmptyArea, shared with ProfileShell) sizes
@@ -1043,6 +1043,8 @@ function makeStyles(theme: AppThemePreset) {
     root: { flex: 1, backgroundColor: theme.background },
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
+    // Saved cells are sized from the column minus a 16pt gutter each side.
+    savedRow: { paddingHorizontal: SP.md },
 
     // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
     // plus a square discover-people button, 6pt apart, 8pt corners.
@@ -1071,10 +1073,10 @@ const topBarStyles = StyleSheet.create({
 const cellStyles = StyleSheet.create({
   savedTile: { aspectRatio: 1, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
   savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.xs },
-  savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs },
+  savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.meta },
   draftsTile: { borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   draftsTitle: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs },
+  draftsCount: { fontFamily: FONT.regular, fontSize: FS.meta },
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,
@@ -1084,7 +1086,7 @@ const cellStyles = StyleSheet.create({
   orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   orderCardBody: { flex: 1, gap: 2 },
   orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
+  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.meta, marginBottom: 2 },
 });
 
 const sheetStyles = StyleSheet.create({

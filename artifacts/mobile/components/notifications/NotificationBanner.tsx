@@ -112,20 +112,37 @@ export default function NotificationBanner() {
           },
         ]}
       >
-        <TouchableOpacity activeOpacity={0.85} onPress={handlePress} style={styles.content}>
-          <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
-            <Feather name={icon} size={18} color={theme.accent} />
-          </View>
-          <View style={styles.textWrap}>
-            <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{payload.title}</Text>
-            {!!payload.body && (
-              <Text style={[styles.body, { color: theme.muted }]} numberOfLines={2}>{payload.body}</Text>
-            )}
-          </View>
-          <TouchableOpacity hitSlop={12} onPress={hide} style={styles.closeButton}>
+        {/* Open and Dismiss are siblings, not nested touchables — a button
+            inside a button is invalid on web and confuses screen readers. */}
+        <View style={styles.content}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handlePress}
+            style={styles.openArea}
+            accessibilityRole="button"
+            accessibilityLabel={payload.body ? `${payload.title}. ${payload.body}` : payload.title}
+            accessibilityHint="Opens this notification"
+          >
+            <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name={icon} size={18} color={theme.accent} />
+            </View>
+            <View style={styles.textWrap}>
+              <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{payload.title}</Text>
+              {!!payload.body && (
+                <Text style={[styles.body, { color: theme.muted }]} numberOfLines={2}>{payload.body}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            hitSlop={12}
+            onPress={hide}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss notification"
+          >
             <Feather name="x" size={16} color={theme.muted} />
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -154,6 +171,12 @@ const styles = StyleSheet.create({
     paddingVertical: SP.sm,
     paddingHorizontal: SP.sm,
   },
+  openArea: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   iconWrap: {
     width: 36,
     height: 36,
@@ -171,7 +194,7 @@ const styles = StyleSheet.create({
   },
   body: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     marginTop: 2,
   },
   closeButton: {

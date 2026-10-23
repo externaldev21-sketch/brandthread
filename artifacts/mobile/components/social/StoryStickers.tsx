@@ -67,7 +67,7 @@ export function PollSticker({
             >
               {revealed ? <View style={[s.optionFill, { width: `${pct}%` }]} /> : null}
               <View style={s.optionContent}>
-                <Text style={[s.optionLabel, mine && s.optionLabelMine]}>{label}</Text>
+                <Text style={[s.optionLabel, mine && s.optionLabelMine, revealed && s.optionLabelRevealed]} numberOfLines={1}>{label}</Text>
                 {revealed ? (
                   <View style={s.optionRight}>
                     {mine ? <Feather name="check" size={14} color={STICKER.ink} /> : null}
@@ -145,6 +145,7 @@ export function QuestionSticker({
             onPress={() => { if (draft.trim()) onSubmit?.(draft.trim()); }}
             disabled={!draft.trim() || busy}
             style={[s.sendBtn, (!draft.trim() || busy) && s.sendBtnOff]}
+            hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel="Send answer"
           >
@@ -183,8 +184,8 @@ export function ProductSticker({
         ? <CachedImage source={{ uri: imageUrl }} style={s.productImg} contentFit="cover" />
         : <View style={[s.productImg, { backgroundColor: STICKER.silver }]}><Feather name="shopping-bag" size={18} color={STICKER.ink} /></View>}
       <View style={s.productText}>
-        <Text style={s.productName}>{name}</Text>
-        <Text style={s.productSub}>{sub}</Text>
+        <Text style={s.productName} numberOfLines={2}>{name}</Text>
+        <Text style={s.productSub} numberOfLines={1}>{sub}</Text>
       </View>
       {mode === 'viewer' && available ? <Feather name="chevron-right" size={18} color={STICKER.ink} /> : null}
     </Pressable>
@@ -251,7 +252,7 @@ export function CountdownSticker({
       accessibilityLabel={launched ? `${name}, live now` : `${name} drops soon`}
       testID="sticker-countdown"
     >
-      <Text style={s.countName}>{name}</Text>
+      <Text style={s.countName} numberOfLines={2}>{name}</Text>
       {launched ? (
         <View style={s.liveNow}><Text style={s.liveNowText}>Live now</Text></View>
       ) : (
@@ -413,6 +414,8 @@ const s = StyleSheet.create({
   optionContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   optionLabel: { color: STICKER.ink, fontFamily: FONT.medium, fontSize: FS.sm },
   optionLabelMine: { fontFamily: FONT.bold },
+  // Keeps a long label clear of the right-aligned check + percentage.
+  optionLabelRevealed: { maxWidth: STICKER.card - 152 },
   optionRight: { position: 'absolute', right: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
   optionPct: { color: STICKER.ink, fontFamily: FONT.semibold, fontSize: FS.sm },
   meta: { color: STICKER.inkSoft, fontFamily: FONT.medium, fontSize: FS.meta, textAlign: 'center' },

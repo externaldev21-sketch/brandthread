@@ -30,7 +30,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
+  ActivityIndicator, Animated, Image, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -203,6 +203,11 @@ export function ShareProfileSheet({
     setScreen('share');
   }, []);
 
+  const handleSetUsername = useCallback(() => {
+    onClose();
+    router.push((identity?.accountType === 'seller' ? '/edit-profile' : '/(buyer)/edit-profile') as never);
+  }, [identity?.accountType, onClose, router]);
+
   const handleShareProfile = useCallback(() => {
     if (!canonicalUrl || busy) return;
     void runAction('share', async () => {
@@ -315,7 +320,7 @@ export function ShareProfileSheet({
           <View style={styles.centerWrap}>
             {loading ? (
               <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="loader" size={24} color="#0A0A0B" />
+                <ActivityIndicator color="#0A0A0B" />
               </View>
             ) : !isSignedIn ? (
               <View style={[styles.card, styles.stateCard]}>
@@ -334,6 +339,9 @@ export function ShareProfileSheet({
               <View style={[styles.card, styles.stateCard]}>
                 <Feather name="at-sign" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Set a username to get a shareable QR code.</Text>
+                <PressableScale onPress={handleSetUsername} accessibilityRole="button" accessibilityLabel="Set username">
+                  <Text style={styles.retryText}>Set username</Text>
+                </PressableScale>
               </View>
             ) : (
               <>
@@ -608,8 +616,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
-  profileLink: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', marginTop: SP.xs },
-  shareHint: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', paddingHorizontal: SP.lg, marginTop: SP.sm },
+  profileLink: { fontFamily: FONT.regular, fontSize: FS.meta, textAlign: 'center', marginTop: SP.xs },
+  shareHint: { fontFamily: FONT.regular, fontSize: FS.meta, textAlign: 'center', paddingHorizontal: SP.lg, marginTop: SP.sm },
   tilesRow: {
     flexDirection: 'row',
     width: '100%',
@@ -628,7 +636,7 @@ const styles = StyleSheet.create({
   },
   tileLabel: {
     fontFamily: FONT.medium,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: '#FFFFFF',
   },
   toastWrap: {

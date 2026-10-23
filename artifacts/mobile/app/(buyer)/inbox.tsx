@@ -62,6 +62,7 @@ import {
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
+import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
@@ -1844,7 +1845,8 @@ export default function InboxScreen() {
         transparent
         onRequestClose={closeNoteCompose}
       >
-        <View style={s.composeBackdrop}>
+        {/* Keeps the sheet (input + Share button) above the keyboard autoFocus opens. */}
+        <KeyboardAvoidingView style={s.composeBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Glass
             variant="regular"
             tint="dark"
@@ -1871,7 +1873,7 @@ export default function InboxScreen() {
             <TextInput
               value={noteComposeText}
               onChangeText={text => setNoteComposeText(text.slice(0, NOTE_MAX_CHARS))}
-              placeholder="Your thoughts go here..."
+              placeholder="Your thoughts go here…"
               placeholderTextColor={theme.subtle}
               style={[s.noteComposeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
               maxLength={NOTE_MAX_CHARS}
@@ -1893,7 +1895,7 @@ export default function InboxScreen() {
               loading={noteComposeSaving}
             />
           </Glass>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Snackbar
@@ -2007,7 +2009,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     maxWidth: 84, paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
+  noteBubbleText: { fontSize: FS.xs, fontFamily: FONT.medium, lineHeight: 14 },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],

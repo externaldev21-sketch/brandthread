@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
   pillIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   pillCopy: { flexShrink: 1, flexGrow: 1 },
   pillLabel: { fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 21, letterSpacing: -0.3 },
-  pillSub: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, opacity: 0.7 },
+  pillSub: { fontFamily: FONT.semibold, fontSize: FS.meta, lineHeight: 16, opacity: 0.7 },
   pillArrow: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 
   chip: {

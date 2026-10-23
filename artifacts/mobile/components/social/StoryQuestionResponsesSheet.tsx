@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { Avatar } from '@/components/ui';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 export interface QuestionResponses {
@@ -27,7 +27,7 @@ export function StoryQuestionResponsesSheet({ visible, loading, data, onClose, o
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <ModalSafeArea>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[s.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + 16 }]}>
+        <View style={[s.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]}>
           <View style={[s.handle, { backgroundColor: theme.border }]} />
           <Text style={[s.title, { color: theme.text }]}>Responses</Text>
           {loading ? (
@@ -43,12 +43,13 @@ export function StoryQuestionResponsesSheet({ visible, loading, data, onClose, o
                     <View key={a.userId} style={[s.row, { borderBottomColor: theme.border }]}>
                       <Avatar name={a.name} uri={a.avatarUrl ?? undefined} size={40} />
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={[s.name, { color: theme.text }]}>{a.name}</Text>
+                        <Text style={[s.name, { color: theme.text }]} numberOfLines={1}>{a.name}</Text>
                         <Text style={[s.answer, { color: theme.text }]}>{a.answer}</Text>
                       </View>
                       <Pressable
                         onPress={() => onReply(a.userId)}
                         style={[s.replyBtn, { borderColor: theme.text }]}
+                        hitSlop={4}
                         accessibilityRole="button"
                         accessibilityLabel={`Reply to ${a.name}`}
                       >

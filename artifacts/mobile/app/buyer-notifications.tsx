@@ -3,7 +3,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
   View, Text, FlatList, ScrollView,
-  Alert, StyleSheet,
+  StyleSheet,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +21,8 @@ import type { Notification, NotificationCategory } from '@/services/socialTypes'
 import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { BottomSheet, Chip, ListRow } from '@/components/ui';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { activityHref } from '@/lib/activity';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -215,9 +217,15 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
         router.navigate('/(buyer)/friends' as any);
       }
       break;
-    default:
-      router.navigate('/(buyer)/inbox' as any);
+    default: {
+      // Social rows (new follower, likes, comments, reposts, mentions…) open
+      // the same destination their Activity row does — the person's profile,
+      // the post, the comment — instead of dropping everything on the inbox.
+      const href = activityHref(notif, 'buyer');
+      if (href) router.push(href as any);
+      else router.navigate('/(buyer)/inbox' as any);
       break;
+    }
   }
 }
 
@@ -322,9 +330,11 @@ export default function BuyerNotifications() {
     }).catch(() => {
       // In-app navigation must remain available if analytics capture fails.
     });
-    await markNotificationRead(notif.id);
+    // Navigate first: marking read refetches the list, and a slow or failed
+    // request must not delay or swallow the tap.
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);
+    await markNotificationRead(notif.id).catch(() => {});
   };
 
   const handleLongPress = (notif: Notification) => {
@@ -366,7 +376,9 @@ export default function BuyerNotifications() {
   };
 
   const handleClearRead = () => {
-    Alert.alert('Clear read notifications', 'This will remove all read notifications.', [
+    // showActionSheet, not Alert.alert: Alert.alert is a silent no-op on web,
+    // which left this header button doing nothing there.
+    showActionSheet('Clear read notifications', 'This will remove all read notifications.', [
       {
         text: 'Clear',
         style: 'destructive',
@@ -419,7 +431,9 @@ export default function BuyerNotifications() {
         <PressableScale
           style={[
             styles.notifRow,
-            { backgroundColor: theme.background, borderBottomColor: theme.border },
+            // Read rows reserve the same 2pt leading border the unread accent
+            // uses, so avatars don't shift sideways between read and unread.
+            { backgroundColor: theme.background, borderBottomColor: theme.border, borderLeftWidth: 2, borderLeftColor: theme.background },
             !notif.isRead && {
               backgroundColor: theme.card,
               borderLeftWidth: 2,
@@ -429,7 +443,7 @@ export default function BuyerNotifications() {
           onPress={() => handleTap(notif)}
           onLongPress={() => handleLongPress(notif)}
           accessibilityRole="button"
-          accessibilityLabel={`${notif.isRead ? '' : 'Unread. '}${notif.title}. ${notif.body}`}
+          accessibilityLabel={`${notif.isRead ? '' : 'Unread. '}${notif.title}${notif.body ? `. ${notif.body}` : ''}`}
           accessibilityHint="Double tap to open. Long press for more options."
         >
           {/* Left Icon */}
@@ -454,7 +468,9 @@ export default function BuyerNotifications() {
             >
               {notif.title}
             </Text>
-            <Text style={[styles.notifBody, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
+            {notif.body ? (
+              <Text style={[styles.notifBody, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
+            ) : null}
             <View style={styles.notifMeta}>
               <Text style={[styles.notifTime, { color: theme.subtle }]}>{timeAgo(notif.createdAt)}</Text>
               {notif.cta ? (
@@ -527,7 +543,7 @@ export default function BuyerNotifications() {
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Feather name="chevron-left" size={14} color={theme.muted} />
+            <Feather name="chevron-left" size={ICON.xs} color={theme.muted} />
           </View>
         )}
         {filterEdges.right && (
@@ -538,7 +554,7 @@ export default function BuyerNotifications() {
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Feather name="chevron-right" size={14} color={theme.muted} />
+            <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
           </View>
         )}
       </View>

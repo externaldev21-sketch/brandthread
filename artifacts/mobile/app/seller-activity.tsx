@@ -59,6 +59,7 @@ import {
   markPreviewActivityDismissed,
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
 
 export default function SellerActivityScreen() {
   const { theme } = useAppTheme();
@@ -344,15 +345,24 @@ export default function SellerActivityScreen() {
       buttons.push({
         text: 'Block',
         style: 'destructive',
-        onPress: () => {
-          hapticDestructiveConfirm();
-          void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
-            .then(() => {
-              setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
-              showToast('Blocked');
-            })
-            .catch(() => Alert.alert('Could not block', 'Please try again in a moment.'));
-        },
+        // Same "Block name?" confirm as every other Block entry point —
+        // blocking is drastic, so it is never a single tap.
+        onPress: () => showActionSheet(`Block ${actor.name}?`, BLOCK_EXPLAINER, [
+          {
+            text: 'Block',
+            style: 'destructive',
+            onPress: () => {
+              hapticDestructiveConfirm();
+              void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
+                .then(() => {
+                  setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
+                  showToast('Blocked');
+                })
+                .catch(() => Alert.alert('Could not block', 'Please try again in a moment.'));
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]),
       });
     }
     buttons.push({ text: 'Cancel', style: 'cancel' });
