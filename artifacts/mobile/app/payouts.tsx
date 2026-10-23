@@ -8,7 +8,6 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -73,7 +72,6 @@ export default function PayoutsScreen() {
 function PayoutsScreenContent() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
@@ -197,11 +195,8 @@ function PayoutsScreenContent() {
       }
       await WebBrowser.openBrowserAsync(data.url);
       await refreshConnectStatus();
-    } catch (error: any) {
-      const message = typeof error?.message === 'string' && error.message
-        ? error.message
-        : 'Could not open Stripe onboarding. Please try again.';
-      Alert.alert('Onboarding unavailable', message);
+    } catch {
+      Alert.alert('Onboarding unavailable', 'Could not open Stripe onboarding. Try again.');
     } finally {
       onboardingOpenRef.current = false;
       setIsConnecting(false);
@@ -218,7 +213,7 @@ function PayoutsScreenContent() {
     ? fmtDate(balance.nextPayout.arrivalDate)
     : balance?.nextPayoutEstimate?.date
       ? fmtDate(balance.nextPayoutEstimate.date)
-      : '—';
+      : null;
 
   if (!isPreview && isLoadingRole) {
     return (
@@ -279,7 +274,7 @@ function PayoutsScreenContent() {
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
-        <Text style={styles.balanceHeroSub}>{loadError ? '—' : `Next payout ${nextDate}`}</Text>
+        <Text style={styles.balanceHeroSub}>{loadError ? '—' : nextDate ? `Next payout ${nextDate}` : 'No payout scheduled'}</Text>
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
@@ -303,6 +298,8 @@ function PayoutsScreenContent() {
             testID={`seller-payouts-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
             onPress={() => { haptic(); setActiveTab(t); }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === t }}
           >
             <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>
               {t === 'payouts' ? 'Payout history' : 'Bank account'}
@@ -313,7 +310,6 @@ function PayoutsScreenContent() {
 
       {activeTab === 'payouts' ? (
         <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: SP.md },
@@ -321,7 +317,7 @@ function PayoutsScreenContent() {
           ]}
         >
           {loading && !isPreview ? (
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: SP.sm }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
             </View>
           ) : loadError ? (
@@ -368,7 +364,6 @@ function PayoutsScreenContent() {
         </ScrollView>
       ) : (
         <ScrollView
-          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
           contentContainerStyle={[styles.list, { paddingBottom: SP.md }]}
         >
            <View style={styles.bankCard}>
@@ -548,7 +543,7 @@ const createStyles = (theme: AppThemePreset) => {
   balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
-  balanceHeroSub: { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },
+  balanceHeroSub: { color: subtle, fontSize: FS.sm, fontFamily: FONT.regular },
   balanceDivider: { alignSelf: 'stretch', height: 1, backgroundColor: border, marginVertical: SP.md },
   balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   balancePendingLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium },
@@ -570,7 +565,7 @@ const createStyles = (theme: AppThemePreset) => {
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
   payoutDate:   { color: text, fontSize: FS.base, fontFamily: FONT.medium },
-  payoutSub:    { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  payoutSub:    { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },
   payoutAmount: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
   statusPill:   { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:   { fontSize: FS.xs, fontFamily: FONT.medium },
@@ -579,9 +574,9 @@ const createStyles = (theme: AppThemePreset) => {
   totalAmount:  { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
   bankCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
   bankLabel:    { color: text, fontSize: FS.base, fontFamily: FONT.medium },
-  bankSub:      { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  bankSub:      { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },
   settingsSection:{ backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
-  sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: SP.sm },
   settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: border },
   settingsLabel:{ color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
   settingsValue:{ color: text, fontSize: FS.sm, fontFamily: FONT.medium },
