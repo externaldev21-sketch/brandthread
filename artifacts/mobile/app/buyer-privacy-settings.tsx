@@ -246,7 +246,7 @@ export default function BuyerPrivacySettings() {
           <ListRow
             icon="phone"
             title="Contact discovery"
-            subtitle="Find friends from contacts (no contacts uploaded without permission)"
+            subtitle="Find friends from contacts, only with your permission"
             subtitleNumberOfLines={2}
             toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
           />

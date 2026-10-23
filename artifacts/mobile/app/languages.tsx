@@ -84,7 +84,7 @@ export default function LanguagesScreen() {
                 <Feather name="globe" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.currentLabel, { color: colors.primary }]}>Store language</Text>
+                <Text style={[s.currentLabel, { color: colors.primary }]}>Choose a language</Text>
                 <Text style={[s.currentValue, { color: colors.primary }]}>
                   {currentLang ? (currentLang.name === currentLang.nativeName ? currentLang.name : `${currentLang.name} — ${currentLang.nativeName}`) : 'English'}
                 </Text>
@@ -94,7 +94,7 @@ export default function LanguagesScreen() {
 
           {/* Language list */}
           <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Store language</Text>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Choose a language</Text>
             <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
               Select your store's primary language. Buyers will see content in this language.
             </Text>

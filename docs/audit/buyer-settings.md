@@ -115,6 +115,7 @@ as found.
 - [FIXED] Back saved silently and navigated away even when the save failed, dropping the change; now stays and shows the error.
 - [FIXED] A failed local settings load left the skeleton forever; now falls back to defaults.
 - [FIXED] Scroll ignored the bottom safe area (`insets` was declared and unused).
+- [FIXED] "Find friends from contacts (no contacts uploaded without permission)" was cut off by its 2-line clamp; shortened.
 - Follow-request count is capped at 50 (`list(50, 0)`) with no "50+".
 - The server's `canBePrivate` flag is ignored, so Private account shows even when not allowed.
 
@@ -174,7 +175,8 @@ as found.
 - A fast second toggle can roll back the first (closure over stale state).
 
 **Appearance** (app/appearance.tsx; app/app-theme.tsx and app/app-icon.tsx redirect here)
-- [FIXED] "Follow app theme" subtitle and icon names at FS.xs (badges only) → FS.meta.
+- [FIXED] "Follow app theme" subtitle at FS.xs (badges only) → FS.meta.
+- Icon-name labels sit at FS.xs; FS.meta would clip "Emerald & Gold" in the 4-across grid, so they stay.
 - Dead `borderColor: '#000'` (always overridden); raw margins 4/2/6.
 - `selectTheme` has no error handling.
 - app-theme / app-icon redirects: clean.
@@ -190,7 +192,7 @@ as found.
 - [FIXED] Footer pointed to "multi-language support from your plan settings", which doesn't exist; removed.
 - [FIXED] Green "Default" badge (off palette) → neutral "Current" badge.
 - [FIXED] Banner read "English — English"; the native name only shows when it differs.
-- [FIXED] "Published languages" heading for a single-select setting → "Store language".
+- [FIXED] "Published languages" heading for a single-select setting → "Choose a language".
 - [FIXED] Raw font sizes 15/12/14/11 (14 isn't on the scale) and 20pt gutter → FS/SP tokens; bottom safe area.
 - [FIXED] Rows had no radio role or selected state.
 - [FIXED] Bare "Error" alert title.

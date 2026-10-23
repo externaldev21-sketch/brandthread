@@ -183,5 +183,5 @@ const styles = StyleSheet.create({
   iconRing: { width: '100%', aspectRatio: 1, borderRadius: 22, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   icon: { width: '100%', height: '100%', borderRadius: 18 },
   selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
-  label: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6, textAlign: 'center' },
+  label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
 });
