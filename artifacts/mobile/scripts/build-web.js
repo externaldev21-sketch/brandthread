@@ -213,8 +213,8 @@ const env = {
   EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST: workspacePreview ? '1' : '',
   EXPO_PUBLIC_DOMAIN: domainFromEnvironment(),
   EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY:
-    process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
     process.env.CLERK_PUBLISHABLE_KEY ||
+    process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
     '',
   // Production browser traffic must stay on the selected deployment domain.
   // Never inherit EXPO_PUBLIC_* URLs from .replit/dev workflow configuration,
