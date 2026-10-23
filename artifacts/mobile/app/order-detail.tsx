@@ -34,6 +34,7 @@ import { OrderRiskBadge } from '@/components/orders/OrderRiskBadge';
 import { queryKeys } from '@/lib/queryClient';
 import { DELIVERY_CONFIRMED_BY_NOTE, formatLocalDate, sellerOrderConflictMessage, unshippedItems } from '@/lib/deliveryGuarantee';
 import { SellerDeliveryBanner, ShipItemsSheet } from '@/components/orders/SellerDelivery';
+import { MarkShippedForm } from '@/components/orders/MarkShippedForm';
 import { getPreviewSellerOrder } from '@/lib/previewOrders';
 import { ApiError } from '@/lib/networkNotice';
 
@@ -207,6 +208,19 @@ export function adaptApiOrder(raw: any): Order {
       createdAt:         raw.shippedAt,
     });
   }
+  if (raw.deliveredAt) {
+    timeline.push({
+      id:                `tl-delivered-${raw.id}`,
+      type:              'delivered',
+      message:           raw.deliveryConfirmedBy === 'seller' ? 'Marked delivered by you'
+        : raw.deliveryConfirmedBy === 'buyer' ? 'Delivery confirmed by the buyer'
+        : 'Delivered (carrier confirmed)',
+      isCustomerVisible: true,
+      isSystemEvent:     true,
+      isSellerNote:      false,
+      createdAt:         raw.deliveredAt,
+    });
+  }
 
   // Build cancellation object and timeline event from API fields
   const cancellationReasonKey = raw.cancellationReason as string | undefined;
@@ -316,6 +330,8 @@ export function adaptApiOrder(raw: any): Order {
     deliveredAt:            raw.deliveredAt ?? null,
     autoRefundedAt:         raw.autoRefundedAt ?? null,
     disputePausedAt:        raw.disputePausedAt ?? null,
+    deliveryConfirmedBy:    raw.deliveryConfirmedBy ?? null,
+    sellerCanMarkDelivered: raw.sellerCanMarkDelivered === true,
     isManufacturerFulfilled: false,
     currency: 'USD',
     tags:     [],
@@ -774,13 +790,40 @@ export default function OrderDetailScreen() {
     load(generationRef.current);
   }
 
-  async function handleAddTrackingQuick(carrier: string, trackingNumber: string) {
+  async function handleShip(carrier: string, trackingNumber: string): Promise<{ field?: 'carrier' | 'trackingNumber'; error: string } | null> {
     try {
-      await api.orders.addTracking(id, { trackingNumber, carrier });
-      load(generationRef.current);
+      await api.orders.ship(id, { carrier, trackingNumber });
     } catch (e: any) {
-      writeFailed('Couldn’t add tracking', e);
+      if (e?.code === 'INVALID_TRACKING') {
+        let field: 'carrier' | 'trackingNumber' | undefined;
+        let error = 'Check the tracking number and try again.';
+        try { const body = JSON.parse(e.body); field = body.field; error = body.error ?? error; } catch { /* keep defaults */ }
+        return { field, error };
+      }
+      writeFailed('Couldn’t mark this order shipped', e);
+      return null;
     }
+    hapticSuccessAction();
+    load(generationRef.current);
+    return null;
+  }
+
+  function handleMarkDelivered() {
+    Alert.alert(
+      'Mark as delivered?',
+      'Only do this if the package has arrived. The buyer will be told it was delivered and can report a problem if it hasn’t.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark delivered',
+          onPress: async () => {
+            try { await api.orders.markDelivered(id); } catch (e: any) { writeFailed('Couldn’t mark this order delivered', e); return; }
+            hapticSuccessAction();
+            load(generationRef.current);
+          },
+        },
+      ],
+    );
   }
 
   async function handleUpdateTracking(status: TrackingStatus, estimatedDelivery: string | null) {
@@ -916,7 +959,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onShipSome={() => setShowShipItems(true)} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onShip={handleShip} onMarkDelivered={handleMarkDelivered} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -1020,33 +1063,23 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onShipSome, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onShip, onMarkDelivered }: {
   order: Order;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
-  onMarkShipped: () => void;
   onShipSome: () => void;
   onCancelPress: () => void;
   onMessageBuyer: () => void;
   messagingBuyer: boolean;
   router: ReturnType<typeof useRouter>;
   reload: () => void;
-  onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
+  onShip: (carrier: string, trackingNumber: string) => Promise<{ field?: 'carrier' | 'trackingNumber'; error: string } | null>;
+  onMarkDelivered: () => void;
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const [addingTracking, setAddingTracking] = useState(false);
-  const [trackingCarrier, setTrackingCarrier] = useState('');
-  const [trackingNum, setTrackingNum] = useState('');
-
-  async function handleAddTrackingAndShip() {
-    if (!trackingCarrier.trim() || !trackingNum.trim()) {
-      Alert.alert('Missing info', 'Enter carrier and tracking number.');
-      return;
-    }
-    await onAddTrackingQuick(trackingCarrier.trim(), trackingNum.trim());
-    setAddingTracking(false);
-  }
+  const [shipping, setShipping] = useState(false);
+  const canShip = !order.autoRefundedAt && (order.status === 'new' || order.status === 'processing' || order.status === 'ready_to_ship');
 
   return (
     <View style={s.tabContent}>
@@ -1169,15 +1202,14 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
-            <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
-            {addingTracking && (
-              <BrandthreadCard style={s.inlineForm}>
-                <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
-                <TextInput style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
-                <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
-              </BrandthreadCard>
+          </View>
+        )}
+        {canShip && (
+          <View style={s.actionCol}>
+            <SecondaryButton label="Mark as shipped" onPress={() => setShipping(!shipping)} icon="send" />
+            {shipping && (
+              <MarkShippedForm onSubmit={onShip} />
             )}
-            <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'shipped' && (
@@ -1185,7 +1217,14 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             {order.shipments[0]?.trackingNumber && (
               <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
             )}
-            <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
+            {order.sellerCanMarkDelivered ? (
+              <>
+                <SecondaryButton label="Mark as delivered" onPress={onMarkDelivered} icon="check-circle" />
+                <Text style={s.readOnlyNote}>This carrier doesn’t report deliveries, so you can mark the order delivered once it arrives.</Text>
+              </>
+            ) : (
+              <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
+            )}
           </View>
         )}
         {!order.autoRefundedAt && order.lineItems.length > 1 && unshippedItems(order.lineItems).length > 0

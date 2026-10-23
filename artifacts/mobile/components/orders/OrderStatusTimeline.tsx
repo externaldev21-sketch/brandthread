@@ -10,9 +10,27 @@ import type { OrderStatus } from '@/services/orderTypes';
  * detail screens (and inline, compact, on order cards). Single source of
  * truth for "how far along is this order" so the two screens never disagree
  * on stage order or terminal-state handling.
+ *
+ * Compact (order cards) collapses to the three buyer-facing order events,
+ * labelled Ordered / Shipped / Delivered: packing and ready-to-ship still
+ * read as Ordered until the seller marks the order shipped.
  */
 
 const HAPPY_PATH: OrderStatus[] = ['new', 'processing', 'ready_to_ship', 'shipped', 'delivered'];
+const COMPACT_PATH: OrderStatus[] = ['new', 'shipped', 'delivered'];
+
+const COMPACT_LABEL: Partial<Record<OrderStatus, string>> = {
+  new: 'Ordered',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+};
+
+/** Index of `status` on the compact Ordered → Shipped → Delivered path. */
+export function compactStageIndex(status: OrderStatus): number {
+  if (status === 'delivered') return 2;
+  if (status === 'shipped') return 1;
+  return 0;
+}
 
 const STAGE_LABEL: Record<OrderStatus, string> = {
   new: 'Placed',
@@ -46,7 +64,8 @@ export function OrderStatusTimeline({
   const { theme } = useAppTheme();
   const isTerminalException = status === 'cancelled' || status === 'refunded' || status === 'disputed';
   const pulse = useRef(new Animated.Value(0.5)).current;
-  const activeIndex = HAPPY_PATH.indexOf(status);
+  const path = compact ? COMPACT_PATH : HAPPY_PATH;
+  const activeIndex = compact ? compactStageIndex(status) : HAPPY_PATH.indexOf(status);
 
   useEffect(() => {
     if (isTerminalException) return;
@@ -71,10 +90,15 @@ export function OrderStatusTimeline({
   }
 
   return (
-    <View style={[styles.row, compact && styles.rowCompact]}>
-      {HAPPY_PATH.map((stage, i) => {
-        const done = i < activeIndex;
-        const active = i === activeIndex;
+    <View
+      style={[styles.row, compact && styles.rowCompact]}
+      accessible={compact}
+      accessibilityLabel={compact ? `Order progress: ${COMPACT_LABEL[path[activeIndex]]}` : undefined}
+    >
+      {path.map((stage, i) => {
+        // The last stage is complete once reached (a delivered order has nothing left to pulse).
+        const done = i < activeIndex || (i === activeIndex && i === path.length - 1);
+        const active = i === activeIndex && !done;
         const dotColor = done || active ? theme.accent : theme.border;
         return (
           <React.Fragment key={stage}>
@@ -92,15 +116,14 @@ export function OrderStatusTimeline({
               >
                 {done ? <Feather name="check" size={compact ? 10 : 12} color={theme.onAccent} /> : null}
               </Animated.View>
-              {!compact ? (
-                <Text
-                  style={[styles.stageLabel, { color: active || done ? theme.text : theme.muted }]}
-                >
-                  {STAGE_LABEL[stage]}
-                </Text>
-              ) : null}
+              <Text
+                style={[styles.stageLabel, compact && styles.stageLabelCompact, { color: active || done ? theme.text : theme.muted }]}
+                numberOfLines={1}
+              >
+                {compact ? COMPACT_LABEL[stage] : STAGE_LABEL[stage]}
+              </Text>
             </View>
-            {i < HAPPY_PATH.length - 1 ? (
+            {i < path.length - 1 ? (
               <View
                 style={[
                   styles.connector,
@@ -131,7 +154,8 @@ const styles = StyleSheet.create({
   dotCompact: { width: 10, height: 10, borderWidth: 1.5 },
   stageLabel: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.xs, textAlign: 'center' },
   connector: { flex: 1, height: 2, marginTop: 11, borderRadius: 1 },
-  connectorCompact: { marginTop: 4, height: 1.5, minWidth: 8, flex: 0.5 },
+  connectorCompact: { marginTop: 4, height: 1.5, minWidth: 8, flex: 1 },
+  stageLabelCompact: { fontSize: FS.xs, marginTop: 4 },
   exceptionWrap: {
     flexDirection: 'row',
     alignItems: 'center',

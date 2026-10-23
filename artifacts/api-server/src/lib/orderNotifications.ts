@@ -12,6 +12,10 @@
  *                                       (item 108; the buyer already got
  *                                       return_requested)
  *
+ *   buyer  · order_shipped            — notifyBuyerOrderShipped: one copy for
+ *                                       every path that ships an order (seller
+ *                                       status/tracking, labels, Shopify)
+ *
  * Every other transition already publishes (routes/orders.ts status and
  * tracking changes, webhooks-shippo/-shopify, dropLifecycle, returns). Copy
  * uses the same "Order #<orderNumber>" / "$12.34" format as those. Buyer rows
@@ -19,6 +23,8 @@
  * seller's. All best-effort: a notification failure never fails the order
  * operation that triggered it.
  */
+import { eq } from "drizzle-orm";
+import { db, users } from "@workspace/db";
 import { publishNotification } from "../routes/notifications-feed";
 import { actorFieldsFromProfile } from "./activityEvents";
 import { profilesById } from "./safety";
@@ -46,6 +52,60 @@ export async function notifyBuyerOrderConfirmed(input: {
     });
   } catch (err) {
     logger.warn({ err, orderId: input.orderId }, "Order confirmed notification failed");
+  }
+}
+
+/** Where transactional email for an order goes: the buyer's account email, else the guest checkout email. */
+export async function buyerEmailOf(order: { buyerId: string | null; guestEmail: string | null }): Promise<string | null> {
+  let recipient = order.guestEmail;
+  if (order.buyerId) {
+    const [buyer] = await db.select({ email: users.email }).from(users)
+      .where(eq(users.clerkId, order.buyerId)).limit(1);
+    recipient = buyer?.email ?? recipient;
+  }
+  return recipient?.trim() || null;
+}
+
+export function orderShippedCopy(input: {
+  orderNumber: string;
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  partial?: boolean;
+}): { title: string; body: string } {
+  const via = input.carrier ? ` via ${input.carrier}` : "";
+  const tracking = input.trackingNumber ? ` Tracking number: ${input.trackingNumber}.` : "";
+  return input.partial
+    ? {
+      title: "Part of your order has shipped",
+      body: `Some items in order #${input.orderNumber} are on their way${via}.${tracking}`,
+    }
+    : {
+      title: "Your order has shipped",
+      body: `Order #${input.orderNumber} is on its way${via}.${tracking}`,
+    };
+}
+
+/** In-app + push. Opens the buyer's order screen, which links to the carrier's tracking page. */
+export async function notifyBuyerOrderShipped(input: {
+  buyerId: string;
+  orderId: string;
+  orderNumber: string;
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  partial?: boolean;
+}): Promise<void> {
+  try {
+    await publishNotification({
+      userId: input.buyerId,
+      category: "orders",
+      pushCategory: "order",
+      type: "order_shipped",
+      ...orderShippedCopy(input),
+      targetId: input.orderId,
+      targetType: "buyer_order",
+    });
+  } catch (err) {
+    logger.warn({ err, orderId: input.orderId }, "Order shipped notification failed");
   }
 }
 

@@ -20,6 +20,7 @@ import {
   sendManufacturerSignupEmail,
   sendAbandonedCartEmail,
   sendOrderConfirmationEmail,
+  sendOrderDeliveredEmail,
   sendOrderShippingEmail,
   sendPayoutEmail,
   sendReturnStatusEmail,
@@ -263,6 +264,57 @@ describe("Brandthread transactional email", () => {
         ]);
         expect(body.attachments[0].content).toMatch(/^iVBOR/);
       }
+    });
+
+    it("links the shipped email's button to the carrier's tracking page", async () => {
+      vi.stubEnv("RESEND_API_KEY", "test-key");
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await sendOrderShippingEmail({
+        to: "buyer@example.com",
+        orderNumber: "BT-00001",
+        carrier: "UPS",
+        trackingNumber: "1Z999AA10123456784",
+        trackingUrl: "https://www.ups.com/track?tracknum=1Z999AA10123456784",
+        idempotencyKey: "order-shipped/order-1",
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.subject).toBe("Your Brandthread order BT-00001 has shipped");
+      expect(body.html).toContain("https://www.ups.com/track?tracknum=1Z999AA10123456784");
+      expect(body.html).toContain("Track with UPS");
+      expect(body.html).toContain("1Z999AA10123456784");
+    });
+
+    it("sends a delivered email, with a report-a-problem note when the seller marked it", async () => {
+      vi.stubEnv("RESEND_API_KEY", "test-key");
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(sendOrderDeliveredEmail({
+        to: "buyer@example.com", orderNumber: "BT-00001", confirmedBy: "carrier", idempotencyKey: "order-delivered/order-1",
+      })).resolves.toBe(true);
+      await sendOrderDeliveredEmail({
+        to: "buyer@example.com", orderNumber: "BT-00002", confirmedBy: "seller", idempotencyKey: "order-delivered/order-2",
+      });
+
+      const carrier = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(carrier.subject).toBe("Your Brandthread order BT-00001 was delivered");
+      expect(carrier.html).toContain("Order BT-00001 has been delivered.");
+      expect(fetchMock.mock.calls[0][1].headers["Idempotency-Key"]).toBe("order-delivered/order-1");
+      const seller = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(seller.html).toContain("The seller marked order BT-00002 as delivered.");
+      expect(seller.html).toContain("report a problem");
+    });
+
+    it("skips the delivered email when Resend isn't configured", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(sendOrderDeliveredEmail({
+        to: "buyer@example.com", orderNumber: "BT-00001", confirmedBy: "carrier", idempotencyKey: "order-delivered/order-1",
+      })).resolves.toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("passes stable idempotency keys to Resend", async () => {

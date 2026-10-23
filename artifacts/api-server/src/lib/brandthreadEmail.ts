@@ -326,6 +326,8 @@ export async function sendOrderShippingEmail(options: {
   carrier?: string | null;
   trackingNumber?: string | null;
   trackingUpdate?: boolean;
+  /** Carrier's own tracking page; the button opens it when present. */
+  trackingUrl?: string | null;
   idempotencyKey: string;
 }): Promise<boolean> {
   const tracking = options.trackingNumber
@@ -340,13 +342,44 @@ export async function sendOrderShippingEmail(options: {
       ? `Tracking was updated for order ${options.orderNumber}${carrier}.`
       : `Order ${options.orderNumber} has shipped${carrier}.`,
     bodyHtml: `<p>${options.trackingUpdate ? "Use the details below to follow your package." : "Your package is moving toward you. Keep this email for your shipping details."}</p>${tracking}`,
-    cta: { label: "Track your order", url: "https://brandthread.app/orders" },
+    cta: options.trackingUrl
+      ? { label: `Track with ${options.carrier ?? "the carrier"}`, url: options.trackingUrl }
+      : { label: "Track your order", url: "https://brandthread.app/orders" },
   });
   return sendBrandthreadEmail({
     to: options.to,
     subject: options.trackingUpdate
       ? `Tracking updated for Brandthread order ${options.orderNumber}`
       : `Your Brandthread order ${options.orderNumber} has shipped`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
+export async function sendOrderDeliveredEmail(options: {
+  to: string;
+  orderNumber: string;
+  /** "seller" when the seller marked it delivered (no carrier scan exists). */
+  confirmedBy: "carrier" | "buyer" | "seller";
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const subtitle = options.confirmedBy === "seller"
+    ? `The seller marked order ${options.orderNumber} as delivered.`
+    : `Order ${options.orderNumber} has been delivered.`;
+  const body = options.confirmedBy === "seller"
+    ? "<p>If you haven’t received your package, report a problem from your order in the Brandthread app and we’ll help you sort it out.</p>"
+    : "<p>We hope you enjoy your purchase. If anything isn’t right, you can request a return from your order in the Brandthread app.</p>";
+  const html = renderBrandthreadEmail({
+    preheader: subtitle,
+    eyebrow: "Delivery update",
+    title: "Your order was delivered",
+    subtitle,
+    bodyHtml: body,
+    cta: { label: "View your order", url: "https://brandthread.app/orders" },
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Your Brandthread order ${options.orderNumber} was delivered`,
     html,
     idempotencyKey: options.idempotencyKey,
   });

@@ -118,11 +118,13 @@ export type DeliveryResult = {
 /**
  * Marks items delivered. `trackingNumber` given → only the items that
  * tracking number covers (an item's own tracking, else the order's). Omitted
- * (buyer confirms receipt) → every undelivered, unrefunded item.
+ * (buyer confirms receipt, or the seller marks an untrackable shipment
+ * delivered) → every undelivered, unrefunded item.
  */
 export async function recordDelivery(input: {
   orderId: string;
-  source: "carrier" | "buyer";
+  /** "seller" only via sellerMayMarkDelivered (no carrier scan can arrive). */
+  source: "carrier" | "buyer" | "seller";
   at?: Date;
   trackingNumber?: string | null;
 }): Promise<DeliveryResult> {
@@ -173,7 +175,7 @@ export async function recordDelivery(input: {
   });
 
   if (outcome.order && outcome.result.changed) {
-    await notifyBuyerDelivered(outcome.order, !outcome.result.allDelivered).catch(() => {});
+    await notifyBuyerDelivered(outcome.order, !outcome.result.allDelivered, input.source).catch(() => {});
     logger.info({ orderId: input.orderId, source: input.source, allDelivered: outcome.result.allDelivered }, "Order delivery recorded");
   }
   return outcome.result;

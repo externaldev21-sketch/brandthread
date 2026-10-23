@@ -13,10 +13,10 @@ import {
 } from "../lib/money/escrow";
 import { orderHeldCents } from "../lib/money/ledger";
 import { logger } from "../lib/logger";
+import { notifyBuyerOrderShipped } from "../lib/orderNotifications";
 import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
-import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
@@ -117,12 +117,9 @@ async function shipLabelledItems(
     }
     void registerTrackingWithCarrier(orderId, carrier, trackingNumber);
     if (notify && result.buyerId) {
-      publishNotification({
-        userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
-        title: "Part of your order has shipped!",
-        body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
-        targetId: orderId, targetType: "buyer_order",
-      }).catch(() => { /* non-critical */ });
+      void notifyBuyerOrderShipped({
+        buyerId: result.buyerId, orderId, orderNumber: result.orderNumber, carrier, trackingNumber, partial: true,
+      });
     }
   } catch (err) {
     logger.error({ err, orderId }, "Could not mark a labelled parcel's items shipped");

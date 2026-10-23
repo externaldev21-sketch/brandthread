@@ -1341,6 +1341,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      /** "Mark as shipped": carrier + tracking number, format-checked server side; ships and notifies the buyer. */
+      ship:           (id: string, body: { carrier: string; trackingNumber: string }) => post(`/api/orders/${id}/ship`, body),
+      /** Fallback for shipments no carrier can report on (GET returns sellerCanMarkDelivered). */
+      markDelivered:  (id: string) => post(`/api/orders/${id}/mark-delivered`, {}),
       /** Ship only the selected order items with their own tracking number. */
       addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
         patch(`/api/orders/${id}/items-tracking`, body),

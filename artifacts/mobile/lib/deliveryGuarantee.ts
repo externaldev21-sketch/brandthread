@@ -179,7 +179,8 @@ export function mapDelivery(raw: unknown): BuyerDelivery | undefined {
     promisedShipDate: str(d.promisedShipDate),
     estimatedDelivery: str(d.estimatedDelivery),
     deliveredAt: str(d.deliveredAt),
-    deliveryConfirmedBy: d.deliveryConfirmedBy === 'carrier' || d.deliveryConfirmedBy === 'buyer' ? d.deliveryConfirmedBy : null,
+    deliveryConfirmedBy: d.deliveryConfirmedBy === 'carrier' || d.deliveryConfirmedBy === 'buyer' || d.deliveryConfirmedBy === 'seller'
+      ? d.deliveryConfirmedBy : null,
     steps: normalizeDeliverySteps(d.steps),
     events: (Array.isArray(d.events) ? d.events : [])
       .filter((e: any): e is DeliveryEvent => !!e && typeof e.at === 'string')

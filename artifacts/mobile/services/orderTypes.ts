@@ -463,6 +463,10 @@ export interface Order {
   deliveredAt?: string | null;
   autoRefundedAt?: string | null;
   disputePausedAt?: string | null;
+  /** Who confirmed delivery; 'seller' only for shipments no carrier can report on. */
+  deliveryConfirmedBy?: 'carrier' | 'buyer' | 'seller' | null;
+  /** GET /api/orders/:id: shipped with a carrier that can't report delivery, so the seller may mark it delivered. */
+  sellerCanMarkDelivered?: boolean;
   /** Present only when this order contains a product linked to the seller's Shopify store (fulfillment via Shopify). */
   shopifyFulfillment?: {
     sentToShopify: boolean;
@@ -497,7 +501,7 @@ export interface BuyerDelivery {
   promisedShipDate: string | null;
   estimatedDelivery: string | null;
   deliveredAt: string | null;
-  deliveryConfirmedBy: 'carrier' | 'buyer' | null;
+  deliveryConfirmedBy: 'carrier' | 'buyer' | 'seller' | null;
   steps: DeliveryStep[];
   /** Newest first. */
   events: DeliveryEvent[];

@@ -23,6 +23,7 @@ import { verifyWebhookHmac } from "../lib/shopify/oauth";
 import { requestOrderRelease, executeOrderRelease } from "../lib/money/escrow";
 import { publishNotification } from "./notifications-feed";
 import { logger } from "../lib/logger";
+import { notifyBuyerOrderShipped } from "../lib/orderNotifications";
 
 const router = Router();
 
@@ -122,15 +123,13 @@ async function handleFulfillmentWebhook(shopDomain: string, payload: any): Promi
   if (!updated) return;
 
   if (updated.buyerId) {
-    publishNotification({
-      userId: updated.buyerId,
-      category: "orders",
-      type: "order_shipped",
-      title: "Your order has shipped!",
-      body: `Order #${updated.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
-      targetId: updated.id,
-      targetType: "order",
-    }).catch(() => { /* non-critical */ });
+    void notifyBuyerOrderShipped({
+      buyerId: updated.buyerId,
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      carrier,
+      trackingNumber,
+    });
   }
 
   // Held preorder funds: identical trigger to a staff member entering

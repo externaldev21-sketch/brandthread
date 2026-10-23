@@ -61,7 +61,7 @@ export type BuyerDelivery = {
   promisedShipDate: string | null;
   estimatedDelivery: string | null;
   deliveredAt: string | null;
-  deliveryConfirmedBy: "carrier" | "buyer" | null;
+  deliveryConfirmedBy: "carrier" | "buyer" | "seller" | null;
   steps: TimelineStep[];
   events: Array<{ status: string; description: string; location: string | null; at: string }>;
   carrier: string | null;
@@ -122,6 +122,7 @@ export function buildBuyerDelivery(
     estimatedDelivery: order.estimatedDelivery,
     deliveredAt: order.deliveredAt?.toISOString() ?? null,
     deliveryConfirmedBy: order.deliveryConfirmedBy === "buyer" || order.deliveryConfirmedBy === "carrier"
+      || order.deliveryConfirmedBy === "seller"
       ? order.deliveryConfirmedBy : null,
     steps,
     events: [...events]

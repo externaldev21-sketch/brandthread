@@ -8,7 +8,8 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@workspace/db";
 import { publishNotification } from "../../routes/notifications-feed";
 import { logger } from "../logger";
-import { formatOrderCents } from "../orderNotifications";
+import { buyerEmailOf, formatOrderCents } from "../orderNotifications";
+import { sendOrderDeliveredEmail } from "../brandthreadEmail";
 import { formatDeadline, warningLabel } from "./policy";
 
 type Notify = Parameters<typeof publishNotification>[0];
@@ -50,16 +51,32 @@ export async function notifyBuyerOutForDelivery(order: OrderRef): Promise<void> 
   });
 }
 
-export async function notifyBuyerDelivered(order: OrderRef, partial: boolean): Promise<void> {
-  if (!order.buyerId) return;
-  await send({
-    userId: order.buyerId, category: "orders", pushCategory: "order",
-    type: "order_delivered", title: partial ? "Part of your order was delivered" : "Your order was delivered!",
-    body: partial
-      ? `Some items in order #${order.orderNumber} were delivered. The rest are still on the way.`
-      : `Order #${order.orderNumber} has been delivered.`,
-    targetId: order.id, targetType: "buyer_order",
-  });
+export async function notifyBuyerDelivered(
+  order: OrderRef & { guestEmail?: string | null },
+  partial: boolean,
+  confirmedBy: "carrier" | "buyer" | "seller" = "carrier",
+): Promise<void> {
+  if (order.buyerId) {
+    await send({
+      userId: order.buyerId, category: "orders", pushCategory: "order",
+      type: "order_delivered", title: partial ? "Part of your order was delivered" : "Your order was delivered",
+      body: partial
+        ? `Some items in order #${order.orderNumber} were delivered. The rest are still on the way.`
+        : confirmedBy === "seller"
+          ? `The seller marked order #${order.orderNumber} as delivered. If you haven't received it, report a problem from your order.`
+          : `Order #${order.orderNumber} has been delivered.`,
+      targetId: order.id, targetType: "buyer_order",
+    });
+  }
+  // The buyer confirmed it themselves, so an email would only echo their tap.
+  if (partial || confirmedBy === "buyer") return;
+  try {
+    const to = await buyerEmailOf({ buyerId: order.buyerId, guestEmail: order.guestEmail ?? null });
+    if (!to) return;
+    await sendOrderDeliveredEmail({ to, orderNumber: order.orderNumber, confirmedBy, idempotencyKey: `order-delivered/${order.id}` });
+  } catch (err) {
+    logger.warn({ err, orderId: order.id }, "Delivered email failed");
+  }
 }
 
 export async function notifyAutoRefunded(order: OrderRef & { refundedCents: number; partial: boolean; windowDays: number }): Promise<void> {

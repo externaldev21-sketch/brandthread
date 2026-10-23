@@ -534,7 +534,7 @@ export const orders = pgTable('orders', {
   isPreorder: boolean('is_preorder').notNull().default(false),
   promisedShipDate: timestamp('promised_ship_date', { withTimezone: true }),
   deliveredAt: timestamp('delivered_at', { withTimezone: true }),
-  deliveryConfirmedBy: text('delivery_confirmed_by'), // 'carrier' | 'buyer'
+  deliveryConfirmedBy: text('delivery_confirmed_by'), // 'carrier' | 'buyer' | 'seller'
   // Hold-until-delivered: the seller's transfer is released at/after this.
   payoutReleaseAt: timestamp('payout_release_at', { withTimezone: true }),
   // An open chargeback pauses the auto-refund.
