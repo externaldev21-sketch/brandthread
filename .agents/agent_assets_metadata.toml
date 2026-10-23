@@ -761,3 +761,17 @@ mtime_ms = 1792648914261
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/57324e6d-495f-41e5-bfcb-8a3e5871ca83/60f17d04-8639-4bee-b1ff-5012ff72f5fc"
 storage_version_token = "1792649035742972"
 content_type = "image/png"
+
+[[outputs]]
+id = "g0XgsrZkGZ2-jSTf7bMAs"
+uri = "file://.local/validation/spotlight-tips/rail-fast-aligned.png"
+type = "image"
+title = "Fast preview — avatar alignment at 390×844"
+description = "Full 38pt circle, follow badge and Like button share the same horizontal center."
+logical_id = "88a3ec03-4425-42c1-8f3d-e43267275091"
+content_hash = "sha256:cb5adde9a73235d5b9c6f32eb857c373bdde0ac279b92843a5dea74e1d5b2ac9"
+size = 23576
+mtime_ms = 1792734199234
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/88a3ec03-4425-42c1-8f3d-e43267275091/80321573-375b-4e59-a44b-858a4b50bfcd"
+storage_version_token = "1792734248914047"
+content_type = "image/png"

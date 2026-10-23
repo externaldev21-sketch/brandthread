@@ -35,6 +35,8 @@ The latest approved rail design supersedes the earlier rail brief: Repost lives 
 
 The owner rejected the larger feed-rail avatar and requested the original small circular profile control. Do not enlarge it while polishing icons, shared avatars or other screens.
 
+The avatar and its red follow badge must share the action buttons' horizontal center and stay completely on-screen. Fixing their alignment must not move or restyle the action buttons.
+
 **Why:** An unrelated rail rebuild changed a profile control the owner already liked. Avatar changes must not move or restyle the remaining action groups.
 
 **How to apply:** Treat rail-avatar sizing as independently protected; keep the red follow badge centered over its bottom edge and preserve the other groups' positions.

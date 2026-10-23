@@ -55,10 +55,12 @@ describe('feed rail avatar regression', () => {
       expect(circleStyles[0]).toMatchObject({ width: 38, height: 38, borderRadius: 19, overflow: 'hidden' });
       const follow = tree.root.findByProps({ testID: 'follow-btn-avatar-check' });
       const badgeStyle = follow.parent!.props.style[0];
-      expect(badgeStyle).toMatchObject({ top: 28, width: 20, height: 20 });
+      expect(badgeStyle).toMatchObject({ left: 14, top: 28, width: 20, height: 20 });
       expect(badgeStyle.top + badgeStyle.height / 2).toBe(38);
       // Shrinking the avatar must not move Like or any of the other groups.
       const wrapStyle = button.parent!.props.style;
+      expect(wrapStyle).toMatchObject({ width: RAIL_LAYOUT.width, alignSelf: 'center', alignItems: 'center' });
+      expect(badgeStyle.left + badgeStyle.width / 2).toBe(RAIL_LAYOUT.width / 2);
       expect(wrapStyle.height + wrapStyle.marginBottom + 12).toBe(73);
       expect(RAIL_LAYOUT).toMatchObject({ width: 48, avatarBlock: 73, item: 65, icon: 32, disc: 40 });
     } finally {

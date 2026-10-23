@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   rail: { position: 'absolute', right: 6, width: RAIL_WIDTH, alignItems: 'center', gap: RAIL_ITEM_GAP },
   // Height pinned to the avatar so badge/Official never stretch spacing;
   // both live absolutely in the reserved avatar->Like interstitial.
-  avatarWrap: { alignItems: 'center', height: AVATAR, marginBottom: RAIL_LAYOUT.avatarBlock - AVATAR - RAIL_ITEM_GAP },
+  avatarWrap: { width: RAIL_WIDTH, alignSelf: 'center', alignItems: 'center', height: AVATAR, marginBottom: RAIL_LAYOUT.avatarBlock - AVATAR - RAIL_ITEM_GAP },
   avatarHit: { width: AVATAR, height: AVATAR, alignItems: 'center', justifyContent: 'center' },
   avatar: {
     width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, alignItems: 'center', justifyContent: 'center',
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%' },
   avatarText: { fontSize: 15, fontWeight: '700', color: ON_DARK },
   badge: {
-    position: 'absolute', top: AVATAR - BADGE / 2, width: BADGE, height: BADGE, borderRadius: RADII.pill,
+    position: 'absolute', left: (RAIL_WIDTH - BADGE) / 2, top: AVATAR - BADGE / 2, width: BADGE, height: BADGE, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 3,
   },
