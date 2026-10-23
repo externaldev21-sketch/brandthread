@@ -1,34 +1,32 @@
 ---
-name: Guest browsing contract
-description: Owner-approved public browsing, action-time authentication, navigation return and preview isolation.
+name: Account-only app entry
+description: Accounts-only routing supersedes the former guest-browsing and inline-sign-in policy; preview identity stays development-only.
 ---
 
-The owner wants TikTok-style browsing without an account. Open the app on the real buyer feed, not a sign-in screen. Public feeds, Discover/search, public account headers/posts, product pages and comment reading must not acquire authentication walls.
+The app is accounts-only. A signed-out visitor goes to the existing
+Welcome/onboarding/auth flow, never to an app screen with an inline
+"Sign in to view" state. Remove guest entry, not the account wall. Retain
+legal documents, Apple-first auth and account deletion.
 
-**Why:** The owner explicitly rejected having to sign in throughout the app.
+**Why:** The owner explicitly reversed the earlier guest-browsing request
+after repeated reports of unwanted inline sign-in screens. Do not restore
+the old TikTok-style guest model based on older instructions or tests.
 
-**How to apply:** Ask for sign-in through one dismissible sheet only at account actions. Keep private messages, orders, own editing, checkout and seller functions protected. Following may use an inline sign-in empty state. Dismissal must leave browsing usable; successful sign-in returns to the viewed content and never automatically replays a mutation. Public browsing is not authority to expose friend-only posts, private stories, blocked relationships or private account data.
+**How to apply:** Gate every app route and withhold private children while
+auth resolves/redirects. Existing optimistic action safeguards may remain
+but must not open guest sheets or replay actions after authentication.
+Do not alter signed-in layouts, fonts, tab bars or seller swipe/glow.
 
-Opening any screen, deep link, or tab must never automatically show the sign-in sheet, including owner-only routes. Signed-out private screens use a quiet inline state with a Sign in button; only an explicit action/button tap opens the existing sheet.
+Explicit buyer/seller preview identity persists across preview URLs without
+requiring a role query on each visit. This bypass is development/fast-preview
+only. Clearing the saved role or using bt_preview=guest now tests signed-out
+Welcome—not a guest feed. Demo population still requires the current URL's
+explicit demo opt-in.
 
-**Why:** The owner explicitly rejected sign-in prompts on screen entry, even for Messages, Activity, own Profile, Bag, orders, and seller screens.
+**Why:** The owner needs stable signed-in preview screens, without granting
+synthetic authority on published hosts.
 
-**How to apply:** Keep authentication navigation effects passive for guests. Guard private screen mounting separately from presenting the sheet, preserve public tab navigation, and verify both cold entry and in-app tab switching.
-
-Fresh browser sessions browse actual public data. Synthetic buyer/seller review remains an explicit development choice, never inferred from a real account's remembered role. Populated fixtures still require the current URL's demo opt-in.
-
-**Why:** A review bypass must not hide real guest behavior or fabricate public content.
-
-**How to apply:** Keep explicit review URLs working across reloads and new tabs using browser-local role persistence in development and fast preview only. `bt_preview=guest` or clearing the saved role returns to actual guest browsing. Never carry synthetic review authority onto production hosts.
-
-Once the owner explicitly selects a buyer or seller preview, remember that role without requiring URL parameters on later preview visits. Persist only the role, not demo data or real authentication.
-
-**Why:** The owner repeatedly reached inline sign-in states after preview navigation lost its role parameter and explicitly requested sticky preview identity.
-
-**How to apply:** Explicit buyer/seller URLs replace the remembered role; guest clears it. A browser with no selection remains a guest. Keep production-build and production-host gates intact, and keep populated demo fixtures URL-only.
-
-Preserve intentional session persistence settings, and never sign users out just because a development page reloads or a request loses connectivity. Storage restoration tests are not evidence of an actual multi-day iPhone login.
-
-**Why:** The owner requires sign-in to survive restarts; native device longevity cannot be inferred from a mocked cache test.
-
-**How to apply:** Use actual device/account checks for long-lived session claims and clearly distinguish them from token-storage tests.
+**How to apply:** Keep preview bypass ahead of real-session redirects.
+Production public entry is separately sealed by the pre-launch policy.
+Do not sign out real users on reload or connectivity errors; device session
+longevity requires device checks, not just mocked storage tests.

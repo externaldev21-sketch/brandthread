@@ -1,4 +1,5 @@
 import { safeReturnTo } from './guestRoutes';
+import { router } from 'expo-router';
 
 /** A prompt carries navigation only, never a callback that could replay a purchase. */
 export type GuestSignInRequest = { returnTo: string; onDismiss?: () => void; beforeEmailSignIn?: () => void };
@@ -10,9 +11,10 @@ export const subscribeGuestSignIn = (listener: () => void) => {
 };
 export const getGuestSignInRequest = () => request;
 export function requestGuestSignIn(returnTo: string, onDismiss?: () => void, beforeEmailSignIn?: () => void) {
-  if (request) return; // Repeated taps must not stack prompts.
-  request = { returnTo: safeReturnTo(returnTo) ?? '/(buyer)/', onDismiss, beforeEmailSignIn };
-  listeners.forEach(listener => listener());
+  // Compatibility for retained action handlers after a session expires.
+  // No guest sheet or inline screen remains; never replay the action.
+  beforeEmailSignIn?.();
+  router.replace({ pathname: '/onboarding', params: { returnTo: safeReturnTo(returnTo) ?? '/' } } as never);
 }
 export function closeGuestSignIn(dismiss = true) {
   const previous = request;

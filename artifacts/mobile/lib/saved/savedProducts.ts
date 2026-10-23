@@ -48,7 +48,7 @@ setEngagementRetryFallback('save_product', async (action) => {
   });
 });
 
-/** Tap: save / unsave. Signed-out buyers get a sign-in prompt, never an API call. */
+/** Tap: save / unsave. Signed out (preview only — the app requires an account) never makes an API call. */
 export async function toggleSavedProduct(draft: SavedProductDraft): Promise<void> {
   const result = await savedProducts.toggle(draft);
   if (result.ok) {
@@ -60,24 +60,13 @@ export async function toggleSavedProduct(draft: SavedProductDraft): Promise<void
     });
     return;
   }
-  if (result.reason === 'signed-out') {
-    emitSaveHeartEvent({
-      type: 'toast',
-      toast: { message: 'Sign in to save items', actionLabel: 'Sign in', action: { kind: 'sign-in' } },
-    });
-  } else if (result.reason === 'error') {
+  if (result.reason === 'error') {
     emitSaveHeartEvent({ type: 'toast', toast: { message: "Couldn't update your saved items" } });
   }
 }
 
 /** Long-press: open the collection picker (saves the item as part of filing it). */
 export function openSaveToCollection(draft: SavedProductDraft): void {
-  if (!savedProducts.isSignedIn()) {
-    emitSaveHeartEvent({
-      type: 'toast',
-      toast: { message: 'Sign in to save items', actionLabel: 'Sign in', action: { kind: 'sign-in' } },
-    });
-    return;
-  }
+  if (!savedProducts.isSignedIn()) return;
   emitSaveHeartEvent({ type: 'sheet', draft });
 }

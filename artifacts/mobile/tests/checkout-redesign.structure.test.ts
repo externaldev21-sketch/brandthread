@@ -202,7 +202,7 @@ describe('order confirmation (Depop "Thank you!" + GOAT "Discover more")', () =>
     const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
     expect(content).toContain("label={t('View receipt')}");
     expect(content).toContain("label={t('Continue shopping')}");
-    expect(content).toMatch(/label=\{t\('Create an account[^']*'\)\}\s+onPress=\{[^}]+\}\s+subtle/);
+    expect(content).not.toContain('checkout-create-account');
     expect(content).not.toMatch(/<Button[^>]*View receipt/);
   });
 });

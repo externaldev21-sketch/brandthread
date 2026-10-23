@@ -418,18 +418,6 @@ export function OrderConfirmation({
           onPress={() => router.replace('/(buyer)/discover' as never)}
           testID="checkout-continue-shopping"
         />
-        {!isSignedIn && !hideAccountPrompt ? (
-          <>
-            <Hairline style={styles.linkHairline} />
-            <LinkRow
-              icon="user-plus"
-              label={t('Create an account to track orders faster')}
-              onPress={() => router.replace('/sign-in' as never)}
-              subtle
-              testID="checkout-create-account"
-            />
-          </>
-        ) : null}
       </View>
 
       {!finalizing && singleSeller ? (

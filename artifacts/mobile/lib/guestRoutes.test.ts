@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { isGuestBrowseRoute, safeReturnTo } from './guestRoutes';
 import { isSignedInOnlyPath } from './guestApiPolicy';
 
-describe('guest browse routes (5.1.1(v))', () => {
-  it('lets a guest open feed, discover, search, stores, products, drops and profiles', () => {
+describe('account-required routes', () => {
+  it('requires an account for feed, discover, search, stores, products, drops and profiles', () => {
     for (const segs of [
       ['(buyer)'], ['(buyer)', 'index'], ['(buyer)', 'feed'], ['(buyer)', 'discover'], ['(buyer)', 'search'],
       ['buyer-product-detail'], ['thread-product-detail'], ['buyer-category'], ['buyer-trending'], ['seller-profile'], ['buyer-other-profile'], ['live'], ['buyer-live'], ['buyer-post-comments'], ['store', 'product', '[productId]'], ['drops', '[dropId]'], ['u', '[username]'], ['c', '[collectionId]'],
     ]) {
-      expect(isGuestBrowseRoute(segs)).toBe(true);
+      expect(isGuestBrowseRoute(segs)).toBe(false);
     }
   });
 
@@ -46,10 +46,10 @@ describe('signed-out API guard', () => {
 });
 
 describe('guest checkout + product aliases (BT-249, BT-250)', () => {
-  it('lets a guest open the thread-* aliases the cart, Shop sheet and feed tiles push', () => {
-    expect(isGuestBrowseRoute(['thread-product-detail'])).toBe(true);
+  it('requires an account for product and checkout aliases', () => {
+    expect(isGuestBrowseRoute(['thread-product-detail'])).toBe(false);
     expect(isGuestBrowseRoute(['thread-checkout'])).toBe(false);
-    expect(isGuestBrowseRoute(['checkout-return'])).toBe(true);
+    expect(isGuestBrowseRoute(['checkout-return'])).toBe(false);
   });
 
   it('every app/ file that only re-exports a guest route is itself guest-allowed', async () => {

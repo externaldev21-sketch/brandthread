@@ -1,11 +1,7 @@
 /**
- * Routes a signed-out guest may open (App Store Review Guideline 5.1.1(v)):
- * browsing the feed, stores, products, drops and profiles must not require an
- * account. Buying, posting, messaging, following and liking are gated inline
- * at the action (see hooks/useSignInGate.ts), not at the route.
- *
- * Public routes render normally. Private routes show an inline sign-in state;
- * navigation itself never opens the sign-in sheet.
+ * Account-wall policy: all app routes require an account. The buyer browse
+ * lookup below only preserves signed-in seller navigation. AuthGate handles
+ * signed-out redirects; only auth and legal documents mount without a session.
  */
 
 /** Screens inside the `(buyer)` tab group that work without an account. */
@@ -50,7 +46,7 @@ const GUEST_TOP_LEVEL = new Set([
   'giveaway', // public giveaway page; Enter is gated at the action (BT-319)
 ]);
 
-export function isGuestBrowseRoute(segments: readonly string[]): boolean {
+export function isBuyerBrowseRoute(segments: readonly string[]): boolean {
   const first = segments[0] ?? '';
   if (first === '(buyer)') return GUEST_BUYER_TABS.has(segments[1] ?? '');
   if (first === 'live') return true;
@@ -60,14 +56,16 @@ export function isGuestBrowseRoute(segments: readonly string[]): boolean {
 /** Root navigator entries which must mount without an account. Buyer children
  * are checked individually inside their navigator so the tab bar stays usable. */
 export function isGuestScreenEntry(routeName: string, buyerTab = false): boolean {
-  if (buyerTab) return isGuestBrowseRoute(['(buyer)', routeName]);
-  return isGuestBrowseRoute([routeName]) || [
-    '(buyer)', 'index', '', 'sign-in', 'forgot-password', 'splash', 'onboarding',
+  if (buyerTab) return false;
+  return [
+    'index', '', 'sign-in', 'forgot-password', 'splash', 'onboarding',
     'privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy',
-    'help', 'team-invite', 'community-join', 'invite', 'thread-explainer',
-    // This opt-in test route contains no private data.
-    'navigation-isolation-probe',
   ].includes(routeName);
+}
+
+/** Compatibility predicate: browsing is no longer available signed out. */
+export function isGuestBrowseRoute(_segments: readonly string[]): boolean {
+  return false;
 }
 
 /**

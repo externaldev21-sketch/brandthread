@@ -673,7 +673,7 @@ export default function OnboardingScreen() {
           onEmail={() => chooseMethod('email')}
           onApple={providers.apple ? () => chooseMethod('apple') : undefined}
           onGoogle={providers.google ? () => chooseMethod('google') : undefined}
-          onClose={isAddAccount ? () => router.back() : isSignedIn ? undefined : () => router.replace('/(buyer)/discover' as never)}
+          onClose={isAddAccount ? () => router.back() : undefined}
           busy={busy === 'apple' || busy === 'google' ? busy : null}
           error={error}
           devBanner={<ClerkKeyBanner />}

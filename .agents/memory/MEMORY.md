@@ -39,7 +39,7 @@
 - [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.
 - [Truthful seller profile metrics](truthful-seller-profile-metrics.md) — count settled paid orders and deduplicated signed-in storefront visits; never fabricate growth.
 - [Guest commerce boundaries](guest-commerce-boundaries.md) — guest shopping stays public-route-only; order lookup uses a hashed capability, with no loyalty or saved payment identity.
-- [Guest browsing contract](guest-browsing-contract.md) — public browsing has no sign-in walls; account actions use a dismissible sheet and never auto-replay after authentication.
+- [Account-only app entry](guest-browsing-contract.md) — signed out means Welcome/auth, never guest screens or inline sign-in; sticky preview identity remains dev-only.
 - [Integer-cents money contracts](integer-cents-money-contracts.md) — mobile money stays in explicit *Cents fields; parse decimal strings strictly and format only at the UI boundary.
 - [Mobile API resilience](mobile-api-resilience.md) — classify transport/server failures centrally; only read requests get global retry actions, while mutations require explicit screen-level retries.
 - [Promote objective boundary](promote-objectives.md) — Boost defaults to views; objective-aware delivery remains deferred until exposure attribution and ranking support exist.

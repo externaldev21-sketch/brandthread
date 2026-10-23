@@ -1,26 +1,31 @@
 /**
- * Inline account gate for guests (App Store Review Guideline 5.1.1(v)).
+ * Defensive account-action guard; navigation itself is account-gated.
  *
  * Call `requireSignIn()` at the top of an action that needs an account (buy,
  * follow, like, save, message, post). Signed in: returns true and nothing
- * happens. Signed out: opens the shared dismissible sheet and returns false.
+ * happens. An expired session goes to Welcome, never an inline guest sheet.
  * No action is replayed automatically after authentication.
  */
 import { useCallback } from 'react';
-import { useGlobalSearchParams, usePathname } from 'expo-router';
+import { useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { guestReturnPath, requestGuestSignIn } from '@/lib/guestSignIn';
+import { guestReturnPath } from '@/lib/guestSignIn';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 
 export function useSignInGate() {
   const { isSignedIn: clerkSignedIn, isLoaded } = useAuth();
-  const isSignedIn = !!(isLoaded && clerkSignedIn);
+  const preview = isBuyerDevPreview() || isSellerDevPreview() || !!DEV_BYPASS_ROLE;
+  const isSignedIn = !!(isLoaded && clerkSignedIn) || preview;
   const pathname = usePathname();
   const params = useGlobalSearchParams();
+  const router = useRouter();
 
-  /** Show the prompt over the current screen without navigating away. */
+  /** Only remember navigation; no action is automatically replayed. */
   const goToSignIn = useCallback((): void => {
-    requestGuestSignIn(guestReturnPath(pathname, params));
-  }, [pathname, params]);
+    if (preview) return;
+    router.replace({ pathname: '/onboarding', params: { returnTo: guestReturnPath(pathname, params) } } as never);
+  }, [pathname, params, preview, router]);
 
   const requireSignIn = useCallback((): boolean => {
     if (isSignedIn) return true;

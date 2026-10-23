@@ -1474,15 +1474,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
                 <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
-              ) : (
-                <PressableScale style={s.signedOutRow} onPress={goToSignIn} accessibilityRole="button" testID="comments-signed-out-composer">
-                  <Icon name="user" size={32} color={MUTED} />
-                  <View style={s.signedOutPill}>
-                    <Text style={s.signedOutPlaceholder}>Sign in to join the conversation</Text>
-                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text>
-                  </View>
-                </PressableScale>
-              )}
+              ) : null}
             </View>
           ) : (
             <>

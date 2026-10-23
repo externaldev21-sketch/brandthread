@@ -35,12 +35,9 @@ const VIDEO_SHARE = 0.55;
 export function WelcomeStep({
   onGetStarted,
   onSignIn,
-  onBrowse,
 }: {
   onGetStarted: () => void;
   onSignIn: () => void;
-  /** Optional guest entry (Guideline 5.1.1(v)): browse without an account. */
-  onBrowse?: () => void;
 }) {
   const { theme } = useAppTheme();
   const { reduceMotion } = useOnboardingMotion();
@@ -79,17 +76,6 @@ export function WelcomeStep({
             haptic={false}
             onPress={onSignIn}
           />
-          {onBrowse ? (
-            <PressableScale
-              testID="onboarding-welcome-browse-guest"
-              accessibilityRole="button"
-              accessibilityLabel="Browse as a guest"
-              onPress={onBrowse}
-              style={styles.guest}
-            >
-              <Text style={[TYPE.label, { color: theme.muted }]}>Browse as a guest</Text>
-            </PressableScale>
-          ) : null}
         </View>
       </View>
     </View>

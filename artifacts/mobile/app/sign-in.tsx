@@ -828,17 +828,6 @@ export default function SignInScreen() {
             fullWidth
           />
 
-          {/* Guests can browse without an account (Guideline 5.1.1(v)). */}
-          {!isAddAccount && (
-            <Button
-              label="Browse as a guest"
-              variant="tertiary"
-              onPress={() => router.replace('/(buyer)/discover' as never)}
-              fullWidth
-              style={{ marginTop: 8 }}
-              testID="browse-as-guest-button"
-            />
-          )}
 
           <View nativeID="clerk-captcha" />
         </ScrollView>

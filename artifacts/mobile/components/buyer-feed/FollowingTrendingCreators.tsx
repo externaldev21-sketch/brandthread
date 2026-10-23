@@ -190,11 +190,6 @@ export function FollowingTrendingCreators({ enabled, viewerId, pageWidth, onOpen
     <View style={styles.root} testID="following-trending-creators">
       <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">Trending creators</Text>
       <Text style={[styles.sub, { color: theme.muted }]}>Follow an account to see their latest videos here.</Text>
-      {!viewerId && !isBuyerDevPreview() && (
-        <Pressable onPress={() => onRequireSignIn?.()} accessibilityRole="button" accessibilityLabel="Sign in to see your Following feed" testID="following-guest-sign-in">
-          <Text style={[styles.sub, { color: theme.text }]}>Sign in</Text>
-        </Pressable>
-      )}
       {showLoading ? (
         <View style={[styles.track, { paddingHorizontal: side }]}><LoadingSkeleton height={cardH} style={{ width: cardW, borderRadius: RADII.card }} /></View>
       ) : (

@@ -2,7 +2,7 @@
  * Focused pure/contract tests for the /u/[username] canonical profile route.
  *
  * Covers:
- * 1. Signed-out visitor stays on canonical route (no redirect) and renders safe fields only.
+ * 1. Signed-out visitors never see this route (AuthGate account wall); the DTO stays safe-fields-only.
  * 2. Signed-in buyer/seller → correct internal navigation params.
  * 3. No private fields (Clerk IDs, posts, friends, contacts, seller commerce data) in safe DTO.
  * 4. Auth-loading behavior — navigation is gated until auth is ready.
@@ -45,9 +45,8 @@ function makeProfile(
 function resolveNavigation(
   profile: PublicProfileDto,
   auth: { isLoaded: boolean; isSignedIn: boolean },
-): 'stay_on_canonical' | 'redirect_seller' | 'redirect_buyer' | 'wait_for_auth' {
+): 'redirect_seller' | 'redirect_buyer' | 'wait_for_auth' {
   if (!auth.isLoaded) return 'wait_for_auth';
-  if (!auth.isSignedIn) return 'stay_on_canonical';
   return profile.accountType === 'seller' ? 'redirect_seller' : 'redirect_buyer';
 }
 
@@ -63,39 +62,9 @@ function buildBuyerNavUrl(profile: PublicProfileDto): string {
   )}&handle=${encodeURIComponent('@' + profile.username)}`;
 }
 
-// ─── 1. Signed-out: stays on canonical route ──────────────────────────────────
+// ─── 2. Public DTO: safe fields only ──────────────────────────────────────────
 
-describe('signed-out visitor stays on /u/{username}', () => {
-  it('returns stay_on_canonical when auth is loaded and not signed in (buyer profile)', () => {
-    const profile = makeProfile({ accountType: 'buyer' });
-    const result = resolveNavigation(profile, { isLoaded: true, isSignedIn: false });
-    expect(result).toBe('stay_on_canonical');
-  });
-
-  it('returns stay_on_canonical when auth is loaded and not signed in (seller profile)', () => {
-    const profile = makeProfile({ accountType: 'seller' });
-    const result = resolveNavigation(profile, { isLoaded: true, isSignedIn: false });
-    expect(result).toBe('stay_on_canonical');
-  });
-
-  it('does not redirect to buyer-other-profile when signed out', () => {
-    const profile = makeProfile({ accountType: 'buyer' });
-    const result = resolveNavigation(profile, { isLoaded: true, isSignedIn: false });
-    expect(result).not.toBe('redirect_buyer');
-    expect(result).not.toBe('redirect_seller');
-  });
-
-  it('does not redirect to seller-profile when signed out', () => {
-    const profile = makeProfile({ accountType: 'seller' });
-    const result = resolveNavigation(profile, { isLoaded: true, isSignedIn: false });
-    expect(result).not.toBe('redirect_seller');
-    expect(result).not.toBe('redirect_buyer');
-  });
-});
-
-// ─── 2. Signed-out: safe DTO fields rendered ──────────────────────────────────
-
-describe('signed-out landing renders only safe DTO fields', () => {
+describe('public profile DTO exposes only safe fields', () => {
   it('safe fields are present in the DTO', () => {
     const profile = makeProfile({
       accountType: 'buyer',
@@ -249,15 +218,6 @@ describe('auth-loading: navigation waits for Clerk to be ready', () => {
     const result = resolveNavigation(profile, { isLoaded: false, isSignedIn: false });
     expect(result).not.toBe('redirect_buyer');
     expect(result).not.toBe('redirect_seller');
-    expect(result).not.toBe('stay_on_canonical');
-  });
-
-  it('transitions to stay_on_canonical once auth loads and visitor is signed out', () => {
-    const profile = makeProfile({ accountType: 'buyer' });
-    // During load
-    expect(resolveNavigation(profile, { isLoaded: false, isSignedIn: false })).toBe('wait_for_auth');
-    // After load — signed out
-    expect(resolveNavigation(profile, { isLoaded: true, isSignedIn: false })).toBe('stay_on_canonical');
   });
 
   it('transitions to redirect once auth loads and visitor is signed in', () => {

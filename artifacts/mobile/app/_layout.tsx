@@ -9,9 +9,8 @@ import { focusedNavigationKey, markNavigationCommit, markNavigationDispatch, mar
 import { RetainedScene } from '@/components/RetainedScene';
 import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWarmup';
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
-import { isGuestBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
+import { isBuyerBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { GuestRouteBoundary } from '@/components/GuestRouteBoundary';
-import { GuestSignInSheet } from '@/components/GuestSignInSheet';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { webAppPathname } from '@/lib/webAppPathname';
 import { isAccessCleared } from '@/lib/accessGate';
@@ -750,7 +749,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
 // Sellers can use the buyer cart; there is no equivalent seller-tab route.
 const SELLER_SHARED_BUYER_ROUTES = new Set(['cart']);
-const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy', 'help', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', 'seller-agreement', 'refund-policy'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -758,7 +757,10 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
-  const { addAccount, returnTo, guestPrompt } = useGlobalSearchParams<{ addAccount?: string; returnTo?: string; guestPrompt?: string }>();
+  const globalParams = useGlobalSearchParams<{ addAccount?: string; returnTo?: string }>();
+  const { addAccount, returnTo } = globalParams;
+  const pathname = usePathname();
+  const pendingReturnRef = useRef<string | null>(null);
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
@@ -977,6 +979,7 @@ function AuthGate() {
     const inOnboarding    = segments[0] === 'onboarding';
     const inPlans         = segments[0] === 'plans';
     const inPublicScreen  = PUBLIC_SCREENS.includes(segments[0] as string);
+    const inProtectedArea = !inAuthScreen && !inOnboarding && !inPublicScreen;
     const inBuyerGroup    = segments[0] === '(buyer)';
     const inTabsGroup     = segments[0] === '(tabs)';
     // The index route ("/") has no segment — it only shows BootScreen and
@@ -1040,13 +1043,21 @@ function AuthGate() {
     // and direct browser links regardless of authentication/onboarding state.
     if (inPublicScreen) return;
 
-    // A fresh install opens the public feed, not onboarding or an auth wall.
-    if (!isSignedIn && atRoot) {
-      router.replace('/(buyer)/' as never);
+    // Account wall, reconciled with claude/account-wall. Preview bypass is
+    // deliberately above this branch. Never mount a guest app/inline prompt.
+    if (!isSignedIn && inProtectedArea) {
+      const routeParams = new Set((segments as string[])
+        .filter(seg => seg.startsWith('['))
+        .map(seg => seg.replace(/^\[(\.\.\.)?/, '').replace(/\]$/, '')));
+      const query = Object.entries(globalParams)
+        .filter(([key, value]) => typeof value === 'string' && value !== ''
+          && !routeParams.has(key) && key !== 'returnTo' && key !== 'addAccount')
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value as string)}`)
+        .join('&');
+      pendingReturnRef.current = safeReturnTo(query ? `${pathname}?${query}` : pathname);
+      router.replace('/onboarding');
       return;
     }
-    // Private routes render an inline state through GuestRouteBoundary.
-    // Navigation/mount/focus must never request the account-action sheet.
     if (!isSignedIn) return;
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
@@ -1093,11 +1104,13 @@ function AuthGate() {
     // bare "/" boot route to the correct dashboard.
     // Thread explainer is an intentional post-onboarding buyer screen — don't
     // redirect buyers away from it; it handles its own navigation.
-    // A guest who was sent to sign-in from an account-only action returns to it.
-    const returnDest = inAuthScreen ? safeReturnTo(returnTo) : null;
+    // Resume navigation only, never replay an account action.
+    const returnDest = (inAuthScreen ? safeReturnTo(returnTo) : null)
+      ?? (inAuthScreen || inOnboarding || atRoot ? pendingReturnRef.current : null);
+    if (!inAuthScreen && !inOnboarding && !atRoot) pendingReturnRef.current = null;
     if (onboardingDone && returnDest && !inAddAccountFlow) {
-      if (guestPrompt === '1' && router.canGoBack()) router.back();
-      else router.replace(returnDest as never);
+      pendingReturnRef.current = null;
+      router.replace(returnDest as never);
       return;
     }
     if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer && !inAddAccountFlow) {
@@ -1120,11 +1133,11 @@ function AuthGate() {
     if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(buyer)/${rest}` : '/(buyer)/') as never);
-    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !isGuestBrowseRoute(segments as string[]) && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
+    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup && !isBuyerBrowseRoute(segments as string[]) && !SELLER_SHARED_BUYER_ROUTES.has((segments as string[])[1])) {
       const rest = (segments as string[]).slice(1).join('/');
       router.replace((rest ? `/(tabs)/${rest}` : '/(tabs)/') as never);
     }
-  }, [addAccount, returnTo, guestPrompt, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
+  }, [addAccount, returnTo, globalParams, pathname, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, accessRequired, storedRole, threadExplainerSeen, splashSeen, pendingInvite, pendingCommunityInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }
@@ -1582,7 +1595,6 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <SellerBarGate />
       <WhatsNewHost />
       <AuthGate />
-      <GuestSignInSheet />
       <ServiceConfigurer />
       {backgroundReady && (
         <React.Suspense fallback={null}>

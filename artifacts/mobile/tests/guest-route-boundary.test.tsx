@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({ signedIn: false, preview: false }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@clerk/expo', () => ({ useAuth: () => ({ isSignedIn: state.signedIn }) }));
 vi.mock('expo-router', () => ({
+  router: { replace: vi.fn() },
   usePathname: () => '/inbox',
   useGlobalSearchParams: () => ({}),
 }));
@@ -35,8 +36,8 @@ afterEach(async () => {
   state.preview = false;
 });
 
-describe('navigation never requests sign-in', () => {
-  it('shows inline states on every private tab and deep link without mounting private content or prompting', async () => {
+describe('account wall never renders inline sign-in screens', () => {
+  it('withholds every private tab and deep link while AuthGate sends the visitor to Welcome', async () => {
     const privateContentMounted = vi.fn();
     function PrivateScreen() { privateContentMounted(); return null; }
     for (const [routeName, buyerTab] of [
@@ -50,29 +51,31 @@ describe('navigation never requests sign-in', () => {
         else renderer = create(screen);
       });
       expect(getGuestSignInRequest(), routeName).toBeNull();
-      expect(renderer!.root.findByProps({ testID: 'guest-inline-sign-in-action' })).toBeTruthy();
+      expect(renderer!.toJSON()).toBeNull();
     }
     expect(privateContentMounted).not.toHaveBeenCalled();
   });
 
-  it('only requests the sheet from the inline button, dismisses without navigation and does not reopen on rerender', async () => {
+  it('has no inline button or guest sheet on mount or subsequent tab switches', async () => {
     const screen = <GuestRouteBoundary routeName="inbox" buyerTab><span>Private messages</span></GuestRouteBoundary>;
     await act(async () => { renderer = create(screen); });
     expect(getGuestSignInRequest()).toBeNull();
-    renderer!.root.findByProps({ testID: 'guest-inline-sign-in-action' }).props.onPress();
-    expect(getGuestSignInRequest()?.returnTo).toBe('/inbox');
-    closeGuestSignIn();
+    expect(renderer!.toJSON()).toBeNull();
     await act(async () => {
       renderer!.update(<GuestRouteBoundary routeName="profile" buyerTab><span>Private profile</span></GuestRouteBoundary>);
     });
     expect(getGuestSignInRequest()).toBeNull();
+    expect(renderer!.toJSON()).toBeNull();
   });
 
-  it('preserves public browsing, auth, legal and invite routes', () => {
-    for (const route of ['index', '(buyer)', 'sign-in', 'onboarding', 'privacy', 'team-invite', 'community-join', 'seller-profile', 'buyer-other-profile', 'buyer-post-comments', 'buyer-product-detail', 'live']) {
+  it('preserves auth/legal only; invitations and formerly public screens require an account', () => {
+    for (const route of ['index', 'sign-in', 'onboarding', 'privacy', 'terms']) {
       expect(isGuestScreenEntry(route), route).toBe(true);
     }
-    for (const route of ['index', 'discover', 'search', 'feed']) expect(isGuestScreenEntry(route, true)).toBe(true);
+    for (const route of ['index', 'discover', 'search', 'feed']) expect(isGuestScreenEntry(route, true)).toBe(false);
+    for (const route of ['(buyer)', 'team-invite', 'community-join', 'seller-profile', 'buyer-other-profile', 'buyer-post-comments', 'buyer-product-detail', 'live']) {
+      expect(isGuestScreenEntry(route)).toBe(false);
+    }
   });
 
   it.each(['signedIn', 'preview'] as const)('preserves %s access without changing private screens', async key => {
