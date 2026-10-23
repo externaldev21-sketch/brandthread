@@ -32,6 +32,15 @@ describe('Discover search, spacing and floating-navigation clearance', () => {
     expect(grid).toContain('style={{ height: bottomClearance }} testID="discover-bottom-clearance"');
   });
 
+  it('does not offset the shared header when switching to Drops', () => {
+    const screen = read('app/(buyer)/discover.tsx');
+    const drops = screen.slice(screen.indexOf("{filter === 'drops' && ("), screen.indexOf('{threadRefreshIndicator}'));
+    expect(drops).toContain('data={buildDropCalendarItems(drops)}');
+    expect(drops).toContain('ListHeaderComponent={header}');
+    expect(drops).toContain('contentContainerStyle={{ paddingBottom: tabBarClearance }}');
+    expect(drops).not.toMatch(/paddingTop|marginTop/);
+  });
+
   it('hides creator rows only when all loaded posts have the same nonempty author ID', () => {
     const grid = read('components/discover/DiscoverGrid.tsx');
     expect(grid).toContain('posts.length > 0 && !!posts[0].authorId');

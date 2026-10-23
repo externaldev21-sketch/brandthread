@@ -78,10 +78,10 @@ export function buildTrendingCreators(posts: unknown, brands: unknown, viewerId?
   return [...out.values()].sort((a, b) => Number(b.official) - Number(a.official)).slice(0, 12);
 }
 
-/** Card width matching following-2: ~71% of the page, 3:4 tall. */
+/** Keep the existing width; a 5:8 card retains 90% of a 9:16 portrait clip. */
 export function trendingCardSize(pageWidth: number) {
   const width = Math.round(Math.min(360, pageWidth * 0.71));
-  return { width, height: Math.round(width * 1.33) };
+  return { width, height: Math.round(width * 1.6) };
 }
 
 export function FollowingTrendingCreators({ enabled, viewerId, pageWidth, onOpenCreator, fallback = null, focused = true, onRequireSignIn, onFollowError }: {

@@ -31,6 +31,14 @@ The latest approved rail design supersedes the earlier rail brief: Repost lives 
 
 **How to apply:** Apply reviewed visual changes on top of the current playback, HLS, carousel and persistence internals; do not replace those internals with an older implementation.
 
+## Following creator-card framing
+
+The owner requires the Following empty-state creator card to preserve at least roughly 80% of a portrait video's height at full card width. Make the card taller instead of accepting a heavily cropped cover-fit preview. Small top/bottom cropping is acceptable; preserve the creator overlay, dismiss control and carousel behavior.
+
+**Why:** The owner repeated that the short card looked zoomed in and explicitly rejected leaving that framing unchanged.
+
+**How to apply:** Protect portrait-height retention in card-sizing tests across phone widths. Do not fix this by changing unrelated Following layout or its overlays.
+
 ## Rail avatar preservation
 
 The owner rejected the larger feed-rail avatar and requested the original small circular profile control. Do not enlarge it while polishing icons, shared avatars or other screens.

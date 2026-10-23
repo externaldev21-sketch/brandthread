@@ -674,18 +674,15 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
 // Explicitly opt in with ?bt_preview=buyer or ?bt_preview=seller in the URL to
 // skip the Clerk/onboarding gates and jump straight to that dashboard for
-// design review. Without the query param, web behaves like every other
-// platform: real splash -> sign-up -> onboarding. Inert in production builds.
+// design review. Restore that explicit role on later preview loads; a browser
+// without a saved selection stays a guest. Inert in production builds.
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   // Hard gate: never activate on the real production host, even if
   // NAVIGATION_ISOLATION_TEST somehow reached a production build — see
   // lib/devPreview.ts's isProductionPreviewHost doc comment.
   if (isProductionPreviewHost()) return null;
-  if (__DEV__) return getDevWebPreviewRole();
-  const v = new URLSearchParams(window.location.search).get('bt_preview');
-  if (v !== 'buyer' && v !== 'seller') return null;
-  return v;
+  return getDevWebPreviewRole();
 })();
 // Reloading a browser is never permission to sign out an existing session.
 const DEV_WEB_ONBOARDING_PREVIEW = false;

@@ -19,7 +19,13 @@ Fresh browser sessions browse actual public data. Synthetic buyer/seller review 
 
 **Why:** A review bypass must not hide real guest behavior or fabricate public content.
 
-**How to apply:** Keep explicit review URLs working across in-tab navigation, allow an explicit guest review to clear that selection, and never carry synthetic review authority onto production hosts.
+**How to apply:** Keep explicit review URLs working across reloads and new tabs using browser-local role persistence in development and fast preview only. `bt_preview=guest` or clearing the saved role returns to actual guest browsing. Never carry synthetic review authority onto production hosts.
+
+Once the owner explicitly selects a buyer or seller preview, remember that role without requiring URL parameters on later preview visits. Persist only the role, not demo data or real authentication.
+
+**Why:** The owner repeatedly reached inline sign-in states after preview navigation lost its role parameter and explicitly requested sticky preview identity.
+
+**How to apply:** Explicit buyer/seller URLs replace the remembered role; guest clears it. A browser with no selection remains a guest. Keep production-build and production-host gates intact, and keep populated demo fixtures URL-only.
 
 Preserve intentional session persistence settings, and never sign users out just because a development page reloads or a request loses connectivity. Storage restoration tests are not evidence of an actual multi-day iPhone login.
 

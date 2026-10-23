@@ -11,8 +11,8 @@ afterEach(() => {
   platform.OS = 'web';
 });
 
-describe('buyer-first development preview', () => {
-  it('defaults to buyer and preserves explicit seller selection', () => {
+describe('explicit development preview', () => {
+  it('defaults to guest and preserves explicit seller selection', () => {
     expect(resolvePreviewRole('', null)).toBe(null);
     expect(resolvePreviewRole('', 'invalid')).toBe(null);
     expect(resolvePreviewRole('?bt_preview=guest', 'seller')).toBe(null);
@@ -26,9 +26,10 @@ describe('buyer-first development preview', () => {
     const entries = new Map([['bt:previewRole:seller-default', 'seller'], ['bt:previewRole:buyer-default', 'buyer']]);
     vi.stubGlobal('window', {
       location: { search: '', hostname: 'localhost' },
-      sessionStorage: {
+      localStorage: {
         getItem: (key: string) => entries.get(key) ?? null,
         setItem: (key: string, value: string) => entries.set(key, value),
+        removeItem: (key: string) => entries.delete(key),
       },
     });
     const preview = await import('../lib/devPreview');
@@ -39,6 +40,64 @@ describe('buyer-first development preview', () => {
     window.location.search = '';
     expect(preview.getDevWebPreviewRole()).toBe('seller');
     expect(preview.isPreviewDemoMode()).toBe(false);
+  });
+
+  it.each([true, false])('restores explicit roles across loads, clears for guest, and keeps demo URL-only (dev=%s)', async (isDev) => {
+    vi.stubGlobal('__DEV__', isDev);
+    vi.stubEnv('EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST', '1');
+    const entries = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => entries.set(key, value),
+      removeItem: (key: string) => entries.delete(key),
+    };
+    const load = (search: string, hostname = 'localhost') => {
+      vi.stubGlobal('window', { location: { search, hostname }, localStorage: storage });
+    };
+    load('?bt_preview=buyer&demo=1');
+    let preview = await import('../lib/devPreview');
+    expect(preview.isBuyerDevPreview()).toBe(true);
+    expect(entries.get('bt:previewRole:explicit-v1')).toBe('buyer');
+    // A fresh tab/module instance keeps localStorage, not sessionStorage.
+    vi.resetModules();
+    load('');
+    preview = await import('../lib/devPreview');
+    expect(preview.getDevWebPreviewRole()).toBe('buyer');
+    expect(preview.isBuyerDevPreview()).toBe(true);
+    expect(preview.isSellerDevPreview()).toBe(false);
+    expect(preview.isPreviewDemoMode()).toBe(false);
+    load('?bt_preview=seller');
+    expect(preview.isSellerDevPreview()).toBe(true);
+    expect(entries.get('bt:previewRole:explicit-v1')).toBe('seller');
+    load('?bt_preview=guest');
+    expect(preview.isBuyerDevPreview()).toBe(false);
+    expect(preview.isSellerDevPreview()).toBe(false);
+    expect(entries.has('bt:previewRole:explicit-v1')).toBe(false);
+    load('');
+    expect(preview.getDevWebPreviewRole()).toBe(null);
+    load('?bt_preview=buyer');
+    expect(preview.isBuyerDevPreview()).toBe(true);
+    entries.clear();
+    load('');
+    expect(preview.getDevWebPreviewRole()).toBe(null);
+    entries.set('bt:previewRole:explicit-v1', 'buyer');
+    load('?bt_preview=seller', 'brandthread.app');
+    expect(preview.isBuyerDevPreview()).toBe(false);
+    expect(preview.isSellerDevPreview()).toBe(false);
+    expect(entries.get('bt:previewRole:explicit-v1')).toBe('buyer');
+  });
+
+  it('ignores saved roles in a real production build even on a different host', async () => {
+    vi.stubGlobal('__DEV__', false);
+    vi.stubEnv('EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST', '');
+    vi.stubGlobal('window', {
+      location: { search: '?bt_preview=buyer', hostname: 'example.com' },
+      localStorage: { getItem: () => 'buyer' },
+    });
+    const preview = await import('../lib/devPreview');
+    expect(preview.getDevWebPreviewRole()).toBe(null);
+    expect(preview.isBuyerDevPreview()).toBe(false);
+    expect(preview.isSellerDevPreview()).toBe(false);
   });
 
   it('enables native buyer only in development, never in a release', async () => {

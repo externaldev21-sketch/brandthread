@@ -1,6 +1,6 @@
 export type PreviewRole = 'buyer' | 'seller';
 
-/** A URL selection wins; otherwise keep this browser tab's selected demo side. */
+/** A URL selection wins; otherwise restore this browser's explicit preview role. */
 export function resolvePreviewRole(search: string, savedRole: string | null): PreviewRole | null {
   const requestedRole = new URLSearchParams(search).get('bt_preview');
   if (requestedRole === 'buyer' || requestedRole === 'seller') return requestedRole;

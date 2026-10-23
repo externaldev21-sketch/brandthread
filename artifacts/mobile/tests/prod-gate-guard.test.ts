@@ -135,11 +135,11 @@ describe('production-gated flags are referenced only through lib/buildFlags.ts',
     const layout = readFileSync(join(ROOT, 'app/_layout.tsx'), 'utf8');
 
     expect(parser).toContain("new URLSearchParams(search).get('bt_preview')");
-    expect(devPreview.indexOf("if (!__DEV__ || Platform.OS !== 'web'")).toBeLessThan(
+    expect(devPreview.indexOf("if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web'")).toBeLessThan(
       devPreview.indexOf('resolvePreviewRole(search, savedRole)'),
     );
     expect(layout.indexOf('if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !==')).toBeLessThan(
-      layout.indexOf("new URLSearchParams(window.location.search).get('bt_preview')"),
+      layout.indexOf('return getDevWebPreviewRole();'),
     );
   });
 });

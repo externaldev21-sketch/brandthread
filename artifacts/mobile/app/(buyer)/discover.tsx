@@ -509,7 +509,7 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={buildDropCalendarItems(drops)}
           keyExtractor={(d) => d.key}
-          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: tabBarClearance }}
+          contentContainerStyle={{ paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
           refreshControl={threadRefresh}
           renderItem={({ item }) => <DiscoverDropCalendarItem item={item} />}

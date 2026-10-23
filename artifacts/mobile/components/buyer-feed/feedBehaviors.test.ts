@@ -36,6 +36,13 @@ describe('feed behaviors', () => {
   it('trending cards are tall and centered-sized like following-2', () => {
     const s = trendingCardSize(390);
     expect(s.width).toBe(277);
-    expect(s.height).toBeGreaterThan(s.width);
+    expect(s.height).toBe(443);
+  });
+  it.each([320, 390, 430, 768])('retains at least 80% of portrait video height at page width %s', (pageWidth) => {
+    const { width, height } = trendingCardSize(pageWidth);
+    expect(width).toBe(Math.round(Math.min(360, pageWidth * 0.71)));
+    const naturalHeight = width * 16 / 9;
+    expect(height / naturalHeight).toBeGreaterThanOrEqual(0.8);
+    expect(height / naturalHeight).toBeLessThanOrEqual(1);
   });
 });
