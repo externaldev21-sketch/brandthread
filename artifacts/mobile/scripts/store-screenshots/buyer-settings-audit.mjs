@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT, WORK_DIR, buildPreviewWeb,
-  launchBrowser, openContext, openScreen, serveBuild, waitForQuietNetwork, waitForImages,
+  openContext, serveBuild, waitForQuietNetwork, waitForImages,
 } from './harness.mjs';
 import { ensureDemoImages } from './demo-images.mjs';
 import { checkTextFit } from './text-fit-check.mjs';
@@ -78,6 +78,16 @@ export const SCREENS = [
   ['privacy', '/privacy'],
 ];
 
+async function launchBrowser() {
+  const { chromium } = await import('playwright');
+  // Containers with a preinstalled browser expose it at /opt/pw-browsers/chromium.
+  const executablePath = process.env.PW_CHROMIUM_PATH || (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
+  try { return await chromium.launch(); } catch (error) {
+    if (!executablePath) throw error;
+    return chromium.launch({ executablePath });
+  }
+}
+
 async function main() {
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
@@ -92,7 +102,10 @@ async function main() {
       page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
       page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
       try {
-        await openScreen(page, activity, origin, 'buyer', target);
+        // Direct load (same as legal-pages-verify): the client-side popstate
+        // hop in openScreen() lands on the feed for these stack routes.
+        await page.goto(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=buyer`);
+        await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
         await page.waitForTimeout(1200);
         await waitForQuietNetwork(activity, 600, 8_000);
         await waitForImages(page, 5_000);
