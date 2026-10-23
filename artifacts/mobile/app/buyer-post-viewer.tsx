@@ -38,6 +38,8 @@ import { PostCarousel } from '@/components/social/PostCarousel';
 import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
+import { useBlockAction } from '@/lib/useBlockAction';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -208,6 +210,7 @@ export default function BuyerPostViewer() {
   // When post is null (not yet loaded or not found in my posts), assume non-owner
   // so report is visible and owner-only controls are hidden.
   const isOwner = post !== null && post.authorId === MY_USER_ID;
+  const blockUser = useBlockAction();
 
   const loadPost = useCallback(async () => {
     let found: BuyerPost | null = null;
@@ -453,14 +456,27 @@ export default function BuyerPostViewer() {
           ) : null}
           <View style={{ flex: 1 }} />
           {!isOwner && (
-            <TouchableOpacity accessibilityLabel="Report post" accessibilityRole="button"
+            <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button"
               style={s.engageBtn}
               onPress={() => {
                 Haptics.selectionAsync();
-                router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
+                const openReportRoute = () => router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
+                const authorId = post?.authorId;
+                const canBlock = !!authorId && authorId !== userId && !authorId.startsWith('preview-');
+                showActionSheet(undefined, undefined, [
+                  { text: 'Report post', onPress: openReportRoute },
+                  ...(canBlock ? [{
+                    text: `Block ${authorName}`,
+                    style: 'destructive' as const,
+                    onPress: async () => {
+                      if (await blockUser({ userId: authorId, name: authorName })) goBackOr(router);
+                    },
+                  }] : []),
+                  { text: 'Cancel', style: 'cancel' as const },
+                ]);
               }}
             >
-              <Feather name="flag" size={22} color={FG} />
+              <Feather name="more-horizontal" size={22} color={FG} />
             </TouchableOpacity>
           )}
           <TouchableOpacity accessibilityLabel="Share post" accessibilityRole="button" style={s.engageBtn} onPress={handleShare}>

@@ -13,6 +13,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { useAuth } from '@clerk/expo';
 import { useSignInGate } from '@/hooks/useSignInGate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1409,7 +1410,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onBlockCreator, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1452,6 +1453,8 @@ function SpotlightPageImpl({
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string) => void;
+  /** Block the post's author. Omitted for the viewer's own posts and preview content. */
+  onBlockCreator?: (item: SpotlightItem) => void;
   onVideoWatched: (id: string) => void;
   /** Whether the app-wide feed sound preference is on. */
   soundOn: boolean;
@@ -1789,6 +1792,7 @@ function SpotlightPageImpl({
           ownerId: item.sellerId,
           ownerName: item.creator,
         })}
+        onBlock={onBlockCreator ? () => onBlockCreator(item) : undefined}
         onNotInterested={() => onNotInterested(item.id)}
         onFeedback={showToast}
       />
@@ -1805,6 +1809,8 @@ function SpotlightPageImpl({
           ownerId: item.sellerId,
           ownerName: item.creator,
         })}
+        onBlock={onBlockCreator ? () => onBlockCreator(item) : undefined}
+        blockLabel={`Block ${item.creator}`}
         onClose={() => setMenuOpen(false)}
       />
 
@@ -1885,6 +1891,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.onShopTag === next.onShopTag
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
+  && prev.onBlockCreator === next.onBlockCreator
   && prev.onVideoWatched === next.onVideoWatched
   && prev.onToggleSound === next.onToggleSound
   && prev.reduceMotion === next.reduceMotion
@@ -2856,6 +2863,18 @@ export default function FeedScreen({
     showToast('We’ll show you fewer posts like this.', 'info');
   }, [api, showToast]);
 
+  // Block from a post's menu: once the server saves the block, drop every
+  // post by that author from the loaded feed (the server already filters
+  // blocked authors from later pages).
+  const blockUser = useBlockAction();
+  const handleBlockCreator = useCallback(async (item: SpotlightItem) => {
+    if (!item.sellerId) return;
+    const blockedId = item.sellerId;
+    if (!(await blockUser({ userId: blockedId, name: item.creator }))) return;
+    setSellerFeedPosts(prev => prev.filter(post => post.sellerId !== blockedId));
+    showToast(`${item.creator} is blocked.`, 'info');
+  }, [blockUser, showToast]);
+
   useEffect(() => {
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
     if (sellerIds.length === 0) return;
@@ -3191,6 +3210,7 @@ export default function FeedScreen({
               onOpenComments={handleOpenComments}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
+              onBlockCreator={spotlight.sellerId && spotlight.sellerId !== userId && !spotlight.sellerId.startsWith('preview-') ? handleBlockCreator : undefined}
               onVideoWatched={handleVideoWatched}
               soundOn={soundOn}
               onToggleSound={toggleSound}

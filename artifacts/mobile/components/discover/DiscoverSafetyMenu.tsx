@@ -1,6 +1,6 @@
 /**
  * Discover grid/viewer "..." and long-press safety menu — Report / Not
- * interested / Mute. Same Modal/backdrop/menu pattern as the buyer feed's
+ * interested / Mute / Block. Same Modal/backdrop/menu pattern as the buyer feed's
  * LongPressMenu (components/buyer-feed/LongPressMenu.tsx), specialized for
  * a feed of other people's posts rather than one's own video player.
  */
@@ -12,13 +12,15 @@ import { FONT, GOLD, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 export function DiscoverSafetyMenu({
-  visible, authorName, onNotInterested, onMute, onReport, onClose,
+  visible, authorName, onNotInterested, onMute, onReport, onBlock, onClose,
 }: {
   visible: boolean;
   authorName: string;
   onNotInterested: () => void;
   onMute: () => void;
   onReport: () => void;
+  /** Omitted when the author can't be blocked (e.g. no author id). */
+  onBlock?: () => void;
   onClose: () => void;
 }) {
   if (!visible) return null;
@@ -26,6 +28,7 @@ export function DiscoverSafetyMenu({
     { icon: 'eye-off', label: 'Not interested', onPress: onNotInterested },
     { icon: 'volume-x', label: `Mute ${authorName}`, onPress: onMute },
     { icon: 'flag', label: 'Report', onPress: onReport, destructive: true },
+    ...(onBlock ? [{ icon: 'slash' as const, label: `Block ${authorName}`, onPress: onBlock, destructive: true }] : []),
   ];
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>

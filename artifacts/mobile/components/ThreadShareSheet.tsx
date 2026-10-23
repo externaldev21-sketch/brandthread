@@ -44,6 +44,8 @@ interface ThreadShareSheetProps {
   isVideo: boolean;
   onClose: () => void;
   onReport: () => void;
+  /** Block the post's author. Omitted for the viewer's own posts. */
+  onBlock?: () => void;
   onNotInterested: () => void;
   onFeedback: (message: string, kind?: 'info' | 'error') => void;
 }
@@ -60,6 +62,7 @@ export function ThreadShareSheet({
   isVideo,
   onClose,
   onReport,
+  onBlock,
   onNotInterested,
   onFeedback,
 }: ThreadShareSheetProps) {
@@ -311,6 +314,9 @@ export function ThreadShareSheet({
           <View style={styles.section}>
             <View style={styles.actionRow}>
               <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} muted />
+              {onBlock ? (
+                <ShareAction label="Block" icon="slash" onPress={() => { onClose(); onBlock(); }} muted />
+              ) : null}
               <ShareAction label="Not interested" icon="slash" onPress={() => { onClose(); onNotInterested(); }} muted />
               {isVideo && mediaUri ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} muted />

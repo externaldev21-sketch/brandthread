@@ -1,8 +1,8 @@
 /**
  * Buyer Threads Home feed — long-press context menu.
  *
- * A small, centered menu offering "2x speed", "Not interested" and
- * "Report" — opened by long-pressing anywhere on the active video. Reuses
+ * A small, centered menu offering "2x speed", "Not interested", "Report"
+ * and "Block" — opened by long-pressing anywhere on the active video. Reuses
  * the same 2x playback-rate mechanism the existing press-and-hold gesture
  * already drives (`speedActive`/`rate` on the video player); this just
  * gives it a second, discoverable entry point alongside a moderation menu.
@@ -15,13 +15,16 @@ import { FONT, GOLD, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 export function LongPressMenu({
-  visible, speedActive, onToggleSpeed, onNotInterested, onReport, onClose,
+  visible, speedActive, onToggleSpeed, onNotInterested, onReport, onBlock, blockLabel = 'Block', onClose,
 }: {
   visible: boolean;
   speedActive: boolean;
   onToggleSpeed: () => void;
   onNotInterested: () => void;
   onReport: () => void;
+  /** Omitted for the viewer's own posts. */
+  onBlock?: () => void;
+  blockLabel?: string;
   onClose: () => void;
 }) {
   if (!visible) return null;
@@ -29,6 +32,7 @@ export function LongPressMenu({
     { icon: 'fast-forward', label: speedActive ? '2x speed (on)' : '2x speed', onPress: onToggleSpeed, active: speedActive },
     { icon: 'eye-off', label: 'Not interested', onPress: onNotInterested },
     { icon: 'flag', label: 'Report', onPress: onReport },
+    ...(onBlock ? [{ icon: 'slash' as const, label: blockLabel, onPress: onBlock }] : []),
   ];
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>

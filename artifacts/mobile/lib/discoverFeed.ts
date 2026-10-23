@@ -96,6 +96,15 @@ function colorFor(id: string): string {
   return AVATAR_SHADES[hash % AVATAR_SHADES.length];
 }
 
+/**
+ * The server id behind a Discover tile. Tile ids are namespaced by source
+ * (`trend_<postId>`, `friend_<postId>`) so the two feeds can't collide in a
+ * list; anything sent to the API (e.g. a report's targetId) needs the bare id.
+ */
+export function discoverPostTargetId(tileId: string): string {
+  return tileId.replace(/^(?:trend|friend)_/, '');
+}
+
 /** Maps one row of `api.publicTrending.get()` into a brand/seller Discover tile. */
 function mapTrendingToPost(row: any): DiscoverPost | null {
   if (!row?.id || !row?.brandId) return null;

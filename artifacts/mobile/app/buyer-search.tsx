@@ -27,6 +27,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -58,7 +59,7 @@ import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
-import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
+import { composeDiscoverPosts, discoverPostTargetId, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { FilterSheet } from '@/components/search/FilterSheet';
@@ -155,6 +156,7 @@ function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
 export default function BuyerSearchScreen() {
   const router = useRouter();
   const { openReport } = useReportSheet();
+  const blockUser = useBlockAction();
   const params = useLocalSearchParams<{ q?: string }>();
   const insets = useSafeAreaInsets();
   const { push } = useThreadPull();
@@ -167,7 +169,7 @@ export default function BuyerSearchScreen() {
   const primary = theme.accent;
 
   const api = useApi();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const previewMode = isBuyerDevPreview();
 
@@ -786,13 +788,23 @@ export default function BuyerSearchScreen() {
           onReport={() => {
             openReport({
               targetType: 'post',
-              targetId: safetyMenuPost.id,
+              targetId: discoverPostTargetId(safetyMenuPost.id),
               label: 'Post',
               ownerId: safetyMenuPost.authorId,
               ownerName: safetyMenuPost.authorName,
             });
             setSafetyMenuPost(null);
           }}
+          onBlock={isSignedIn && safetyMenuPost.authorId !== userId && !safetyMenuPost.authorId.startsWith('preview-') ? () => {
+            const author = safetyMenuPost;
+            setSafetyMenuPost(null);
+            // Leave the full-screen viewer: the author's post shouldn't stay up,
+            // and the confirm must not open underneath it.
+            setViewer(null);
+            void blockUser({ userId: author.authorId, name: author.authorName }).then((done) => {
+              if (done) removePostFromLists(author.authorId);
+            });
+          } : undefined}
         />
       )}
     </View>

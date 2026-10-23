@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import type { MuteRecord } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { apiErrorMessage, confirmUnblock, shortRelativeTime } from '@/lib/safety';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import type { BlockedAccount } from '@/lib/safetyTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
@@ -69,7 +70,12 @@ export default function BlockedAndMutedScreen() {
 
   async function unblock(account: BlockedAccount) {
     setPendingId(account.userId);
-    const done = await confirmUnblock({ userId: account.userId, name: account.name }, api.social.unblock);
+    // react-native-web's Alert.alert renders nothing; web gets the themed sheet.
+    const done = await confirmUnblock(
+      { userId: account.userId, name: account.name },
+      api.social.unblock,
+      Platform.OS === 'web' ? showActionSheet : undefined,
+    );
     setPendingId(null);
     if (done) {
       hapticSuccess();

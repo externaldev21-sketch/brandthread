@@ -32,6 +32,7 @@ import { BrandsYouMightLikeRow } from '@/components/discover/BrandsYouMightLikeR
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -59,7 +60,7 @@ import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
-  composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
+  composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops, discoverPostTargetId,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
 } from '@/lib/discoverFeed';
 
@@ -105,9 +106,10 @@ export default function DiscoverScreen() {
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const { openReport } = useReportSheet();
+  const blockUser = useBlockAction();
   const api = useApi();
   const { theme } = useAppTheme();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
 
   const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
   const [refreshing, setRefreshing] = useState(false);
@@ -459,12 +461,21 @@ export default function DiscoverScreen() {
           onReport={() => {
             openReport({
               targetType: 'post',
-              targetId: safetyMenuPost.id,
+              targetId: discoverPostTargetId(safetyMenuPost.id),
               label: 'Post',
               ownerId: safetyMenuPost.authorId,
               ownerName: safetyMenuPost.authorName,
             });
           }}
+          onBlock={isSignedIn && safetyMenuPost.authorId !== userId && !safetyMenuPost.authorId.startsWith('preview-') ? () => {
+            const author = safetyMenuPost;
+            // Leave the full-screen viewer: the author's post shouldn't stay up,
+            // and the confirm must not open underneath it.
+            setViewer(null);
+            void blockUser({ userId: author.authorId, name: author.authorName }).then((done) => {
+              if (done) removePostFromLists(author.authorId);
+            });
+          } : undefined}
           onClose={() => setSafetyMenuPost(null)}
         />
       )}
