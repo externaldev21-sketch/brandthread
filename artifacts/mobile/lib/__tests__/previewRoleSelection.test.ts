@@ -20,4 +20,12 @@ describe('development preview role selection', () => {
     expect(resolvePreviewRole('', 'seller')).toBe('seller');
     expect(resolvePreviewRole('', 'admin')).toBe('buyer');
   });
+
+  it('keeps guest testing selected until an explicit role overrides it', () => {
+    expect(resolvePreviewRole('?bt_preview=guest', 'buyer')).toBe(null);
+    expect(resolvePreviewRole('?bt_preview=guest', 'seller')).toBe(null);
+    expect(resolvePreviewRole('', 'guest')).toBe(null);
+    expect(resolvePreviewRole('?bt_preview=buyer', 'guest')).toBe('buyer');
+    expect(resolvePreviewRole('?bt_preview=seller', 'guest')).toBe('seller');
+  });
 });

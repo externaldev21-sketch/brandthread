@@ -11,7 +11,7 @@
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
  *   - the explicitly selected role survives reloads and new browser tabs
- *   - a browser with no saved selection remains a real guest
+ *   - a fresh preview browser defaults to buyer; explicit guest tests the auth wall
  *
  * Expo Router drops the query on in-app navigation. Dev builds retain the
  * browser-local choice in both development and exported preview builds.
@@ -53,8 +53,9 @@ export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | nul
 export function setDevWebPreviewRole(role: PreviewRole | null): void {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return;
   try {
-    if (role) window.localStorage.setItem(PREVIEW_ROLE_KEY, role);
-    else window.localStorage.removeItem(PREVIEW_ROLE_KEY);
+    // An explicit guest marker must survive navigation to onboarding without
+    // the query; removing the key would re-enable the default buyer immediately.
+    window.localStorage.setItem(PREVIEW_ROLE_KEY, role ?? 'guest');
     // Retire the old tab-only selection so it cannot revive after guest mode.
     window.sessionStorage?.removeItem(PREVIEW_ROLE_KEY);
   } catch {
@@ -93,7 +94,7 @@ export function isProductionPreviewHost(hostnameOverride?: string): boolean {
 
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
- * precedence, then the saved explicit browser role, with guest as the default.
+ * precedence, then the saved browser selection, with buyer as the preview default.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.

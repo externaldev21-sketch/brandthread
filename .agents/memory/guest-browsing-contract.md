@@ -19,12 +19,15 @@ Do not alter signed-in layouts, fonts, tab bars or seller swipe/glow.
 
 Explicit buyer/seller preview identity persists across preview URLs without
 requiring a role query on each visit. This bypass is development/fast-preview
-only. Clearing the saved role or using bt_preview=guest now tests signed-out
-Welcome—not a guest feed. Demo population still requires the current URL's
-explicit demo opt-in.
+only. A fresh preview browser (or clearing its saved role) defaults to buyer,
+never Welcome. Only bt_preview=guest selects signed-out Welcome testing;
+retain that explicit selection across auth redirects until buyer/seller is
+chosen again. URL selection wins over storage. Demo population still requires
+the current URL's explicit demo opt-in.
 
-**Why:** The owner needs stable signed-in preview screens, without granting
-synthetic authority on published hosts.
+**Why:** The owner explicitly requires every plain workspace preview URL to
+open inside the app, even in a new browser, without granting synthetic
+authority on published hosts.
 
 **How to apply:** Keep preview bypass ahead of real-session redirects.
 Production public entry is separately sealed by the pre-launch policy.

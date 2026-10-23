@@ -12,9 +12,10 @@ afterEach(() => {
 });
 
 describe('explicit development preview', () => {
-  it('defaults to guest and preserves explicit seller selection', () => {
-    expect(resolvePreviewRole('', null)).toBe(null);
-    expect(resolvePreviewRole('', 'invalid')).toBe(null);
+  it('defaults to buyer and preserves explicit seller and guest selections', () => {
+    expect(resolvePreviewRole('', null)).toBe('buyer');
+    expect(resolvePreviewRole('', 'invalid')).toBe('buyer');
+    expect(resolvePreviewRole('', 'guest')).toBe(null);
     expect(resolvePreviewRole('?bt_preview=guest', 'seller')).toBe(null);
     expect(resolvePreviewRole('?bt_preview=seller', null)).toBe('seller');
     expect(resolvePreviewRole('', 'seller')).toBe('seller');
@@ -33,7 +34,7 @@ describe('explicit development preview', () => {
       },
     });
     const preview = await import('../lib/devPreview');
-    expect(preview.getDevWebPreviewRole()).toBe(null);
+    expect(preview.getDevWebPreviewRole()).toBe('buyer');
     window.location.search = '?bt_preview=seller';
     expect(preview.getDevWebPreviewRole()).toBe('seller');
     expect(entries.get('bt:previewRole:explicit-v1')).toBe('seller');
@@ -42,7 +43,7 @@ describe('explicit development preview', () => {
     expect(preview.isPreviewDemoMode()).toBe(false);
   });
 
-  it.each([true, false])('restores explicit roles across loads, clears for guest, and keeps demo URL-only (dev=%s)', async (isDev) => {
+  it.each([true, false])('defaults to buyer, restores explicit guest/roles across loads, and keeps demo URL-only (dev=%s)', async (isDev) => {
     vi.stubGlobal('__DEV__', isDev);
     vi.stubEnv('EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST', '1');
     const entries = new Map<string, string>();
@@ -54,8 +55,11 @@ describe('explicit development preview', () => {
     const load = (search: string, hostname = 'localhost') => {
       vi.stubGlobal('window', { location: { search, hostname }, localStorage: storage });
     };
-    load('?bt_preview=buyer&demo=1');
+    load('');
     let preview = await import('../lib/devPreview');
+    expect(preview.isBuyerDevPreview()).toBe(true);
+    expect(preview.isPreviewDemoMode()).toBe(false);
+    load('?bt_preview=buyer&demo=1');
     expect(preview.isBuyerDevPreview()).toBe(true);
     expect(entries.get('bt:previewRole:explicit-v1')).toBe('buyer');
     // A fresh tab/module instance keeps localStorage, not sessionStorage.
@@ -72,14 +76,14 @@ describe('explicit development preview', () => {
     load('?bt_preview=guest');
     expect(preview.isBuyerDevPreview()).toBe(false);
     expect(preview.isSellerDevPreview()).toBe(false);
-    expect(entries.has('bt:previewRole:explicit-v1')).toBe(false);
+    expect(entries.get('bt:previewRole:explicit-v1')).toBe('guest');
     load('');
     expect(preview.getDevWebPreviewRole()).toBe(null);
     load('?bt_preview=buyer');
     expect(preview.isBuyerDevPreview()).toBe(true);
     entries.clear();
     load('');
-    expect(preview.getDevWebPreviewRole()).toBe(null);
+    expect(preview.getDevWebPreviewRole()).toBe('buyer');
     entries.set('bt:previewRole:explicit-v1', 'buyer');
     load('?bt_preview=seller', 'brandthread.app');
     expect(preview.isBuyerDevPreview()).toBe(false);

@@ -17,6 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { resolvePreviewRole } from '../previewRoleSelection';
 
 // We import after setting __DEV__ to test both code paths.
 // Because vitest module cache is shared, we test the search-override path
@@ -28,7 +29,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 // through a minimal local replica that mirrors the exported function contract.
 
 type PreviewResult = boolean;
-type PersistedRole = 'buyer' | 'seller' | null;
+type PersistedRole = 'buyer' | 'seller' | 'guest' | null;
 
 // `persistedRole` mirrors reading localStorage['user_role'] once the query
 // param itself is gone (tab-bar switch, router.push to a plain path) — see
@@ -36,19 +37,13 @@ type PersistedRole = 'buyer' | 'seller' | null;
 function sellerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean, persistedRole: PersistedRole = null): PreviewResult {
   if (!isDev) return false;
   if (!isWeb) return false;
-  const v = new URLSearchParams(search).get('bt_preview');
-  if (v === 'seller') return true;
-  if (v === 'buyer') return false;
-  return persistedRole === 'seller';
+  return resolvePreviewRole(search, persistedRole) === 'seller';
 }
 
 function buyerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean, persistedRole: PersistedRole = null): PreviewResult {
   if (!isDev) return false;
   if (!isWeb) return false;
-  const v = new URLSearchParams(search).get('bt_preview');
-  if (v === 'buyer') return true;
-  if (v === 'seller') return false;
-  return persistedRole === 'buyer';
+  return resolvePreviewRole(search, persistedRole) === 'buyer';
 }
 
 // ── Production guard ──────────────────────────────────────────────────────────
@@ -73,7 +68,7 @@ describe('isSellerDevPreview — native platform guard', () => {
 // ── Query-string logic (dev + web) ────────────────────────────────────────────
 
 describe('isSellerDevPreview — query-string logic (dev web)', () => {
-  it('returns false for default (no bt_preview param) — real flow, not fake data', () => {
+  it('does not default to seller when no bt_preview param exists', () => {
     expect(sellerPreviewFromSearch('', true, true)).toBe(false);
   });
 
@@ -117,8 +112,8 @@ describe('isBuyerDevPreview', () => {
     expect(buyerPreviewFromSearch('?bt_preview=seller', true, true)).toBe(false);
   });
 
-  it('returns false for default (no param) on dev web', () => {
-    expect(buyerPreviewFromSearch('', true, true)).toBe(false);
+  it('defaults to buyer (no param) on dev web', () => {
+    expect(buyerPreviewFromSearch('', true, true)).toBe(true);
   });
 });
 
@@ -126,7 +121,7 @@ describe('isBuyerDevPreview', () => {
 
 describe('seller + buyer preview symmetry', () => {
   const cases = [
-    { search: '',                   seller: false, buyer: false },
+    { search: '',                   seller: false, buyer: true },
     { search: '?bt_preview=seller', seller: true,  buyer: false },
     { search: '?bt_preview=buyer',  seller: false, buyer: true },
   ];
@@ -160,9 +155,9 @@ describe('preview detection falls back to the persisted role once the query para
     expect(buyerPreviewFromSearch('', true, true, 'buyer')).toBe(true);
   });
 
-  it('an absent param with no persisted role at all is still the real flow, not fake data', () => {
+  it('an absent param with no persisted role defaults to the preview buyer', () => {
     expect(sellerPreviewFromSearch('', true, true, null)).toBe(false);
-    expect(buyerPreviewFromSearch('', true, true, null)).toBe(false);
+    expect(buyerPreviewFromSearch('', true, true, null)).toBe(true);
   });
 
   it('an absent param never leaks the OTHER role\'s persisted flag', () => {
@@ -222,14 +217,14 @@ describe('isSellerDevPreview real export (module path exists)', () => {
   it('seller preview requires an explicit bt_preview=seller opt-in (source check)', () => {
     const { readFileSync } = require('fs');
     const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
-    expect(src).toContain("if (v === 'seller') return true;");
+    expect(src).toContain("getDevWebPreviewRole(searchOverride) === 'seller'");
   });
 
   it('falls back to the persisted user_role once the query param is gone (source check)', () => {
     const { readFileSync } = require('fs');
     const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
-    expect(src).toContain("localStorage.getItem('user_role')");
-    expect(src).toContain('persistedPreviewRole()');
+    expect(src).toContain('window.localStorage.getItem(PREVIEW_ROLE_KEY)');
+    expect(src).toContain('resolvePreviewRole(search, savedRole)');
   });
 });
 
