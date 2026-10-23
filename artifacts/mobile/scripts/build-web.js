@@ -296,5 +296,11 @@ addCanonicalMetadata();
 writePublicCrawlFiles();
 // After addCanonicalMetadata so the landing page keeps its own head. Served by
 // server/serve.js for signed-out visits to "/" and for "/welcome".
-writeLandingPage(outputDir, projectRoot);
+const landingHtml = writeLandingPage(outputDir, projectRoot);
+if (!workspacePreview) {
+  // The deployed default document must be the pre-launch cover, even when
+  // served directly rather than through the session-aware landing handler.
+  fs.copyFileSync(path.join(outputDir, 'index.html'), path.join(outputDir, 'app-shell.html'));
+  fs.writeFileSync(path.join(outputDir, 'index.html'), landingHtml);
+}
 console.log('Web export complete.');

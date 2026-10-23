@@ -394,6 +394,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
   }
+  // Production index.html is the public pre-launch cover. A root request
+  // deliberately admitted to the app (session/development preview) uses
+  // the preserved Expo shell instead. Fast-preview keeps its original index.
+  const appShellPath = path.join(STATIC_ROOT, 'app-shell.html');
+  if (requestedPath === '/' && fs.existsSync(appShellPath)) {
+    if (serveFile(appShellPath, res, acceptEncoding, req.headers?.range)) return;
+  }
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding, req.headers?.range)) return;
 
   // This server only ever serves the exported browser app — real /api/*
@@ -416,7 +423,7 @@ const server = http.createServer(async (req, res) => {
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
   if (acceptsHtml) {
-    const shellPath = path.join(STATIC_ROOT, 'index.html');
+    const shellPath = fs.existsSync(appShellPath) ? appShellPath : path.join(STATIC_ROOT, 'index.html');
     if (fs.existsSync(shellPath)) {
       const shellHtml = fs.readFileSync(shellPath, 'utf8');
       // Product pages get full SEO (schema.org Product, noscript body);

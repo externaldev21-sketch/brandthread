@@ -15,7 +15,6 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/expo';
-import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
@@ -136,17 +135,19 @@ export function LiveShowsGrid({
   };
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     try {
       const [live, next] = await Promise.all([provider.listLive(), provider.listUpcoming().catch(() => [])]);
-      if (scopeRef.current !== scope) return;
+      if (scopeRef.current !== scope || generation !== loadGeneration.current) return;
       const nextSnapshot = { scope, streams: live, upcoming: next };
       directoryCache.set(scope, nextSnapshot);
       setSnapshot(nextSnapshot);
       setError(false);
     } catch {
-      if (scopeRef.current !== scope) return;
+      if (scopeRef.current !== scope || generation !== loadGeneration.current) return;
       setError(true);
       setSnapshot(prev => prev.scope === scope ? { ...prev, streams: prev.streams ?? [] } :
         { scope, streams: [], upcoming: [] });
@@ -154,12 +155,16 @@ export function LiveShowsGrid({
   }, [provider, scope]);
 
   const enabled = availability === 'available' || availability === 'unknown';
-  useFocusEffect(useCallback(() => {
+  // Also mounted inside the feed pager, outside a navigation screen.
+  useEffect(() => {
     if (!enabled || !active) return undefined;
     void load();
     const t = setInterval(() => { void load(); }, REFRESH_MS);
-    return () => clearInterval(t);
-  }, [enabled, active, load]));
+    return () => {
+      clearInterval(t);
+      ++loadGeneration.current;
+    };
+  }, [enabled, active, load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

@@ -13,4 +13,10 @@ Reusable dashboard content must also work without a per-screen navigation contex
 
 **Why:** A Live Map's React Navigation focus hook passed typechecking but crashed the fresh seller preview because that preview renders the dashboard directly, outside a screen navigator.
 
-**How to apply:** Use Expo Router's optional focus lifecycle for preview-reusable content; let local preview data remain independent of authenticated websocket focus. Do not introduce required navigator hooks solely to track background work.
+**How to apply:** For reusable content mounted in a pager or preview root, pass visibility from the parent and use an effect for load/polling cleanup, rather than navigation-context hooks. Let local preview data remain independent of authenticated websocket focus. Ignore pending results after deactivation or identity changes.
+
+The buyer feed's LIVE directory is pager content, not a navigation screen.
+
+**Why:** A navigation focus hook crashed LIVE inside the feed even though its standalone route had a valid navigator.
+
+**How to apply:** Keep the directory's lifecycle driven by its active prop. Opening a show already uses the Expo Router push helper; do not add a required navigation hook to the embedded directory or its children.

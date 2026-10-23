@@ -323,7 +323,11 @@ describe('server integration', () => {
   beforeAll(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'bt-landing-srv-'));
     fs.writeFileSync(path.join(root, 'index.html'), '<html><head></head><body>APP SHELL</body></html>');
-    writeLandingPage(root, projectRoot, {});
+    const landing = writeLandingPage(root, projectRoot, {});
+    // Match the production export: public default document plus a separate
+    // Expo shell for authenticated entry and non-root app routes.
+    fs.copyFileSync(path.join(root, 'index.html'), path.join(root, 'app-shell.html'));
+    fs.writeFileSync(path.join(root, 'index.html'), landing);
     child = spawn(process.execPath, [path.join(projectRoot, 'server', 'serve.js')], {
       env: { ...process.env, PORT: String(port), EXPO_WEB_BUILD_DIR: root },
       stdio: 'ignore',
@@ -346,6 +350,17 @@ describe('server integration', () => {
     const res = await fetch(`http://127.0.0.1:${port}${url}`, { headers: { accept: 'text/html', ...headers } });
     return { status: res.status, body: await res.text() };
   };
+
+  it('ships the pre-launch page as the production default document without app-entry links', async () => {
+    const body = (await get('/index.html')).body;
+    expect(body).toContain('Notify me at launch');
+    expect(body).toContain('/api/launch-waitlist');
+    expect(body).not.toMatch(/href=["']\/(?:onboarding|sign-in|pricing)(?:["'?#/])/);
+    expect((await get('/inbox')).body).toContain('APP SHELL');
+    const build = fs.readFileSync(path.join(projectRoot, 'scripts/build-web.js'), 'utf8');
+    expect(build).toContain('if (!workspacePreview)');
+    expect(build).toContain("fs.writeFileSync(path.join(outputDir, 'index.html'), landingHtml)");
+  });
 
   it('shows the landing page signed out and the unchanged app shell otherwise', async () => {
     expect((await get('/')).body).toContain('Shop, sell and design streetwear.');
