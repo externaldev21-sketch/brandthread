@@ -15,14 +15,13 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER,
+  BG, CARD, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM,
-  ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadHeader, EmptyState, IconButton } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, EmptyState, IconButton, LoadingSkeleton } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
@@ -34,7 +33,14 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
   const isActive = bundle.status === 'active';
 
   return (
-    <TouchableOpacity style={r.root} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={r.root}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${bundle.name}, ${isActive ? 'Active' : 'Draft'}`}
+      accessibilityHint="Opens the bundle editor"
+    >
       <View style={r.iconWrap}>
         <Feather name="package" size={ICON.md} color={PURPLE_LIGHT} />
       </View>
@@ -42,12 +48,12 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
         <View style={r.topRow}>
           <Text style={r.name} numberOfLines={1}>{bundle.name}</Text>
           <View style={[r.badge, isActive ? r.activeBadge : r.draftBadge]}>
-            <Text style={[r.badgeText, { color: isActive ? SUCCESS : ORANGE }]}>
+            <Text style={[r.badgeText, { color: isActive ? FG : MUTED }]}>
               {isActive ? 'Active' : 'Draft'}
             </Text>
           </View>
         </View>
-        <Text style={r.meta}>
+        <Text style={r.meta} numberOfLines={1}>
           {bundle.itemCount ?? 0} item{(bundle.itemCount ?? 0) !== 1 ? 's' : ''} ·{' '}
           {formatCents(bundle.bundlePriceCents)}
           {savings > 0 ? ` · saves ${formatCents(savings)}` : ''}
@@ -67,14 +73,17 @@ export default function ProductBundlesScreen() {
   const [bundles, setBundles]     = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const data = await (api as any).bundles.list();
       setBundles(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch (err) {
       console.warn('bundles load error:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,15 +102,20 @@ export default function ProductBundlesScreen() {
         rightElement={
           <IconButton
             name="plus"
+            accessibilityLabel="New bundle"
             onPress={() => router.push('/product-bundle-edit' as never)}
           />
         }
       />
 
       {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator color={colors.accentForeground} />
+        <View style={s.list}>
+          <LoadingSkeleton height={78} />
+          <LoadingSkeleton height={78} />
+          <LoadingSkeleton height={78} />
         </View>
+      ) : loadError && bundles.length === 0 ? (
+        <ErrorState message="Couldn’t load your bundles." onRetry={() => load()} retryLabel="Try again" />
       ) : bundles.length === 0 ? (
         <EmptyState
           icon="package"
@@ -111,7 +125,7 @@ export default function ProductBundlesScreen() {
         />
       ) : (
         <ScrollView
-          contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 120 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accentForeground} />}
           showsVerticalScrollIndicator={false}
         >
@@ -135,18 +149,18 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:   { padding: SP.md, gap: SP.sm },
-  hint:   { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: SP.xs, lineHeight: 18 },
+  hint:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.xs, lineHeight: 18 },
 });
 
 const r = StyleSheet.create({
   root:        { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER },
   iconWrap:    { width: 44, height: 44, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  body:        { flex: 1, gap: 3 },
+  body:        { flex: 1, gap: SP.xs },
   topRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  name:        { flex: 1, fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  name:        { flex: 1, fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
   badge:       { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill },
-  activeBadge: { backgroundColor: SUCCESS_DIM },
-  draftBadge:  { backgroundColor: ORANGE_DIM },
+  activeBadge: { borderWidth: 1, borderColor: BORDER_ACTIVE },
+  draftBadge:  { borderWidth: 1, borderColor: BORDER },
   badgeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.4 },
-  meta:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  meta:        { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
 });

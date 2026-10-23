@@ -9,6 +9,8 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { FS } from '@/lib/theme';
 
 type KlaviyoStatus = {
@@ -27,16 +29,21 @@ export default function KlaviyoIntegrationScreen() {
 
   const [status, setStatus] = useState<KlaviyoStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError(false);
     try {
       const res = await api.integrations.klaviyoStatus();
       setStatus(res);
     } catch {
-      setStatus({ connected: false });
+      // Don't show the connect form on a failed load — a connected seller
+      // would be told Klaviyo isn't connected.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -78,7 +85,7 @@ export default function KlaviyoIntegrationScreen() {
       const res = await api.integrations.klaviyoSync();
       setStatus(res);
     } catch {
-      Alert.alert('Sync failed', 'Could not refresh subscriber counts from Klaviyo.');
+      Alert.alert('Sync failed', 'Couldn’t refresh subscriber counts from Klaviyo. Try again.');
     } finally {
       setSyncing(false);
     }
@@ -89,8 +96,15 @@ export default function KlaviyoIntegrationScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Disconnect', style: 'destructive', onPress: async () => {
-          await api.integrations.klaviyoDisconnect();
-          setStatus({ connected: false });
+          setDisconnecting(true);
+          try {
+            await api.integrations.klaviyoDisconnect();
+            setStatus({ connected: false });
+          } catch {
+            Alert.alert('Couldn’t disconnect Klaviyo', 'Check your connection and try again.');
+          } finally {
+            setDisconnecting(false);
+          }
         },
       },
     ]);
@@ -100,19 +114,21 @@ export default function KlaviyoIntegrationScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Klaviyo" />
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
             <Feather name="zap" size={22} color={colors.primary} />
           </View>
-          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
+          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo email and SMS</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
             Connect your existing Klaviyo account so the email and SMS subscribers you already built keep working here.
           </Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
+          <LoadingSkeleton height={180} />
+        ) : loadError ? (
+          <ErrorState message="Couldn’t load your Klaviyo connection." onRetry={() => { setLoading(true); load(); }} retryLabel="Try again" />
         ) : status?.connected ? (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.connectedRow}>
@@ -125,11 +141,11 @@ export default function KlaviyoIntegrationScreen() {
             <View style={styles.statsRow}>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{(status.emailSubscriberCount ?? 0).toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Email subs</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Email subscribers</Text>
               </View>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{(status.smsSubscriberCount ?? 0).toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>SMS subs</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>SMS subscribers</Text>
               </View>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{status.listCount ?? 0}</Text>
@@ -148,26 +164,32 @@ export default function KlaviyoIntegrationScreen() {
               onPress={handleSync}
               disabled={syncing}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: syncing, busy: syncing }}
             >
               {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
               <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.disconnectBtn}
+              style={[styles.disconnectBtn, disconnecting && { opacity: 0.6 }]}
               onPress={handleDisconnect}
+              disabled={disconnecting}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: disconnecting, busy: disconnecting }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Klaviyo</Text>
+              <Text style={[styles.disconnectText, { color: colors.destructive }]}>{disconnecting ? 'Disconnecting…' : 'Disconnect Klaviyo'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Klaviyo Private API Key</Text>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>Private API key</Text>
             <TextInput
+              accessibilityLabel="Klaviyo private API key"
               style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="pk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              placeholder="Paste your key (starts with pk_)"
               placeholderTextColor={colors.mutedForeground}
               value={apiKey}
               onChangeText={setApiKey}
@@ -180,6 +202,8 @@ export default function KlaviyoIntegrationScreen() {
               onPress={handleConnect}
               disabled={connecting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: connecting, busy: connecting }}
             >
               {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
               <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
@@ -190,9 +214,10 @@ export default function KlaviyoIntegrationScreen() {
               onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="link"
             >
               <Feather name="external-link" size={13} color={colors.primary} />
-              <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>
+              <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my private API key?</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -215,27 +240,27 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   heroSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
 
-  section: { borderRadius: 14, borderWidth: 1, padding: 18 },
-  label: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 13, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 14 },
+  section: { borderRadius: 14, borderWidth: 1, padding: 16 },
+  label: { fontSize: 13, fontFamily: 'Inter_500Medium', marginBottom: 8 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 15, fontFamily: 'Inter_400Regular', marginBottom: 16 },
   connectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 14 },
   connectBtnText: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
-  helpText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  helpText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 
   connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  connectedText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  connectedText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   statsRow: { flexDirection: 'row', marginBottom: 12 },
   statBox: { flex: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  statVal: { fontSize: 19, fontFamily: 'Inter_700Bold' },
   statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  syncedText: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
+  syncedText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 16 },
   secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingVertical: 12, marginBottom: 10 },
   secondaryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
   disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 
   infoBlock: { flexDirection: 'row', gap: 8, marginTop: 20, paddingHorizontal: 4 },
-  infoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16 },
+  infoText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 });

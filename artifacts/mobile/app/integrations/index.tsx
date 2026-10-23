@@ -27,7 +27,7 @@ interface IntegrationDef {
 // Only integrations with a real, working connect flow ship here — no
 // "Coming soon" placeholder rows for OAuth flows that don't exist yet.
 const INTEGRATION_DEFS: IntegrationDef[] = [
-  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
+  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email and SMS marketing', route: '/integrations/klaviyo' },
   { key: 'stripe', label: 'Stripe', icon: 'credit-card', description: 'Payments and payouts', isStripe: true },
 ];
 
@@ -74,7 +74,7 @@ export default function IntegrationsScreen() {
     try {
       const data = await api.seller.connect.onboard();
       if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
-        Alert.alert('Onboarding unavailable', 'Stripe did not provide a valid onboarding link. Please try again.');
+        Alert.alert('Payout setup unavailable', 'Couldn’t open payout setup. Try again in a moment.');
         return;
       }
       const canOpen = await Linking.canOpenURL(data.url);
@@ -83,7 +83,7 @@ export default function IntegrationsScreen() {
       // The seller finishes onboarding in an external browser tab/window;
       // useFocusEffect's load() re-checks real status on return.
     } catch {
-      Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
+      Alert.alert('Couldn’t open payout setup', 'Check your connection and try again.');
     } finally {
       setToggling(null);
     }
@@ -108,7 +108,7 @@ export default function IntegrationsScreen() {
             try {
               await api.seller.disconnectIntegration(item.key) as any;
               setConnectedKeys(prev => { const next = new Set(prev); next.delete(item.key); return next; });
-            } catch { Alert.alert('Error', 'Could not disconnect. Try again.'); }
+            } catch { Alert.alert(`Couldn’t disconnect ${item.label}`, 'Check your connection and try again.'); }
             finally { setToggling(null); }
           },
         },
@@ -126,7 +126,7 @@ export default function IntegrationsScreen() {
               try {
                 await api.seller.connectIntegration(item.key, {}) as any;
                 setConnectedKeys(prev => new Set([...prev, item.key]));
-              } catch { Alert.alert('Error', 'Could not connect. Try again.'); }
+              } catch { Alert.alert(`Couldn’t connect ${item.label}`, 'Check your connection and try again.'); }
               finally { setToggling(null); }
             },
           },
@@ -141,7 +141,7 @@ export default function IntegrationsScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
           <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Connect the tools you already use to run your brand — sales channels, marketing, and shipping in one place.
+            Connect the tools you already use to run your brand.
           </Text>
 
           {loading ? (
@@ -150,7 +150,7 @@ export default function IntegrationsScreen() {
             <View style={s.errorBox}>
               <Feather name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
               <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
-              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]}>
+              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel="Retry loading integrations">
                 <Text style={[s.retryBtnText, { color: colors.foreground }]}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -164,10 +164,13 @@ export default function IntegrationsScreen() {
                     key={item.key}
                     onPress={() => handleConnect(item)}
                     activeOpacity={connected && !item.route ? 1 : 0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
+                    accessibilityState={{ busy: isToggling }}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
                     <View style={s.iconWrap}>
-                      <Feather name={item.icon} size={ICON.sm} color="#FFFFFF" />
+                      <Feather name={item.icon} size={ICON.sm} color={colors.foreground} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
@@ -194,7 +197,7 @@ export default function IntegrationsScreen() {
           {/* Connected count summary */}
           {!loading && !loadError && (
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              {connectedKeys.size + (isStripeFullyConnected(stripeStatus) ? 1 : 0)} of {INTEGRATION_DEFS.length} integrations connected
+              {INTEGRATION_DEFS.filter(d => (d.isStripe ? isStripeFullyConnected(stripeStatus) : connectedKeys.has(d.key))).length} of {INTEGRATION_DEFS.length} integrations connected
             </Text>
           )}
         </View>
@@ -205,21 +208,21 @@ export default function IntegrationsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 16 },
+  section: { paddingHorizontal: 20, paddingVertical: 16 },
+  sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18, marginBottom: 16 },
   loadingRow: { alignItems: 'center', paddingVertical: 30 },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
   retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 2 },
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   iconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
-  rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  rowLabel: { fontSize: FS.base, fontFamily: FONT.semibold },
+  rowDesc: { fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },
   connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   connectedText: { fontSize: 11, fontFamily: FONT.semibold },
   connectBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 7 },
-  connectBtnText: { fontSize: 12, fontFamily: FONT.semibold },
+  connectBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   footerNote: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: 12 },
 });

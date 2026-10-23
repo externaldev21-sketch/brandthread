@@ -68,7 +68,7 @@ export default function ShopifyFulfillmentScreen() {
       }
       await load();
     } catch (err: any) {
-      Alert.alert('Could not update fulfillment', String(err?.message ?? 'Please try again.'));
+      Alert.alert('Couldn’t update fulfillment', 'Check your connection and try again.');
     } finally {
       setBusy(false);
     }
@@ -89,11 +89,11 @@ export default function ShopifyFulfillmentScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Fulfillment connections" />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
         <BrandthreadCard>
           <View style={styles.rowHeader}>
-            <View style={[styles.iconWrap, { backgroundColor: '#95BF4722' }]}>
-              <Feather name="shopping-bag" size={18} color="#5E8E3E" />
+            <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
+              <Feather name="shopping-bag" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Fulfill orders through my Shopify store</Text>
@@ -105,6 +105,7 @@ export default function ShopifyFulfillmentScreen() {
               value={Boolean(status?.fulfillmentEnabled)}
               onValueChange={handleToggle}
               disabled={busy}
+              accessibilityLabel="Fulfill orders through my Shopify store"
             />
           </View>
 
@@ -112,6 +113,7 @@ export default function ShopifyFulfillmentScreen() {
             <>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>Shopify store domain</Text>
               <TextInput
+                accessibilityLabel="Shopify store domain"
                 style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
                 placeholder="my-brand.myshopify.com"
                 placeholderTextColor={colors.mutedForeground}
@@ -144,7 +146,7 @@ export default function ShopifyFulfillmentScreen() {
             </View>
           ))}
           <Text style={[styles.footNote, { color: colors.mutedForeground }]}>
-            Tapstitch doesn't offer a direct API — this is how orders reach it (and any other Shopify fulfillment app) from Brandthread.
+            This is how Brandthread orders reach Tapstitch and any other Shopify fulfillment app.
           </Text>
         </BrandthreadCard>
 
@@ -153,9 +155,15 @@ export default function ShopifyFulfillmentScreen() {
             style={styles.disconnectBtn}
             onPress={() => Alert.alert('Disconnect Shopify?', 'This turns off fulfillment forwarding and disconnects your store.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Disconnect', style: 'destructive', onPress: async () => { await api.shopify.disconnect(); await load(); } },
+              {
+                text: 'Disconnect', style: 'destructive', onPress: async () => {
+                  try { await api.shopify.disconnect(); await load(); }
+                  catch { Alert.alert('Couldn’t disconnect Shopify', 'Check your connection and try again.'); }
+                },
+              },
             ])}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
           >
             <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Shopify</Text>
           </TouchableOpacity>
@@ -169,14 +177,14 @@ const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, minHeight: COMP.minTouchTarget },
   iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
-  cardSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  label: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  cardSub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  label: { fontSize: 13, fontFamily: 'Inter_500Medium', marginTop: 8, marginBottom: 8 },
+  input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 15, fontFamily: 'Inter_400Regular' },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   stepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   stepBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  explainerStep: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  footNote: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 4, fontStyle: 'italic' },
+  explainerStep: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  footNote: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18, marginTop: 4 },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: COMP.minTouchTarget, paddingVertical: 16 },
   disconnectText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });

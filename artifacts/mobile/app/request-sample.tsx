@@ -28,6 +28,8 @@ export default function RequestSampleScreen() {
   const { manufacturerId } = useLocalSearchParams<{ manufacturerId?: string }>();
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [productType, setProductType] = useState('T-Shirt');
   const [quantity, setQuantity] = useState(1);
   const [colorway, setColorway] = useState('');
@@ -42,15 +44,17 @@ export default function RequestSampleScreen() {
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setLoadFailed(false);
     getManufacturer(manufacturerId)
       .then((value) => {
         if (!active) return;
         setManufacturer(value ?? null);
       })
-      .catch(() => {})
+      .catch(() => { if (active) setLoadFailed(true); })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [manufacturerId]);
+  }, [manufacturerId, reloadKey]);
 
   async function submit() {
     if (!manufacturerId || !manufacturer) return;
@@ -79,7 +83,7 @@ export default function RequestSampleScreen() {
         [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (error) {
-      Alert.alert('Could not send request', error instanceof Error ? error.message : 'Try again.');
+      Alert.alert('Couldn’t send request', 'Check your connection and try again.');
     } finally {
       setSending(false);
     }
@@ -89,11 +93,28 @@ export default function RequestSampleScreen() {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   }
 
+  if (!manufacturer && loadFailed) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader
+          title="Request a sample"
+          onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        />
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn’t load manufacturer"
+          description="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => setReloadKey((k) => k + 1) }}
+        />
+      </View>
+    );
+  }
+
   if (!manufacturer) {
     return (
       <View style={styles.root}>
         <ScreenHeader
-          title="Request Sample"
+          title="Request a sample"
           onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
         />
         <EmptyState
@@ -111,7 +132,7 @@ export default function RequestSampleScreen() {
   return (
     <View style={styles.root}>
       <ScreenHeader
-        title="Request Sample"
+        title="Request a sample"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -141,7 +162,7 @@ export default function RequestSampleScreen() {
           accessibilityState={{ disabled: sending, busy: sending }}
         >
           {sending && <ActivityIndicator size="small" color={colors.primaryForeground} />}
-          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
+          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send request'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -179,11 +200,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   headerSub: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 120, gap: 20 },
   field: { gap: 8 },
-  label: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { color: colors.mutedForeground, fontSize: 11, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 8, justifyContent: 'center' },
   chipText: { color: colors.mutedForeground, fontSize: 13, fontFamily: FONT.medium },
-  input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
+  input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: FONT.regular },
   notes: { minHeight: 100, textAlignVertical: 'top' },
   bottom: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
   button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
