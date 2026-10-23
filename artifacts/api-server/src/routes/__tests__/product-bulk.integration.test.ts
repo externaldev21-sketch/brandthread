@@ -6,7 +6,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, products, productVariants, productVariantCompareAt, productSeo } from "@workspace/db";
+import { db, products, productVariants, productVariantCompareAt, productSeo, users } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
 const state = vi.hoisted(() => ({
@@ -72,6 +72,11 @@ const prices = async (id: string) =>
 const statusOf = async (id: string) => (await db.select({ s: products.status }).from(products).where(eq(products.id, id)))[0].s;
 
 beforeAll(async () => {
+  // The bulk "set active" path is payout-gated; this seller has finished Connect onboarding.
+  await db.insert(users).values([seller, `${seller}-limit`].map((clerkId) => ({
+    clerkId, email: `${clerkId}@test.local`, name: "Bulk Seller",
+    stripeAccountId: `acct_${clerkId}`, stripeAccountStatus: "active",
+  })));
   const { default: router } = await import("../product-bulk");
   const app = express();
   app.use((req, _res, next) => { (req as any).log = { error: (o: unknown) => console.error(o), warn: () => undefined }; next(); });
@@ -93,6 +98,7 @@ afterAll(async () => {
     const copies = await db.select({ id: products.id }).from(products).where(inArray(products.ownerId, [seller, other]));
     await db.delete(products).where(inArray(products.id, [...created, ...copies.map((c) => c.id)]));
   }
+  await db.delete(users).where(inArray(users.clerkId, [seller, `${seller}-limit`]));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 

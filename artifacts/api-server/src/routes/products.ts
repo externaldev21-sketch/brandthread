@@ -14,6 +14,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { getSellerPayoutReadiness, payoutsNotReadyBody } from "../lib/payoutGate";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -214,6 +215,13 @@ router.post("/", requireRole("manager"), async (req, res) => {
     });
   }
 
+  // Payout gate: a listing cannot go live before the owner's Stripe Connect
+  // account can take charges and send payouts. Drafts are always allowed.
+  if (status === "active") {
+    const payouts = await getSellerPayoutReadiness(ownerId);
+    if (!payouts.ready) { res.status(409).json(payoutsNotReadyBody(payouts)); return; }
+  }
+
   const access = await getProductAccess(req, res);
   if (!access) return;
 
@@ -263,6 +271,19 @@ router.post("/", requireRole("manager"), async (req, res) => {
   if (product.status === "active") void notifyNewProduct({ productId: product.id });
 
   res.status(201).json(product);
+});
+
+// GET /api/products/payout-gate — payout readiness plus how many listings are
+// already live (published before the payout gate). Read-only: nothing is
+// unpublished; the dashboard uses it to ask the seller to finish setup.
+router.get("/payout-gate", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const payouts = await getSellerPayoutReadiness(ownerId);
+  const [live] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(and(eq(products.ownerId, ownerId), eq(products.status, "active"), isNull(products.deletedAt)));
+  res.json({ ready: payouts.ready, payoutStatus: payouts.status, liveProductCount: live?.count ?? 0 });
 });
 
 // GET /api/products/:id
@@ -333,6 +354,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
 
   const access = status && status !== "archived" ? await getProductAccess(req, res) : null;
   if (status && status !== "archived" && !access) return;
+  const payouts = status === "active" ? await getSellerPayoutReadiness(ownerId) : null;
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ status: products.status, deletedAt: products.deletedAt, removalKind: products.removalKind })
@@ -341,6 +363,11 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       .limit(1)
       .for("update");
     if (!existing) return { updated: null, limited: false, moderationLocked: false, published: false };
+    // Payout gate: only the move into "active" is refused; a listing that was
+    // already live before the gate keeps working and stays editable.
+    if (payouts && !payouts.ready && existing.status !== "active") {
+      return { updated: null, limited: false, moderationLocked: false, published: false, payoutsBlocked: true };
+    }
     if (
       existing.removalKind?.startsWith("moderation_")
       && status !== undefined
@@ -378,6 +405,10 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       published: !!updated && updated.status === "active" && existing.status !== "active" && !updated.deletedAt,
     };
   });
+  if ("payoutsBlocked" in result && payouts) {
+    res.status(409).json(payoutsNotReadyBody(payouts));
+    return;
+  }
   if (result.moderationLocked) {
     res.status(409).json({
       error: "This listing is locked by a platform moderation action",

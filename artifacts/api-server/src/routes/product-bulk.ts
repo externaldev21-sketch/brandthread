@@ -24,6 +24,7 @@ import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable 
 import { hasProductCapacity } from "../lib/productCapacity";
 import { notifyNewProduct } from "../lib/activityEvents";
 import { notifyPriceDrop } from "../lib/stockNotifications";
+import { getSellerPayoutReadiness, payoutsNotReadyBody } from "../lib/payoutGate";
 import {
   isValidPriceChange, planProductPrices, uniqueCopySku,
   type CompareAtMode, type PriceChange, type PriceRounding, type ProductPricePlan,
@@ -283,10 +284,16 @@ router.post("/status", requireRole("manager"), async (req, res): Promise<void> =
     try { access = await getVerifiedPlanAccess(ownerId); }
     catch (error) { sendPlanLookupUnavailable(req, res, error); return; }
   }
+  const payouts = target === "active" ? await getSellerPayoutReadiness(ownerId) : null;
 
   try {
     const outcome = await db.transaction(async (tx) => {
       const owned = await loadOwned(tx, ownerId, parsed.ids, true);
+      // Payout gate: nothing new goes live until payouts are set up. Listings
+      // that are already active are left as they are.
+      if (payouts && !payouts.ready && owned.some((p) => p.status !== "active")) {
+        throw new BulkRefusal(409, payoutsNotReadyBody(payouts));
+      }
       if (target !== "archived") {
         const lockedIds = owned.filter((p) => isModerationLocked(p.removalKind)).map((p) => p.id);
         if (lockedIds.length > 0) {

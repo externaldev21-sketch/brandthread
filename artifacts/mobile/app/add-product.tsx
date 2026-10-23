@@ -47,6 +47,9 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { FeeBreakdown } from '@/components/money/FeeBreakdown';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
+import { PayoutSetupCard } from '@/components/PayoutSetupCard';
+import { useSellerPayoutGate } from '@/hooks/useSellerPayoutGate';
+import { isPayoutsNotReadyError, resolvePublishStatus } from '@/lib/payoutGate';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -247,7 +250,7 @@ export default function AddProductScreen() {
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string; heldForPayouts?: boolean } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
@@ -264,6 +267,9 @@ export default function AddProductScreen() {
   const [photoSlotCount, setPhotoSlotCount] = useState(3);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
+  // Payout gate: a listing that was already live before the gate stays live.
+  const [editWasLive, setEditWasLive] = useState(false);
+  const payoutGate = useSellerPayoutGate();
   const [collections, setCollections] = useState<ProductCollection[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
@@ -401,6 +407,7 @@ export default function AddProductScreen() {
         }
         setIsEditMode(true);
         setEditProductId(editId!);
+        setEditWasLive((product.status ?? product.storeSettings?.status) === 'active');
         setDraftData(product as Partial<Product>);
         restoreFormState(product);
         draftId.current = 'edit_' + editId!;
@@ -701,7 +708,14 @@ export default function AddProductScreen() {
 
     // The header status pill (Active/Draft) decides what gets saved — Save
     // always runs this same flow, just with a different final status.
-    const finalStatus: 'active' | 'draft' = draftData.storeSettings?.status === 'active' ? 'active' : 'draft';
+    // Payout gate: until Stripe payouts are set up, a new go-live saves as a
+    // draft instead (the Set up payouts card explains why).
+    const gate = resolvePublishStatus({
+      requested: draftData.storeSettings?.status === 'active' ? 'active' : 'draft',
+      payoutsReady: payoutGate.ready,
+      alreadyLive: isEditMode && editWasLive,
+    });
+    const finalStatus = gate.status;
 
     const productPayload: Partial<Product> = {
       ...draftData,
@@ -776,19 +790,31 @@ export default function AddProductScreen() {
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
     };
 
-    try {
+    const save = async (status: 'active' | 'draft', heldForPayouts: boolean) => {
       const name = draftData.name ?? 'Product';
       if (isEditMode && editProductId) {
-        await api.products.update(editProductId, serverUpdatePayload);
+        await api.products.update(editProductId, { ...serverUpdatePayload, status });
         await deleteDraft(draftId.current);
-        setPublishSuccess({ name, kind: 'updated', productId: editProductId });
+        setPublishSuccess({ name, kind: 'updated', productId: editProductId, heldForPayouts });
       } else {
         const newProduct = await completeSetupTaskAfter(
           'first_product',
-          () => api.products.create(serverCreatePayload),
+          () => api.products.create({ ...serverCreatePayload, status }),
         ) as any;
         await deleteDraft(draftId.current);
-        setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
+        setPublishSuccess({ name, kind: 'created', productId: newProduct.id, heldForPayouts });
+      }
+    };
+
+    try {
+      try {
+        await save(finalStatus, gate.heldForPayouts);
+      } catch (err) {
+        // Readiness was stale (or still loading): the server refused the
+        // go-live, so keep the seller's work as a draft instead.
+        if (finalStatus !== 'active' || !isPayoutsNotReadyError(err)) throw err;
+        payoutGate.markNotReady();
+        await save('draft', true);
       }
     } catch (err: any) {
       const needsShipDate = err?.code === 'PREORDER_SHIP_DATE_REQUIRED';
@@ -2094,6 +2120,15 @@ export default function AddProductScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {payoutGate.ready === false && !(isEditMode && editWasLive) ? (
+            <View style={s.essentialSection}>
+              <PayoutSetupCard
+                theme={theme}
+                variant="listing"
+                onSetUpPayouts={() => router.push('/payout-setup' as never)}
+              />
+            </View>
+          ) : null}
           <View style={s.essentialSection}>
             {renderPhotos()}
             {renderBasicInfo()}
@@ -2193,9 +2228,18 @@ export default function AddProductScreen() {
       <SuccessSheet
         visible={!!publishSuccess}
         onClose={() => setPublishSuccess(null)}
-        title={publishSuccess?.kind === 'updated' ? 'Product updated!' : currentStatus === 'active' ? 'Product published!' : 'Draft saved!'}
-        subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}` : undefined}
-        primaryAction={{
+        title={publishSuccess?.heldForPayouts ? 'Draft saved' : publishSuccess?.kind === 'updated' ? 'Product updated!' : currentStatus === 'active' ? 'Product published!' : 'Draft saved!'}
+        subtitle={publishSuccess ? (publishSuccess.heldForPayouts
+          ? `${publishSuccess.name} was saved as a draft. Set up payouts to publish it.`
+          : `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : currentStatus === 'active' ? 'is now live.' : 'was saved as a draft.'}`) : undefined}
+        primaryAction={publishSuccess?.heldForPayouts ? {
+          label: 'Set up payouts',
+          onPress: () => {
+            setPublishSuccess(null);
+            // Replace (not push) so returning can't re-save the same listing.
+            router.replace('/payout-setup' as never);
+          },
+        } : {
           label: 'View product',
           onPress: () => {
             const id = publishSuccess?.productId;

@@ -1294,6 +1294,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
       archive:        (id: string)             => del(`/api/products/${id}`),
       restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
+      /** Payout gate: whether listings can go live, and how many already are. */
+      payoutGate:     ()                       =>
+        get<{ ready: boolean; payoutStatus: 'not_started' | 'pending' | 'restricted' | 'active'; liveProductCount: number }>('/api/products/payout-gate'),
       addVariant:     (id: string, body: unknown) => post(`/api/products/${id}/variants`, body),
       updateVariant:  (id: string, vId: string, body: unknown) => patch(`/api/products/${id}/variants/${vId}`, body),
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */

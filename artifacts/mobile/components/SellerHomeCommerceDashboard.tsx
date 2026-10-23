@@ -80,6 +80,9 @@ import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProdu
 import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
+import { PayoutSetupCard } from '@/components/PayoutSetupCard';
+import { useSellerPayoutGate } from '@/hooks/useSellerPayoutGate';
+import { shouldShowFinishPayoutBanner } from '@/lib/payoutGate';
 import {
   BG,
   FG,
@@ -227,6 +230,9 @@ export default function SellerHomeCommerceDashboard({
   const [cashingOut, setCashingOut] = useState(false);
   const balanceGenerationRef = useRef(0);
   const threadCash = useSellerThreadCashBalance();
+  // Listings that went live before the payout gate: ask the owner to finish
+  // payout setup (never unpublishes anything). Preview sellers bypass it.
+  const payoutGate = useSellerPayoutGate(Boolean(userId) && !isLoadingRole && currentRole === 'owner');
   const payoutAttemptKeyRef = useRef<string | null>(null);
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
@@ -887,6 +893,17 @@ export default function SellerHomeCommerceDashboard({
                   </Text>
                   <Feather name="chevron-right" size={16} color={theme.subtle} />
                 </TouchableOpacity>
+              )}
+
+              {currentRole === 'owner' && shouldShowFinishPayoutBanner(payoutGate) && (
+                <View style={styles.section}>
+                  <PayoutSetupCard
+                    theme={theme}
+                    variant="live"
+                    liveProductCount={payoutGate.liveProductCount}
+                    onSetUpPayouts={() => nav('/payout-setup')}
+                  />
+                </View>
               )}
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
