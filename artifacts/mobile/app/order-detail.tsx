@@ -658,7 +658,6 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
   const refundParam = embedded ? undefined : params.refund;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const queryClient = useQueryClient();
 
@@ -962,7 +961,13 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
 
   if (!order) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
+      <View style={s.root}>
+        <ScreenHeader
+          title="Order"
+          divider={false}
+          variant="push"
+          onBack={() => goBackOr(router, '/(tabs)/orders')}
+        />
         {updatesPaused && (
           <PressableScale
             style={s.pausedBanner}
@@ -982,7 +987,7 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
           description={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the ID is invalid.'}
           action={orderLoadFailed
             ? { label: 'Retry', onPress: retryUpdates, icon: 'refresh-cw' }
-            : { label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
+            : { label: 'Go back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );

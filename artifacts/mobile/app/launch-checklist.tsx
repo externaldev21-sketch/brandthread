@@ -52,7 +52,10 @@ export default function LaunchChecklistScreen() {
       {!checklist ? (
         <View style={s.center}>
           {error ? (
-            <Button label="Try again" variant="secondary" size="small" onPress={reload} />
+            <>
+              <Text style={s.errorText}>Couldn't load your launch checklist.</Text>
+              <Button label="Try again" variant="secondary" size="small" onPress={reload} />
+            </>
           ) : (
             <ActivityIndicator color={theme.muted} />
           )}
@@ -112,7 +115,8 @@ export default function LaunchChecklistScreen() {
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md },
+  errorText: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted },
   scroll: { paddingHorizontal: SP.md, paddingTop: SP.md },
   pill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 3 },
   pillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.text },

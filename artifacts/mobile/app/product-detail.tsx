@@ -33,6 +33,7 @@ import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 import { haptics, haptic } from '@/lib/haptics';
 
@@ -56,6 +57,8 @@ import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/pro
 import { reportNetworkError } from '@/lib/networkNotice';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -95,6 +98,7 @@ const TABS: { key: Tab; label: string }[] = [
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
+  const tabBarInset = useSellerTabBarInset();
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
@@ -265,7 +269,7 @@ export default function ProductDetailScreen() {
                 { text: 'Duplicate', onPress: () => {
                   duplicateProduct(product.id).then(copy => {
                     if (copy) {
-                      Alert.alert('Product duplicated', `${copy.name} was added as a draft.`, [
+                      showActionSheet('Product duplicated', `${copy.name} was added as a draft.`, [
                         { text: 'View copy', onPress: () => router.replace(('/product-detail?id=' + copy.id) as never) },
                         { text: 'OK' },
                       ]);
@@ -324,7 +328,7 @@ export default function ProductDetailScreen() {
       <ScrollView
         style={s.tabContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: tabBarInset + 56 + SP.lg }}
       >
         {activeTab === 'overview'   && <OverviewTab   product={product} pricing={pricing} coverImage={coverImage} />}
         {activeTab === 'variants'   && <VariantsTab   product={product} setProduct={setProduct} id={id!} />}
@@ -1444,7 +1448,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
                   borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: foreground, letterSpacing: -0.2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  headerBtn:    { minHeight: COMP.minTouchTarget, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
+  headerBtn:    { minHeight: COMP.minTouchTarget, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
                   borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.accent },
   editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
   iconBtnSmall: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,

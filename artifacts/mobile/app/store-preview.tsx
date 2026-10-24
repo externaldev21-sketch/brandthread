@@ -80,6 +80,7 @@ function HtmlSurface({ html, width, height, injectedJS }: {
 }
 
 export default function StorePreview() {
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -188,13 +189,14 @@ export default function StorePreview() {
   const desktopInjectedJS = "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;";
 
   return (
-    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
+    <View style={[styles.root, { paddingTop: headerTopInset }]}>
       <View style={styles.bar}>
         <TouchableOpacity
           onPress={() => { goBackOr(router); }}
           style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"
+          accessibilityRole="button"
         >
           <Icon name="x" size={ICON.md} color={theme.text} />
         </TouchableOpacity>
@@ -243,7 +245,7 @@ export default function StorePreview() {
         <View style={styles.center}>
           <Icon name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
-          <TouchableOpacity onPress={load} style={styles.retryBtn}>
+          <TouchableOpacity onPress={load} style={styles.retryBtn} accessibilityRole="button" accessibilityLabel="Try loading the store preview again">
             <Text style={styles.retryText}>Try again</Text>
           </TouchableOpacity>
         </View>

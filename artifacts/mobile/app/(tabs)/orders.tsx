@@ -1637,12 +1637,12 @@ const createStyles = (theme: AppThemePreset) => {
     color: FG,
   },
   orderItems: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: MUTED,
   },
   orderCancelled: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: RED,
   },
@@ -1660,7 +1660,7 @@ const createStyles = (theme: AppThemePreset) => {
     letterSpacing: -0.1,
   },
   orderTime: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: SUBTLE,
   },
@@ -1702,7 +1702,7 @@ const createStyles = (theme: AppThemePreset) => {
     borderColor: STRONG + '44',
   },
   trackingText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: STRONG,
   },
@@ -1735,12 +1735,12 @@ const createStyles = (theme: AppThemePreset) => {
   },
   pausedBannerText: {
     flex: 1,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: FG,
   },
   pausedBannerAction: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.semibold,
     color: MUTED,
   },
@@ -1759,7 +1759,7 @@ const createStyles = (theme: AppThemePreset) => {
   },
   errorBannerText: {
     flex: 1,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: RED,
     lineHeight: 16,
@@ -1776,7 +1776,7 @@ const createStyles = (theme: AppThemePreset) => {
     paddingVertical: SP.xs,
   },
   errorRetryText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.semibold,
     color: STRONG,
   },
@@ -1818,7 +1818,7 @@ const createStyles = (theme: AppThemePreset) => {
     borderColor: BORDER,
   },
   bulkBtnText: {
-     fontSize: FS.xs,
+     fontSize: FS.meta,
     fontFamily: FONT.semibold,
   },
 

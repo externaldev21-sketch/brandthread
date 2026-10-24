@@ -127,11 +127,12 @@ export interface RecentOrderSummary {
 
 /** Normalizes one order row from `api.orders.list()` for the Recent Orders list — same fallback fields the rest of the app already reads. */
 export function normalizeRecentOrder(order: any): RecentOrderSummary {
-  const lineItems = Array.isArray(order?.lineItems) ? order.lineItems : [];
+  const lineItems = Array.isArray(order?.lineItems) ? order.lineItems : Array.isArray(order?.items) ? order.items : [];
+  // GET /api/orders returns a server-side `itemCount`; fall back to the line items only when it's absent.
   return {
     id: String(order?.id ?? ''),
     buyerName: order?.customerName ?? order?.customer?.name ?? order?.buyerName ?? 'Unknown',
-    itemCount: Number(order?.listItemCount ?? lineItems.length ?? 0),
+    itemCount: Number(order?.itemCount ?? order?.listItemCount ?? lineItems.length),
     totalCents: typeof order?.totalCents === 'number' ? order.totalCents : Number(order?.total_cents ?? 0),
     status: String(order?.status ?? 'unknown'),
     orderNumber: order?.orderNumber ?? order?.order_number ?? `#${String(order?.id ?? '').slice(-6).toUpperCase()}`,

@@ -94,6 +94,9 @@ function TaskCard({
           accessibilityLabel={task.completed ? `${task.label} done` : isAutoTrackedTask(task.id) ? `Open ${task.label}` : `Mark ${task.label} complete`}
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: task.completed, disabled: task.completed }}
+          accessibilityLabel={`Mark ${task.label} done`}
         >
           {task.completed && <Icon name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
@@ -138,10 +141,10 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
   labelRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 2 },
   label:      { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   labelDone:  { textDecorationLine: 'line-through', color: MUTED },
-  desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  desc:       { fontSize: FS.meta, lineHeight: 16, fontFamily: FONT.regular, color: MUTED },
   activePill: { backgroundColor: colors.primary, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
   activePillText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.primaryForeground },
-  skip:       { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
+  skip:       { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────

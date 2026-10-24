@@ -577,7 +577,7 @@ export default function FulfillOrderScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Fulfill Order" divider={false} />
+      <ScreenHeader title="Fulfill order" divider={false} />
 
       {/* Stepper */}
       <View style={s.stepperRow}>
@@ -608,7 +608,14 @@ export default function FulfillOrderScreen() {
             <SectionHeader title={`Order #${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
             <OrderGiftNote gift={order.gift} />
             {order.lineItems.map(li => (
-              <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
+              <TouchableOpacity
+                key={li.id}
+                onPress={() => toggleItem(li.id)}
+                activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: !!checked[li.id] }}
+                accessibilityLabel={`Packed ${li.productName}${li.variant ? `, ${li.variant}` : ''}, quantity ${li.quantity}`}
+              >
                 <BrandthreadCard style={s.itemCard}>
                   {li.imageUri ? (
                     <Image cachePolicy="memory-disk" source={{ uri: li.imageUri }} style={s.itemThumb} />
@@ -888,12 +895,12 @@ const createStyles = (theme: { background: string; card: string; border: string;
     itemThumb: { width: 48, height: 48, borderRadius: RADIUS.sm },
     itemThumbPlaceholder: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
     itemName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-    itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+    itemVariant: { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
 
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     presetChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, gap: 2 },
     presetChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-    presetChipSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+    presetChipSub: { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
     carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
 
     fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },

@@ -8,7 +8,7 @@ import { hapticPrimaryAction } from '@/lib/haptics';
  * Payouts de-duplicated (single entry in Money).
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -150,7 +150,7 @@ export default function MoreScreen() {
   const router   = useRouter();
   const topInset = useHeaderTopInset();
   const { user } = useUser();
-  const { signOut } = useAuth();
+  const { signOut, userId } = useAuth();
   const api = useApi();
 
   const [setupState, setSetupState]   = useState<SetupState | null>(null);
@@ -163,9 +163,13 @@ export default function MoreScreen() {
   const { plan } = useSubscriptionPlan();
   const planLabel = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
 
-  useEffect(() => {
-    getSetupState().then(setSetupState);
-  }, []);
+  // Same per-seller record the dashboard and Store setup read (an unscoped
+  // read could show 0% while they show real progress); refreshed on focus.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getSetupState(userId).then((next) => { if (active) setSetupState(next); });
+    return () => { active = false; };
+  }, [userId]));
 
   // Refresh unread count whenever this screen is focused
   useFocusEffect(useCallback(() => {
@@ -451,7 +455,7 @@ const createStyles = (theme: any) => {
     color: theme.accentLight,
   },
   switcherHint: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: SUBTLE_THEME,
   },
@@ -482,7 +486,7 @@ const createStyles = (theme: any) => {
     borderRadius: RADII.pill,
   },
   continueSetup: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: theme.accentLight,
     marginTop: SP.sm,

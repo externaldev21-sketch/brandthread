@@ -947,7 +947,7 @@ function makeStyles(theme: any) {
       borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
     },
     previewName: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
-    previewMeta: { fontFamily: FONT.regular, fontSize: FS.xs ?? 12, color: theme.muted, marginTop: 2 },
+    previewMeta: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: 2 },
     previewPrices: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     before: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, textDecorationLine: 'line-through' },
     after: { fontFamily: FONT.bold, fontSize: FS.sm, color: theme.text },
