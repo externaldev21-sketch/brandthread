@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, timeLeft } from '@/lib/sellerEngagement';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 export default function GiveawayScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -23,16 +24,25 @@ export default function GiveawayScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [g, setG] = useState<any>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<null | 'missing' | 'error'>(null);
+  const [reload, setReload] = useState(0);
   const [rules, setRules] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
-    api.giveaways.get(String(code)).then((r) => { if (!cancelled) { setG(r); setFailed(false); } }).catch(() => { if (!cancelled) setFailed(true); });
+    api.giveaways.get(String(code)).then((r) => { if (!cancelled) { setG(r); setFailed(null); } })
+      .catch((e: any) => { if (!cancelled) setFailed(e?.status === 404 ? 'missing' : 'error'); });
     return () => { cancelled = true; };
-  }, [api, code]));
+  }, [api, code, reload]));
 
-  if (failed) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><Text style={[styles.note, { color: c.mutedForeground, padding: SP.md }]}>This giveaway isn't available.</Text></View>;
+  if (failed) return (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <ScreenHeader title="Giveaway" />
+      {failed === 'missing'
+        ? <Text style={[styles.note, { color: c.mutedForeground, padding: SP.md }]}>This giveaway isn't available.</Text>
+        : <View style={{ padding: SP.md }}><RetryRow label="Couldn't load this giveaway" onRetry={() => { setFailed(null); setReload((n) => n + 1); }} /></View>}
+    </View>
+  );
   if (!g) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><ActivityIndicator color={c.foreground} style={{ marginTop: 40 }} /></View>;
 
   const me = g.me;
@@ -81,12 +91,16 @@ export default function GiveawayScreen() {
           <Text style={[styles.note, { color: c.mutedForeground, marginTop: SP.sm }]}>
             {me.eligible ? "You're entered." : me.excludedReason === 'blocked' || me.excludedReason === 'seller' ? "You can't enter this giveaway." : 'Finish the steps above to be entered.'}
           </Text>
+        ) : !me && live ? (
+          <Text style={[styles.note, { color: c.mutedForeground, marginTop: SP.sm }]}>
+            {g.isOwner ? "This is your giveaway, so you can't enter it." : 'Sign in to enter this giveaway.'}
+          </Text>
         ) : null}
 
         {g.winners.length > 0 ? (
           <>
             <Text style={[styles.section, { color: c.foreground }]}>Winners</Text>
-            {g.winners.map((w: any, i: number) => <Text key={i} style={[styles.note, { color: c.foreground }]}>{w.name}{w.handle ? `  @${w.handle}` : ''}</Text>)}
+            {g.winners.map((w: any, i: number) => <Text key={i} style={[styles.note, { color: c.foreground }]}>{w.name}{w.handle ? ` · @${w.handle}` : ''}</Text>)}
           </>
         ) : null}
 
@@ -99,7 +113,7 @@ export default function GiveawayScreen() {
 }
 
 const styles = StyleSheet.create({
-  meta: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 8 },
+  meta: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: 8 },
   title: { fontSize: FS.xxl, fontFamily: FONT.bold, lineHeight: 32 },
   prize: { fontSize: FS.base, fontFamily: FONT.semibold, marginTop: 8, marginBottom: 4 },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },

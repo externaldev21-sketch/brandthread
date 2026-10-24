@@ -34,6 +34,8 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
       onPress={() => { Haptics.selectionAsync(); router.push(`/manufacturer-profile?id=${mfr.manufacturerId}` as never); }}
       style={s.mfrCard}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`${mfr.name}, open manufacturer profile`}
     >
       <View style={s.mfrHeader}>
         <View style={s.mfrAvatar}>
@@ -63,7 +65,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
         </View>
         <View style={s.mfrStat}>
           <Text style={[s.mfrStatValue, { color: mfr.sampleApprovalRate >= 90 ? colors.success : colors.warning }]}>{mfr.sampleApprovalRate}%</Text>
-          <Text style={s.mfrStatLabel}>Sample ok</Text>
+          <Text style={s.mfrStatLabel}>Samples OK</Text>
         </View>
       </View>
       {mfr.delayRate > 10 && (
@@ -121,7 +123,7 @@ export default function AnalyticsProductionScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader
         title="Production Analytics"
-        rightElement={<HeaderPillButton label="Mfr. Hub" onPress={() => router.push('/manufacturer-hub' as never)} />}
+        rightElement={<HeaderPillButton label="Suppliers" onPress={() => router.push('/manufacturer-hub' as never)} />}
       />
       {loading ? (
         <AnalyticsSkeleton kpiCount={3} listRows={3} />
@@ -183,14 +185,15 @@ export default function AnalyticsProductionScreen() {
           {data.manufacturers.length === 0 ? (
             <EmptyState icon="tool" title="No production data" description="Production performance will appear after working with manufacturers." />
           ) : (
-            <View style={{ gap: SP.sm }}>
+            <View>
               {data.manufacturers.map(mfr => <ManufacturerCard key={mfr.manufacturerId} mfr={mfr} />)}
             </View>
           )}
         </>
       )}
 
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -208,7 +211,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   gaugeWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
   gaugeWarningText:{ fontSize: FS.sm, fontFamily: FONT.medium, color: colors.destructive },
   mfrCard:  { backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: colors.border, marginBottom: SP.sm, minHeight: COMP.minTouchTarget },
-  mfrHeader:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm + 2 },
+  mfrHeader:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm + 4 },
   mfrAvatar:{ width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   mfrName:  { fontSize: FS.sm, fontFamily: FONT.bold, color: colors.foreground },
   mfrSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },

@@ -1,8 +1,11 @@
 /**
  * Shared chrome for the seller analytics report screens: the app's standard
  * header (bare back arrow, no subtitle), the Dashboard's Today / Week / Month
- * / Year / All pills, loading and error states, and bottom clearance so
- * nothing ends under the floating seller tab bar.
+ * / Year / All pills, loading and error states, and a small bottom inset.
+ * Pushed report screens already end above the floating seller tab bar: the
+ * stack scene applies that clearance once (useSceneBottomClearance in
+ * components/layout/ScreenChrome.tsx), so adding it here again left a
+ * second bar-height gap under every report.
  */
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
@@ -12,15 +15,13 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader, type ScreenHeaderAction } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { AnalyticsSkeleton } from '@/components/analytics/AnalyticsKit';
-import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
 
-/** Space a report screen keeps clear at the bottom for the floating seller bar. */
+/** Breathing room under a pushed report's last card (the bar clearance itself comes from the stack scene). */
 export function useReportBottomInset(): number {
-  // Same geometry the seller bar itself is drawn from (two side circles).
-  return useTabBarClearance(2);
+  return SP.lg;
 }
 
 export function InsightFrame({

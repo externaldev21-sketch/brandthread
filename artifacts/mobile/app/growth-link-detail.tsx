@@ -26,14 +26,14 @@ export default function GrowthLinkDetailScreen() {
 
   const remove = () => Alert.alert('Archive this link?', 'The short link stops working. Its stats are kept.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveLink(String(id)); router.back(); } catch { Alert.alert("Couldn't archive link"); } } },
+    { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveLink(String(id)); router.back(); } catch { Alert.alert("Couldn't archive link", 'Please try again.'); } } },
   ]);
 
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title={d?.label || 'Link'} />
       {failed && !d ? <ErrorState onRetry={load} /> : !d ? <AnalyticsSkeleton kpiCount={4} listRows={2} /> : (
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 140 }}>
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}>
           <CopyRow value={d.url} />
           <View style={{ height: SP.md }} />
           <MetricTiles cols={2} items={[
@@ -45,7 +45,7 @@ export default function GrowthLinkDetailScreen() {
           <View style={{ height: SP.lg }} />
           <SectionTitle note="Last 30 days">Clicks</SectionTitle>
           <Card padded>
-            <AnalyticsBarChart points={d.series.map((p) => ({ label: p.day.slice(5), value: p.clicks }))} emptyLabel="No clicks yet" />
+            <AnalyticsBarChart points={d.series.map((p) => ({ label: shortDay(p.day), value: p.clicks }))} emptyLabel="No clicks yet" />
           </Card>
           <SectionTitle>Top countries</SectionTitle>
           <Card padded>
@@ -59,9 +59,9 @@ export default function GrowthLinkDetailScreen() {
           </Card>
           <SectionTitle>Campaign</SectionTitle>
           <Card padded>
-            <MetricRow label="Source" value={d.utmSource ?? '-'} />
-            <MetricRow label="Medium" value={d.utmMedium ?? '-'} />
-            <MetricRow label="Campaign" value={d.utmCampaign ?? '-'} last />
+            <MetricRow label="Source" value={d.utmSource ?? '—'} />
+            <MetricRow label="Medium" value={d.utmMedium ?? '—'} />
+            <MetricRow label="Campaign" value={d.utmCampaign ?? '—'} last />
           </Card>
           <PrimaryButton label="Share link" icon="share-2" onPress={() => Share.share({ message: d.url, url: d.url }).catch(() => {})} />
           <View style={{ height: SP.sm }} />
@@ -70,6 +70,13 @@ export default function GrowthLinkDetailScreen() {
       )}
     </View>
   );
+}
+
+/** "2026-08-20" -> "Aug 20" (chart axis), parsed as a local calendar day. */
+function shortDay(day: string): string {
+  const [y, m, dd] = day.split('-').map(Number);
+  if (!y || !m || !dd) return day;
+  return new Date(y, m - 1, dd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const muted = (c: ReturnType<typeof useColors>) => ({ color: c.mutedForeground, fontFamily: FONT.medium, fontSize: FS.sm });

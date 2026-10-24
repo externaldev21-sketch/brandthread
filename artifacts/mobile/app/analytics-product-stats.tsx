@@ -18,8 +18,6 @@ import { InsightLineChart, KpiGrid, RankedRow } from '@/components/analytics/Ins
 import { useSellerInsight } from '@/hooks/useSellerInsight';
 import { DEFAULT_INSIGHT_RANGE, getProductStats, type InsightRange } from '@/services/sellerInsightsService';
 
-const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
-
 export default function AnalyticsProductStatsScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -33,7 +31,7 @@ export default function AnalyticsProductStatsScreen() {
   return (
     <InsightFrame title="Product stats" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
-        <EmptyState icon="shopping-bag" title="No product activity" description="Views, add-to-carts and purchases for this period show here." />
+        <EmptyState icon="shopping-bag" title="No product activity" description={range === 'all' ? 'Product views, add-to-carts and purchases show here once shoppers find your products.' : 'No product views, add-to-carts or purchases in this period. Try a longer range.'} />
       ) : (
         <>
           <KpiGrid range={range} items={[
@@ -52,13 +50,13 @@ export default function AnalyticsProductStatsScreen() {
           <Card padded>
             {[
               { label: 'Viewed a product', value: t!.views, rate: null as string | null },
-              { label: 'Added to cart', value: t!.addToCarts, rate: pct(t!.viewToCartPct) },
-              { label: 'Purchased', value: t!.purchases, rate: pct(t!.cartToPurchasePct) },
+              { label: 'Added to cart', value: t!.addToCarts, rate: t!.viewToCartPct === null ? null : `${t!.viewToCartPct}% of views` },
+              { label: 'Purchased', value: t!.purchases, rate: t!.cartToPurchasePct === null ? null : `${t!.cartToPurchasePct}% of carts` },
             ].map((step, i) => (
               <View key={step.label} style={{ marginTop: i ? SP.md : 0 }}>
                 <View style={s.rowBetween}>
                   <Text style={s.label}>{step.label}</Text>
-                  <Text style={s.value}>{step.value.toLocaleString()}{step.rate ? `  ·  ${step.rate}` : ''}</Text>
+                  <Text style={s.value}>{step.value.toLocaleString()}{step.rate ? ` · ${step.rate}` : ''}</Text>
                 </View>
                 <ProgressBar pct={(step.value / top) * 100} height={8} />
               </View>
@@ -76,7 +74,7 @@ export default function AnalyticsProductStatsScreen() {
                   thumbnailUrl={p.imageUrl}
                   icon="shopping-bag"
                   title={p.name}
-                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
+                  subtitle={`${formatCompactCount(p.views)} views · ${p.purchases.toLocaleString()} sold`}
                   value={formatCents(p.revenueCents)}
                   valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}

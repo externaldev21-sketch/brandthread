@@ -2,34 +2,39 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type EmailCampaign } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { Hairline, Heading, SolidButton } from '@/components/email/EmailUI';
 import { AUDIENCE_LABEL, DEMO_CAMPAIGNS, STATUS_LABEL, emailMode, formatWhen, pct } from '@/lib/emailMarketing';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 
 export default function EmailCampaignResultsScreen() {
   const c = useColors();
   const api = useApi();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [camp, setCamp] = useState<EmailCampaign | null>(null);
   const [error, setError] = useState(false);
+  // Preview modes resolve synchronously; an unknown id there (or a missing
+  // id anywhere) must end on a message, not an endless spinner.
+  const [notFound, setNotFound] = useState(false);
   const mode = emailMode();
 
   const load = useCallback(() => {
-    if (mode !== 'live') { setCamp(mode === 'demo' ? DEMO_CAMPAIGNS.find((x) => x.id === id) ?? null : null); return; }
+    if (!id) { setNotFound(true); return; }
+    if (mode !== 'live') {
+      const found = mode === 'demo' ? DEMO_CAMPAIGNS.find((x) => x.id === id) ?? null : null;
+      setCamp(found); setNotFound(!found); return;
+    }
     api.emailMarketing.campaign(String(id)).then((r) => { setCamp(r); setError(false); }).catch(() => setError(true));
   }, [api, id, mode]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const unschedule = async () => {
     try { await api.emailMarketing.unschedule(String(id)); router.replace(`/email-campaign-compose?id=${id}` as never); }
-    catch { Alert.alert('Not changed', "Couldn't cancel the schedule."); }
+    catch { Alert.alert('Schedule not cancelled', "Couldn't cancel the schedule. Try again."); }
   };
 
   const s = camp?.stats;
@@ -43,16 +48,18 @@ export default function EmailCampaignResultsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <ScreenHeader title="Results" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 140 }} showsVerticalScrollIndicator={false}>
-        {error ? <RetryRow label="Couldn't load results" onRetry={load} /> : !camp ? (
+      <ScreenHeader title="Campaign results" />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: SP.xl }} showsVerticalScrollIndicator={false}>
+        {error ? <RetryRow label="Couldn't load results" onRetry={load} /> : notFound ? (
+          <Text style={[st.label, { color: c.mutedForeground, marginTop: 16 }]}>This campaign couldn't be found.</Text>
+        ) : !camp ? (
           <ActivityIndicator color={c.foreground} style={{ marginTop: 32 }} />
         ) : (
           <>
-            <Text style={[st.subject, { color: c.foreground }]}>{camp.subject}</Text>
+            <Text style={[st.subject, { color: c.foreground }]}>{camp.subject || 'Untitled campaign'}</Text>
             <Text style={[st.label, { color: c.mutedForeground }]}>
               {STATUS_LABEL[camp.status]} · {AUDIENCE_LABEL[camp.audience]}
-              {camp.sentAt ? ` · ${formatWhen(camp.sentAt)}` : camp.scheduledAt ? ` · ${new Date(camp.scheduledAt).toLocaleString()}` : ''}
+              {camp.sentAt ? ` · ${formatWhen(camp.sentAt)}` : camp.scheduledAt ? ` · ${new Date(camp.scheduledAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}
             </Text>
             <Heading>Delivery</Heading>
             <View style={st.grid}>
@@ -89,6 +96,6 @@ export default function EmailCampaignResultsScreen() {
 const st = StyleSheet.create({
   subject: { fontFamily: FONT.bold, fontSize: FS.xl, marginTop: 8, marginBottom: 4 },
   label: { fontFamily: FONT.regular, fontSize: FS.sm },
-  num: { fontFamily: FONT.bold, fontSize: 28 },
+  num: { fontFamily: FONT.bold, fontSize: FS.xxl },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, marginTop: 4 },
 });

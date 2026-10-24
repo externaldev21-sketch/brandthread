@@ -95,8 +95,8 @@ export default function AnalyticsProfitScreen() {
           <View style={s.heroCard}>
             <Text style={s.heroEst}>Estimated</Text>
             <Text style={s.heroValue}>{profit.estimatedProfit.formatted}</Text>
-            <Text style={[s.heroMargin, { color: colors.success }]}>{profit.profitMargin.formatted} margin</Text>
-            <Text style={s.heroDisclaimer}>Cost estimates may differ from actual figures</Text>
+            <Text style={[s.heroMargin, { color: profit.profitMargin.value < 0 ? colors.destructive : colors.success }]}>{profit.profitMargin.formatted} margin</Text>
+            <Text style={s.heroDisclaimer}>Cost estimates may differ from actual figures.</Text>
             <Sparkline points={profit.profitChart} color={colors.success} />
           </View>
 
@@ -111,12 +111,12 @@ export default function AnalyticsProfitScreen() {
                   <View style={[s.lineRow, isTotal && s.totalRow]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.lineLabel, isTotal && { color: colors.foreground, fontFamily: FONT.bold }]}>{item.label}</Text>
-                      {item.isEstimate && !isTotal && <Text style={s.estimateNote}>estimate</Text>}
+                      {item.isEstimate && !isTotal && <Text style={s.estimateNote}>Estimate</Text>}
                     </View>
                     <Text style={[
                       s.lineAmount,
                       isTotal
-                        ? { color: colors.warning, fontSize: FS.md, fontFamily: FONT.bold }
+                        ? { color: colors.foreground, fontSize: FS.md, fontFamily: FONT.bold }
                         : item.isDeduction
                           ? { color: colors.destructive }
                           : { color: colors.success },
@@ -173,8 +173,8 @@ export default function AnalyticsProfitScreen() {
               { label: 'Pending Balance',         value: payout.pendingBalance.formatted,         note: '' },
               { label: 'Held Funds',              value: payout.heldFunds.formatted,              note: '' },
               { label: 'Total Paid Out',          value: payout.totalPaidOut.formatted,           note: '' },
-              { label: 'Manufacturer Allocation', value: payout.manufacturerAllocation.formatted, note: 'est.' },
-              { label: 'Shipping Allocation',     value: payout.shippingAllocation.formatted,     note: 'est.' },
+              { label: 'Manufacturer Allocation', value: payout.manufacturerAllocation.formatted, note: 'Estimate' },
+              { label: 'Shipping Allocation',     value: payout.shippingAllocation.formatted,     note: 'Estimate' },
               { label: 'Dispute Holds',           value: payout.disputeHolds.formatted,           note: '' },
               { label: 'Refund Impact',           value: payout.refundImpact.formatted,           note: '' },
             ].map((row, i) => (
@@ -196,7 +196,8 @@ export default function AnalyticsProfitScreen() {
         </>
       )}
 
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -208,7 +209,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   content:  { paddingHorizontal: SP.md },
   heroCard: { backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg, alignItems: 'center', gap: 4 },
   heroEst:  { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.subtle, letterSpacing: 0.8, textTransform: 'uppercase' },
-  heroValue:{ fontSize: 44, fontFamily: FONT.bold, color: colors.foreground },
+  heroValue:{ fontSize: FS.h1, fontFamily: FONT.bold, color: colors.foreground },
   heroMargin:{ fontSize: FS.md, fontFamily: FONT.semibold },
   heroDisclaimer:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, marginBottom: SP.sm },
   lineRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.minTouchTarget },

@@ -12,7 +12,6 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Feather } from '@expo/vector-icons';
@@ -32,13 +31,22 @@ import type { MetaAdsConnection, MetaBusiness, MetaAdAccount, MetaPage } from '@
 
 type Step = 'loading' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
 
+// Meta's Graph API returns `account_status` as a numeric code; show the
+// seller words, never the raw number.
+const AD_ACCOUNT_STATUS: Record<string, string> = {
+  '1': 'Active', '2': 'Disabled', '3': 'Unsettled', '7': 'In risk review',
+  '8': 'Pending settlement', '9': 'In grace period', '100': 'Pending closure', '101': 'Closed',
+};
+function adAccountStatusLabel(status: string | number): string {
+  return AD_ACCOUNT_STATUS[String(status)] ?? (/^\d+$/.test(String(status)) ? 'Status unknown' : String(status));
+}
+
 export default function MetaAdsConnectScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ oauth?: string; message?: string }>();
   const colors = useColors();
   const { theme } = useAppTheme();
   const api = useApi();
-  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('loading');
   const [connection, setConnection] = useState<MetaAdsConnection | null>(null);
@@ -198,7 +206,7 @@ export default function MetaAdsConnectScreen() {
               setBusinesses(null); setAdAccounts(null); setPages(null);
               setStep('not_connected');
             } catch {
-              Alert.alert('Error', 'Could not disconnect. Please try again.');
+              Alert.alert('Could not disconnect', 'Please try again.');
             } finally {
               setDisconnecting(false);
             }
@@ -212,7 +220,7 @@ export default function MetaAdsConnectScreen() {
     <BrandthreadScreen noSafeTop>
       <ScreenHeader title="Connect Meta" onBack={() => goBackOr(router)} />
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.lg, gap: SP.md }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: SP.lg, gap: SP.md }}
         keyboardShouldPersistTaps="handled"
       >
         {step === 'loading' && (
@@ -227,8 +235,8 @@ export default function MetaAdsConnectScreen() {
               <Feather name="facebook" size={ICON.lg} color={theme.accentLight} />
               <Text style={[s.introTitle, { color: colors.foreground }]}>Run real ads on Facebook & Instagram</Text>
               <Text style={[s.introBody, { color: colors.mutedForeground }]}>
-                Connect your Facebook & Instagram to run real ads. Meta bills your ad account directly —
-                Brandthread never touches your ad spend.
+                Link your Meta business account to launch and manage campaigns from Brandthread. Meta bills
+                your ad account directly — Brandthread never touches your ad spend.
               </Text>
             </View>
             <PrimaryButton label="Connect Meta" icon="link" onPress={handleConnect} loading={connecting} />
@@ -246,7 +254,7 @@ export default function MetaAdsConnectScreen() {
 
         {step === 'picker' && (
           <View style={{ gap: SP.lg }}>
-            <Text style={[s.stepTitle, { color: colors.foreground }]}>Choose your Business</Text>
+            <Text style={[s.stepTitle, { color: colors.foreground }]}>Choose your business</Text>
             {pickerLoading && !businesses && <ActivityIndicator color={theme.accentLight} style={{ marginVertical: SP.lg }} />}
             {pickerError && (
               <EmptyState icon="alert-circle" title="Something went wrong" description={pickerError} action={{ label: 'Retry', onPress: loadBusinesses }} />
@@ -260,11 +268,11 @@ export default function MetaAdsConnectScreen() {
 
             {businessId && (
               <>
-                <Text style={[s.stepTitle, { color: colors.foreground, marginTop: SP.md }]}>Choose an Ad Account</Text>
+                <Text style={[s.stepTitle, { color: colors.foreground, marginTop: SP.md }]}>Choose an ad account</Text>
                 {pickerLoading && <ActivityIndicator color={theme.accentLight} style={{ marginVertical: SP.md }} />}
                 {adAccounts?.length === 0 && <Text style={[s.introBody, { color: colors.mutedForeground }]}>No ad accounts found for this business.</Text>}
                 {adAccounts?.map((a) => (
-                  <PickerRow key={a.id} label={a.name} sub={`${a.currency} · ${a.accountStatus}`} selected={adAccountId === a.id} onPress={() => setAdAccountId(a.id)} />
+                  <PickerRow key={a.id} label={a.name} sub={`${a.currency} · ${adAccountStatusLabel(a.accountStatus)}`} selected={adAccountId === a.id} onPress={() => setAdAccountId(a.id)} />
                 ))}
               </>
             )}
@@ -297,8 +305,8 @@ export default function MetaAdsConnectScreen() {
         {step === 'connected' && connection && (
           <View style={{ gap: SP.lg }}>
             <View style={[s.introCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[s.checkCircle, { backgroundColor: colors.success + '22' }]}>
-                <Feather name="check" size={22} color={colors.success} />
+              <View style={[s.checkCircle, { backgroundColor: colors.elevated }]}>
+                <Feather name="check" size={ICON.md} color={colors.foreground} />
               </View>
               <Text style={[s.introTitle, { color: colors.foreground }]}>Meta connected</Text>
               <SummaryRow label="Business" value={connection.businessName} colors={colors} />
@@ -352,5 +360,5 @@ const s = StyleSheet.create({
   radio:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioFill:   { width: 9, height: 9, borderRadius: 5 },
   rowLabel:    { fontSize: FS.base, fontFamily: FONT.semibold },
-  rowSub:      { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  rowSub:      { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
 });

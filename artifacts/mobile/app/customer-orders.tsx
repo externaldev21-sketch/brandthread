@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import { FS } from '@/lib/theme';
+import { FS, SP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
@@ -53,6 +53,13 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'neutral'
 
 function cents(c: number) {
   return formatCents(c);
+}
+
+// Raw order statuses ("delivered", "partially_refunded") as sentence-case
+// badge labels, matching the other seller StatusBadge call sites.
+function statusLabel(status: string): string {
+  const text = status.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export default function CustomerOrdersScreen() {
@@ -109,9 +116,20 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={customer?.name ?? 'Customer Orders'} onBack={() => goBackOr(router, '/customers')} />
+      <ScreenHeader title={customer?.name ?? 'Customer orders'} onBack={() => goBackOr(router, '/customers')} />
 
-      {loading ? (
+      {!customerId ? (
+        // No customerId in the URL: nothing to load (this used to render an
+        // empty "Order history — No orders yet" card as if it were a real
+        // customer with no orders).
+        <View style={s.center}>
+          <Feather name="user-x" size={28} color={colors.mutedForeground} />
+          <Text style={[s.errorText, { color: colors.mutedForeground }]}>
+            This customer couldn't be found.
+          </Text>
+          <Button label="Back to customers" variant="secondary" size="small" style={s.retryBtn} onPress={() => goBackOr(router, '/customers')} />
+        </View>
+      ) : loading ? (
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -185,7 +203,7 @@ export default function CustomerOrdersScreen() {
           )}
 
           {/* Orders list */}
-          <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>Order History</Text>
+          <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>Order history</Text>
           {orders.length === 0 ? (
             <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="inbox" size={28} color={colors.mutedForeground} />
@@ -194,9 +212,14 @@ export default function CustomerOrdersScreen() {
           ) : (
             <View style={[s.orderList, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {orders.map((order, i) => (
-                <View
+                <TouchableOpacity
                   key={order.id}
                   style={[s.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+                  onPress={() => router.push(`/order-detail?id=${encodeURIComponent(order.id)}` as never)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Order ${order.orderNumber}, ${cents(order.totalCents)}, ${statusLabel(order.status)}`}
+                  accessibilityHint="Opens the order"
                 >
                   <View style={s.orderLeft}>
                     <Text style={[s.orderNum, { color: colors.foreground }]}>#{order.orderNumber}</Text>
@@ -215,11 +238,11 @@ export default function CustomerOrdersScreen() {
                   <View style={s.orderRight}>
                     <Text style={[s.orderTotal, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
                     <StatusBadge
-                      label={order.status}
+                      label={statusLabel(order.status)}
                       variant={STATUS_VARIANT[order.status] ?? 'neutral'}
                     />
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -231,7 +254,7 @@ export default function CustomerOrdersScreen() {
 
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
+  scroll:       { padding: SP.md, paddingBottom: SP.xl, gap: SP.md },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   errorText:    { fontSize: FS.sm, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
   retryBtn:     { marginTop: 8 },
@@ -239,8 +262,8 @@ const s = StyleSheet.create({
   custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   avatar:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  custName:     { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  avatarText:   { fontSize: FS.base, fontFamily: 'Inter_700Bold' },
+  custName:     { fontSize: FS.base, fontFamily: 'Inter_700Bold' },
   custEmail:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
   statsRow:     { flexDirection: 'row', borderRadius: 10, padding: 12 },
   stat:         { flex: 1, alignItems: 'center', gap: 2 },
@@ -259,8 +282,8 @@ const s = StyleSheet.create({
   orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
   orderLeft:    { flex: 1, gap: 3 },
   orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
+  orderDate:    { fontSize: FS.meta, fontFamily: 'Inter_400Regular' },
+  trackingText: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
   orderTotal:   { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
 });

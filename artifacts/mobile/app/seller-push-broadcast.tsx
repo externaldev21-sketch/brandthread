@@ -8,7 +8,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -17,7 +16,9 @@ import { ListRow } from '@/components/ui/ListRow';
 import { OptionSheet } from '@/components/ui/OptionSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FONT, FS, SP } from '@/lib/theme';
-import { formatNextSend } from '@/lib/sellerEngagement';
+import { formatDay, formatNextSend } from '@/lib/sellerEngagement';
+
+const followers = (n: number) => `${n} ${n === 1 ? 'follower' : 'followers'}`;
 
 const TITLE_MAX = 50;
 const BODY_MAX = 178;
@@ -28,7 +29,6 @@ export default function SellerPushBroadcastScreen() {
   const api = useApi();
   const router = useRouter();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -86,7 +86,7 @@ export default function SellerPushBroadcastScreen() {
     try {
       setReview(await api.sellerPush.preview(payload));
     } catch (e: any) {
-      setError(e?.message || 'Could not review this message.');
+      setError(e?.message || "Couldn't review this push.");
     } finally { setBusy(false); }
   }
 
@@ -98,7 +98,7 @@ export default function SellerPushBroadcastScreen() {
       setReview(null); setTitle(''); setBody('');
       load();
     } catch (e: any) {
-      setError(e?.message || 'Could not send.');
+      setError(e?.message || "Couldn't send this push.");
       load();
     } finally { setBusy(false); }
   }
@@ -119,10 +119,10 @@ export default function SellerPushBroadcastScreen() {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title="Follower push" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 140 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
           {loading ? <ActivityIndicator color={c.foreground} style={{ marginVertical: 40 }} /> : loadError ? (
             <View style={{ gap: SP.sm }}>
-              <Text style={[styles.note, { color: c.mutedForeground }]}>Couldn't load your push status.</Text>
+              <Text style={[styles.note, { color: c.mutedForeground }]}>Couldn't load follower push.</Text>
               <Button label="Try again" variant="secondary" onPress={() => { setLoading(true); load(); }} />
             </View>
           ) : (
@@ -130,14 +130,16 @@ export default function SellerPushBroadcastScreen() {
               <Text style={[styles.lead, { color: c.foreground }]}>
                 {limited
                   ? `You can send your next push ${formatNextSend(status.nextSendAt)}.`
-                  : `Send one push to your ${status?.audience?.recipients ?? 0} reachable followers. You can send one every 24 hours.`}
+                  : (status?.audience?.recipients ?? 0) > 0
+                    ? `Send one push to ${followers(status.audience.recipients)} who can receive it. You can send one every 24 hours.`
+                    : 'None of your followers can receive a push yet. You can send one every 24 hours.'}
               </Text>
 
               {sent ? (
                 <View style={[styles.banner, { borderColor: c.border }]}>
                   <Feather name="check-circle" size={18} color={c.success} />
                   <Text style={[styles.note, { color: c.foreground, flex: 1 }]}>
-                    Sent to {sent.delivery.sent} followers. Your next push opens {formatNextSend(sent.nextSendAt)}.
+                    Sent to {followers(sent.delivery.sent)}. Your next push opens {formatNextSend(sent.nextSendAt)}.
                   </Text>
                 </View>
               ) : null}
@@ -187,7 +189,7 @@ export default function SellerPushBroadcastScreen() {
                 <>
                   <SectionHeader title="Past pushes" />
                   {status.history.map((h: any) => (
-                    <ListRow key={h.id} title={h.title} subtitle={`${h.sentCount} sent · ${formatNextSend(h.createdAt)}`} chevron
+                    <ListRow key={h.id} title={h.title} subtitle={`${h.sentCount} sent · ${formatDay(h.createdAt)}`} chevron
                       onPress={() => router.push(`/seller-push-broadcast-results?id=${encodeURIComponent(h.id)}` as never)} />
                   ))}
                 </>

@@ -54,9 +54,11 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
   const color = statusColor(colors, p.inventoryStatus);
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.push(`/product-detail?id=${p.productId}` as never); }}
+      onPress={() => { Haptics.selectionAsync(); router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never); }}
       style={s.prodRow}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`${p.name}, ${formatCents(p.revenueCents)}, ${p.unitsSold} units sold`}
     >
       <View style={s.rankBadge}><Text style={s.rankText}>{rank}</Text></View>
       <View style={s.prodThumb}>
@@ -67,7 +69,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
         <View style={s.prodMeta}>
           <Text style={s.prodStat}>{formatCents(p.revenueCents)}</Text>
           <Text style={s.dotSep}>·</Text>
-          <Text style={s.prodStat}>{p.unitsSold} units</Text>
+          <Text style={s.prodStat}>{p.unitsSold.toLocaleString()} units</Text>
           {typeof p.conversionRate === 'number' && (
             <>
               <Text style={s.dotSep}>·</Text>
@@ -77,9 +79,12 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
         </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <View style={[s.statusDot, { backgroundColor: color + '22', borderColor: color }]}>
-          <Text style={[s.statusText, { color }]}>{statusLabel(p.inventoryStatus)}</Text>
-        </View>
+        {/* The products endpoint may omit stock status; never show an empty "—" badge. */}
+        {statusLabel(p.inventoryStatus) !== '—' && (
+          <View style={[s.statusDot, { backgroundColor: color + '22', borderColor: color }]}>
+            <Text style={[s.statusText, { color }]}>{statusLabel(p.inventoryStatus)}</Text>
+          </View>
+        )}
         {typeof p.refundRate === 'number' && p.refundRate > 3 && (
           <View style={s.refundWarn}>
             <Feather name="alert-triangle" size={10} color={colors.destructive} />
@@ -157,7 +162,7 @@ export default function AnalyticsProductsScreen() {
         ]}
       />
 
-      <SectionTitle>{SORT_OPTIONS.find(o => o.key === sortKey)?.label}</SectionTitle>
+      <SectionTitle>{sortKey === 'topByUnits' ? 'Top products by units' : 'Top products by revenue'}</SectionTitle>
       {rows.length === 0 ? (
         <EmptyState
           icon="package"
@@ -174,7 +179,8 @@ export default function AnalyticsProductsScreen() {
           ))}
         </Card>
       )}
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -185,7 +191,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   scroll:   { flex: 1, backgroundColor: 'transparent' },
   loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
-  prodRow:  { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.sm + 2, paddingVertical: SP.sm, gap: SP.sm },
+  prodRow:  { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.sm + 4, paddingVertical: SP.sm, gap: SP.sm },
   rankBadge:{ width: 22, height: 22, borderRadius: RADIUS.xs, backgroundColor: colors.elevated, alignItems: 'center', justifyContent: 'center' },
   rankText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.mutedForeground },
   prodThumb:{ width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
@@ -193,7 +199,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   prodMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
   prodStat: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   dotSep:   { fontSize: FS.xs, color: colors.subtle },
-  statusDot:{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADIUS.pill, borderWidth: 1 },
+  statusDot:{ paddingHorizontal: SP.sm, paddingVertical: 2, borderRadius: RADIUS.pill, borderWidth: 1 },
   statusText:{ fontSize: FS.xs, fontFamily: FONT.medium },
   refundWarn:{ flexDirection: 'row', alignItems: 'center', gap: 3 },
   refundWarnText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.destructive },

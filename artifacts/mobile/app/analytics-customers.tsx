@@ -20,6 +20,7 @@ import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTyp
 import { EmptyState } from '@/components/BrandthreadUI';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { ProLockedState } from '@/components/analytics/ProLockedState';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -36,6 +37,26 @@ type TopCustomer = {
   lastOrderAt: string | null;
   firstOrderAt: string | null;
 };
+
+/** Signed-out web preview never calls the API: fresh = real zeros, &demo=1 = a small sample. */
+function previewCustomers(demo: boolean): { data: CustomerAnalytics; top: TopCustomer[] } {
+  const m = (key: string, value: number, formatted: string) => ({ key, label: '', value, formatted, unit: 'number' as const });
+  const data = {
+    totalCustomers: m('total_customers', demo ? 127 : 0, demo ? '127' : '0'),
+    returningCustomers: m('repeat_customers', demo ? 41 : 0, demo ? '41' : '0'),
+    repeatRate: m('repeat_rate', demo ? 32 : 0, demo ? '32%' : '0%'),
+    purchaseFrequency: m('avg_orders_per_customer', demo ? 1.6 : 0, demo ? '1.6' : '0'),
+    cohorts: [], topLocations: [], newVsReturningChart: [],
+  } as unknown as CustomerAnalytics;
+  const day = 864e5;
+  const top: TopCustomer[] = !demo ? [] : [
+    ['Jordan Reyes', 6, 68400, 2], ['Priya Natarajan', 4, 51200, 5], ['Marcus Lee', 3, 39600, 9],
+  ].map(([name, orderCount, totalCents, ago]) => ({
+    buyerId: null, customerId: null, name: name as string, email: '', orderCount: orderCount as number, totalCents: totalCents as number,
+    lastOrderAt: new Date(Date.now() - (ago as number) * day).toISOString(), firstOrderAt: null,
+  }));
+  return { data, top };
+}
 
 function retColor(colors: ReturnType<typeof useColors>, pct: number): string {
   if (pct === 0) return colors.subtle;
@@ -92,6 +113,12 @@ export default function AnalyticsCustomersScreen() {
 
   useEffect(() => {
     requestUser.current = null;
+    if (isSellerDevPreview()) {
+      const preview = previewCustomers(isPreviewDemoMode());
+      setData(preview.data); setTopCustomers(preview.top);
+      setLoadError(false); setProLocked(false); setLoading(false);
+      return;
+    }
     setData(null); setFilter(null); setTopCustomers([]);
     setLoading(!authLoaded);
     if (authLoaded && userId) { setLoading(true); load(); }
@@ -99,7 +126,7 @@ export default function AnalyticsCustomersScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenHeader title="Customer Analytics" />
+      <ScreenHeader title="Customer analytics" />
       {loading ? (
         <AnalyticsSkeleton kpiCount={0} listRows={4} />
       ) : proLocked ? (
@@ -113,24 +140,24 @@ export default function AnalyticsCustomersScreen() {
       style={s.scroll}
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
+      refreshControl={isSellerDevPreview() ? undefined : <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
       {/* KPIs */}
       <SectionTitle>Overview</SectionTitle>
       <Card>
         {data && <>
-          <StatRow label={data.totalCustomers.label} value={data.totalCustomers.formatted} icon="users" iconColor={colors.primary} />
+          <StatRow label="Customers" value={data.totalCustomers.formatted} icon="users" iconColor={colors.primary} />
           <CardDivider />
-          <StatRow label={data.returningCustomers.label} value={data.returningCustomers.formatted} changePct={data.returningCustomers.changePct} icon="repeat" iconColor={colors.info} />
+          <StatRow label="Returning customers" value={data.returningCustomers.formatted} changePct={data.returningCustomers.changePct} icon="repeat" iconColor={colors.info} />
           <CardDivider />
-          <StatRow label={data.repeatRate.label} value={data.repeatRate.formatted} changePct={data.repeatRate.changePct} icon="refresh-cw" iconColor={colors.primary} />
+          <StatRow label="Repeat rate" value={data.repeatRate.formatted} changePct={data.repeatRate.changePct} icon="refresh-cw" iconColor={colors.primary} />
           <CardDivider />
-          <StatRow label={data.purchaseFrequency.label} value={data.purchaseFrequency.formatted} changePct={data.purchaseFrequency.changePct} icon="shopping-bag" iconColor={colors.info} />
+          <StatRow label="Orders per customer" value={data.purchaseFrequency.formatted} changePct={data.purchaseFrequency.changePct} icon="shopping-bag" iconColor={colors.info} />
         </>}
       </Card>
 
       {/* Top customers */}
-      <SectionTitle>Top Customers</SectionTitle>
+      <SectionTitle>Top customers</SectionTitle>
       <Card>
         {topCustomers.length === 0 ? (
           <View style={s.customerEmpty}>
@@ -178,17 +205,18 @@ export default function AnalyticsCustomersScreen() {
         )}
       </Card>
 
-      {/* Cohorts */}
-      <SectionTitle>Cohort Retention</SectionTitle>
+      {/* Cohorts (only when the API returns them) */}
+      {!!data?.cohorts.length && <>
+      <SectionTitle>Cohort retention</SectionTitle>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.lg }}>
         <View>
           <View style={s.cohortHeaderRow}>
             <Text style={[s.cohortCell, s.cohortLabelCell]}>Cohort</Text>
             <Text style={s.cohortCell}>Customers</Text>
-            <Text style={s.cohortCell}>M+1</Text>
-            <Text style={s.cohortCell}>M+2</Text>
-            <Text style={s.cohortCell}>M+3</Text>
-            <Text style={s.cohortCell}>Avg LTV</Text>
+            <Text style={s.cohortCell}>Month 1</Text>
+            <Text style={s.cohortCell}>Month 2</Text>
+            <Text style={s.cohortCell}>Month 3</Text>
+            <Text style={s.cohortCell}>Lifetime value</Text>
           </View>
           {data?.cohorts.map(c => (
             <View key={c.cohortLabel} style={s.cohortRow}>
@@ -197,14 +225,16 @@ export default function AnalyticsCustomersScreen() {
               <Text style={[s.cohortCell, { color: retColor(colors, c.month1RetentionPct) }]}>{c.month1RetentionPct > 0 ? `${c.month1RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(colors, c.month2RetentionPct) }]}>{c.month2RetentionPct > 0 ? `${c.month2RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(colors, c.month3RetentionPct) }]}>{c.month3RetentionPct > 0 ? `${c.month3RetentionPct}%` : '—'}</Text>
-              <Text style={[s.cohortCell, { color: colors.warning }]}>{formatCents(c.avgLtvCents)}</Text>
+              <Text style={[s.cohortCell, { color: colors.foreground }]}>{formatCents(c.avgLtvCents)}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
+      </>}
 
-      {/* Locations */}
-      <SectionTitle>Top Locations</SectionTitle>
+      {/* Locations (only when the API returns them) */}
+      {!!data?.topLocations.length && <>
+      <SectionTitle>Top locations</SectionTitle>
       <Card>
         {data?.topLocations.map((loc, i) => (
           <View key={loc.location}>
@@ -224,8 +254,9 @@ export default function AnalyticsCustomersScreen() {
           </View>
         ))}
       </Card>
+      </>}
 
-      <View style={{ height: 120 }} />
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -235,7 +266,7 @@ export default function AnalyticsCustomersScreen() {
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
   loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
-  content:  { paddingHorizontal: SP.md },
+  content:  { paddingHorizontal: SP.md, paddingTop: SP.sm },
   cohortHeaderRow:{ flexDirection: 'row', backgroundColor: colors.elevated, borderRadius: RADIUS.sm, marginBottom: 4, padding: 4 },
   cohortRow:{ flexDirection: 'row', backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border, padding: 4 },
   cohortCell:{ width: 80, textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, paddingVertical: 8 },
@@ -249,7 +280,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   customerRankText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.accentForeground },
   customerInfo: { flex: 1, minWidth: 0, gap: 3 },
   customerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
-  customerMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+  customerMeta: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground },
   customerSpend: { alignItems: 'flex-end', gap: 3 },
   customerSpendValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
   customerEmpty: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.sm },

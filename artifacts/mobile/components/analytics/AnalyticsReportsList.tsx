@@ -15,7 +15,7 @@ export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyp
   { label: 'Goals', icon: 'target', href: '/analytics-goals' },
   { label: 'Export', icon: 'download', href: '/analytics-export' },
   { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-advanced', badge: 'PRO' },
-  { label: 'Customer cohorts and lifetime value', icon: 'users', href: '/analytics-cohorts', badge: 'PRO' },
+  { label: 'Customer cohorts and lifetime value', icon: 'pie-chart', href: '/analytics-cohorts', badge: 'PRO' },
 ];
 
 /** Entry points to the seller reports; appended to the Analytics tab. */

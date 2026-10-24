@@ -33,6 +33,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LoadingSkeleton, HapticSwitch} from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/layout';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
@@ -82,13 +83,17 @@ function dateStrForOffset(offsetDays: number): string {
 }
 
 const DAY_CHIP_COUNT = 21;
-const DAY_CHIPS = Array.from({ length: DAY_CHIP_COUNT }, (_, i) => {
-  const value = dateStrForOffset(i);
-  const d = new Date();
-  d.setDate(d.getDate() + i);
-  const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  return { value, label };
-});
+// Built per picker mount (not once at module load) so "Today"/"Tomorrow"
+// stay correct when the app has been open across midnight.
+function buildDayChips() {
+  return Array.from({ length: DAY_CHIP_COUNT }, (_, i) => {
+    const value = dateStrForOffset(i);
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return { value, label };
+  });
+}
 
 const TIME_CHIPS = Array.from({ length: 48 }, (_, i) => {
   const hour = Math.floor(i / 2);
@@ -122,6 +127,7 @@ function DateTimeChipPicker({
   dateValue: string; timeValue: string; onDateChange: (v: string) => void; onTimeChange: (v: string) => void; theme: any;
 }) {
   const [customOpen, setCustomOpen] = useState(false);
+  const DAY_CHIPS = useMemo(buildDayChips, []);
   // A date/time outside the 21-day quick-pick range (e.g. editing an older
   // drop) still needs to render as selected — fall back to Custom for those.
   const dateInChips = DAY_CHIPS.some(c => c.value === dateValue);
@@ -140,7 +146,13 @@ function DateTimeChipPicker({
           <Chip key={c.value} label={c.label} active={timeValue === c.value} onPress={() => onTimeChange(c.value)} theme={theme} />
         ))}
       </ScrollView>
-      <TouchableOpacity onPress={() => setCustomOpen(v => !v)} style={styles.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity
+        onPress={() => setCustomOpen(v => !v)}
+        style={styles.customToggle}
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showCustom }}
+      >
         <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={theme.muted} />
         <Text style={[styles.customToggleText, { color: theme.muted }]}>Enter an exact date & time</Text>
       </TouchableOpacity>
@@ -152,6 +164,7 @@ function DateTimeChipPicker({
             onChangeText={onDateChange}
             placeholder="YYYY-MM-DD"
             placeholderTextColor={theme.muted}
+            accessibilityLabel="Date (YYYY-MM-DD)"
           />
           <TextInput
             style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
@@ -159,6 +172,7 @@ function DateTimeChipPicker({
             onChangeText={onTimeChange}
             placeholder="HH:MM"
             placeholderTextColor={theme.muted}
+            accessibilityLabel="Time (24-hour HH:MM)"
           />
         </View>
       )}
@@ -176,6 +190,8 @@ export default function SellerDropCreate() {
   const isEdit = !!dropId;
 
   const [loading, setLoading] = useState(isEdit);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -212,6 +228,7 @@ export default function SellerDropCreate() {
     }).catch(() => {});
 
     if (isEdit && dropId) {
+      setLoadFailed(false);
       api.drops.get(dropId).then((data: any) => {
         if (!active || !data) return;
         setName(data.name ?? '');
@@ -234,12 +251,14 @@ export default function SellerDropCreate() {
         setSelectedProductIds(assigned);
         setOriginalProductIds(assigned);
       }).catch(() => {
-        Alert.alert("Couldn't load drop", 'Try again from the drops list.');
+        // Don't fall through to a blank "Edit drop" form whose Save / Cancel
+        // drop buttons would act on a drop we never loaded.
+        if (active) setLoadFailed(true);
       }).finally(() => { if (active) setLoading(false); });
     }
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dropId]);
+  }, [dropId, loadAttempt]);
 
   const timeZones = useMemo(() => listSupportedTimeZones(), []);
   const filteredZones = useMemo(() => {
@@ -298,14 +317,14 @@ export default function SellerDropCreate() {
     }
     const releaseParts = parseDateAndTime(releaseDate, releaseTime);
     if (!releaseParts) {
-      Alert.alert('Launch date required', 'Enter the launch date as YYYY-MM-DD and time as HH:MM (24h).');
+      Alert.alert('Launch date required', 'Pick a launch day and time, or enter an exact date (YYYY-MM-DD) and 24-hour time (HH:MM).');
       return;
     }
     let endsAtIso: string | undefined;
     if (hasEndDate) {
       const endParts = parseDateAndTime(endDate, endTime);
       if (!endParts) {
-        Alert.alert('End date invalid', 'Enter the end date as YYYY-MM-DD and time as HH:MM (24h), or turn off "Set an end time".');
+        Alert.alert('End time required', 'Pick an end day and time, or turn off "Set an end time".');
         return;
       }
       endsAtIso = zonedTimeToUtc(endParts, timezone).toISOString();
@@ -416,11 +435,27 @@ export default function SellerDropCreate() {
     );
   }
 
+  if (loadFailed) {
+    return (
+      <View style={[styles.root, { backgroundColor: theme.background }]}>
+        <ScreenHeader title="Edit drop" />
+        <EmptyState
+          icon="alert-circle"
+          variant="error"
+          title="Couldn't load this drop"
+          message="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => { setLoading(true); setLoadAttempt(n => n + 1); }}
+        />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.root, { backgroundColor: theme.background }]}>
         <ScreenHeader title={isEdit ? 'Edit drop' : 'New drop'} />
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xxl, gap: SP.lg }}>
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl, gap: SP.lg }}>
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.muted }]}>DROP NAME</Text>
@@ -430,6 +465,7 @@ export default function SellerDropCreate() {
               onChangeText={setName}
               placeholder="e.g. Midnight Capsule"
               placeholderTextColor={theme.muted}
+              accessibilityLabel="Drop name"
             />
           </View>
 
@@ -447,6 +483,8 @@ export default function SellerDropCreate() {
                     isEdit && { opacity: 0.6 },
                   ]}
                   onPress={() => setType(t)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: type === t, disabled: isEdit }}
                 >
                   <Text style={[styles.segmentText, { color: type === t ? theme.onAccent : theme.text }]}>
                     {t === 'pre-order' ? 'Pre-order' : 'Pre-made'}
@@ -466,12 +504,15 @@ export default function SellerDropCreate() {
                 ) : (
                   <View style={[styles.heroPreview, styles.heroVideoPlaceholder, { backgroundColor: theme.cardElevated }]}>
                     <Feather name="film" size={22} color={theme.muted} />
-                    <Text style={{ color: theme.muted, fontSize: FS.xs, marginTop: 6 }}>Video selected</Text>
+                    <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta, marginTop: SP.sm }}>Video selected</Text>
                   </View>
                 )}
                 <TouchableOpacity
                   style={[styles.heroRemoveBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                   onPress={() => { setHeroImageUrl(null); setHeroVideoUrl(null); }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove hero media"
                 >
                   <Feather name="x" size={14} color={theme.text} />
                 </TouchableOpacity>
@@ -482,6 +523,7 @@ export default function SellerDropCreate() {
                   style={[styles.heroPickBtn, { borderColor: theme.border, backgroundColor: theme.card }]}
                   onPress={() => pickHero('image')}
                   disabled={heroUploading}
+                  accessibilityRole="button"
                 >
                   <Feather name="image" size={18} color={theme.text} />
                   <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add photo</Text>
@@ -490,6 +532,7 @@ export default function SellerDropCreate() {
                   style={[styles.heroPickBtn, { borderColor: theme.border, backgroundColor: theme.card }]}
                   onPress={() => pickHero('video')}
                   disabled={heroUploading}
+                  accessibilityRole="button"
                 >
                   <Feather name="film" size={18} color={theme.text} />
                   <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add video</Text>
@@ -511,6 +554,9 @@ export default function SellerDropCreate() {
             <TouchableOpacity
               style={[styles.tzButton, { borderColor: theme.border, backgroundColor: theme.card }]}
               onPress={() => setTzPickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Timezone, ${timezone}`}
+              accessibilityHint="Opens the timezone list"
             >
               <Feather name="globe" size={14} color={theme.muted} />
               <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }} numberOfLines={1}>{timezone}</Text>
@@ -524,7 +570,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>SET AN END TIME</Text>
-              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} />
+              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} accessibilityLabel="Set an end time" />
             </View>
             {hasEndDate && (
               <View style={{ marginTop: 8 }}>
@@ -542,7 +588,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>EARLY ACCESS FOR FOLLOWERS</Text>
-              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} />
+              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} accessibilityLabel="Early access for followers" />
             </View>
             {earlyAccessEnabled && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
@@ -553,8 +599,9 @@ export default function SellerDropCreate() {
                   keyboardType="number-pad"
                   placeholder="30"
                   placeholderTextColor={theme.muted}
+                  accessibilityLabel="Early access minutes"
                 />
-                <Text style={{ color: theme.muted, fontSize: FS.sm }}>minutes before everyone else</Text>
+                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>minutes before everyone else</Text>
               </View>
             )}
           </View>
@@ -602,6 +649,7 @@ export default function SellerDropCreate() {
             style={[styles.saveBtn, { backgroundColor: theme.accent }, saving && { opacity: 0.7 }]}
             onPress={handleSave}
             disabled={saving || heroUploading}
+            accessibilityRole="button"
           >
             {saving ? <ActivityIndicator color={theme.onAccent} /> : (
               <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base }}>
@@ -615,6 +663,7 @@ export default function SellerDropCreate() {
               <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: theme.border }]}
                 onPress={() => router.push((`/seller-drop-preview?dropId=${encodeURIComponent(dropId)}`) as never)}
+                accessibilityRole="button"
               >
                 <Feather name="eye" size={16} color={theme.text} />
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Preview</Text>
@@ -623,6 +672,7 @@ export default function SellerDropCreate() {
                 style={[styles.secondaryBtn, { borderColor: '#FF3B30' }]}
                 onPress={handleCancelDrop}
                 disabled={cancelling}
+                accessibilityRole="button"
               >
                 {cancelling ? <ActivityIndicator color="#FF3B30" /> : (
                   <>
@@ -640,7 +690,12 @@ export default function SellerDropCreate() {
         <View style={[styles.root, { backgroundColor: theme.background, paddingTop: topInset }]}>
           <View style={styles.tzHeader}>
             <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
-            <TouchableOpacity onPress={() => setTzPickerOpen(false)}>
+            <TouchableOpacity
+              onPress={() => setTzPickerOpen(false)}
+              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <Feather name="x" size={22} color={theme.text} />
             </TouchableOpacity>
           </View>
@@ -650,13 +705,21 @@ export default function SellerDropCreate() {
             onChangeText={setTzFilter}
             placeholder="Search timezones…"
             placeholderTextColor={theme.muted}
+            accessibilityLabel="Search timezones"
           />
-          <ScrollView>
+          {/* Full-screen Modal: sits over the tab bar, so only the home
+              indicator needs clearing here. */}
+          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SP.md }} keyboardShouldPersistTaps="handled">
+            {filteredZones.length === 0 && (
+              <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md }}>No timezones match “{tzFilter.trim()}”.</Text>
+            )}
             {filteredZones.map(z => (
               <TouchableOpacity
                 key={z}
                 style={[styles.tzRow, { borderColor: theme.border }]}
                 onPress={() => { setTimezone(z); setTzPickerOpen(false); setTzFilter(''); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: z === timezone }}
               >
                 <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{z}</Text>
                 {z === timezone && <Feather name="check" size={16} color={theme.accent} />}

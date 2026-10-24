@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -13,13 +12,15 @@ import { ChipGroup } from '@/components/ui';
 import { FONT, FS, SP } from '@/lib/theme';
 
 const DURATIONS = [{ id: '3', label: '3 days' }, { id: '7', label: '7 days' }, { id: '14', label: '14 days' }, { id: '30', label: '30 days' }];
+/** Shortens a caption for a one-line label, with an ellipsis when it was cut. */
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
 const WINNERS = [{ id: '1', label: '1' }, { id: '2', label: '2' }, { id: '3', label: '3' }, { id: '5', label: '5' }, { id: '10', label: '10' }];
 
 export default function SellerGiveawayCreate() {
   const api = useApi();
   const router = useRouter();
   const c = useColors();
-  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
   const [prize, setPrize] = useState('');
   const [winners, setWinners] = useState('1');
@@ -82,7 +83,7 @@ export default function SellerGiveawayCreate() {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title="New giveaway" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 140 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
           {field('Title', title, setTitle, { placeholder: 'Win the black jacket' })}
           {field('Prize', prize, setPrize, { placeholder: 'The Nord jacket, any size' })}
           <ListRow icon="shopping-bag" title="Prize product" value={product?.label ?? 'None'} chevron onPress={() => setSheet('product')} />
@@ -98,14 +99,15 @@ export default function SellerGiveawayCreate() {
           {field('Official rules', rules, setRules, { multiline: true, onEdit: () => setRulesEdited(true) })}
           {rulesEdited ? <Button label="Reset rules to template" variant="tertiary" onPress={() => setRulesEdited(false)} /> : null}
           {error ? <Text style={[styles.error, { color: c.destructive }]}>{error}</Text> : null}
+          {!valid ? <Text style={[styles.note, { color: c.mutedForeground, marginTop: SP.md }]}>Add a title, a prize and the official rules to start.</Text> : null}
           <View style={{ height: SP.lg }} />
           <Button label="Start giveaway" fullWidth loading={busy} disabled={!valid} onPress={submit} />
         </ScrollView>
       </KeyboardAvoidingView>
       <OptionSheet visible={sheet === 'post'} onClose={() => setSheet(null)} title="Entry post"
-        options={[{ id: 'none', label: 'Follow only' }, ...posts.slice(0, 20).map((p) => ({ id: p.id, label: (p.caption || 'Untitled post').slice(0, 48) }))]}
+        options={[{ id: 'none', label: 'Follow only' }, ...posts.slice(0, 20).map((p) => ({ id: p.id, label: clip(p.caption || 'Untitled post', 48) }))]}
         selectedId={post?.id ?? 'none'}
-        onSelect={(id) => { const p = posts.find((x) => x.id === id); setPost(p ? { id: p.id, label: (p.caption || 'Untitled post').slice(0, 24) } : null); setSheet(null); }} />
+        onSelect={(id) => { const p = posts.find((x) => x.id === id); setPost(p ? { id: p.id, label: clip(p.caption || 'Untitled post', 24) } : null); setSheet(null); }} />
       <OptionSheet visible={sheet === 'product'} onClose={() => setSheet(null)} title="Prize product"
         options={[{ id: 'none', label: 'None' }, ...products.slice(0, 20).map((p) => ({ id: p.id, label: p.name }))]}
         selectedId={product?.id ?? 'none'}
@@ -115,7 +117,7 @@ export default function SellerGiveawayCreate() {
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
+  label: { fontSize: FS.meta, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular },
   multiline: { minHeight: 200, textAlignVertical: 'top' },

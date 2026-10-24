@@ -123,7 +123,7 @@ export default function CustomersScreen() {
         title="Customers"
         rightElement={
           <TouchableOpacity
-            onPress={() => router.navigate('/(tabs)/analytics' as never)}
+            onPress={() => router.push('/analytics-customers' as never)}
             hitSlop={10}
             activeOpacity={0.7}
             style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}
@@ -144,7 +144,7 @@ export default function CustomersScreen() {
       <View style={styles.statsRow}>
         {[
           { label: 'Total', value: totalCustomers.toLocaleString(), icon: 'users' as const },
-          { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'heart' as const },
+          { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'dollar-sign' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -163,6 +163,8 @@ export default function CustomersScreen() {
           placeholderTextColor={colors.mutedForeground}
           value={search}
           onChangeText={setSearch}
+          accessibilityLabel="Search customers"
+          returnKeyType="search"
         />
       </View>
 
@@ -175,6 +177,9 @@ export default function CustomersScreen() {
               key={opt.key}
               activeOpacity={0.7}
               onPress={() => setSortBy(opt.key)}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${opt.label}`}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.segChip,
                 {
@@ -207,8 +212,8 @@ export default function CustomersScreen() {
           // Dev's explicit call: Customers gets no action button, ever —
           // there's nothing a seller can "do" from an empty customer list
           // (see the fresh-preview empty-state action audit in this PR's
-          // description).
-          compact
+          // description). Not `compact`: compact drops the message, which
+          // is what tells a searching seller to try a different term.
         />
       ) : (
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -233,7 +238,10 @@ export default function CustomersScreen() {
                 key={c.id}
                 activeOpacity={0.8}
                 style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-                onPress={() => router.push(`/customer-orders?customerId=${c.id}` as never)}
+                onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
+                accessibilityRole="button"
+                accessibilityLabel={`${c.name}, ${c.email}`}
+                accessibilityHint="Opens this customer's orders"
               >
                 <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
                   <Text style={[styles.avatarText, { color }]}>{initials}</Text>
@@ -293,7 +301,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   segments: { marginBottom: 16 },
   sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1 },
+  segChip: { paddingHorizontal: 14, minHeight: 36, justifyContent: 'center', borderRadius: radius.sm, borderWidth: 1 },
   segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
@@ -301,8 +309,8 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
   custInfo: { flex: 1, gap: 2 },
   custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
-  custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custEmail: { fontSize: FS.meta, fontFamily: 'Inter_400Regular' },
+  custOrders: { fontSize: FS.meta, fontFamily: 'Inter_400Regular' },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },

@@ -15,6 +15,10 @@ import { getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import type { SellerCreator } from '@/lib/affiliateTypes';
 import { ActionButton, KeyStatRow, Pill, SectionTitle } from '@/components/affiliate/AffiliateUI';
 
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Active', pending: 'Needs approval', paused: 'Paused', invited: 'Invited', removed: 'Removed', declined: 'Declined',
+};
+
 export default function SellerCreatorDetailScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -46,6 +50,7 @@ export default function SellerCreatorDetailScreen() {
 
   const run = async (key: string, fn: () => Promise<unknown>, leave?: boolean) => {
     setBusy(key);
+    setMsg(null);
     try {
       if (!previewOnly) await fn();
       if (leave) router.back(); else await load();
@@ -56,17 +61,17 @@ export default function SellerCreatorDetailScreen() {
   const c = creator;
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <ScreenHeader title={c?.displayName ?? c?.username ?? 'Creator'} />
+      <ScreenHeader title={c?.displayName ?? (c?.username ? `@${c.username}` : 'Creator')} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         {loading ? <ActivityIndicator color={theme.text} /> : error ? <RetryRow label="Couldn't load this creator" onRetry={load} /> : !c ? (
-          <Text style={{ fontFamily: FONT.regular, color: theme.muted }}>This creator isn't in your program.</Text>
+          <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted }}>This creator isn't in your program.</Text>
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
               <Text style={{ fontFamily: FONT.bold, fontSize: FS.xl, color: theme.text, letterSpacing: 2 }}>{c.code}</Text>
-              <Pill label={c.status === 'active' ? 'Active' : c.status === 'pending' ? 'Needs approval' : c.status === 'paused' ? 'Paused' : 'Invited'} tone={c.status === 'active' ? 'strong' : 'neutral'} />
+              <Pill label={STATUS_LABEL[c.status] ?? c.status} tone={c.status === 'active' ? 'strong' : 'neutral'} />
             </View>
-            {c.username ? <Text style={{ fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm }}>@{c.username}</Text> : null}
+            {c.username ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginBottom: SP.sm }}>@{c.username}</Text> : null}
 
             <SectionTitle>Performance</SectionTitle>
             <KeyStatRow label="Clicks" value={String(c.stats.clicks)} />
@@ -86,7 +91,7 @@ export default function SellerCreatorDetailScreen() {
                 style={{ flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text }}
                 accessibilityLabel="Commission override"
               />
-              <Text style={{ fontFamily: FONT.medium, color: theme.muted }}>%</Text>
+              <Text style={{ fontFamily: FONT.medium, fontSize: FS.base, color: theme.muted }}>%</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg }}>
               <ActionButton label="Save rate" flex loading={busy === 'rate'} disabled={override.trim() === '' || !Number.isFinite(Number(override))}
@@ -94,7 +99,7 @@ export default function SellerCreatorDetailScreen() {
               <ActionButton label="Use default" flex outline disabled={!c.hasOverride || busy === 'rate'}
                 onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: null }))} />
             </View>
-            <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginBottom: SP.lg }}>
+            <Text style={{ fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginBottom: SP.lg }}>
               A new rate applies to future orders. Existing commissions keep the rate they were earned at.
             </Text>
 

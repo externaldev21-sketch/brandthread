@@ -43,7 +43,7 @@ export default function AnalyticsExportScreen() {
     try {
       const file = await requestExport(format, range, picked);
       const done = await saveExportFile(file);
-      if (!done) Alert.alert('Export ready', 'Sharing is not available on this device.');
+      if (!done) Alert.alert("Couldn't share export", 'Sharing is not available on this device.');
     } catch {
       Alert.alert('Export failed', 'Could not generate the export. Check your connection and try again.');
     } finally { setBusy(false); }
@@ -53,6 +53,7 @@ export default function AnalyticsExportScreen() {
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Export" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: bottom }} showsVerticalScrollIndicator={false}>
+        <SectionTitle>Date range</SectionTitle>
         <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={setRange} />
         <SectionTitle>Include</SectionTitle>
         <Card>
@@ -74,6 +75,7 @@ export default function AnalyticsExportScreen() {
         </Card>
         <SectionTitle>Format</SectionTitle>
         <SegmentedPills<'csv' | 'pdf'> options={[{ key: 'csv', label: 'CSV' }, { key: 'pdf', label: 'PDF' }]} value={format} onChange={setFormat} />
+        {picked.length === 0 && <Text style={s.hint}>Select at least one section to export.</Text>}
         <PrimaryButton label={busy ? 'Preparing…' : `Export ${format.toUpperCase()}`} icon="download" onPress={onExport} loading={busy} disabled={busy || picked.length === 0} />
       </ScrollView>
     </View>
@@ -83,7 +85,8 @@ export default function AnalyticsExportScreen() {
 const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56, paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
-  detail: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+  detail: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+  hint: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginBottom: SP.sm },
   box: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   boxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
 });

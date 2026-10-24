@@ -111,9 +111,13 @@ export default function MarketingScreen() {
     }, [api, reloadToken]),
   );
 
+  // Brief "copied" check on the tapped row so the copy isn't silent.
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const copyDiscountCode = useCallback(async (code: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode((cur) => (cur === code ? null : cur)), 1500);
   }, []);
 
   return (
@@ -126,6 +130,7 @@ export default function MarketingScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/analytics' as never); }}
           accessibilityRole="button"
           accessibilityLabel="View analytics"
+          style={styles.headerIconBtn}
         >
           <Feather name="bar-chart-2" size={ICON.md} color={colors.foreground} />
         </PressableScale>
@@ -142,8 +147,8 @@ export default function MarketingScreen() {
           separation (Dev's standing "no grey boxes" rule). */}
       <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
         {[
-          { label: 'Email Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
-          { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
+          { label: 'Email subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
+          { label: 'SMS subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
         ].map((s, i) => (
           <View key={s.label} style={[styles.statChip, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -157,6 +162,7 @@ export default function MarketingScreen() {
       <TouchableOpacity
         style={[styles.klaviyoBtn, { backgroundColor: klaviyo?.connected ? colors.card : colors.primary, borderColor: colors.border, borderWidth: klaviyo?.connected ? 1 : 0 }]}
         activeOpacity={0.85}
+        accessibilityRole="button"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push('/integrations/klaviyo' as never);
@@ -164,7 +170,7 @@ export default function MarketingScreen() {
       >
         <Feather name={klaviyo?.connected ? 'check-circle' : 'zap'} size={16} color={klaviyo?.connected ? colors.success : colors.primaryForeground} />
         <Text style={[styles.klaviyoText, { color: klaviyo?.connected ? colors.foreground : colors.primaryForeground }]}>
-          {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo: Email Marketing & SMS'}
+          {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo for email and SMS'}
         </Text>
       </TouchableOpacity>
 
@@ -183,7 +189,7 @@ export default function MarketingScreen() {
           compact
           icon="tv"
           title="No campaigns yet"
-          description="Create a Meta ad to put your products in front of new buyers."
+          description="Create an ad to put your products in front of new buyers."
           style={styles.emptyFlat}
           action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -196,6 +202,8 @@ export default function MarketingScreen() {
             <TouchableOpacity
               key={c.id}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`${c.headline?.trim() || 'Untitled campaign'}, ${campaignStatusLabel(c.status)}, ${formatCents(c.budgetCents)} budget`}
               onPress={() => router.push(`/design-campaign?campaignId=${c.id}` as never)}
               style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
@@ -218,7 +226,7 @@ export default function MarketingScreen() {
 
       {/* Discount Codes */}
       <SectionHeader
-        title="Discount Codes"
+        title="Discount codes"
         action="New +"
         onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
       />
@@ -255,9 +263,9 @@ export default function MarketingScreen() {
                 onPress={() => copyDiscountCode(d.code)}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel={`Copy code ${d.code}`}
+                accessibilityLabel={copiedCode === d.code ? `Code ${d.code} copied` : `Copy code ${d.code}`}
               >
-                <Feather name="copy" size={15} color={colors.mutedForeground} />
+                <Feather name={copiedCode === d.code ? 'check' : 'copy'} size={15} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
           ))}
@@ -265,9 +273,11 @@ export default function MarketingScreen() {
       )}
 
       {/* Referral */}
-      <SectionHeader title="Referral Program" />
+      <SectionHeader title="Referral program" />
       <TouchableOpacity
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Invite and earn"
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-invite' as never); }}
         style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
       >
@@ -278,7 +288,7 @@ export default function MarketingScreen() {
             {referrals == null
               ? 'Give $10, get $10 Thread Cash'
               : referrals.total > 0
-                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · ${formatCents(referrals.earnedCents)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}
           </Text>
         </View>
@@ -287,7 +297,7 @@ export default function MarketingScreen() {
 
       {/* Growth: tracked links, link in bio, store pixels */}
       <SectionHeader title="Growth" />
-      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden', marginBottom: 24 }}>
         <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />
@@ -347,6 +357,7 @@ export default function MarketingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerIconBtn: { width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs, minHeight: COMP.headerH },
   pageTitle: { fontSize: FS.xl, fontFamily: FONT.bold, letterSpacing: -0.3, marginBottom: 2 },
   pageSubtitle: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 20 },

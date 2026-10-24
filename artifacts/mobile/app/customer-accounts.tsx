@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useColors } from '@/hooks/useColors';
+import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { Feather } from '@expo/vector-icons';
+import { EmptyState } from '@/components/layout';
 
 /**
  * This screen used to be a static Shopify-admin clone: fake sign-in-link
@@ -16,24 +15,22 @@ import { Feather } from '@expo/vector-icons';
  */
 export default function CustomerAccountsScreen() {
   const router = useRouter();
-  const colors = useColors();
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Customer accounts" onBack={() => goBackOr(router, "/seller-settings")} />
-      <View style={styles.empty}>
-        <Feather name="user" size={28} color={colors.mutedForeground} />
-        <Text style={[styles.title, { color: colors.foreground }]}>Not configurable from the app</Text>
-        <Text style={[styles.body, { color: colors.mutedForeground }]}>
-          Customer account settings aren{'’'}t editable here.
-        </Text>
-      </View>
+      {/* Shared empty-state badge + copy, same as every other seller
+          empty state (was a bespoke icon + hard-coded type sizes). */}
+      <EmptyState
+        icon="user"
+        title="Not configurable from the app"
+        message="Customer account settings aren’t editable here. Your customer list and order history are under Customers."
+        actionLabel="View customers"
+        onAction={() => router.push('/customers' as never)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
-  title: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  body: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18 },
 });

@@ -15,7 +15,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -26,18 +25,19 @@ import {
   StatusBadge, IconButton, PrimaryButton,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents } from '@/services/metaAdsService';
+import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents, META_OBJECTIVE_OPTIONS } from '@/services/metaAdsService';
 import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
 import { radius } from '@/constants/radii';
 
 type Row = MetaCampaign & { insights?: MetaCampaignInsights };
+
+const objectiveLabel = (o: string) => META_OBJECTIVE_OPTIONS.find((x) => x.objective === o)?.label ?? o;
 
 export default function MetaAdsManageScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
 
   const [checking, setChecking] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -46,6 +46,8 @@ export default function MetaAdsManageScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Which action is in flight, so only that button shows a spinner.
+  const [busyAction, setBusyAction] = useState<'toggle' | 'duplicate' | 'refresh' | 'budget' | null>(null);
   const [editingBudget, setEditingBudget] = useState<Row | null>(null);
   const [budgetInput, setBudgetInput] = useState('');
 
@@ -84,37 +86,43 @@ export default function MetaAdsManageScreen() {
 
   async function handlePauseResume(row: Row) {
     setBusyId(row.id);
+    setBusyAction('toggle');
     try {
       const { campaign } = row.status === 'active' ? await api.metaAds.pause(row.id) : await api.metaAds.resume(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, ...campaign } : r)) ?? prev);
     } catch {
-      Alert.alert('Error', `Could not ${row.status === 'active' ? 'pause' : 'resume'} this campaign. Please try again.`);
+      Alert.alert(`Could not ${row.status === 'active' ? 'pause' : 'resume'} campaign`, 'Please try again.');
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   }
 
   async function handleDuplicate(row: Row) {
     setBusyId(row.id);
+    setBusyAction('duplicate');
     try {
       const { campaign } = await api.metaAds.duplicate(row.id);
       setRows((prev) => (prev ? [campaign, ...prev] : prev));
     } catch {
-      Alert.alert('Error', 'Could not duplicate this campaign. Please try again.');
+      Alert.alert('Could not duplicate campaign', 'Please try again.');
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   }
 
   async function handleRefreshInsights(row: Row) {
     setBusyId(row.id);
+    setBusyAction('refresh');
     try {
       const { insights } = await api.metaAds.refreshInsights(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, insights } : r)) ?? prev);
     } catch {
-      Alert.alert('Error', 'Could not refresh insights right now.');
+      Alert.alert('Could not refresh results', 'Please try again in a moment.');
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   }
 
@@ -132,21 +140,26 @@ export default function MetaAdsManageScreen() {
     }
     const id = editingBudget.id;
     setBusyId(id);
+    setBusyAction('budget');
     try {
       const { campaign } = await api.metaAds.updateCampaign(id, { budgetCents: Math.round(dollars * 100) });
       setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, ...campaign } : r)) ?? prev);
       setEditingBudget(null);
     } catch {
-      Alert.alert('Error', 'Could not update the budget. Please try again.');
+      Alert.alert('Could not update budget', 'Please try again.');
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   }
 
   if (checking) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.accentLight} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScreenHeader title="Meta Ads" onBack={() => goBackOr(router)} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accentLight} size="large" />
+        </View>
       </View>
     );
   }
@@ -174,7 +187,7 @@ export default function MetaAdsManageScreen() {
         rightElement={<IconButton name="plus" accessibilityLabel="New campaign" onPress={() => router.push('/meta-ads-setup')} />}
       />
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.lg, gap: SP.md }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: SP.lg, gap: SP.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accentLight} />}
       >
         {loading && (
@@ -199,6 +212,7 @@ export default function MetaAdsManageScreen() {
             key={row.id}
             row={row}
             busy={busyId === row.id}
+            busyAction={busyId === row.id ? busyAction : null}
             colors={colors}
             theme={theme}
             onPauseResume={() => handlePauseResume(row)}
@@ -214,9 +228,13 @@ export default function MetaAdsManageScreen() {
         <View style={s.modalOverlay}>
           <View style={[s.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[s.modalTitle, { color: colors.foreground }]}>Edit budget</Text>
+            <Text style={[s.rowSub, { color: colors.mutedForeground }]}>
+              {editingBudget?.budgetType === 'daily' ? 'Daily budget' : 'Total budget'}, in whole dollars (minimum $5).
+            </Text>
             <View style={[s.budgetInputRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
               <Text style={[s.modalTitle, { color: colors.mutedForeground }]}>$</Text>
               <TextInput
+                accessibilityLabel="Budget in dollars"
                 value={budgetInput}
                 onChangeText={setBudgetInput}
                 keyboardType="number-pad"
@@ -237,9 +255,9 @@ export default function MetaAdsManageScreen() {
 }
 
 function CampaignCard({
-  row, busy, colors, theme, onPauseResume, onDuplicate, onRefreshInsights, onEditBudget, onFixAndRelaunch,
+  row, busy, busyAction, colors, theme, onPauseResume, onDuplicate, onRefreshInsights, onEditBudget, onFixAndRelaunch,
 }: {
-  row: Row; busy: boolean; colors: ReturnType<typeof useColors>; theme: ReturnType<typeof useAppTheme>['theme'];
+  row: Row; busy: boolean; busyAction: string | null; colors: ReturnType<typeof useColors>; theme: ReturnType<typeof useAppTheme>['theme'];
   onPauseResume: () => void; onDuplicate: () => void; onRefreshInsights: () => void;
   onEditBudget: () => void; onFixAndRelaunch: () => void;
 }) {
@@ -251,7 +269,7 @@ function CampaignCard({
         <View style={{ flex: 1 }}>
           <Text style={[s.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{row.headline || 'Untitled campaign'}</Text>
           <Text style={[s.rowSub, { color: colors.mutedForeground }]}>
-            {formatBudgetCents(row.budgetCents)}{row.budgetType === 'daily' ? '/day' : ' total'} · {row.objective}
+            {formatBudgetCents(row.budgetCents)}{row.budgetType === 'daily' ? '/day' : ' total'} · {objectiveLabel(row.objective)}
           </Text>
         </View>
         <StatusBadge label={metaCampaignStatusLabel(row.status)} variant={metaCampaignStatusVariant(row.status)} small />
@@ -272,7 +290,7 @@ function CampaignCard({
           <Stat label="CTR" value={`${(i.ctr * 100).toFixed(2)}%`} colors={colors} />
           <Stat label="CPC" value={money(i.cpcCents)} colors={colors} />
           <Stat label="Purchases" value={i.purchases.toLocaleString()} colors={colors} />
-          <Stat label="ROAS" value={i.roas.toFixed(2)} colors={colors} />
+          <Stat label="ROAS" value={`${i.roas.toFixed(2)}x`} colors={colors} />
         </View>
       )}
 
@@ -282,12 +300,12 @@ function CampaignCard({
         ) : (
           <>
             {(row.status === 'active' || row.status === 'paused') && (
-              <ActionBtn label={row.status === 'active' ? 'Pause' : 'Resume'} icon={row.status === 'active' ? 'pause' : 'play'} onPress={onPauseResume} busy={busy} colors={colors} theme={theme} />
+              <ActionBtn label={row.status === 'active' ? 'Pause' : 'Resume'} icon={row.status === 'active' ? 'pause' : 'play'} onPress={onPauseResume} busy={busy} spinning={busyAction === 'toggle'} colors={colors} theme={theme} />
             )}
-            <ActionBtn label="Edit budget" icon="dollar-sign" onPress={onEditBudget} busy={busy} colors={colors} theme={theme} />
-            <ActionBtn label="Duplicate" icon="copy" onPress={onDuplicate} busy={busy} colors={colors} theme={theme} />
+            <ActionBtn label="Edit budget" icon="dollar-sign" onPress={onEditBudget} busy={busy} spinning={busyAction === 'budget'} colors={colors} theme={theme} />
+            <ActionBtn label="Duplicate" icon="copy" onPress={onDuplicate} busy={busy} spinning={busyAction === 'duplicate'} colors={colors} theme={theme} />
             {row.status === 'active' && (
-              <ActionBtn label="Refresh" icon="refresh-cw" onPress={onRefreshInsights} busy={busy} colors={colors} theme={theme} />
+              <ActionBtn label="Refresh" icon="refresh-cw" onPress={onRefreshInsights} busy={busy} spinning={busyAction === 'refresh'} colors={colors} theme={theme} />
             )}
           </>
         )}
@@ -305,7 +323,7 @@ function Stat({ label, value, colors }: { label: string; value: string; colors: 
   );
 }
 
-function ActionBtn({ label, icon, onPress, busy, colors, theme }: any) {
+function ActionBtn({ label, icon, onPress, busy, spinning, colors, theme }: any) {
   return (
     <TouchableOpacity
       style={[s.actionBtn, { backgroundColor: colors.elevated, borderColor: colors.border }]}
@@ -314,7 +332,7 @@ function ActionBtn({ label, icon, onPress, busy, colors, theme }: any) {
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      {busy ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Feather name={icon} size={13} color={colors.foreground} />}
+      {spinning ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Feather name={icon} size={13} color={colors.foreground} />}
       <Text style={[s.actionBtnText, { color: colors.foreground }]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -322,15 +340,15 @@ function ActionBtn({ label, icon, onPress, busy, colors, theme }: any) {
 
 const s = StyleSheet.create({
   rowTitle:   { fontSize: FS.base, fontFamily: FONT.bold },
-  rowSub:     { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  rowSub:     { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   rejectBox:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', borderRadius: RADIUS.sm, borderWidth: 1, padding: SP.sm, marginTop: SP.sm },
   statRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, marginTop: SP.sm },
   stat:       { minWidth: 72 },
   statValue:  { fontSize: FS.sm, fontFamily: FONT.bold },
-  statLabel:  { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
+  statLabel:  { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 1 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.md },
   actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
-  actionBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  actionBtnText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   modalCard:  { width: '100%', maxWidth: 360, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg },
   modalTitle: { fontSize: FS.lg, fontFamily: FONT.bold },

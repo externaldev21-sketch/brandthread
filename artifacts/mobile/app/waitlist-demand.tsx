@@ -9,13 +9,12 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useRouter } from 'expo-router';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
 
@@ -32,19 +31,22 @@ export default function WaitlistDemandScreen() {
   const api = useApi();
   const router = useRouter();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const data = await api.waitlist.sellerDemand();
       setRows(Array.isArray(data) ? data : []);
+      setFailed(false);
     } catch {
-      setRows([]);
+      // Keep whatever was last on screen; only an empty screen shows the
+      // error state (a failed load used to read as "No one is waiting").
+      setFailed(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,18 +80,25 @@ export default function WaitlistDemandScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <Header title="Waitlist demand" dividerVariant="none" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Waitlist demand" onBack={() => goBackOr(router, '/products')} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.accentForeground} /></View>
+      ) : failed && rows.length === 0 ? (
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load your waitlist"
+          description="Check your connection and try again."
+          action={{ label: 'Retry', onPress: () => load() }}
+        />
       ) : rows.length === 0 ? (
         <EmptyState
           icon="users"
           title="No one is waiting"
-          description="When a shopper taps Notify me on a sold-out size, they show up here."
+          description="When a shopper taps “Notify me” on a sold-out size, they show up here."
         />
       ) : (
         <ScrollView
-          contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={s.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.accentForeground} />}
           showsVerticalScrollIndicator={false}
         >
@@ -118,7 +127,7 @@ export default function WaitlistDemandScreen() {
                     onPress={() => notify(r)}
                     disabled={sending === r.variantId}
                     accessibilityRole="button"
-                    accessibilityLabel={`Notify ${waiting} waiting for ${r.productName} ${r.variantLabel}`}
+                    accessibilityLabel={`Notify ${waiting} ${waiting === 1 ? 'shopper' : 'shoppers'} waiting for ${r.productName}${r.variantLabel ? ` (${r.variantLabel})` : ''}`}
                   >
                     {sending === r.variantId
                       ? <ActivityIndicator size="small" color={colors.primaryForeground} />
@@ -139,12 +148,12 @@ export default function WaitlistDemandScreen() {
 const s = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: SP.md, gap: SP.sm },
+  list: { padding: SP.md, paddingBottom: SP.xl, gap: SP.sm },
   summary: { borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: 2, marginBottom: SP.xs },
-  summaryValue: { fontFamily: FONT.bold, fontSize: 28, fontVariant: ['tabular-nums'] },
+  summaryValue: { fontFamily: FONT.bold, fontSize: FS.xxl, fontVariant: ['tabular-nums'] },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  meta: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
+  meta: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
   btn: { minHeight: 40, paddingHorizontal: SP.md, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

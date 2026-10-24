@@ -15,6 +15,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { fmtDate } from '@/lib/format';
+import { proUpgradeHref } from '@/lib/proPerks';
 import { EmptyState, PrimaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
@@ -44,11 +45,11 @@ function ProGate() {
           <View style={{ width: 56, height: 56, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="lock" size={22} color={colors.foreground} />
           </View>
-          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Pro</Text>
+          <Text accessibilityRole="header" style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Pro</Text>
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.md }}>
             Average order value, conversion, repeat buyers, refunds, sales by channel and top customers.
           </Text>
-          <View style={{ width: '100%' }}><PrimaryButton label="See plans" onPress={() => router.push('/plans' as never)} /></View>
+          <View style={{ width: '100%' }}><PrimaryButton label="See plans" onPress={() => router.push(proUpgradeHref('analytics-advanced') as never)} /></View>
         </View>
       </View>
     </View>
@@ -86,7 +87,7 @@ function AdvancedReport() {
           <KpiGrid range={range} items={[
             { key: 'aov', label: 'Average order', value: formatCents(t!.averageOrderCents), changePct: data.deltas.averageOrderPct, featured: true },
             { key: 'conv', label: 'Conversion', value: `${t!.conversionPct}%`, changePct: data.deltas.conversionPct },
-            { key: 'repeat', label: 'Repeat buyers', value: `${t!.repeatBuyerPct}%`, changePct: null },
+            { key: 'repeat', label: 'Repeat buyers', value: `${t!.repeatBuyerPct}%`, changePct: null, caption: `${formatCompactCount(t!.repeatBuyers)} returning` },
             { key: 'refund', label: 'Refund rate', value: `${t!.refundRatePct}%`, changePct: data.deltas.refundRatePct, invert: true },
           ]} />
 

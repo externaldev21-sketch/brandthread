@@ -4,9 +4,8 @@
  * invite by username, open a creator to pause/remove/override.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
@@ -15,6 +14,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAffiliate';
@@ -28,7 +28,6 @@ const STATUS_LABEL: Record<string, string> = {
 export default function SellerCreatorProgramScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const { isLoaded, isSignedIn } = useAuth();
   const previewOnly = isSellerDevPreview() && (!isLoaded || !isSignedIn);
@@ -39,6 +38,7 @@ export default function SellerCreatorProgramScreen() {
   const [username, setUsername] = useState('');
   const [inviting, setInviting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [inviteNote, setInviteNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (previewOnly) { setData(getPreviewSellerOverview()); setLoading(false); return; }
@@ -57,15 +57,18 @@ export default function SellerCreatorProgramScreen() {
     catch { setData((d) => ({ ...d, program: { ...d.program, enabled: !enabled } })); flash("Couldn't update the program."); }
   };
 
+  // Invite results show under the Send invite button, where the seller is
+  // looking, rather than in the note at the top of the scroll.
   const invite = async () => {
     setInviting(true);
+    setInviteNote(null);
     try {
-      if (previewOnly) { flash('Invites need a signed-in account.'); return; }
+      if (previewOnly) { setInviteNote('Invites need a signed-in account.'); return; }
       await api.affiliate.seller.invite(username.trim().replace(/^@/, ''));
       setUsername('');
-      flash('Invite sent');
+      setInviteNote('Invite sent.');
       await load();
-    } catch (e: any) { flash(e?.message ?? "Couldn't send the invite."); }
+    } catch (e: any) { setInviteNote(e?.message ?? "Couldn't send the invite."); }
     finally { setInviting(false); }
   };
 
@@ -83,7 +86,7 @@ export default function SellerCreatorProgramScreen() {
     inputText: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text },
     creatorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border, minHeight: 64 },
     name: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
-    meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
+    meta: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: 2 },
     linkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, minHeight: 44 },
     link: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted },
   }), [theme]);
@@ -95,7 +98,7 @@ export default function SellerCreatorProgramScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScreenHeader title="Creator program" />
-      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 120 }]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: SP.xl }]} keyboardShouldPersistTaps="handled">
         {note ? <Text style={[s.body, { marginBottom: SP.sm }]} accessibilityLiveRegion="polite">{note}</Text> : null}
         {loading ? <ActivityIndicator color={theme.text} style={{ marginTop: SP.xl }} /> : error ? (
           <RetryRow label="Couldn't load the creator program" onRetry={load} />
@@ -109,10 +112,9 @@ export default function SellerCreatorProgramScreen() {
                     {p.enabled ? `${pct(p.commissionPercent)} commission · ${p.windowDays}-day window` : 'Off. Creators can\'t join or earn.'}
                   </Text>
                 </View>
-                <Switch
+                <HapticSwitch
                   value={p.enabled}
                   onValueChange={toggle}
-                  trackColor={{ true: theme.success, false: theme.border }}
                   accessibilityLabel="Creator program"
                 />
               </View>
@@ -158,6 +160,8 @@ export default function SellerCreatorProgramScreen() {
               />
             </View>
             <ActionButton label="Send invite" loading={inviting} disabled={!p.enabled || username.trim().length < 2} onPress={invite} />
+            {!p.enabled ? <Text style={s.body}>Turn on the creator program to invite creators.</Text>
+              : inviteNote ? <Text style={s.body} accessibilityLiveRegion="polite">{inviteNote}</Text> : null}
 
             <SectionTitle>Creators</SectionTitle>
             {visible.length === 0 ? (
@@ -168,11 +172,11 @@ export default function SellerCreatorProgramScreen() {
                 style={s.creatorRow}
                 onPress={() => router.push({ pathname: '/seller-creator-detail' as any, params: { id: c.id } })}
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${c.displayName ?? c.username ?? 'creator'}`}
+                accessibilityLabel={`Open ${c.displayName ?? (c.username ? `@${c.username}` : 'creator')}`}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={s.name}>{c.displayName ?? c.username ?? 'Creator'}</Text>
-                  <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatCents(c.stats.revenueCents)}</Text>
+                  <Text style={s.name} numberOfLines={1}>{c.displayName ?? (c.username ? `@${c.username}` : 'Creator')}</Text>
+                  <Text style={s.meta}>{c.code} · {c.stats.orders === 1 ? '1 order' : `${c.stats.orders} orders`} · {formatCents(c.stats.revenueCents)}</Text>
                   <Text style={s.meta}>Owed {formatCents(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatCents(c.stats.paidCents)}</Text>
                 </View>
                 {c.status === 'pending' ? (

@@ -82,7 +82,7 @@ export default function AnalyticsAudienceScreen() {
                 {data.topRegions.map((r, i) => (
                   <View key={`${r.country}-${r.region}`}>
                     {i > 0 && <CardDivider />}
-                    <StatRow label={`${r.region}, ${r.country}`} value={r.people.toLocaleString()} />
+                    <StatRow label={`${r.region}, ${countryName(r.country)}`} value={r.people.toLocaleString()} />
                   </View>
                 ))}
               </Card>
@@ -108,5 +108,5 @@ export default function AnalyticsAudienceScreen() {
 
 const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   empty: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, padding: SP.md },
-  note: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginBottom: SP.md },
+  note: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginBottom: SP.md },
 });

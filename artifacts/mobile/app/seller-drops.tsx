@@ -2,12 +2,11 @@
  * Seller-facing drops list — the seller's own drops (api.drops.list()),
  * with a "+ New drop" entry to seller-drop-create.tsx.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -28,6 +27,19 @@ function statusVariant(status: string): DropStatusVariant {
   }
 }
 
+// Server statuses (lib/db schema: draft | active | closed | fulfilled) shown
+// as sentence-case badge labels instead of the raw upper-cased enum.
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Live',
+  draft: 'Draft',
+  closed: 'Closed',
+  fulfilled: 'Fulfilled',
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABEL[status] ?? (status.charAt(0).toUpperCase() + status.slice(1));
+}
+
 interface SellerDropRow {
   id: string;
   name: string;
@@ -36,10 +48,19 @@ interface SellerDropRow {
   orderCount?: number;
 }
 
+// Year only when it isn't this year, so a past drop ("Jan 4") isn't
+// mistaken for an upcoming one.
+function formatLaunch(iso: string): string {
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }), hour: 'numeric', minute: '2-digit',
+  });
+}
+
 export default function SellerDrops() {
   const api = useApi();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const [rows, setRows] = useState<SellerDropRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,13 +73,15 @@ export default function SellerDrops() {
       const data: any = await api.drops.list();
       setRows(Array.isArray(data) ? data : []);
     } catch {
-      setError('Could not load your drops. Tap to retry.');
+      setError("Couldn't load your drops.");
     } finally {
       setLoading(false);
     }
   }, [api]);
 
-  useEffect(() => { load(); }, [load]);
+  // Refetch on focus so a drop created, edited or cancelled from
+  // seller-drop-create shows its new state when the seller comes back.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function handleRefresh() {
     setRefreshing(true);
@@ -87,24 +110,21 @@ export default function SellerDrops() {
         }
       />
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: 10 }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl, gap: 12 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} colors={[theme.accent]} />}
       >
         {loading ? (
-          <View style={{ paddingVertical: 40, alignItems: 'center' }}><ActivityIndicator color={theme.accent} /></View>
+          <View style={{ paddingVertical: SP.xl, alignItems: 'center' }}><ActivityIndicator color={theme.accent} /></View>
         ) : error ? (
           <SectionError message={error} onRetry={load} />
         ) : rows.length === 0 ? (
-          <View style={{ gap: SP.md, alignItems: 'center' }}>
-            <EmptyState icon="zap" message="No drops yet — create your first one" />
-            <TouchableOpacity
-              style={[styles.emptyCta, { backgroundColor: theme.accent }]}
-              onPress={() => router.push('/seller-drop-create' as never)}
-            >
-              <Feather name="plus" size={16} color={theme.onAccent} />
-              <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm }}>New drop</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            icon="zap"
+            title="No drops yet"
+            message="Schedule a limited release and launch its products together at a set time."
+            actionLabel="New drop"
+            onAction={() => router.push('/seller-drop-create' as never)}
+          />
         ) : (
           rows.map(row => (
             <TouchableOpacity
@@ -112,14 +132,17 @@ export default function SellerDrops() {
               style={[styles.row, { borderColor: theme.border, backgroundColor: theme.card }]}
               onPress={() => openDrop(row.id)}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`${row.name}, ${statusLabel(row.status)}`}
+              accessibilityHint="Opens the drop to edit"
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{row.name}</Text>
-                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 }}>
-                  {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No launch date set'}
+                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: SP.xs }}>
+                  {row.releaseAt ? formatLaunch(row.releaseAt) : 'No launch date set'}
                 </Text>
               </View>
-              <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
+              <StatusBadge label={statusLabel(row.status)} variant={statusVariant(row.status)} small />
               <Feather name="chevron-right" size={18} color={theme.muted} />
             </TouchableOpacity>
           ))
@@ -131,7 +154,7 @@ export default function SellerDrops() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  newBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
-  emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
+  // 44x44: the minimum comfortable touch target (was 36x36).
+  newBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.md },
 });

@@ -24,8 +24,14 @@ export default function GrowthLinkNewScreen() {
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<TrackedLink | null>(null);
+  const [destFailed, setDestFailed] = useState(false);
 
-  useEffect(() => { getDestinations().then(setDest).catch(() => setDest({ store: { available: false }, bio: { available: false, url: null }, products: [] })); }, []);
+  useEffect(() => {
+    getDestinations().then(setDest).catch(() => {
+      setDestFailed(true);
+      setDest({ store: { available: false }, bio: { available: false, url: null }, products: [] });
+    });
+  }, []);
 
   const pickPreset = (id: string) => {
     const p = UTM_PRESETS.find((x) => x.id === id);
@@ -34,7 +40,8 @@ export default function GrowthLinkNewScreen() {
   };
 
   const unavailable =
-    (type === 'store' && dest && !dest.store.available) ? 'Publish your store or set a username to link to it.'
+    destFailed ? "Couldn't load your link destinations. Go back and try again."
+    : (type === 'store' && dest && !dest.store.available) ? 'Publish your store or set a username to link to it.'
     : (type === 'bio' && dest && !dest.bio.available) ? 'Set up your link in bio page first.'
     : (type === 'product' && dest && dest.products.length === 0) ? 'Add an active product to link to it.'
     : null;
@@ -56,7 +63,7 @@ export default function GrowthLinkNewScreen() {
     return (
       <View style={{ flex: 1 }}>
         <ScreenHeader title="Link ready" onBack={() => router.replace('/growth-links' as never)} />
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 120 }}>
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}>
           <Text style={{ fontSize: FS.sm, color: colors.mutedForeground, fontFamily: FONT.medium, marginBottom: SP.sm }}>Your short link</Text>
           <CopyRow value={created.url} />
           <View style={{ height: SP.md }} />
@@ -71,7 +78,7 @@ export default function GrowthLinkNewScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="New link" />
-      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
         <Text style={[lbl, { color: colors.mutedForeground }]}>Destination</Text>
         <View style={row}>
           <Chip label="Store" active={type === 'store'} onPress={() => setType('store')} />
@@ -80,13 +87,16 @@ export default function GrowthLinkNewScreen() {
         </View>
         {!!unavailable && <Text style={{ color: colors.mutedForeground, fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.md }}>{unavailable}</Text>}
         {type === 'product' && !!dest?.products.length && (
-          <View style={[row, { marginBottom: SP.sm }]}>
-            {dest.products.slice(0, 30).map((p) => <Chip key={p.id} label={p.name} active={productId === p.id} onPress={() => setProductId(p.id)} />)}
-          </View>
+          <>
+            <View style={[row, { marginBottom: SP.sm }]}>
+              {dest.products.slice(0, 30).map((p) => <Chip key={p.id} label={p.name} active={productId === p.id} onPress={() => setProductId(p.id)} />)}
+            </View>
+            {!productId && <Text style={{ color: colors.mutedForeground, fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.md }}>Choose the product to link to.</Text>}
+          </>
         )}
 
-        <Text style={[lbl, { color: colors.mutedForeground, marginTop: SP.md }]}>Where will you share it</Text>
-        <View style={row}>
+        <Text style={[lbl, { color: colors.mutedForeground, marginTop: SP.md }]}>Where will you share it?</Text>
+        <View style={[row, { marginBottom: SP.md }]}>
           {UTM_PRESETS.map((p) => <Chip key={p.id} label={p.label} active={preset === p.id} onPress={() => pickPreset(p.id)} />)}
         </View>
 
@@ -101,5 +111,5 @@ export default function GrowthLinkNewScreen() {
   );
 }
 
-const lbl = { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 8 } as const;
-const row = { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.sm } as const;
+const lbl = { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.sm } as const;
+const row = { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.sm } as const;

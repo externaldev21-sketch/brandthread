@@ -100,18 +100,24 @@ export default function AnalyticsSalesScreen() {
           value={activeChart}
           onChange={setActiveChart}
         />
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 2 }}>
-          {points.slice(-14).map((p, i) => {
-            const max = Math.max(...points.map(pt => pt.value), 1);
-            return (
-              <View key={i} style={{ flex: 1, borderRadius: 2, height: Math.max(2, (p.value / max) * 32), backgroundColor: colors.primary, opacity: 0.7 }} />
-            );
-          })}
-        </View>
-        <View style={s.xRow}>
-          <Text style={s.xLabel}>Start</Text>
-          <Text style={s.xLabel}>Today</Text>
-        </View>
+        {points.length === 0 ? (
+          <Text style={s.emptyText}>No {CHART_TAB_LABELS[activeChart].toLowerCase()} data for this period.</Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 2 }}>
+              {points.slice(-14).map((p, i) => {
+                const max = Math.max(...points.map(pt => pt.value), 1);
+                return (
+                  <View key={i} style={{ flex: 1, borderRadius: 2, height: Math.max(2, (p.value / max) * 32), backgroundColor: colors.primary, opacity: 0.7 }} />
+                );
+              })}
+            </View>
+            <View style={s.xRow}>
+              <Text style={s.xLabel}>Start</Text>
+              <Text style={s.xLabel}>Today</Text>
+            </View>
+          </>
+        )}
       </Card>
 
       {/* P&L summary */}
@@ -138,10 +144,11 @@ export default function AnalyticsSalesScreen() {
             </View>
           </View>
         ))}
-        {data?.breakdown.length === 0 && <Text style={[s.emptyText, { padding: 16 }]}>No product breakdown is available for this period.</Text>}
+        {data?.breakdown.length === 0 && <Text style={[s.emptyText, { padding: SP.md }]}>No product breakdown is available for this period.</Text>}
       </Card>
 
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>

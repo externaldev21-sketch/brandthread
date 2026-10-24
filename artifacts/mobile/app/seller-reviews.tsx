@@ -34,7 +34,12 @@ type Review = {
 function Stars({ rating }: { rating: number }) {
   const { theme } = useAppTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
+    <View
+      style={{ flexDirection: 'row', gap: 2 }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${rating} out of 5 stars`}
+    >
       {[1, 2, 3, 4, 5].map((i) => (
         <Feather
           key={i}
@@ -65,7 +70,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
       setReplyText('');
       onReplySubmitted();
     } catch {
-      Alert.alert('Error', 'Could not post reply. Please try again.');
+      Alert.alert("Couldn't post reply", 'Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -113,6 +118,9 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
           style={s.replyBtn}
           onPress={() => setReplying(true)}
           activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Reply publicly to ${buyerLabel}`}
         >
           <Feather name="message-square" size={13} color={theme.accentLight} />
           <Text style={s.replyBtnText}>Reply publicly</Text>
@@ -131,12 +139,14 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
             numberOfLines={3}
             maxLength={500}
             autoFocus
+            accessibilityLabel="Public reply"
           />
           <View style={s.replyActions}>
             <TouchableOpacity
               style={s.cancelBtn}
               onPress={() => { setReplying(false); setReplyText(''); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
             >
               <Text style={s.cancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -145,11 +155,14 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
               onPress={handleSubmitReply}
               disabled={!replyText.trim() || submitting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Post reply"
+              accessibilityState={{ disabled: !replyText.trim() || submitting, busy: submitting }}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color={theme.onAccent} />
               ) : (
-                <Text style={s.submitText}>Post Reply</Text>
+                <Text style={s.submitText}>Post reply</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -214,7 +227,7 @@ export default function SellerReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="My Reviews" />
+      <ScreenHeader title="Reviews" />
 
       {/* Stats strip */}
       {reviews.length > 0 && (
@@ -236,7 +249,7 @@ export default function SellerReviewsScreen() {
           <View style={s.statDivider} />
           <View style={s.stat}>
             <Text style={s.statVal}>{reviews.length - replied}</Text>
-            <Text style={s.statLabel}>Pending</Text>
+            <Text style={s.statLabel}>Awaiting reply</Text>
           </View>
         </View>
       )}
@@ -251,6 +264,21 @@ export default function SellerReviewsScreen() {
         ListEmptyComponent={loading ? (
           <View style={s.center}>
             <ActivityIndicator size="large" color={PURPLE} />
+          </View>
+        ) : error ? (
+          // `error` used to be set but never rendered, so a failed load read
+          // as "No reviews yet".
+          <View style={s.center}>
+            <Feather name="alert-circle" size={28} color={MUTED} />
+            <Text style={s.errorText}>Couldn't load your reviews. Check your connection and try again.</Text>
+            <TouchableOpacity
+              style={s.retryBtn}
+              onPress={() => { setLoading(true); load(); }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+            >
+              <Text style={s.retryText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={s.center}>
@@ -281,27 +309,27 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   statsRow:   { flexDirection: 'row', padding: 16, gap: 0, borderBottomWidth: 1, borderBottomColor: BORDER },
   stat:       { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
+  statVal:    { fontSize: FS.lg, fontFamily: 'Inter_700Bold', color: FG },
   statLabel:  { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
   statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 
-  scroll:     { padding: 16, paddingBottom: 100, gap: 12 },
+  scroll:     { padding: SP.md, paddingBottom: SP.xl, gap: 12 },
 
   reviewCard: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 12 },
   reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   avatar:     { width: 38, height: 38, borderRadius: 19, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: PURPLE_LIGHT },
   buyerName:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  productName: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  productName: { fontSize: FS.meta, fontFamily: 'Inter_400Regular', color: MUTED },
   dateText:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
   reviewBody: { fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 20 },
 
   replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 10, padding: 12, gap: 6 },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  replyLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: PURPLE_LIGHT, textTransform: 'uppercase', letterSpacing: 0.5 },
+  replyLabel: { fontSize: FS.xs, fontFamily: 'Inter_600SemiBold', color: PURPLE_LIGHT, textTransform: 'uppercase', letterSpacing: 0.5 },
   replyText:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 19 },
 
-  replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
+  replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
   replyBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: PURPLE_LIGHT },
 
   replyForm:  { gap: 10 },
@@ -314,10 +342,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   submitText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_ACCENT },
 
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
-  errorText:  { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
-  retryBtn:   { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
+  errorText:  { fontSize: FS.sm, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  retryBtn:   { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
   retryText:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  emptyTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  emptyTitle: { fontSize: FS.md, fontFamily: 'Inter_700Bold', color: FG },
   emptyBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   });
 };

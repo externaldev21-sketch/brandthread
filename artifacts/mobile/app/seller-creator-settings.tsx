@@ -1,6 +1,6 @@
 /** Creator program settings (seller). Route: /seller-creator-settings */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -8,6 +8,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAffiliate';
@@ -26,9 +27,9 @@ function Field({ label, value, onChange, suffix, help }: { label: string; value:
           style={{ flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text }}
           accessibilityLabel={label}
         />
-        <Text style={{ fontFamily: FONT.medium, color: theme.muted }}>{suffix}</Text>
+        <Text style={{ fontFamily: FONT.medium, fontSize: FS.base, color: theme.muted }}>{suffix}</Text>
       </View>
-      {help ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 16 }}>{help}</Text> : null}
+      {help ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.xs, lineHeight: 16 }}>{help}</Text> : null}
     </View>
   );
 }
@@ -68,6 +69,9 @@ export default function SellerCreatorSettingsScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const save = async () => {
+    setMsg(null);
+    // Number('') is 0, so an emptied field would otherwise save as 0.
+    if ([commission, discount, windowDays, holdDays, minPayout].some((v) => v.trim() === '')) { setMsg('Enter numbers in every field.'); return; }
     const body = {
       commissionPercent: Number(commission),
       buyerDiscountPercent: Number(discount),
@@ -98,9 +102,9 @@ export default function SellerCreatorSettingsScreen() {
             <Field label="Attribution window" value={windowDays} onChange={setWindowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />
             <Field label="Hold period" value={holdDays} onChange={setHoldDays} suffix="days" help="Days after delivery before commission becomes payable." />
             <Field label="Minimum payout" value={minPayout} onChange={setMinPayout} suffix="USD" />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.lg }}>
-              <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Approve applications automatically</Text>
-              <Switch value={autoApprove} onValueChange={setAutoApprove} trackColor={{ true: theme.success, false: theme.border }} accessibilityLabel="Approve applications automatically" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, marginBottom: SP.lg }}>
+              <Text style={{ flex: 1, fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Approve applications automatically</Text>
+              <HapticSwitch value={autoApprove} onValueChange={setAutoApprove} accessibilityLabel="Approve applications automatically" />
             </View>
             {msg ? <Text style={{ fontFamily: FONT.medium, color: theme.error, marginBottom: SP.sm }}>{msg}</Text> : null}
             <ActionButton label="Save" loading={saving} onPress={save} />

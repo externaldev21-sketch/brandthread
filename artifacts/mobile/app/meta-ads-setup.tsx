@@ -20,7 +20,6 @@ import {
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -54,7 +53,6 @@ const GENDERS = ['All', 'Men', 'Women'] as const;
 export default function MetaAdsSetupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ promoteKind?: string; promoteRefId?: string; id?: string }>();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const { theme } = useAppTheme();
   const colors = useColors();
@@ -321,7 +319,7 @@ export default function MetaAdsSetupScreen() {
     setLaunchError(null);
     const id = campaignId ?? await saveDraft();
     if (!id) {
-      Alert.alert('Incomplete', 'Fill in a headline, budget, and creative before launching.');
+      Alert.alert('Finish your ad', 'Add a headline, budget and creative before launching.');
       return;
     }
     setLaunching(true);
@@ -340,8 +338,11 @@ export default function MetaAdsSetupScreen() {
   // ── Gates ─────────────────────────────────────────────────────────────
   if (checkingConnection || loadingExisting) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.accentLight} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accentLight} size="large" />
+        </View>
       </View>
     );
   }
@@ -376,7 +377,7 @@ export default function MetaAdsSetupScreen() {
       <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 110, gap: SP.xl }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: SP.lg, gap: SP.xl }}
       >
         {rejectionReason && (
           <View style={[s.rejectBanner, { backgroundColor: colors.destructive + '14', borderColor: colors.destructive }]}>
@@ -476,7 +477,7 @@ export default function MetaAdsSetupScreen() {
               {interests.length > 0 && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
                   {interests.map((i) => (
-                    <Chip key={i.id} label={`${i.name} ✕`} active onPress={() => setInterests((prev) => prev.filter((x) => x.id !== i.id))} colors={colors} theme={theme} />
+                    <Chip key={i.id} label={`${i.name} ✕`} accessibilityLabel={`Remove ${i.name}`} active onPress={() => setInterests((prev) => prev.filter((x) => x.id !== i.id))} colors={colors} theme={theme} />
                   ))}
                 </View>
               )}
@@ -485,7 +486,7 @@ export default function MetaAdsSetupScreen() {
         </Section>
 
         {/* Budget */}
-        <Section title="Budget & duration" colors={colors}>
+        <Section title="Budget" colors={colors}>
           <View style={{ flexDirection: 'row', gap: SP.sm }}>
             <Chip label="Daily" active={budgetType === 'daily'} onPress={() => setBudgetType('daily')} colors={colors} theme={theme} />
             <Chip label="Lifetime" active={budgetType === 'lifetime'} onPress={() => setBudgetType('lifetime')} colors={colors} theme={theme} />
@@ -499,8 +500,8 @@ export default function MetaAdsSetupScreen() {
             <InlineSlider value={budgetCents} min={BUDGET_MIN_CENTS} max={BUDGET_MAX_CENTS} steps={BUDGET_STEPS} onChange={setBudgetCents} accessibilityLabel="Budget" accentColor={theme.accentLight} trackColor={colors.border} />
           </View>
           {estimatedReach && (
-            <View style={[s.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]}>
-              <Feather name="trending-up" size={16} color={colors.success} />
+            <View style={[s.reachCard, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+              <Feather name="trending-up" size={ICON.sm} color={colors.foreground} />
               <Text style={[s.helper, { color: colors.foreground }]}>Estimated reach: {formatReachRange(estimatedReach.low, estimatedReach.high)}</Text>
             </View>
           )}
@@ -509,7 +510,7 @@ export default function MetaAdsSetupScreen() {
         {/* Schedule */}
         <Section title="Schedule" colors={colors}>
           <ToggleRow label="Start now" value={startNow} onChange={setStartNow} colors={colors} />
-          {!startNow && <FormInput label="Start date (YYYY-MM-DD)" value={startDate} onChange={setStartDate} placeholder="2026-10-01" />}
+          {!startNow && <FormInput label="Start date" value={startDate} onChange={setStartDate} placeholder="YYYY-MM-DD" />}
           <FormInput label="End date (optional)" value={endDate} onChange={setEndDate} placeholder="YYYY-MM-DD" />
         </Section>
 
@@ -550,7 +551,12 @@ export default function MetaAdsSetupScreen() {
         )}
       </ScrollView>
 
-      <View style={[s.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[s.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: SP.md }]}>
+        {!requiredValid && (
+          <Text style={[s.helper, { color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.sm }]}>
+            Choose what to promote and add a headline to launch.
+          </Text>
+        )}
         <PrimaryButton
           label={`Launch · ${formatBudgetCents(budgetCents)}${budgetType === 'daily' ? '/day' : ''}`}
           icon="zap"
@@ -587,13 +593,14 @@ function SourceChip({ label, active, onPress, colors, theme }: any) {
   );
 }
 
-function Chip({ label, active, onPress, colors, theme }: any) {
+function Chip({ label, active, onPress, colors, theme, accessibilityLabel }: any) {
   return (
     <TouchableOpacity
       style={[s.chip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: active }}
+      accessibilityRole={accessibilityLabel ? 'button' : 'radio'}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityLabel ? undefined : { checked: active }}
     >
       <Text style={[s.chipText, { color: active ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
     </TouchableOpacity>
@@ -629,11 +636,11 @@ function Stepper({ label, value, min, max, onChange, colors, theme }: any) {
     <View style={{ flex: 1, gap: SP.xs }}>
       <Text style={[s.helper, { color: colors.mutedForeground }]}>{label}</Text>
       <View style={[s.stepperRow, { borderColor: colors.border, backgroundColor: colors.elevated }]}>
-        <TouchableOpacity onPress={() => onChange(Math.max(min, value - 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => onChange(Math.max(min, value - 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={`Decrease ${label.toLowerCase()}`}>
           <Feather name="minus" size={14} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.rowLabel, { color: colors.foreground }]}>{value >= 65 ? '65+' : value}</Text>
-        <TouchableOpacity onPress={() => onChange(Math.min(max, value + 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => onChange(Math.min(max, value + 1))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={`Increase ${label.toLowerCase()}`}>
           <Feather name="plus" size={14} color={colors.foreground} />
         </TouchableOpacity>
       </View>
@@ -644,7 +651,7 @@ function Stepper({ label, value, min, max, onChange, colors, theme }: any) {
 const s = StyleSheet.create({
   sectionTitle: { fontSize: FS.base, fontFamily: FONT.bold, marginBottom: SP.sm, letterSpacing: -0.1 },
   sectionCard:  { borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, gap: SP.md },
-  helper:       { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
+  helper:       { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 17 },
   sourceChip:   { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.sm, paddingHorizontal: SP.xs },
   sourceChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center' },
   chip:         { borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
