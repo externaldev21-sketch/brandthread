@@ -34,7 +34,7 @@ import { useColors } from '@/hooks/useColors';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
-import { BrandthreadHeader, PrimaryButton, SecondaryButton, BrandedLoadingState, HapticSwitch } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, PrimaryButton, SecondaryButton, HapticSwitch } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 
 import { useApi } from '@/lib/api';
@@ -48,6 +48,20 @@ import { KeyboardStickyFooter } from '@/components/KeyboardStickyFooter';
 import { radius } from '@/constants/radii';
 
 import { formatMoney } from '@/lib/format';
+
+import { CachedImage as Image } from '@/components/CachedImage';
+
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+
+import { showToast } from '@/lib/toast';
+
+/** First photo of a bundle item: API rows carry `images` as URLs (older rows as `{ url }`). */
+function firstImageUri(item: { images?: unknown }): string | null {
+  const first = Array.isArray(item.images) ? item.images[0] : null;
+  if (typeof first === 'string') return first || null;
+  if (first && typeof first === 'object' && typeof (first as { url?: unknown }).url === 'string') return (first as { url: string }).url;
+  return null;
+}
 
 function centsToDecimalInput(cents: number | undefined): string {
   if (cents === undefined) return '';
@@ -124,11 +138,8 @@ export default function ProductBundleEditScreen() {
 
   // ── Picker: add/remove items ─────────────────────────────────────────────────
   async function addItem(product: any, variant?: any) {
-    if (!bundleId) {
-      // Must save bundle first before adding items
-      Alert.alert('Save first', 'Save the bundle details before adding products.');
-      return;
-    }
+    // "Add product" is disabled until the bundle is saved (items need its id).
+    if (!bundleId) return;
     try {
       const item = await (api as any).bundles.addItem(bundleId, {
         productId: product.id,
@@ -181,7 +192,7 @@ export default function ProductBundleEditScreen() {
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
-        Alert.alert('Saved', 'Bundle updated successfully.');
+        showToast('Bundle saved');
       }
     } catch { Alert.alert("Couldn't save bundle", 'Try again.'); }
     finally { setSaving(false); }
@@ -204,7 +215,25 @@ export default function ProductBundleEditScreen() {
     ]);
   }
 
-  if (loading) return <BrandedLoadingState message="Loading bundle…" />;
+  if (loading) {
+    return (
+      <View style={s.root}>
+        <ScreenHeader title="Edit bundle" onBack={() => goBackOr(router)} />
+        <View style={s.content} accessibilityLabel="Loading bundle" testID="bundle-edit-loading">
+          <SkeletonBlock width={110} height={12} radius={4} />
+          {[44, 88, 44].map((h, i) => (
+            <View key={i} style={{ gap: 4 }}>
+              <SkeletonBlock width={90} height={14} radius={4} />
+              <SkeletonBlock width="100%" height={h} radius={RADIUS.sm} />
+            </View>
+          ))}
+          <SkeletonBlock width="100%" height={72} radius={RADIUS.sm} />
+          <SkeletonBlock width={140} height={12} radius={4} />
+          {[0, 1].map((i) => <SkeletonBlock key={`item-${i}`} width="100%" height={62} radius={RADIUS.sm} />)}
+        </View>
+      </View>
+    );
+  }
 
   if (loadError) {
     return (
@@ -303,7 +332,6 @@ export default function ProductBundleEditScreen() {
         <View style={s.itemsHeader}>
           <Text style={s.sectionTitle}>Products in bundle</Text>
           {/* Items can only be added once the bundle exists (see addItem). */}
-          {!isNew && (
           <TouchableOpacity
             style={[s.addItemBtn, isNew && { opacity: 0.5 }]}
             onPress={() => {  setPickerOpen(o => !o); }}
@@ -312,26 +340,30 @@ export default function ProductBundleEditScreen() {
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel="Add product"
+            accessibilityHint={isNew ? 'Save the bundle to add products' : undefined}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Icon name="plus" size={14} color={PURPLE_LIGHT} />
             <Text style={s.addItemBtnText}>Add product</Text>
           </TouchableOpacity>
-          )}
         </View>
 
         {isNew && items.length === 0 && (
           <View style={s.newBundleHint}>
             <Icon name="info" size={14} color={MUTED} />
-            <Text style={s.newBundleHintText}>Save the bundle first, then add products.</Text>
+            <Text style={s.newBundleHintText}>Save the bundle to add products.</Text>
           </View>
         )}
 
         {items.map(item => (
           <View key={item.id} style={s.itemRow}>
-            <View style={s.itemImg}>
-              <Icon name="image" size={ICON.sm} color={MUTED} />
-            </View>
+            {firstImageUri(item) ? (
+              <Image cachePolicy="memory-disk" source={{ uri: firstImageUri(item)! }} style={s.itemImg} contentFit="cover" accessibilityLabel={`${item.productName ?? 'Product'} photo`} />
+            ) : (
+              <View style={s.itemImg}>
+                <Icon name="image" size={ICON.sm} color={MUTED} />
+              </View>
+            )}
             <View style={s.itemInfo}>
               <Text style={s.itemName} numberOfLines={1}>{item.productName ?? 'Product'}</Text>
               {(item.size || item.color) && (

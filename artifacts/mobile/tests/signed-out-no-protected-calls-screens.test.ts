@@ -60,6 +60,20 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     before(s, 'const openConnectOnboarding = useCallback', 'if (isPreview) return;', 'api.');
   });
 
+  it('payout-detail.tsx / payout-schedule.tsx: any seller preview skips the API, signed in or not', () => {
+    for (const file of ['app/payout-detail.tsx', 'app/payout-schedule.tsx']) {
+      const s = read(file);
+      expect(s).toContain('const isPreview = isPreviewMode || (!authLoaded || !isSignedIn);');
+      expect(s).not.toContain('isPreviewMode && !userId');
+    }
+  });
+
+  it('payout-setup.tsx: any seller preview (or demo) skips the API', () => {
+    const s = read('app/payout-setup.tsx');
+    expect(s).toContain('const skipApi = sellerPreview || demoActive;');
+    expect(s).toContain('const sellerPreview = isSellerDevPreview();');
+  });
+
   it('subscription.tsx: skips status fetch, focus refresh, app-state poll and billing actions', () => {
     const s = read('app/subscription.tsx');
     expect(s).toContain('isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId)');

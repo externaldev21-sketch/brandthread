@@ -211,6 +211,33 @@ export async function getManufacturer(id: string): Promise<Manufacturer | undefi
   return row?.id ? mapFreshPublicManufacturer(row) : undefined;
 }
 
+/** Matches the server's cap on GET /api/manufacturers/partners?ids=. */
+const MANUFACTURER_BATCH_SIZE = 50;
+
+/**
+ * Several manufacturer profiles in one request (same shape as
+ * `getManufacturer`). Ids the seller can't see are simply missing from the
+ * result, so callers should treat it as a lookup, not a 1:1 list.
+ */
+export async function getManufacturersByIds(ids: string[]): Promise<Manufacturer[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return [];
+  if (isSellerDevPreview()) {
+    if (!isPreviewDemoMode()) return [];
+    return unique.map((id) => getPreviewManufacturer(id)).filter((item): item is Manufacturer => !!item);
+  }
+  unique.forEach(assertCanonicalManufacturerId);
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += MANUFACTURER_BATCH_SIZE) chunks.push(unique.slice(i, i + MANUFACTURER_BATCH_SIZE));
+  const pages = await Promise.all(chunks.map((chunk) => serviceRequest<any[]>(
+    `/api/manufacturers/partners?ids=${chunk.map(encodeURIComponent).join(',')}`,
+  )));
+  return pages.flatMap((rows) => {
+    if (!Array.isArray(rows)) throw new Error('Manufacturer profiles returned an invalid response.');
+    return rows.filter((row) => row?.id).map(mapFreshPublicManufacturer);
+  });
+}
+
 export async function getFavoriteManufacturerIds(): Promise<string[]> {
   if (isSellerDevPreview()) {
     return isPreviewDemoMode() ? [...previewFavoriteManufacturerIds] : [];
@@ -513,6 +540,21 @@ export async function getSampleImageUrls(sampleOrderId: string): Promise<string[
   return result.imageUrls ?? [];
 }
 
+/**
+ * Every status from payment onward means the card was paid (mirrors the
+ * server's PAID_ORDER_STATUSES in lib/manufacturerTrust). A payment under
+ * reversal review must never read as settled.
+ */
+const PAID_SAMPLE_STATUSES = new Set([
+  'payment_received', 'processing', 'cut_and_sew', 'packing', 'shipped', 'delivered',
+  'review_needed', 'approved', 'rejected', 'revision_requested', 'completed', 'complete',
+]);
+
+function samplePaymentStatus(row: any): Sample['paymentStatus'] {
+  if (row.paymentReviewState && row.paymentReviewState !== 'none') return 'pending';
+  return PAID_SAMPLE_STATUSES.has(row.status) ? 'paid' : 'pending';
+}
+
 function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
   const serverRevision = Number(row.revision);
   if (!Number.isInteger(serverRevision) || serverRevision < 1) {
@@ -528,7 +570,9 @@ function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
     quoteId: detail.quoteId, productName: row.title ?? '', type: 'proto',
     status: statusMap[row.status] ?? row.status ?? 'requested',
     costCents: Number(row.priceCents ?? 0),
-    paymentStatus: row.status === 'payment_received' ? 'paid' : 'pending',
+    paymentStatus: samplePaymentStatus(row),
+    estimatedCompletionDate: row.estimatedCompletionDate ?? row.deliveredAt ?? undefined,
+    shippedDate: row.shippedAt ?? undefined, deliveredDate: row.deliveredAt ?? undefined,
     imageUris, fileIds: [], revisions: detail.revisions ?? [], review: detail.review,
     notes: row.description ?? undefined, createdAt: row.createdAt ?? now(), updatedAt: row.updatedAt ?? now(),
     threadId: row.threadId ?? undefined, orderType: row.orderType ?? 'sample',

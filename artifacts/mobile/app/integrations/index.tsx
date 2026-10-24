@@ -12,6 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 
@@ -168,7 +169,7 @@ export default function IntegrationsScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
           {loading ? (
-            <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
+            <View style={s.loadingRow} accessibilityLabel="Loading integrations">{[0, 1].map((i) => <LoadingSkeleton key={i} height={66} />)}</View>
           ) : loadError ? (
             <View style={s.errorBox}>
               <Icon name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
@@ -233,7 +234,7 @@ export default function IntegrationsScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: SP.md, paddingVertical: 18 },
-  loadingRow: { alignItems: 'center', paddingVertical: 30 },
+  loadingRow: { gap: SP.sm },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
   retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', marginTop: 2 },

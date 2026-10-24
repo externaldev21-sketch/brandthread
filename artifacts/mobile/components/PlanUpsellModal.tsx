@@ -151,7 +151,7 @@ export default function PlanUpsellModal({
                           <Text style={s.toolTitle}>{tool.title}</Text>
                           {isTapped && (
                             <View style={[s.tappedBadge, { backgroundColor: `${theme.accent}30` }]}>
-                              <Text style={[s.tappedBadgeText, { color: theme.accentLight }]}>You tapped this</Text>
+                              <Text style={[s.tappedBadgeText, { color: theme.accentLight }]}>Selected</Text>
                             </View>
                           )}
                         </View>

@@ -3,7 +3,7 @@
  * Params: id (string)
  */
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert,
@@ -39,15 +39,12 @@ import { isStaleManufacturerWrite } from '@/services/manufacturerWriteRecovery';
 import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes';
 
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE,
-  ACCENT_LIGHT,
-  SUCCESS_DIM, RED,
-  GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
-  SHADOW_PURPLE,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
+import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import { radius } from '@/constants/radii';
 import { prepareImageForUpload } from '@/lib/imageUploadPrep';
 
@@ -140,10 +137,11 @@ function StarRow({
   onRate?: (r: number) => void;
   readonly?: boolean;
 }) {
+  const { theme } = useAppTheme();
   return (
     <View style={sr.row}>
       {[1, 2, 3, 4, 5].map(i => (
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Rate ${i} star${i === 1 ? '' : 's'}`}
+        <TouchableOpacity
           key={i}
           onPress={() => !readonly && onRate?.(i)}
           disabled={readonly}
@@ -155,7 +153,7 @@ function StarRow({
           <Icon
             name="star"
             size={ICON.md}
-            color={i <= rating ? FG : BORDER}
+            color={i <= rating ? theme.text : theme.border}
           />
         </TouchableOpacity>
       ))}
@@ -194,6 +192,8 @@ function SampleTimeline({
     ? (['requested', normalizedStatus] as SampleStatus[])
     : SAMPLE_STATUSES.filter(st => st !== 'revision_requested' || normalizedStatus === 'revision_requested');
   const currentIdx = timelineStatuses.indexOf(normalizedStatus as SampleStatus);
+  const { theme } = useAppTheme();
+  const tl = useMemo(() => makeTimelineStyles(theme), [theme]);
 
   return (
     <View style={tl.container}>
@@ -211,7 +211,7 @@ function SampleTimeline({
             <View style={tl.dotCol}>
               {isCompleted && (
                 <View style={tl.dotCompleted}>
-                  <Icon name="check" size={13} color={BG} />
+                  <Icon name="check" size={13} color={theme.background} />
                 </View>
               )}
               {isActive && (
@@ -260,7 +260,7 @@ function SampleTimeline({
   );
 }
 
-const tl = StyleSheet.create({
+const makeTimelineStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
@@ -278,9 +278,9 @@ const tl = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: FG,
+    backgroundColor: theme.text,
     borderWidth: 1,
-    borderColor: FG,
+    borderColor: theme.text,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -289,9 +289,9 @@ const tl = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.surface,
     borderWidth: 2,
-    borderColor: FG,
+    borderColor: theme.text,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -300,15 +300,15 @@ const tl = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: FG,
+    backgroundColor: theme.text,
   },
   dotFuture: {
     width: 26,
     height: 26,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD_ELEVATED,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -316,17 +316,17 @@ const tl = StyleSheet.create({
   dotFutureText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: SUBTLE,
+    color: theme.subtle,
   },
   line: {
     width: 2,
     flex: 1,
     minHeight: 20,
-    backgroundColor: BORDER,
+    backgroundColor: theme.border,
     marginVertical: 2,
   },
   lineCompleted: {
-    backgroundColor: FG,
+    backgroundColor: theme.text,
   },
   textCol: {
     flex: 1,
@@ -336,34 +336,34 @@ const tl = StyleSheet.create({
   stepTitle: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
   },
   stepTitleCompleted: {
-    color: FG,
+    color: theme.text,
   },
   stepTitleActive: {
-    color: FG,
+    color: theme.text,
     fontSize: FS.base,
   },
   stepTitleFuture: {
-    color: MUTED,
+    color: theme.muted,
   },
   stepDesc: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 2,
     lineHeight: 18,
   },
   stepDescActive: {
-    color: MUTED,
+    color: theme.muted,
   },
   activeImage: {
     width: 120,
     height: 120,
     borderRadius: RADIUS.md,
     marginTop: SP.sm,
-    backgroundColor: CARD,
+    backgroundColor: theme.surface,
   },
 });
 
@@ -371,6 +371,8 @@ const tl = StyleSheet.create({
 
 export default function SampleDetailScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const { id, paymentPrompt, paymentReturn, action } = useLocalSearchParams<{ id: string; paymentPrompt?: string; paymentReturn?: string; action?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -532,6 +534,14 @@ export default function SampleDetailScreen() {
     router.setParams({ paymentReturn: undefined, paymentPrompt: undefined } as never);
     void confirmHostedPayment();
   }, [paymentReturn, sample?.id, paying, confirmHostedPayment, router]);
+
+  // Opens the review form and brings it into view (it sits below the fold).
+  const openReview = useCallback(() => {
+    setReviewMode(true);
+    setTimeout(() => {
+      if (reviewSectionY.current != null) reviewSectionRef.current?.scrollTo({ y: reviewSectionY.current, animated: true });
+    }, 250);
+  }, []);
 
   const setRating = (dim: keyof RatingState) => (val: number) =>
     setRatings(prev => ({ ...prev, [dim]: val }));
@@ -725,7 +735,7 @@ export default function SampleDetailScreen() {
   const primaryAction = isPendingPayment
     ? handlePaySecurely
     : (canReview && !sample.review)
-      ? () => setReviewMode(true)
+      ? openReview
       : handleMessage;
   const primaryDisabled = isPendingPayment && sample.manufacturerPayoutReady !== true;
 
@@ -734,6 +744,7 @@ export default function SampleDetailScreen() {
       <ScreenHeader
         title="Sample details"
         onBack={() => goBackOr(router)}
+        actions={[{ icon: 'help-circle', accessibilityLabel: 'Help center', onPress: () => router.push('/help' as never) }]}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -839,7 +850,7 @@ export default function SampleDetailScreen() {
             </ScrollView>
           ) : (
             <TouchableOpacity onPress={handleAddImage} disabled={imageUploading} activeOpacity={0.75}>
-              <GradientCard style={[s.section, s.imagePlaceholder]} colors={GRAD_CARD_GLOW}>
+              <GradientCard style={[s.section, s.imagePlaceholder]} colors={theme.glowGradient}>
                 <Icon name="camera" size={ICON.xl} color={colors.accentForeground} style={{ marginBottom: SP.sm }} />
                 <Text style={s.imagePlaceholderText}>No images yet</Text>
                 <Text style={s.imagePlaceholderSub}>Tap to add a sample progress photo</Text>
@@ -876,7 +887,9 @@ export default function SampleDetailScreen() {
           )}
 
           {/* ── REVIEW SECTION ───────────────────────────────────── */}
-          {(canReview || sample.review) && (
+          {/* The "Write review" button lives in the action bar; this section
+              shows the form once it's open, or the submitted review. */}
+          {(sample.review || (canReview && reviewMode)) && (
             <>
               <View onLayout={(e) => { reviewSectionY.current = e.nativeEvent.layout.y; }} />
               <SectionHeader title="Review" style={s.sectionHeader} />
@@ -961,14 +974,6 @@ export default function SampleDetailScreen() {
                     />
                   </View>
                 </BrandthreadCard>
-              ) : canReview && !reviewMode ? (
-                <View style={s.section}>
-                  <SecondaryButton
-                    label="Write review"
-                    onPress={() => setReviewMode(true)}
-                    icon="star"
-                  />
-                </View>
               ) : null}
             </>
           )}
@@ -1009,11 +1014,15 @@ export default function SampleDetailScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <FormInput
-                    label="Deadline (YYYY-MM-DD)"
-                    value={revDeadline}
-                    onChange={setRevDeadline}
-                    placeholder="2025-06-01"
+                  <NativeDateTimeField
+                    mode="date"
+                    label="Deadline"
+                    placeholder="Optional"
+                    value={ymdToDate(revDeadline)}
+                    onChange={(d) => setRevDeadline(dateToYmd(d))}
+                    onClear={() => setRevDeadline('')}
+                    minimumDate={startOfToday()}
+                    testID="sample-revision-deadline"
                   />
                   <PrimaryButton
                     label="Submit revision"
@@ -1033,8 +1042,9 @@ export default function SampleDetailScreen() {
 
         {/* ── ACTION BAR ───────────────────────────────────────────── */}
         <View style={[s.actionBar, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-          {/* Contextual: revision request button when review/delivered */}
-          {(sample.status === 'review_needed' || sample.status === 'delivered') && (
+          {/* One row: the contextual secondary action, then the primary.
+              Help center is the "?" in the header. */}
+          {canReview && (
             <SecondaryButton
               label="Request revision"
               onPress={() => setRevisionMode(true)}
@@ -1042,15 +1052,6 @@ export default function SampleDetailScreen() {
               style={s.actionBtn}
             />
           )}
-
-          {/* Help Center — always secondary */}
-          <SecondaryButton
-            label="Help center"
-            icon="help-circle"
-            onPress={() => router.push('/help' as never)}
-            style={s.actionBtn}
-            small
-          />
 
           {/* Primary action: context-driven */}
           <PrimaryButton
@@ -1069,7 +1070,7 @@ export default function SampleDetailScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   scroll: {
     paddingTop: SP.sm,
   },
@@ -1080,8 +1081,8 @@ const s = StyleSheet.create({
   sectionHeader: {
     marginTop: SP.sm,
   },
-  paymentTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
-  paymentText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.md },
+  paymentTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text, marginBottom: SP.xs },
+  paymentText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.md },
   paymentError: { fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: SP.sm },
   loadingContainer: {
     padding: SP.md,
@@ -1114,24 +1115,24 @@ const s = StyleSheet.create({
   infoLabel: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
     flex: 1,
   },
   infoValue: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
     textAlign: 'right',
     flex: 1,
   },
   paidText: {
-    color: FG,
+    color: theme.text,
   },
 
   // Separator
   separator: {
     height: 1,
-    backgroundColor: BORDER,
+    backgroundColor: theme.border,
     marginVertical: SP.sm,
   },
 
@@ -1139,14 +1140,14 @@ const s = StyleSheet.create({
   notesLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
     marginBottom: SP.xs,
     letterSpacing: 0.2,
   },
   notesText: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: FG,
+    color: theme.text,
     lineHeight: 20,
   },
 
@@ -1162,7 +1163,7 @@ const s = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: RADIUS.md,
-    backgroundColor: CARD,
+    backgroundColor: theme.surface,
   },
   imagePlaceholder: {
     alignItems: 'center',
@@ -1171,13 +1172,13 @@ const s = StyleSheet.create({
   imagePlaceholderText: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
     marginBottom: SP.xs,
   },
   imagePlaceholderSub: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
     textAlign: 'center',
   },
   uploadingRow: {
@@ -1190,7 +1191,7 @@ const s = StyleSheet.create({
   uploadingText: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
   },
 
   // Revision
@@ -1204,7 +1205,7 @@ const s = StyleSheet.create({
   revTitle: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
     flex: 1,
   },
   revBadges: {
@@ -1215,14 +1216,14 @@ const s = StyleSheet.create({
   revNotes: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     lineHeight: 18,
     marginTop: SP.xs,
   },
   revDeadline: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: SUBTLE,
+    color: theme.subtle,
     marginTop: SP.xs,
   },
 
@@ -1236,12 +1237,12 @@ const s = StyleSheet.create({
   reviewDecisionLabel: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
   },
   reviewFormTitle: {
     fontSize: FS.md,
     fontFamily: FONT.bold,
-    color: FG,
+    color: theme.text,
     marginBottom: SP.md,
     letterSpacing: -0.2,
   },
@@ -1254,7 +1255,7 @@ const s = StyleSheet.create({
   ratingLabel: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
     flex: 1,
   },
 
@@ -1262,7 +1263,7 @@ const s = StyleSheet.create({
   chipGroupLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
     marginBottom: SP.sm,
     marginTop: SP.sm,
     letterSpacing: 0.2,
@@ -1278,20 +1279,20 @@ const s = StyleSheet.create({
     paddingVertical: SP.sm,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
   },
   chipActive: {
-    borderColor: BORDER_ACTIVE,
+    borderColor: theme.text,
     backgroundColor: 'transparent',
   },
   chipText: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
   },
   chipTextActive: {
-    color: ACCENT_LIGHT,
+    color: theme.accentLight,
     fontFamily: FONT.semibold,
   },
 
@@ -1303,13 +1304,14 @@ const s = StyleSheet.create({
   // Action bar
   actionBar: {
     borderTopWidth: 1,
-    borderTopColor: BORDER,
-    backgroundColor: BG,
+    borderTopColor: theme.border,
+    backgroundColor: theme.background,
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
+    flexDirection: 'row',
     gap: SP.sm,
   },
   actionBtn: {
-    width: '100%',
+    flex: 1,
   },
 });

@@ -209,6 +209,7 @@ vi.mock('@/lib/theme', () => ({
   GRID_MAX_WIDTH: 1080,
   BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
   TABULAR: { fontVariant: ['tabular-nums'] },
+  COMP: { buttonH: 52, buttonHSm: 44, inputH: 52, tabBarH: 72, headerH: 56, cardRadius: 14, iconBtn: 44, minTouchTarget: 44 },
   TEXT: {
     title1: { fontSize: 28 }, title2: { fontSize: 22 }, headline: { fontSize: 17 }, body: { fontSize: 17 },
     subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 },
@@ -358,7 +359,7 @@ describe('owner-only billing actions', () => {
 
     await press(renderer, 'seller-subscription-change-growth');
 
-    expect(alertMock).toHaveBeenCalledWith('Checkout error', 'Could not start checkout. Please try again.');
+    expect(alertMock).toHaveBeenCalledWith('Checkout error', "Couldn't open checkout. Try again.");
     expect(alertMock).not.toHaveBeenCalledWith('Checkout error', expect.stringContaining('API 500'));
     renderer.unmount();
   });
@@ -395,7 +396,7 @@ describe('owner-only billing actions', () => {
 
     await press(renderer, 'seller-subscription-cancel');
 
-    expect(alertMock).toHaveBeenCalledWith('Portal error', 'Could not open billing portal. Please try again.');
+    expect(alertMock).toHaveBeenCalledWith('Portal error', "Couldn't open billing portal. Try again.");
     expect(alertMock).not.toHaveBeenCalledWith('Portal error', expect.stringContaining('API 500'));
     renderer.unmount();
   });

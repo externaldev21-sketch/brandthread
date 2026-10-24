@@ -43,7 +43,7 @@ import { acceptUploadSession } from "../lib/uploadSessions";
 import { recordLegalAcceptance } from "../lib/legalAcceptance";
 import {
   MANUFACTURER_TERMS_REQUIRED, MANUFACTURER_TERMS_VERSION, acceptedCurrentManufacturerTerms,
-  contactFieldsForViewer, filterManufacturerMessage, hasPaidOrderBetween, manufacturerTermsAcceptanceVersion,
+  contactFieldsForViewer, filterManufacturerMessage, hasPaidOrderBetween, manufacturerTermsAcceptanceVersion, paidManufacturerIdsForSeller,
   recordContactSignal, refreshManufacturerVerification, verificationGapLine, visibleToSellerCondition,
 } from "../lib/manufacturerTrust";
 import { emailManufacturerNewMessage, inBackground } from "../lib/manufacturerNotifications";
@@ -437,34 +437,17 @@ router.get("/relationships", ...requireGrowthSeller, async (req, res) => {
   }))));
 });
 
-// Seller-scoped profile: public directory listings, plus private manufacturers
-// the seller is connected to (for example ones they invited).
-router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res) => {
-  const sellerId = (req as any).clerkUserId as string;
-  const manufacturerId = String(req.params.manufacturerId);
-  if (!isUuid(manufacturerId)) { res.status(404).json({ error: "Manufacturer not found" }); return; }
-  const [row] = await db.select({ manufacturer: manufacturers, relationshipId: manufacturerRelationships.id })
-    .from(manufacturers)
-    .leftJoin(manufacturerRelationships, and(
-      eq(manufacturerRelationships.manufacturerId, manufacturers.id),
-      eq(manufacturerRelationships.sellerId, sellerId),
-    ))
-    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
-    .limit(1);
-  if (!row || (!row.manufacturer.isPublicDirectory && !row.relationshipId)) {
-    res.status(404).json({ error: "Manufacturer not found" }); return;
-  }
-  const m = row.manufacturer;
-  if (row.manufacturer.isPublicDirectory && !row.relationshipId && m.verificationStatus !== "verified") {
-    res.status(404).json({ error: "Manufacturer not found" }); return;
-  }
-  const [summary] = await db.select({
-    reviewCount: sql<number>`count(*)::integer`,
-    rating: sql<number | null>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
-  }).from(manufacturerReviews).where(eq(manufacturerReviews.manufacturerId, m.id));
+type PartnerProfileSummary = { reviewCount: number; rating: number | null };
+
+async function serializePartnerProfile(
+  m: typeof manufacturers.$inferSelect,
+  isConnected: boolean,
+  summary: PartnerProfileSummary | undefined,
+  hasPaidOrder: boolean,
+) {
   // Website / email / phone stay hidden until this seller has paid an order card.
-  const contact = contactFieldsForViewer(m, await hasPaidOrderBetween(sellerId, m.id));
-  res.json({
+  const contact = contactFieldsForViewer(m, hasPaidOrder);
+  return {
     id: m.id,
     businessName: m.businessName,
     country: m.country,
@@ -486,7 +469,7 @@ router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res)
     responseTime: m.responseTime || null,
     isVerified: !!m.verifiedAt,
     isPublicDirectory: m.isPublicDirectory,
-    isConnected: !!row.relationshipId,
+    isConnected,
     rating: summary?.reviewCount ? Number(summary.rating) : null,
     reviewCount: summary?.reviewCount ?? 0,
     reviews: [],
@@ -494,7 +477,77 @@ router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res)
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
     revision: m.revision,
-  });
+  };
+}
+
+/** A seller may see a manufacturer that is listed (and verified) or connected to them. */
+function visibleAsPartner(m: typeof manufacturers.$inferSelect, isConnected: boolean): boolean {
+  if (!m.isPublicDirectory) return isConnected;
+  return isConnected || m.verificationStatus === "verified";
+}
+
+const MAX_PARTNER_BATCH = 50;
+
+// Batch form of /partners/:manufacturerId for lists that only need a few
+// profiles at once (the hub's Quotes tab): GET /partners?ids=a,b,c.
+// Same shape and visibility rules; ids the seller can't see are left out.
+router.get("/partners", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const raw = typeof req.query.ids === "string" ? req.query.ids : "";
+  const ids = [...new Set(raw.split(",").map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) { res.json([]); return; }
+  if (ids.length > MAX_PARTNER_BATCH || !ids.every(isUuid)) {
+    res.status(400).json({ error: `ids must be up to ${MAX_PARTNER_BATCH} manufacturer UUIDs`, code: "VALIDATION_ERROR" }); return;
+  }
+  const rows = await db.select({ manufacturer: manufacturers, relationshipId: manufacturerRelationships.id })
+    .from(manufacturers)
+    .leftJoin(manufacturerRelationships, and(
+      eq(manufacturerRelationships.manufacturerId, manufacturers.id),
+      eq(manufacturerRelationships.sellerId, sellerId),
+    ))
+    .where(and(inArray(manufacturers.id, ids), eq(manufacturers.status, "active")));
+  const visible = rows.filter((row) => visibleAsPartner(row.manufacturer, !!row.relationshipId));
+  const visibleIds = visible.map((row) => row.manufacturer.id);
+  if (visibleIds.length === 0) { res.json([]); return; }
+  const [summaries, paidIds] = await Promise.all([
+    db.select({
+      manufacturerId: manufacturerReviews.manufacturerId,
+      reviewCount: sql<number>`count(*)::integer`,
+      rating: sql<number | null>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
+    }).from(manufacturerReviews)
+      .where(inArray(manufacturerReviews.manufacturerId, visibleIds))
+      .groupBy(manufacturerReviews.manufacturerId),
+    paidManufacturerIdsForSeller(sellerId, visibleIds),
+  ]);
+  const summaryById = new Map(summaries.map((row) => [row.manufacturerId, row]));
+  res.json(await Promise.all(visible.map((row) => serializePartnerProfile(
+    row.manufacturer, !!row.relationshipId, summaryById.get(row.manufacturer.id), paidIds.has(row.manufacturer.id),
+  ))));
+});
+
+// Seller-scoped profile: public directory listings, plus private manufacturers
+// the seller is connected to (for example ones they invited).
+router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const manufacturerId = String(req.params.manufacturerId);
+  if (!isUuid(manufacturerId)) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  const [row] = await db.select({ manufacturer: manufacturers, relationshipId: manufacturerRelationships.id })
+    .from(manufacturers)
+    .leftJoin(manufacturerRelationships, and(
+      eq(manufacturerRelationships.manufacturerId, manufacturers.id),
+      eq(manufacturerRelationships.sellerId, sellerId),
+    ))
+    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
+    .limit(1);
+  if (!row || !visibleAsPartner(row.manufacturer, !!row.relationshipId)) {
+    res.status(404).json({ error: "Manufacturer not found" }); return;
+  }
+  const m = row.manufacturer;
+  const [summary] = await db.select({
+    reviewCount: sql<number>`count(*)::integer`,
+    rating: sql<number | null>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
+  }).from(manufacturerReviews).where(eq(manufacturerReviews.manufacturerId, m.id));
+  res.json(await serializePartnerProfile(m, !!row.relationshipId, summary, await hasPaidOrderBetween(sellerId, m.id)));
 });
 
 router.post("/relationships", ...requireGrowthSeller, async (req, res) => {

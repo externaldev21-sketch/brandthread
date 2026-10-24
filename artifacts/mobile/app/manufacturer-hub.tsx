@@ -27,6 +27,8 @@ import { Sheet } from '@/components/ui/BottomSheet';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 
+import { useFocusedInterval } from '@/hooks/useFocusedInterval';
+
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,7 +51,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { BrandthreadCard, GradientCard, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, HapticSwitch } from '@/components/BrandthreadUI';
 
-import { searchManufacturers, getRelationships, getRelationship, saveManufacturer, getManufacturer, favoriteManufacturer, getFavoriteManufacturerIds, unfavoriteManufacturer, getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest, getSamples, getProductionOrders, getConversations, getOrCreateConversation, type DirectorySort } from '@/services/manufacturerService';
+import { searchManufacturers, getRelationships, getRelationship, saveManufacturer, getManufacturersByIds, favoriteManufacturer, getFavoriteManufacturerIds, unfavoriteManufacturer, getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest, getSamples, getProductionOrders, getConversations, getOrCreateConversation, type DirectorySort } from '@/services/manufacturerService';
 
 import { getDirectoryFacets, getSellerOrders, type DirectoryFacets, type SellerOrderRow } from '@/services/manufacturerOrderFlow';
 
@@ -237,9 +239,9 @@ export default function ManufacturerHub() {
     <View style={s.root}>
       <HubHeader activeTab={activeTab} router={router} onLeave={leaveSetupDestination} />
 
-      {/* Tab bar — 5 segments fit 393pt without scrolling in practice, but
-          the edge fade stays as a safety net for narrower devices/larger
-          text sizes rather than silently clipping the last tab again. */}
+      {/* Tab bar — 5 segments overflow ~390pt screens, so ChipRow scrolls the
+          active segment into view on mount and on every change (deep links
+          like ?tab=production included). The edge fade hints at more tabs. */}
       <View style={s.tabBarWrapper}>
         <ChipRow
           style={s.tabBarScroll}
@@ -1250,9 +1252,8 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       const [reqs, qs] = await Promise.all([getQuoteRequests(), getQuotes()]);
       setQuoteRequests((Array.isArray(reqs) ? reqs : []).filter(r => r.status !== 'accepted'));
       setQuotes(Array.isArray(qs) ? qs : []);
-      const ids = [...new Set([...reqs, ...qs].map(item => item.manufacturerId).filter(Boolean))];
-      const profiles = await Promise.all(ids.map(id => getManufacturer(id)));
-      setManufacturerNames(Object.fromEntries(profiles.filter(Boolean).map(profile => [profile!.id, profile!.name])));
+      const profiles = await getManufacturersByIds([...reqs, ...qs].map(item => item.manufacturerId));
+      setManufacturerNames(Object.fromEntries(profiles.map(profile => [profile.id, profile.name])));
     } catch (e) {
       setQuoteRequests([]);
       setQuotes([]);
@@ -1486,10 +1487,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
-  useEffect(() => {
-    const timer = setInterval(load, 15_000);
-    return () => clearInterval(timer);
-  }, [load]);
+  useFocusedInterval(load, 15_000, !isSellerDevPreview());
 
   if (loading && samples.length === 0) return <View style={s.skeletonList}>{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
   if (error) {
@@ -1590,10 +1588,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
-  useEffect(() => {
-    const timer = setInterval(load, 15_000);
-    return () => clearInterval(timer);
-  }, [load]);
+  useFocusedInterval(load, 15_000, !isSellerDevPreview());
 
   if (loading && orders.length === 0) return <View style={s.skeletonList} testID="production-loading">{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
   if (error) {
@@ -1704,10 +1699,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
-  useEffect(() => {
-    const timer = setInterval(load, 10_000);
-    return () => clearInterval(timer);
-  }, [load]);
+  useFocusedInterval(load, 10_000, !isSellerDevPreview());
 
   if (loading) return <View style={{ padding: SP.md }}><ListSkeleton rows={6} /></View>;
   if (error) {

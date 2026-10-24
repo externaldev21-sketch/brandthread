@@ -24,6 +24,7 @@ const {
       transactions: vi.fn(),
       payouts: vi.fn(),
       summary: vi.fn(),
+      firstPayout: vi.fn(),
     },
     seller: {
       connect: {
@@ -240,6 +241,7 @@ function resetApiToRoleRequired() {
   apiMock.finance.transactions.mockRejectedValue(roleError());
   apiMock.finance.payouts.mockRejectedValue(roleError());
   apiMock.finance.summary.mockRejectedValue(roleError());
+  apiMock.finance.firstPayout.mockResolvedValue({ identityRequired: false });
   apiMock.seller.connect.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.invoices.mockRejectedValue(roleError());
@@ -315,7 +317,9 @@ describe('seller financial role boundaries', () => {
 
   it.each([
     ['billing', BillingScreen, 'Upcoming bill'],
-    ['subscription', SubscriptionScreen, 'Current plan'],
+    // Managers can't read the owner's plan status (ROLE_REQUIRED), so the
+    // current-plan card becomes a retry row; the plan catalogue still shows.
+    ['subscription', SubscriptionScreen, 'All plans'],
     ['finance', FinanceScreen, 'Summary'],
     ['payouts', PayoutsScreen, 'Payout history'],
   ])('renders the manager %s view when owner-only APIs return ROLE_REQUIRED', async (_name, ScreenComponent, expectedText) => {
@@ -362,6 +366,11 @@ describe('seller financial role boundaries', () => {
 
   it('keeps owner controls available', async () => {
     roleState.currentRole = 'owner';
+    // An owner can read their own plan; ROLE_REQUIRED only applies to managers.
+    apiMock.seller.subscription.status.mockResolvedValue({
+      plan: 'starter', status: 'active', renewsOn: 'Nov 1, 2026', trialEnd: null,
+      amountCents: 2900, cancelAtPeriodEnd: false, effectiveProvider: 'stripe',
+    });
 
     const billing = await renderScreen(BillingScreen);
     const subscription = await renderScreen(SubscriptionScreen);

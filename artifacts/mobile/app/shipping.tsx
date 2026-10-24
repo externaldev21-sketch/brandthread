@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Icon } from '@/components/ui/Icon';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -670,6 +670,16 @@ export default function ShippingScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 style={[styles.countryInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                onPress={() => { setShipFromDraft(shipFromCountry); setShipFromEditing(false); }}
+                disabled={savingShipFrom}
+                hitSlop={8}
+                style={[styles.smallBtn, { borderWidth: 1, borderColor: colors.border }]}
+              >
+                <Icon name="x" size={14} color={colors.foreground} />
+              </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save" onPress={saveShipFrom} disabled={savingShipFrom} style={[styles.smallBtn, { backgroundColor: colors.primary }]}>
                 {savingShipFrom ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Icon name="check" size={14} color={colors.primaryForeground} />}
               </TouchableOpacity>
@@ -863,8 +873,10 @@ export default function ShippingScreen() {
     <Snackbar visible={!!returnToast} message={returnToast ?? ''} onDismiss={() => setReturnToast(null)} />
 
     {/* ── Zone editor sheet ────────────────────────────────────────────────── */}
-    {zoneSheetVisible && (
-      <View style={styles.sheetBackdrop}>
+    {/* A real Modal, so the scrim covers the floating tab bar too and it
+        can't be tapped while the sheet is open. */}
+    <Modal visible={zoneSheetVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setZoneSheetVisible(false)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetBackdrop}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setZoneSheetVisible(false)} />
         <ScrollView
           style={[styles.sheetScroll, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -1106,12 +1118,12 @@ export default function ShippingScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
-    )}
+      </KeyboardAvoidingView>
+    </Modal>
 
     {/* ── Packaging preset sheet ───────────────────────────────────────────── */}
-    {presetSheetVisible && (
-      <View style={styles.sheetBackdrop}>
+    <Modal visible={presetSheetVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPresetSheetVisible(false)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetBackdrop}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPresetSheetVisible(false)} />
         <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: insets.bottom + 20 }]}>
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{presetForm.id ? 'Edit package' : 'Add package preset'}</Text>
@@ -1160,8 +1172,8 @@ export default function ShippingScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
-    )}
+      </KeyboardAvoidingView>
+    </Modal>
     </View>
   );
 }
@@ -1169,7 +1181,7 @@ export default function ShippingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   sheetBackdrop: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)', // theme-exempt: modal scrim over the whole screen
     justifyContent: 'flex-end',
   },

@@ -47,6 +47,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { haptic } from '@/lib/haptics';
+import { showToast } from '@/lib/toast';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
@@ -254,7 +255,10 @@ export default function PlansScreen() {
               } else {
                 setCurrentPlanId(status.plan ?? null);
                 setAwaitingReturn(false);
-                Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan)} plan — enjoy your ${trialDays}-day free trial.`);
+                showToast(
+                  'Plan updated',
+                  `You're now on the ${capitalize(status.plan)} plan.${status.status === 'trialing' ? ` Your ${trialDays}-day free trial has started.` : ''}`,
+                );
               }
               return;
             }
@@ -313,7 +317,7 @@ export default function PlansScreen() {
           await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
           router.replace('/(tabs)/' as never);
         } else {
-          Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan ?? plan.id)} plan.`);
+          showToast('Plan updated', `You're now on the ${capitalize(status.plan ?? plan.id)} plan.`);
         }
         return;
       }
@@ -365,7 +369,7 @@ export default function PlansScreen() {
       const status = await api.seller.subscription.status();
       setCurrentPlanId(status.plan ?? null);
       setCurrentPlanStatus(status.status ?? null);
-      Alert.alert('Purchases restored', 'Your subscription status has been refreshed.');
+      showToast('Purchases restored', 'Your subscription status has been refreshed.');
     } catch (e: any) {
       Alert.alert("Couldn't restore purchases", 'Please check your connection and try again.');
     } finally {
@@ -709,7 +713,7 @@ function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.background ?? '#0A0A0B' },
+  root: { flex: 1, backgroundColor: theme.background },
 
   // Phone-framed dashboard preview
   phoneFrame: {

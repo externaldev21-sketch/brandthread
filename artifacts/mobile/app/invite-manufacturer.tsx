@@ -7,8 +7,8 @@
  * conversation with this seller.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
@@ -21,9 +21,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { haptics } from '@/lib/haptics';
 
-import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, ORANGE, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP, SUCCESS } from '@/lib/theme';
 
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -36,6 +36,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 
 import { radius } from '@/constants/radii';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
@@ -47,6 +48,7 @@ function inviteMessage(companyName: string, link: string) {
 
 export default function InviteManufacturerScreen() {
   const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarInset = useSellerTabBarInset();
@@ -153,7 +155,7 @@ export default function InviteManufacturerScreen() {
                   <Text style={[s.primaryText, { color: theme.onAccent }]}>Share link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.secondaryBtn} onPress={() => created.inviteLink && void copyLink(created.inviteLink)} testID="invite-copy">
-                  <Icon name={copied ? 'check' : 'copy'} size={16} color={FG} />
+                  <Icon name={copied ? 'check' : 'copy'} size={16} color={theme.text} />
                   <Text style={s.secondaryText}>{copied ? 'Copied' : 'Copy'}</Text>
                 </TouchableOpacity>
               </View>
@@ -171,7 +173,7 @@ export default function InviteManufacturerScreen() {
                     ['message-circle', 'One ongoing conversation for the whole job'],
                     ['credit-card', 'Pay for samples and bulk orders by card or Apple Pay'],
                   ].map(([icon, label]) => (
-                    <View key={label} style={s.point}><Icon name={icon as any} size={14} color={FG} /><Text style={s.pointText}>{label}</Text></View>
+                    <View key={label} style={s.point}><Icon name={icon as any} size={14} color={theme.text} /><Text style={s.pointText}>{label}</Text></View>
                   ))}
                 </View>
               </View>
@@ -188,7 +190,17 @@ export default function InviteManufacturerScreen() {
           <View style={s.card} testID="invite-history">
             <Text style={s.section}>Your invites</Text>
             {invites === null && !invitesError ? (
-              <ActivityIndicator color={FG} style={{ marginVertical: SP.md }} />
+              <View accessibilityLabel="Loading your invites" testID="invite-history-loading">
+                {[0, 1].map((i) => (
+                  <View key={i} style={s.inviteRow}>
+                    <View style={s.skeletonText}>
+                      <SkeletonBlock width="55%" height={14} radius={4} />
+                      <SkeletonBlock width="30%" height={10} radius={4} />
+                    </View>
+                    <SkeletonBlock width={88} height={32} radius={radius.sm} />
+                  </View>
+                ))}
+              </View>
             ) : invitesError ? (
               <RetryRow label="Couldn't load your invites" onRetry={() => void loadInvites()} />
             ) : invites!.length === 0 ? (
@@ -217,27 +229,28 @@ export default function InviteManufacturerScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1 },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: SP.sm },
-  title: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  body: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  fine: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
-  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE },
+  card: { backgroundColor: theme.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: SP.sm },
+  title: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  body: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },
+  fine: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, lineHeight: 16 },
+  section: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.subtle },
   points: { gap: 8, marginTop: 4 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pointText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  pointText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   error: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: -4 },
-  successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(16,185,129,0.14)', alignItems: 'center', justifyContent: 'center' },
-  linkBox: { backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm + 4 },
-  linkText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: `${SUCCESS}24`, alignItems: 'center', justifyContent: 'center' },
+  linkBox: { backgroundColor: theme.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm + 4 },
+  linkText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   row: { flexDirection: 'row', gap: SP.sm },
   primaryBtn: { flex: 2, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: RADIUS.md },
   primaryText: { fontSize: FS.base, fontFamily: FONT.bold },
-  secondaryBtn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED },
-  secondaryText: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
-  inviteName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  resend: { paddingHorizontal: 12, height: 32, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, justifyContent: 'center' },
-  resendText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+  secondaryBtn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
+  secondaryText: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: theme.border },
+  skeletonText: { flex: 1, gap: 6 },
+  inviteName: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  resend: { paddingHorizontal: 12, height: 32, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border, justifyContent: 'center' },
+  resendText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
 });

@@ -61,6 +61,8 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@clerk/expo', () => ({ useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }) }));
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/toast', () => ({ showToast: toastMock }));
 vi.mock('@/hooks/useTeamRole', () => ({ useTeamRole: () => ({ currentRole: roleState.currentRole, isLoadingRole: false }) }));
 vi.mock('@/hooks/useSubscriptionPlan', () => ({ invalidatePlanCache: vi.fn() }));
 vi.mock('@/lib/revenueCat', () => ({ useRevenueCat: () => ({ managementURL: null, restore: vi.fn() }) }));
@@ -173,7 +175,7 @@ describe('billing — change plan', () => {
     expect(apiMock.seller.subscription.checkout).toHaveBeenCalledWith('pro');
     expect(linkingMock.openURL).not.toHaveBeenCalled();
     expect(text(r.toJSON())).toContain('Pro');
-    expect(alertMock).toHaveBeenCalledWith('Plan updated', "You're now on Pro.");
+    expect(toastMock).toHaveBeenCalledWith('Plan updated', "You're now on Pro.");
   });
 });
 

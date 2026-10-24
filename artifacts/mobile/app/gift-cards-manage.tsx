@@ -203,7 +203,7 @@ export default function GiftCardsManageScreen() {
                     <Text style={s.fine} numberOfLines={1}>{card.recipientName || card.recipientEmail || 'Unassigned'} · {giftCardStatusLabel(card)}</Text>
                   </View>
                   {card.status === 'active' ? (
-                    <PressableScale onPress={() => confirmVoid(card)} accessibilityRole="button" accessibilityLabel={`Void gift card ${giftCardMask(card)}`}>
+                    <PressableScale onPress={() => confirmVoid(card)} style={s.voidBtn} accessibilityRole="button" accessibilityLabel={`Void gift card ${giftCardMask(card)}`}>
                       <Text style={s.void}>Void</Text>
                     </PressableScale>
                   ) : null}
@@ -231,6 +231,9 @@ function makeStyles(ck: CheckoutColors) {
     inlineButton: { marginTop: 25, minWidth: 84 },
     total: { fontVariant: ['tabular-nums'],  fontFamily: FONT.bold, fontSize: 28, color: ck.text },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2, borderTopWidth: 1, borderTopColor: ck.divider },
+    // PressableScale forces a 44pt box; centre the label inside it so it
+    // lines up with the middle of the two-line row, not its first line.
+    voidBtn: { alignSelf: 'center', justifyContent: 'center' },
     void: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline', color: ck.text },
     codeBox: { gap: SP.sm, padding: SP.md, borderRadius: 12, borderWidth: 1, borderColor: ck.fieldBorder, marginBottom: SP.md },
     code: { fontFamily: FONT.bold, fontSize: FS.lg, color: ck.text },

@@ -9,6 +9,8 @@ import { useAuth } from '@clerk/expo';
 
 import { haptics, haptic } from '@/lib/haptics';
 
+import { showToast } from '@/lib/toast';
+
 
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -27,6 +29,7 @@ import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 import { useApi } from '@/lib/api';
 
@@ -73,10 +76,13 @@ export default function PayoutScheduleScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const api = useApi();
-  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const isPreviewMode = isSellerDevPreview();
-  const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
-  const { currentRole, isLoadingRole } = useTeamRole();
+  // lib/api.ts rejects every request in the seller web preview, signed in or
+  // not, so any preview (and any missing session) skips the API — a signed-in
+  // preview used to land on "Owner access required".
+  const isPreview = isPreviewMode || (!authLoaded || !isSignedIn);
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
 
   const [info, setInfo] = useState<PayoutScheduleInfo | null>(null);
@@ -143,6 +149,7 @@ export default function PayoutScheduleScreen() {
           : { interval: choice === 'instant' ? 'manual' : 'daily' },
       );
       await load();
+      showToast('Schedule saved');
     } catch (error) {
       if (showPayoutGuard(error, (route) => router.push(route as never))) return;
       const message = error instanceof ApiError && error.status < 500
@@ -179,7 +186,7 @@ export default function PayoutScheduleScreen() {
                   idempotencyKey: cashoutKeyRef.current.key, amount: max, currency: 'usd', method: 'instant',
                 });
                 cashoutKeyRef.current = null;
-                Alert.alert('Cash out requested', `${payout.formatted ?? formatCents(max)} is on its way to your card.`);
+                showToast('Cash out requested', `${payout.formatted ?? formatCents(max)} is on its way to your card.`);
               } catch (error) {
                 if (error instanceof ApiError && error.status < 500 && error.code !== 'PAYOUT_REVIEW_REQUIRED') {
                   cashoutKeyRef.current = null;
@@ -215,6 +222,19 @@ export default function PayoutScheduleScreen() {
       </View>
     );
   }
+  // A failed role lookup is not "no access": offer a retry instead of the
+  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  if (!isPreview && roleError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payout schedule" onBack={goBack} />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load your payout schedule" onRetry={retryRole} />
+        </View>
+      </View>
+    );
+  }
+
   if (!isPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>

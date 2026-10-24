@@ -13,16 +13,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable,
+  Alert, FlatList, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon } from '@/components/ui/Icon';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useFocusedInterval } from '@/hooks/useFocusedInterval';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
@@ -149,6 +151,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
 export default function ManufacturerMessagesScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
+  const bub = useMemo(() => makeBub(theme), [theme]);
   const params = useLocalSearchParams<{ threadId?: string; mfrName?: string; mfrId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -246,12 +249,15 @@ export default function ManufacturerMessagesScreen() {
     return () => { cancelled = true; };
   }, [authLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Thread refresh only while this screen is focused and the app is in the
+  // foreground (refreshes once on return); the clock just re-renders the
+  // manufacturer's local time label.
+  useFocusedInterval(() => { if (threadId) void loadMessages(threadId); }, 5_000, !!threadId && !isSellerDevPreview());
   useEffect(() => {
     if (!threadId || isSellerDevPreview()) return;
-    const timer = setInterval(() => { void loadMessages(threadId); }, 5_000);
     const clock = setInterval(() => setClock((tick) => tick + 1), 60_000);
-    return () => { clearInterval(timer); clearInterval(clock); };
-  }, [threadId, loadMessages]);
+    return () => clearInterval(clock);
+  }, [threadId]);
 
   const rows = useMemo(() => (INVERTED ? buildRows(messages) : buildRows(messages).reverse()), [messages]);
   const listRef = useRef<FlatList<Row>>(null);
@@ -385,7 +391,13 @@ export default function ManufacturerMessagesScreen() {
     return (
       <View style={{ flex: 1 }}>
         {header}
-        <View style={s.center} testID="thread-loading"><ActivityIndicator color={theme.text} /><Text style={s.centerText}>Loading conversation…</Text></View>
+        <View style={s.skeletonThread} testID="thread-loading" accessibilityLabel="Loading conversation">
+          {SKELETON_BUBBLES.map((bubble, index) => (
+            <View key={index} style={[bub.row, bubble.mine ? bub.right : bub.left]}>
+              <SkeletonBlock width={bubble.width} height={bubble.height} radius={RADIUS.lg} />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -512,6 +524,15 @@ export default function ManufacturerMessagesScreen() {
   );
 }
 
+// Placeholder thread while loading: alternating left/right bubbles.
+const SKELETON_BUBBLES: { mine: boolean; width: number; height: number }[] = [
+  { mine: false, width: 220, height: 56 },
+  { mine: true, width: 180, height: 40 },
+  { mine: false, width: 150, height: 40 },
+  { mine: true, width: 240, height: 72 },
+  { mine: false, width: 200, height: 56 },
+];
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeBub = (theme: AppThemePreset) => StyleSheet.create({
@@ -536,7 +557,7 @@ const makeBub = (theme: AppThemePreset) => StyleSheet.create({
 
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, padding: SP.lg },
-  centerText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
+  skeletonThread: { flex: 1, justifyContent: 'flex-end', paddingBottom: SP.lg },
   headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.lg, marginVertical: SP.sm },
   dayLine: { flex: 1, height: 1, backgroundColor: theme.border },

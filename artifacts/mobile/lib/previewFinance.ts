@@ -50,9 +50,10 @@ export function getPreviewFinanceDemo(): PreviewFinanceDemo {
       stripeError: false,
       held: { ...zero, drops: [] },
       releasing: { ...zero, count: 0 },
-      // The Stripe balance is deliberately unavailable in a signed-out demo.
-      available: null,
-      pending: null,
+      // Stripe is never connected in a demo, so its balance is an honest
+      // $0.00 like every other card (not "—", which reads as a load failure).
+      available: zero,
+      pending: zero,
       paidOut: { ...zero, toBank: null },
       owed: zero,
       credit: zero,

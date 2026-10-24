@@ -475,6 +475,32 @@ describe("directory filters", () => {
   });
 });
 
+describe("batched partner profiles", () => {
+  it("returns several seller-visible profiles in one request with the single-profile shape", async () => {
+    const listed = await seedFactory({ photos: ["/objects/uploads/listed"] });
+    const unverified = await seedFactory({ verificationStatus: "pending" });
+    const hidden = await seedFactory({ isPublicDirectory: false });
+    const connected = await seedFactory({ isPublicDirectory: false });
+    await db.insert(manufacturerRelationships).values({ sellerId: seller, manufacturerId: connected.id });
+
+    const ids = [listed.id, unverified.id, hidden.id, connected.id, listed.id].join(",");
+    const batch = await call(`/api/manufacturers/partners?ids=${ids}`, "GET", undefined, seller);
+    expect(batch.status).toBe(200);
+    expect(batch.body.map((row: any) => row.id).sort()).toEqual([listed.id, connected.id].sort());
+    const single = await call(`/api/manufacturers/partners/${listed.id}`, "GET", undefined, seller);
+    expect(batch.body.find((row: any) => row.id === listed.id)).toEqual(single.body);
+    expect(batch.body.find((row: any) => row.id === connected.id)).toMatchObject({ isConnected: true, isPublicDirectory: false });
+
+    // Another seller only sees the public listing.
+    const other = await call(`/api/manufacturers/partners?ids=${ids}`, "GET", undefined, otherSeller);
+    expect(other.body.map((row: any) => row.id)).toEqual([listed.id]);
+
+    expect((await call("/api/manufacturers/partners?ids=", "GET", undefined, seller)).body).toEqual([]);
+    expect((await call("/api/manufacturers/partners?ids=not-a-uuid", "GET", undefined, seller)).status).toBe(400);
+    expect((await call(`/api/manufacturers/partners?ids=${listed.id}`)).status).toBe(401);
+  });
+});
+
 describe("international payout readiness", () => {
   it("treats a cross-border recipient account as ready once transfers and payouts are active", async () => {
     const { connectReadiness, connectCountryProblem } = await import("../manufacturer-connect");

@@ -2,17 +2,14 @@
  * Seller Data Export — request a JSON/CSV export of products, orders, customers.
  */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Share, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { saveTextFile } from '@/lib/saveCsvFile';
 
 type IncludeKey = 'products' | 'orders' | 'customers';
 type Format = 'json' | 'csv';
@@ -26,8 +23,6 @@ const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: IconName; desc: s
 export default function SellerDataExportScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const api = useApi();
 
   const [include, setInclude] = useState<IncludeKey[]>(['products', 'orders', 'customers']);
@@ -51,33 +46,26 @@ export default function SellerDataExportScreen() {
     try {
       const data = await api.sellerExport.request(format, include);
 
-      if (format === 'json') {
-        // Write JSON to a temp file and share
-        const json = JSON.stringify(data, null, 2);
-        const file = new File(Paths.cache, `brandthread-export-${Date.now()}.json`);
-        file.write(json);
-        const uri = file.uri;
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export data' });
-        } else {
-          Alert.alert('Export ready', 'Open it from the share sheet.');
-        }
-        setResult({ counts: data.counts ?? {}, exportedAt: data.exportedAt ?? new Date().toISOString() });
-      } else {
-        // CSV: data is a string from server
-        const csv = typeof data === 'string' ? data : JSON.stringify(data);
-        const file = new File(Paths.cache, `brandthread-export-${Date.now()}.csv`);
-        file.write(csv);
-        const uri = file.uri;
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Export CSV' });
-        } else {
-          Alert.alert('Export ready', 'Open it from the share sheet.');
-        }
-        setResult({ counts: {}, exportedAt: new Date().toISOString() });
+      // Web downloads the file; native opens the share sheet. CSV arrives
+      // from the server as a string.
+      const saved = format === 'json'
+        ? await saveTextFile(JSON.stringify(data, null, 2), `brandthread-export-${Date.now()}.json`, {
+          mimeType: 'application/json', uti: 'public.json', dialogTitle: 'Export data',
+        })
+        : await saveTextFile(typeof data === 'string' ? data : JSON.stringify(data), `brandthread-export-${Date.now()}.csv`, {
+          mimeType: 'text/csv', uti: 'public.comma-separated-values-text', dialogTitle: 'Export CSV',
+        });
+      if (saved === 'unavailable') {
+        // No share sheet: the file would only sit in the app's private cache.
+        Alert.alert(
+          "Can't save the file here",
+          "This device can't open a share sheet, so the export couldn't be saved. Try again on another device or in a web browser.",
+        );
+        return;
       }
+      setResult(format === 'json'
+        ? { counts: data.counts ?? {}, exportedAt: data.exportedAt ?? new Date().toISOString() }
+        : { counts: {}, exportedAt: new Date().toISOString() });
     } catch (err) {
       Alert.alert('Export failed', 'Could not generate export. Check your connection and try again.');
     } finally {
@@ -193,8 +181,6 @@ export default function SellerDataExportScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle:  { fontSize: 17, fontFamily: FONT.bold, color: theme.text },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   sectionLabel: { fontSize: 12, fontFamily: FONT.semibold, color: theme.muted, marginBottom: -8 },
   card:         { backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border },

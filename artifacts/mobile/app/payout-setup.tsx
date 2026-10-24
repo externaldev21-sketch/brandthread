@@ -9,10 +9,14 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { RoleLockedView } from '@/components/RoleLockedView';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { hasPayoutsAccess, isManagerRole } from '@/lib/roleError';
+import { useTeamRole } from '@/hooks/useTeamRole';
 import {
   PayoutSetup,
   SetupState,
@@ -42,9 +46,14 @@ export default function PayoutSetupScreen() {
   const api = useApi();
   const params = useLocalSearchParams<{ returned?: string; refresh?: string; state?: string }>();
   const { isLoaded, isSignedIn } = useAuth();
-  const signedOutPreview = isSellerDevPreview() && (!isLoaded || !isSignedIn);
+  // Any seller web preview skips the API (lib/api.ts rejects it signed in or not).
+  const sellerPreview = isSellerDevPreview();
   const demoActive = isPreviewDemoMode();
-  const skipApi = signedOutPreview || demoActive;
+  const skipApi = sellerPreview || demoActive;
+  // Same gate as Payouts: staff without payout access get the role lock, not
+  // a generic load error. Managers can look but not start Stripe onboarding.
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
+  const isReadOnly = isManagerRole(currentRole);
   const demoState = demoActive
     ? (DEMO_STATES.includes(params.state as SetupState) ? (params.state as SetupState) : 'not_started')
     : null;
@@ -106,7 +115,7 @@ export default function PayoutSetupScreen() {
 
   const view: PayoutSetup | null = demoState
     ? demoPayoutSetup(demoState)
-    : signedOutPreview
+    : sellerPreview
       ? { state: 'not_started', steps: idleSteps(), deadline: null, bankLast4: null, providerConfigured: true }
       : setup;
 
@@ -122,9 +131,44 @@ export default function PayoutSetupScreen() {
   const done = view ? completedCount(view.steps) : 0;
   const complete = view?.state === 'complete';
 
+  const goBack = () => goBackOr(router, '/payouts');
+
+  if (!skipApi && isLoadingRole) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payout setup" onBack={goBack} />
+        <View style={styles.skeleton}>
+          <LoadingSkeleton height={96} />
+          <LoadingSkeleton height={210} />
+        </View>
+      </View>
+    );
+  }
+
+  // A failed role lookup is not "no access": retry instead of the lock.
+  if (!skipApi && roleError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payout setup" onBack={goBack} />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load payout setup" onRetry={retryRole} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!skipApi && !hasPayoutsAccess(currentRole) && !isReadOnly) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payout setup" onBack={goBack} />
+        <RoleLockedView screenTitle="payout setup" currentRole={currentRole ?? undefined} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Payout setup" onBack={() => goBackOr(router, '/payouts')} />
+      <ScreenHeader title="Payout setup" onBack={goBack} />
       {loading ? (
         <View style={styles.skeleton}>
           <LoadingSkeleton height={96} />
@@ -178,7 +222,7 @@ export default function PayoutSetupScreen() {
             {loadError && <Text style={styles.footnote}>Could not refresh. Showing the last known status.</Text>}
           </ScrollView>
 
-          {cta && view.providerConfigured && (
+          {cta && view.providerConfigured && !isReadOnly && (
             <View style={styles.footer}>
               <TouchableOpacity
                 testID="payout-setup-cta"
