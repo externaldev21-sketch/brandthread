@@ -208,7 +208,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/manufacturer-profile.tsx',
   'app/navigation-isolation-probe.tsx',
   'app/order-detail.tsx',
-  'app/plans.tsx',
   'app/product-bundle-edit.tsx',
   'app/product-bundles.tsx',
   'app/product-detail.tsx',

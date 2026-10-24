@@ -322,8 +322,8 @@ export default function FinanceScreen() {
         ) : (
           overviewCards.map((card) => (
             <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Icon name={card.icon} size={16} color={card.color} />
-              <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
+              <Icon name={card.icon} size={16} color={colors.mutedForeground} />
+              <Text style={[styles.overviewVal, TABULAR_NUMS, { color: colors.foreground }]}>{card.value}</Text>
               <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
             </View>
           ))

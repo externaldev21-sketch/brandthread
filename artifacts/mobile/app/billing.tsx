@@ -264,7 +264,7 @@ export default function BillingScreen() {
         await loadStatus();
       }
       closeSheet();
-      Alert.alert('Plan updated', `You're now on ${getSellerPlan(planId)?.name ?? 'your new plan'}.`);
+      showToast('Plan updated', `You're now on ${getSellerPlan(planId)?.name ?? 'your new plan'}.`);
     } catch (error) {
       showActionError(error, 'Could not change plan');
     } finally {
