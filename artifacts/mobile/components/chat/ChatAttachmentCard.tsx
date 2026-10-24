@@ -122,7 +122,7 @@ export function ChatAttachmentCard({
       noMinHeight
       style={[s.card, { backgroundColor: fill, alignSelf: isMe ? 'flex-end' : 'flex-start' }, style]}
     >
-      <View style={s.media} accessibilityRole="none">
+      <View style={[s.media, !hasImage && s.mediaIconOnly]} accessibilityRole="none">
         {hasImage ? (
           <CachedImage
             source={{ uri: imageUri! }}
@@ -185,6 +185,9 @@ const s = StyleSheet.create({
     // 44×44 inline thumbnail this replaces.
     aspectRatio: 3 / 4,
   },
+  // Order cards have no photo — a full 3:4 frame around a single icon was a
+  // ~300pt empty block in the thread.
+  mediaIconOnly: { aspectRatio: 2 },
   iconCircle: {
     width: 56,
     height: 56,

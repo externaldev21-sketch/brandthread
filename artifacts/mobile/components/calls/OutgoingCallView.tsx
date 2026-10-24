@@ -2,8 +2,8 @@
  * OutgoingCallView — Instagram "Calling…" screen, mirrored 1:1 in layout:
  * chevron-down minimize top-left, centered peer avatar + name + "Calling…",
  * bottom control capsule (camera, mic, [effects/gallery skipped — no such
- * feature], end). Flip-camera only appears for `mode === 'video'`, matching
- * Instagram not showing it on the audio-only variant either.
+ * feature], end). The camera toggle only appears for `mode === 'video'`; there
+ * is no flip-camera control until the call provider has a real camera to flip.
  */
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -36,12 +36,14 @@ export function OutgoingCallView() {
 
       <View style={styles.bottom}>
         <ControlCapsule>
-          <ControlButton
-            icon={cameraOff ? 'camera-off' : 'camera'}
-            active={mode === 'video' && cameraOff}
-            onPress={toggleCameraOff}
-            accessibilityLabel={cameraOff ? 'Turn camera on' : 'Turn camera off'}
-          />
+          {mode === 'video' && (
+            <ControlButton
+              icon={cameraOff ? 'camera-off' : 'camera'}
+              active={cameraOff}
+              onPress={toggleCameraOff}
+              accessibilityLabel={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+            />
+          )}
           <ControlButton
             icon={muted ? 'mic-off' : 'mic'}
             active={muted}

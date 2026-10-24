@@ -145,7 +145,14 @@ export default function ConversationGroupCreateScreen() {
           renderItem={({ item }) => {
             const checked = selected.has(item.userId);
             return (
-              <PressableScale rippleEnabled={false} onPress={() => toggle(item.userId)} testID={`group-candidate-${item.userId}`}>
+              <PressableScale
+                rippleEnabled={false}
+                onPress={() => toggle(item.userId)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                accessibilityLabel={item.name}
+                testID={`group-candidate-${item.userId}`}
+              >
                 <View style={[s.row, { borderBottomColor: theme.border }]}>
                   <View style={[s.avatar, { backgroundColor: item.color }]}>
                     <Text style={s.avatarInitials}>{item.initials}</Text>

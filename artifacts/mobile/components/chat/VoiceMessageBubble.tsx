@@ -7,7 +7,7 @@ import { isBarPlayed, remainingTimeLabel } from '@/lib/voicePlayback';
 import { radius } from '@/constants/radii';
 
 export const TRANSCRIPTION_STUB =
-  "Transcription isn't wired up to a real speech-to-text service yet — this is placeholder text standing in for it.";
+  "Transcription isn't available for this voice message yet.";
 
 const SPEEDS = [1, 1.5, 2] as const;
 
@@ -101,13 +101,22 @@ export function VoiceMessageBubble({
       </View>
 
       <View style={vs.footerRow}>
-        <Pressable onPress={cycleSpeed} style={[vs.speedPill, { borderColor: dim }]} testID="voice-speed-toggle">
+        <Pressable
+          onPress={cycleSpeed}
+          style={[vs.speedPill, { borderColor: dim }]}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          testID="voice-speed-toggle"
+          accessibilityRole="button"
+          accessibilityLabel={`Playback speed ${SPEEDS[speedIdx]}x`}
+        >
           <Text style={[vs.speedText, { color: onColor }]}>{SPEEDS[speedIdx]}x</Text>
         </Pressable>
         {hasTranscription && (
           <Pressable
             onPress={onViewTranscription ?? (() => Alert.alert('Transcription', TRANSCRIPTION_STUB))}
+            hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
             testID="voice-view-transcription"
+            accessibilityRole="button"
           >
             <Text style={[vs.transcriptionLink, { color: dim }]}>View transcription</Text>
           </Pressable>

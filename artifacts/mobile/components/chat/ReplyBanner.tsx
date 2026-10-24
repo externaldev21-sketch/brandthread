@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -58,7 +59,7 @@ export function ReplyBanner({ fromName, previewText, onCancel, theme, testID }: 
         accessibilityLabel="Cancel reply"
         testID={testID ? `${testID}-cancel` : undefined}
       >
-        <Text style={s.close}>×</Text>
+        <Feather name="x" size={ICON.sm} color={theme.muted} style={s.close} />
       </PressableScale>
     </Animated.View>
   );
@@ -86,9 +87,6 @@ const styles = (theme: AppThemePreset) => StyleSheet.create({
     marginTop: 1,
   },
   close: {
-    fontSize: FS.md,
-    fontFamily: FONT.regular,
-    color: theme.muted,
     marginLeft: SP.sm,
   },
 });

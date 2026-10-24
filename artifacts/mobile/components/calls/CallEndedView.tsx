@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 /**
- * CallEndedView — Instagram's "call ended + rating" screen. Terminal, not
+ * CallEndedView — Instagram's "call ended" screen. Terminal, not
  * minimizable, so the top-right icon is a close "X" (not the chevron the
  * other three surfaces use). Tapping a rating icon saves it to the call
  * record (POST /api/call/dm/calls/:id/rating), gives visual + haptic
@@ -116,7 +116,4 @@ export function CallEndedView() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: '18%', gap: 10 },
-  ratingBlock: { alignItems: 'center', gap: 20, marginTop: '14%' },
-  ratingPrompt: { textAlign: 'center' },
-  ratingRow: { flexDirection: 'row', gap: 40 },
 });

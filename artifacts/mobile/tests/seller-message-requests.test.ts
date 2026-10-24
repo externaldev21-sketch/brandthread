@@ -37,7 +37,7 @@ describe('seller inbox (shared MessagesInbox, seller variant): Requests tab', ()
   it('has an Inbox/Requests pill row with a live count', () => {
     expect(inboxSrc).toContain("type InboxTab = 'inbox' | 'requests';");
     expect(inboxSrc).toContain('function InboxPillRow(');
-    expect(inboxSrc).toContain('requestsCount={requestConvs.length}');
+    expect(inboxSrc).toContain('requestsCount={allRequestConvs.length}');
   });
 
   it('filters the Requests tab to isRequest conversations only, excluding archived and pending-delete rows', () => {

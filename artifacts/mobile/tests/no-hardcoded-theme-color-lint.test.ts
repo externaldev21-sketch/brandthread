@@ -326,6 +326,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/feed/UploadProgressPill.tsx',
   'components/illustrations/EmptyStateArt.tsx',
   'components/inbox/FollowerAvatarCard.tsx',
+  'components/layout/Header.tsx',
   'components/layout/StickyFooter.tsx',
   'components/live/LiveAvatarRing.tsx',
   'components/manufacturer/OrderCardBubble.tsx',

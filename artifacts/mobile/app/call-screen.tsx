@@ -33,7 +33,7 @@ import { loadAgoraModule } from '@/lib/agoraAvailability';
 const AgoraModule = loadAgoraModule();
 
 
-const CALL_DARK  = '#0A0A14';
+const CALL_DARK  = '#000000';
 const MUTE_RED   = '#FF3B30';
 const CTRL_BG    = 'rgba(255,255,255,0.10)';
 const HANG_RED   = '#FF3B30';
@@ -289,6 +289,8 @@ function NativeCallScreen() {
           setRemoteUid(uid);
           remoteJoinedRef.current = true;
           setStatus('connected');
+          // A repeated join callback must not stack a second ticking timer.
+          if (timerRef.current) clearInterval(timerRef.current);
           timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
         },
         onUserOffline: () => {
@@ -366,13 +368,14 @@ function NativeCallScreen() {
   function toggleScreenShare() {
     if (!AgoraModule || !engineRef.current) return;
     const next = !screenSharing;
-    setScreenSharing(next);
     try {
       if (next) {
         engineRef.current?.startScreenCapture?.({});
       } else {
         engineRef.current?.stopScreenCapture?.();
       }
+      // Only flip the control once the SDK accepted the change.
+      setScreenSharing(next);
     } catch {}
   }
 
@@ -411,6 +414,8 @@ function NativeCallScreen() {
           onPress={handleHangUp}
           style={s.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="End call and go back"
         >
           <Icon name="arrow-left" size={22} color={FG} />
         </TouchableOpacity>
@@ -439,7 +444,7 @@ function NativeCallScreen() {
           <>
 
         {/* Remote video / avatar */}
-        {mode === 'video' && isConnected && remoteUid != null && RtcView && !cameraOff ? (
+        {mode === 'video' && isConnected && remoteUid != null && RtcView ? (
           <View style={s.remoteVideo}>
             <RtcView
               uid={remoteUid}
@@ -514,6 +519,8 @@ function NativeCallScreen() {
           style={[s.ctrlBtn, muted && s.ctrlBtnActive]}
           onPress={toggleMute}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityState={{ selected: muted }}
         >
           <Icon
             name={muted ? 'mic-off' : 'mic'}
@@ -531,6 +538,8 @@ function NativeCallScreen() {
             style={[s.ctrlBtn, cameraOff && s.ctrlBtnActive]}
             onPress={toggleCamera}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: cameraOff }}
           >
             <Icon
               name={cameraOff ? 'camera-off' : 'camera'}
@@ -548,6 +557,8 @@ function NativeCallScreen() {
           style={[s.ctrlBtn, s.hangUpBtn]}
           onPress={handleHangUp}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="End call"
         >
           <Icon name="phone-off" size={26} color="#fff" />
           <Text style={[s.ctrlLabel, { color: '#fff' }]}>End</Text>
@@ -559,6 +570,8 @@ function NativeCallScreen() {
             style={[s.ctrlBtn, screenSharing && s.ctrlBtnActive]}
             onPress={toggleScreenShare}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: screenSharing }}
           >
             <Icon name="monitor" size={24} color={screenSharing ? colors.primary : FG} />
             <Text style={[s.ctrlLabel, screenSharing && { color: colors.primary }]}>
@@ -697,7 +710,7 @@ const s = StyleSheet.create({
   },
   localCameraOffInitials: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: FS.xl,
     fontFamily: FONT.bold,
   },
   controls: {

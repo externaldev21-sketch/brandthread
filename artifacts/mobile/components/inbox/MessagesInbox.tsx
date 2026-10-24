@@ -37,7 +37,7 @@ import { useScreenInteractive } from '@/lib/perf';
 import {
   View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
-  Modal, TextInput, ActivityIndicator, Platform, Animated,
+  Modal, TextInput, ActivityIndicator, Platform, Animated, Pressable,
 } from 'react-native';
 import { Icon as Feather } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -218,6 +218,7 @@ type ComposePerson = {
   initials: string;
   color: string;
   accountType: AccountType;
+  avatarUri?: string;
 };
 
 type ComposeSection = { key: string; title: string; data: ComposePerson[] };
@@ -461,6 +462,11 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     () => previewTrayAtMount ? PREVIEW_MY_STORY.id : null, { persist: !previewTrayAtMount });
   const [profileAvatar, setProfileAvatar] = useState<{ owner: string | null; uri: string | null }>({ owner: null, uri: null });
   const myAvatarUri = (profileAvatar.owner === userId ? profileAvatar.uri : null) || (clerkUser?.hasImage ? clerkUser.imageUrl : undefined);
+  const [failedAvatarUris, setFailedAvatarUris] = useState<ReadonlySet<string>>(() => new Set());
+  const markAvatarFailed = useCallback((uri: string) => {
+    setFailedAvatarUris(prev => (prev.has(uri) ? prev : new Set(prev).add(uri)));
+  }, []);
+  const avatarOk = (uri?: string | null): uri is string => !!uri && !failedAvatarUris.has(uri);
   useEffect(() => {
     let current = true;
     if (userId) void loadBuyerProfile().then(profile => { if (current) setProfileAvatar({ owner: userId, uri: profile.avatarUri || null }); }).catch(() => {});
@@ -501,7 +507,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
           seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
-        setMyStoryId(PREVIEW_MY_STORY.id);
+        setMyStoryId(isPreviewDemoMode() ? PREVIEW_MY_STORY.id : null);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
@@ -539,7 +545,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
           seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
-        setMyStoryId(PREVIEW_MY_STORY.id);
+        setMyStoryId(isPreviewDemoMode() ? PREVIEW_MY_STORY.id : null);
         cacheStoriesForViewer([
           PREVIEW_MY_STORY,
           ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
@@ -760,7 +766,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       }
       return true;
     })
-    .sort((a, b) => inboxPinRank(b) - inboxPinRank(a));
+    .sort((a, b) => (inboxPinRank(b) - inboxPinRank(a)) || ((b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0)));
 
   // Joined community group chats live beside DMs (joining is consent), so
   // they are merged in by recency here and never counted as requests.
@@ -771,9 +777,18 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
-  const requestConvs = conversations.filter(conv =>
-    conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
-  );
+  const allRequestConvs = conversations
+    .filter(conv => conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id));
+  // The header search filters Requests too (name, handle, last message);
+  // the pill badge still counts every pending request.
+  const requestConvs = allRequestConvs
+    .filter(conv => {
+      if (!messagesSearchLower) return true;
+      const participant = getParticipant(conv);
+      return [participant?.name, participant?.handle, conv.lastMessage]
+        .filter(Boolean).join(' ').toLowerCase().includes(messagesSearchLower);
+    })
+    .sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   if (!loading && rowFirstSeenRef.current === null) {
@@ -1145,8 +1160,11 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // (I follow them and they follow me) — that's what this app's UI
       // treats as a "friend" (there is no separate friend-request table).
       const mutualIds = new Set(followerList.filter(f => f.isFollowingBack).map(f => f.userId));
-      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string }): ComposePerson => ({
+      // Follow/suggestion rows don't all declare a photo field; carry one
+      // through when the server sends it (avatarUrl or avatarUri).
+      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string; avatarUrl?: string | null; avatarUri?: string | null }): ComposePerson => ({
         userId: u.userId, name: u.name, handle: u.handle, initials: u.initials, color: u.color, accountType: 'buyer',
+        avatarUri: u.avatarUri ?? u.avatarUrl ?? undefined,
       });
       const friendsList = followerList.filter(f => mutualIds.has(f.userId)).map(toPerson);
       const followersOnly = followerList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
@@ -1214,7 +1232,13 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     const directoryIds = new Set(composeDirectory.map(p => p.userId));
     const morePeople: ComposePerson[] = composeResults
       .filter(r => !directoryIds.has(r.userId))
-      .map(r => ({ userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType }));
+      .map(r => {
+        const photo = (r as ProfileSearchResult & { avatarUrl?: string | null; avatarUri?: string | null });
+        return {
+          userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType,
+          avatarUri: photo.avatarUri ?? photo.avatarUrl ?? undefined,
+        };
+      });
     return [
       { key: 'in-network', title: 'In your network', data: inDirectory },
       { key: 'more-people', title: 'More people', data: morePeople },
@@ -1239,7 +1263,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       closeCompose();
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
-      Alert.alert('Couldn’t start conversation', 'Try again.');
+      Alert.alert('Couldn’t start conversation', 'Please try again.');
     } finally {
       setComposeStartingId(null);
     }
@@ -1354,13 +1378,13 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         accessibilityLabel: `${conv.mutedUntil && Date.parse(conv.mutedUntil) > Date.now() ? 'Unmute' : 'Mute'} conversation with ${participant.name}`,
       },
       {
-        key: 'delete',
-        label: 'Delete',
-        icon: 'trash-2',
+        key: 'archive',
+        label: 'Archive',
+        icon: 'archive',
         color: theme.cardElevated,
-        textColor: theme.error,
-        onPress: () => swipeDeleteConversation(conv),
-        accessibilityLabel: `Delete conversation with ${participant.name}`,
+        textColor: theme.muted,
+        onPress: () => swipeArchiveConversation(conv),
+        accessibilityLabel: `Archive conversation with ${participant.name}`,
       },
     ];
 
@@ -1375,6 +1399,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             onLongPress={() => longPressConversation(conv)}
             activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}
+            accessibilityRole="button"
+            accessibilityLabel={`Open conversation with ${participant.name}${isUnread ? ', unread' : ''}`}
+            accessibilityHint="Long press for more options"
             testID={`inbox-conversation-${conv.id}`}
           >
             {/* Avatar — Threads-style: no unread/online dot chrome on the
@@ -1522,6 +1549,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
             onPress={() => openRequestConversation(conv)}
             activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}
+            accessibilityRole="button"
+            accessibilityLabel={`Open message request from ${participant.name}`}
             testID={`inbox-request-row-${conv.id}`}
           >
             <View style={s.avatarContainer}>
@@ -1702,7 +1731,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                   // border/box appears on focus, only a very subtle fill
                   // change (never anything boxy). borderWidth is 0 on the
                   // base style itself (searchRow) at both rest and focus.
-                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.10)' : theme.cardElevated,
+                  backgroundColor: messagesSearchFocused ? `${theme.text}1A` : theme.cardElevated,
                 },
               ]}
             >
@@ -1813,10 +1842,10 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                     {myStoryId ? (
                       <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
                     ) : null}
-                    {myAvatarUri ? (
-                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
+                    {avatarOk(myAvatarUri) ? (
+                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(myAvatarUri)} />
                     ) : (
-                      <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
+                      <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated === theme.background ? `${theme.text}1F` : theme.cardElevated }]}>
                         <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
                       </View>
                     )}
@@ -1861,8 +1890,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                     <View key={row.authorId} style={s.activeRailItem}>
                       {noteBubble}
                       <LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>
-                        {row.avatarUri ? (
-                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                        {avatarOk(row.avatarUri) ? (
+                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(row.avatarUri!)} />
                         ) : (
                           <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                             <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1892,8 +1921,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                           { borderColor: row.seen ? theme.border : theme.text },
                         ]}
                       />
-                      {row.avatarUri ? (
-                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                      {avatarOk(row.avatarUri) ? (
+                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(row.avatarUri!)} />
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1927,7 +1956,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         <InboxPillRow
           value={activeTab}
           onChange={setActiveTab}
-          requestsCount={requestConvs.length}
+          requestsCount={allRequestConvs.length}
           theme={theme}
           onFilterPress={isSeller ? undefined : openFilterMenu}
         />
@@ -2048,8 +2077,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
                     accessibilityRole="button"
                     accessibilityLabel={`Message ${item.name}`}
                   >
-                    <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
-                      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm }}>{item.initials}</Text>
+                    <View style={[s.composeAvatar, { backgroundColor: item.color || theme.cardElevated }]}>
+                      {avatarOk(item.avatarUri) ? (
+                        <Image source={{ uri: item.avatarUri }} style={s.composeAvatarImage} onError={() => markAvatarFailed(item.avatarUri!)} />
+                      ) : (
+                        <Text style={[s.avatarInitials, { fontSize: FS.sm }]}>{item.initials}</Text>
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
@@ -2137,12 +2170,16 @@ avatar56: {
   },
   composeCenter: { paddingVertical: SP.xl, alignItems: 'center' },
   composeResultRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm + SP.xs,
     paddingVertical: SP.sm, minHeight: 52,
   },
   composeAvatar: {
-    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  composeAvatarImage: { width: 40, height: 40 },
+  // Full-screen tap-to-close layer behind a sheet. A plain Pressable, not
+  // PressableScale (which styles an inner view and would collapse to 0×0).
+  sheetDismissLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   // Instagram-DM-style stories tray (below search, above the tabs) — chrome
   // (sizes/spacing) unchanged from the old "active people" rail this
@@ -2352,7 +2389,7 @@ avatar56: {
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SP.sm,
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
     height: 36,

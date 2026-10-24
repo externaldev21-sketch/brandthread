@@ -6,6 +6,10 @@ import { Feather } from '@expo/vector-icons';
 
 import SwipeRow, { type SwipeRowAction, type SwipeTone } from '@/components/ui/SwipeRow';
 
+// Only one row may be swiped open at a time (Instagram/TikTok inbox
+// convention): opening a row closes whichever row was open before.
+let closeOpenRow: (() => void) | null = null;
+
 export interface InboxSwipeAction {
   key: string;
   label: string;

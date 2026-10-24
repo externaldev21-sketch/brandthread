@@ -139,7 +139,9 @@ export function ReactionOverlay({
                   noMinHeight
                   style={s.emojiBtn}
                   onPress={() => onSelectReaction(r.type)}
-                  accessibilityLabel={r.label}
+                  accessibilityRole="button"
+                  accessibilityLabel={`React with ${r.label}`}
+                  accessibilityState={{ selected: isSelected }}
                   testID={`reaction-emoji-${r.type}`}
                 >
                   <ReactionGlyph type={r.type} size={isSelected ? EMOJI_SIZE_SELECTED : EMOJI_SIZE} />
@@ -163,6 +165,8 @@ export function ReactionOverlay({
                   bounce={false}
                   style={[s.menuItem, idx > 0 && s.menuItemBorder]}
                   onPress={item.onPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
                   testID={`reaction-menu-${item.key}`}
                 >
                   <Text style={[s.menuLabel, item.destructive && { color: theme.error }]}>{item.label}</Text>

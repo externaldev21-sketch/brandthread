@@ -16,7 +16,11 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
  * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUser } from '@clerk/expo';
+import { SheetRise } from '@/components/motion/SheetRise';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +56,8 @@ const MUTE_OPTIONS: MuteOption[] = [
   { label: 'Until I turn it back on', minutes: -1 },
 ];
 
+const THEME_NEW_SEEN_KEY = '@brandthread/chat-theme-new-seen:v1';
+
 export default function ConversationDetailsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
@@ -74,6 +80,27 @@ export default function ConversationDetailsScreen() {
   const [disappearing, setDisappearing] = useState(false);
   const [isBlocked, setIsBlocked] = useState(params.isBlocked === '1');
   const [busy, setBusy] = useState(false);
+  // Default hidden until storage answers, so a returning user never sees the
+  // pill flash in and back out.
+  const [themeNewSeen, setThemeNewSeen] = useState(true);
+  const [bugVisible, setBugVisible] = useState(false);
+  const [bugText, setBugText] = useState('');
+  const [bugSending, setBugSending] = useState(false);
+  const { user } = useUser();
+
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(THEME_NEW_SEEN_KEY)
+      .then((v) => { if (!cancelled) setThemeNewSeen(v === '1'); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!themePickerVisible) return;
+    setThemeNewSeen(true);
+    AsyncStorage.setItem(THEME_NEW_SEEN_KEY, '1').catch(() => {});
+  }, [themePickerVisible]);
 
   // isSellerDevPreview()/isBuyerDevPreview() (not just a seeded conversation
   // id): this screen is opened by query params rather than a file-based
@@ -243,15 +270,35 @@ export default function ConversationDetailsScreen() {
     router.push(('/conversation-group-create?role=' + (params.role ?? 'buyer')) as never);
   }
 
-  function reportConversation() {
+  // "Something isn't working" is a bug report about the chat itself, not a
+  // report against the other person — it files a real support ticket
+  // (POST /api/support/tickets, category "bug", the same endpoint Help &
+  // Support's form uses) with this conversation attached as context.
+  function openBugReport() {
     hapticSelection();
-    if (!participant?.userId) return;
-    router.push(reportHref({
-      targetType: 'profile',
-      targetId: participant.userId,
-      ownerId: participant.userId,
-      ownerName: displayName,
-    }) as never);
+    setBugText('');
+    setBugVisible(true);
+  }
+
+  async function submitBugReport() {
+    const text = bugText.trim();
+    if (!text || bugSending) return;
+    setBugSending(true);
+    try {
+      await api.support.submitTicket({
+        subject: 'Something isn’t working in a chat',
+        body: `${text}\n\n— Conversation: ${params.id ?? 'unknown'} (${params.role ?? 'buyer'} view)`,
+        category: 'bug',
+        email: user?.primaryEmailAddress?.emailAddress ?? 'unknown@brandthread.app',
+        name: user?.fullName ?? user?.firstName ?? 'Brandthread User',
+      });
+      setBugVisible(false);
+      Alert.alert('Thanks for letting us know', 'Our team will look into it.');
+    } catch (e) {
+      Alert.alert('Couldn’t send your report', apiErrorMessage(e, 'Please try again.'));
+    } finally {
+      setBugSending(false);
+    }
   }
 
   function openOptions() {
@@ -259,7 +306,6 @@ export default function ConversationDetailsScreen() {
     // the "Options" action button completely dead in the web preview. See
     // components/ui/ActionSheet.tsx's header comment.
     showActionSheet(displayName, undefined, [
-      { text: 'Cancel', style: 'cancel' },
       {
         text: isBlocked ? `Unblock ${displayName}` : `Block ${displayName}`,
         style: isBlocked ? 'default' : 'destructive',
@@ -272,6 +318,7 @@ export default function ConversationDetailsScreen() {
           if (ok) setIsBlocked((v) => !v);
         },
       },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
@@ -355,7 +402,7 @@ export default function ConversationDetailsScreen() {
             icon="droplet" theme={theme}
             title="Theme"
             subtitle={getConversationTheme(themeId)?.name ?? 'Default'}
-            pill="New"
+            pill={themeNewSeen ? undefined : 'New'}
             onPress={() => { setThemePickerVisible(true); }}
             testID="chat-details-row-theme"
           />
@@ -373,6 +420,7 @@ export default function ConversationDetailsScreen() {
               <HapticSwitch
                 value={disappearing}
                 onValueChange={toggleDisappearing}
+                accessibilityLabel="Disappearing messages"
                 testID="chat-details-disappearing-switch"
               />
             )}
@@ -393,7 +441,7 @@ export default function ConversationDetailsScreen() {
           <ListRow
             icon="alert-circle" theme={theme}
             title="Something isn't working"
-            onPress={reportConversation}
+            onPress={openBugReport}
             last
             testID="chat-details-row-report"
           />
@@ -412,6 +460,39 @@ export default function ConversationDetailsScreen() {
           </PressableScale>
         ))}
       </Sheet>
+
+      <Modal visible={bugVisible} transparent animationType="fade" onRequestClose={() => setBugVisible(false)}>
+        <Pressable style={s.modalBackdrop} onPress={() => setBugVisible(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <SheetRise style={[s.muteSheet, { backgroundColor: theme.surface, paddingBottom: insets.bottom + SP.md }]}>
+          <View style={s.sheetHandle} />
+          <Text style={[s.muteSheetTitle, { color: theme.text }]}>Something isn’t working</Text>
+          <Text style={[s.bugHint, { color: theme.muted }]}>Tell us what went wrong in this chat. We’ll include the conversation so the team can look into it.</Text>
+          <TextInput
+            value={bugText}
+            onChangeText={setBugText}
+            placeholder="What happened?"
+            placeholderTextColor={theme.muted}
+            multiline
+            maxLength={1000}
+            style={[s.bugInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }, WEB_INPUT_RESET]}
+            accessibilityLabel="Describe the problem"
+            testID="chat-details-bug-input"
+          />
+          <PressableScale
+            rippleEnabled={false}
+            onPress={submitBugReport}
+            disabled={!bugText.trim() || bugSending}
+            style={[s.bugSend, { backgroundColor: theme.accent, opacity: !bugText.trim() ? 0.5 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Send report"
+            testID="chat-details-bug-send"
+          >
+            {bugSending
+              ? <ActivityIndicator color={theme.onAccent} />
+              : <Text style={[s.bugSendText, { color: theme.onAccent }]}>Send report</Text>}
+          </PressableScale>
+        </SheetRise>
+      </Modal>
 
       <ThemePickerSheet
         visible={themePickerVisible}
@@ -495,13 +576,20 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: SP.lg, marginTop: SP.sm },
   actionBtn: { alignItems: 'center', gap: 6, width: 64 },
   actionIconWrap: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+  actionLabel: { fontSize: FS.meta, fontFamily: FONT.medium },
   list: { marginTop: SP.md, borderTopWidth: StyleSheetHairline },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
-  rowSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  rowSubtitle: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, marginRight: SP.sm },
   pillText: { fontSize: 11, fontFamily: FONT.bold },
   muteOption: { paddingVertical: SP.md, alignItems: 'center' },
   muteOptionText: { fontFamily: FONT.regular, fontSize: FS.base },
+  bugHint: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginBottom: SP.md },
+  bugInput: {
+    minHeight: 96, maxHeight: 160, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
+    padding: SP.md, fontFamily: FONT.regular, fontSize: FS.base, textAlignVertical: 'top',
+  },
+  bugSend: { height: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.md },
+  bugSendText: { fontFamily: FONT.semibold, fontSize: FS.base },
 });

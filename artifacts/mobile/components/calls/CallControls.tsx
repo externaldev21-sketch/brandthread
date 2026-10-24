@@ -119,6 +119,7 @@ export function ControlButton({ icon, onPress, accessibilityLabel, active, dange
       onPress={onPress}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={active !== undefined ? { selected: active } : undefined}
       noMinHeight
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       style={[

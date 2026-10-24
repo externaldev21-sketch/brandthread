@@ -43,10 +43,10 @@ export function ThemePreviewScreen({
             <Text style={[s.bubbleText, { color: candidate.receivedText }]}>Every theme creates a unique experience.</Text>
           </View>
           <View style={[s.bubble, s.bubbleReceived, { backgroundColor: candidate.receivedBubble }]}>
-            <Text style={[s.bubbleText, { color: candidate.receivedText }]}>You'll see the messages you send in this color.</Text>
+            <Text style={[s.bubbleText, { color: candidate.receivedText }]}>You'll see messages from other people in this color.</Text>
           </View>
           <View style={[s.bubble, s.bubbleSent, { backgroundColor: candidate.sentBubble }]}>
-            <Text style={[s.bubbleText, { color: candidate.sentText }]}>And the messages you receive from other people in this color.</Text>
+            <Text style={[s.bubbleText, { color: candidate.sentText }]}>And the messages you send in this color.</Text>
           </View>
           <View style={[s.bubble, s.bubbleSent, { backgroundColor: candidate.sentBubble }]}>
             <Text style={[s.bubbleText, { color: candidate.sentText }]}>Tap Apply to choose this theme or Cancel to preview others.</Text>

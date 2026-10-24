@@ -89,19 +89,18 @@ export default function CommunityChatScreen() {
       ...(community.kind === 'user'
         ? [{
             text: 'Report group',
+            // Always the real report flow (POST /api/reports) — it confirms
+            // only after the report is actually filed, and shows the API's
+            // error otherwise. No local "Thanks" for a report never sent.
             onPress: () => {
-              if (isLive) {
-                router.push(reportHref({ targetType: 'community', targetId: community.id, label: community.name }) as never);
-              } else {
-                chat.flash('Thanks. We’ll take a look at this group.');
-              }
+              router.push(reportHref({ targetType: 'community', targetId: community.id, label: community.name }) as never);
             },
           }]
         : []),
       { text: 'Leave group', style: 'destructive' as const, onPress: confirmLeave },
       { text: 'Cancel', style: 'cancel' as const },
     ]);
-  }, [chat, community, confirmLeave, isLive, openMembers, router]);
+  }, [chat, community, confirmLeave, openMembers, router]);
 
   // ─── Message menu (long-press) ────────────────────────────────────────────
   const closeMenu = useCallback(() => { setMenuMsg(null); setMenuAnchor(null); }, []);
@@ -150,14 +149,10 @@ export default function CommunityChatScreen() {
         key: 'report', label: 'Report message', icon: 'flag', destructive: true,
         onPress: () => {
           closeMenu();
-          if (isLive) {
-            router.push(reportHref({
-              targetType: 'community_message', targetId: msg.id, label: `${msg.fromName}’s message`,
-              ownerId: msg.fromId, ownerName: msg.fromName,
-            }) as never);
-          } else {
-            chat.flash('Thanks. We’ll take a look at this message.');
-          }
+          router.push(reportHref({
+            targetType: 'community_message', targetId: msg.id, label: `${msg.fromName}’s message`,
+            ownerId: msg.fromId, ownerName: msg.fromName,
+          }) as never);
         },
       });
       items.push({ key: 'block', label: 'Block user', icon: 'slash', destructive: true, onPress: () => { closeMenu(); blockSender(msg); } });
@@ -166,7 +161,7 @@ export default function CommunityChatScreen() {
       items.push({ key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => { closeMenu(); void chat.deleteMessage(msg); } });
     }
     return items;
-  }, [blockSender, chat, closeMenu, isLive, menuMsg, myId, router]);
+  }, [blockSender, chat, closeMenu, menuMsg, myId, router]);
 
   // ─── List ─────────────────────────────────────────────────────────────────
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -435,12 +430,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   dayText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   olderSpinner: { paddingVertical: SP.md },
   startNote: { textAlign: 'center', fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.lg, paddingHorizontal: SP.lg },
-  reconnect: { textAlign: 'center', fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.xs },
+  reconnect: { textAlign: 'center', fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.xs },
   pillWrap: { position: 'absolute', left: 0, right: 0, bottom: SP.sm, alignItems: 'center' },
   newPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, height: 34,
     paddingHorizontal: SP.md, borderRadius: radius.sm, backgroundColor: theme.accent,
   },
   newPillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.onAccent },
-  overlayText: { fontSize: 15, fontFamily: FONT.regular, lineHeight: 21 },
+  overlayText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21 },
 });

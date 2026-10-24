@@ -26,8 +26,7 @@ import { errorMessageOr } from '@/lib/errorMessage';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
-} from 'react-native';
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking, Pressable } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from '@/components/KeyboardProviderCompat';
 import { TypingBubble } from '@/components/chat/TypingBubble';
 import { LinkPreviewCard } from '@/components/chat/LinkPreviewCard';
@@ -232,6 +231,14 @@ function mergeCallLogRows(rows: ListRow[], callLog: CallLogEntry[]): ListRow[] {
   return merged;
 }
 
+/** Raw order status ("shipped", "out_for_delivery") → display label
+ *  ("Shipped", "Out for delivery"). Deliberately not dbStatusToOrderStatus:
+ *  that maps any status it doesn't know to "cancelled". */
+function formatOrderStatus(status: string): string {
+  const words = status.trim().replace(/[_-]+/g, ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow[] {
   const rows: ListRow[] = [];
   let lastDate = '';
@@ -322,6 +329,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     contextSellerName?: string;
     // Item 74 verification aid ONLY — see the effect below that reads it.
     bt_force_upload?: string;
+    /** Set by conversation-search: scroll to and briefly highlight this
+     *  message instead of landing at the bottom of the thread. */
+    focusMessageId?: string;
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
@@ -397,6 +407,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [copiedToast, setCopiedToast] = useState(false);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [agentAboutVisible, setAgentAboutVisible] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
@@ -424,6 +436,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [unreadDividerId, setUnreadDividerId] = useState<string | null>(null);
   const hasComputedUnreadRef = useRef(false);
   const hasScrolledToUnreadRef = useRef(false);
+  // Search-result jump (params.focusMessageId): while a focus target is
+  // pending or just shown, the automatic "stick to the bottom" scrolls stand
+  // down so they can't yank the list away from the found message.
+  const focusPendingRef = useRef<string | null>(null);
+  const searchFocusHoldRef = useRef(false);
+  const focusHoldLenRef = useRef(0);
+  const [highlightMsgId, setHighlightMsgId] = useState<string | null>(null);
 
   const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
 
@@ -570,6 +589,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       setIsLoading(false);
       return;
     }
+    setLoadFailed(false);
     try {
       let loadedConv: Conversation | null = null;
       let unreadBeforeRead = 0;
@@ -671,6 +691,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       const status = (e as { status?: number } | null)?.status;
       setLoadFailed(status !== 404 && status !== 403);
       console.error('Failed to load conversation', e);
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -728,6 +749,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).
   useEffect(() => {
+    // A new message after a search jump (sent or received) releases the hold.
+    if (searchFocusHoldRef.current && messages.length > focusHoldLenRef.current) searchFocusHoldRef.current = false;
+    if (searchFocusHoldRef.current || focusPendingRef.current) return;
     if (messages.length > 0 && (!unreadDividerId || hasScrolledToUnreadRef.current)) {
       listScroll.requestScrollToEnd(false);
     }
@@ -790,7 +814,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const convTheme = getConversationTheme(conv?.themeId);
   const sentBubbleColor = convTheme?.sentBubble ?? theme.accent;
   const sentTextColor = convTheme?.sentText ?? theme.onAccent;
-  const receivedBubbleColor = convTheme?.receivedBubble ?? theme.cardElevated;
+  // The default Monochrome palette's card is the same pure black as the
+  // screen, which left received bubbles with no visible fill at all.
+  const receivedBubbleColor = convTheme?.receivedBubble
+    ?? (theme.cardElevated === theme.background ? `${theme.text}1F` : theme.cardElevated);
   const receivedTextColor = convTheme?.receivedText ?? theme.text;
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
@@ -1350,6 +1377,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
               activeOpacity={0.9}
               onPress={() => setViewerUri(uri)}
+              accessibilityLabel={uris.length > 1 ? `View photo ${idx + 1} of ${uris.length}` : 'View photo'}
             >
               <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
@@ -1424,39 +1452,54 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     // for them — they're standalone rows, not content that belongs inside a
     // chat bubble (see the "Standalone product/order card" comment on
     // renderItem's own product/order branch for why).
-    // Default: post / profile card
-    return (
-      <PressableScale rippleEnabled={false}
-        style={s.attachCard}
-        activeOpacity={att.type === 'post' ? 0.7 : 1}
-        onPress={() => {
-          if (att.type === 'post') {
-            const postId = att.meta?.postId;
-            if (postId) {
-              const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
-              const qs = [
-                'postId=' + encodeURIComponent(postId),
-                'postAuthorName=' + encodeURIComponent(postAuthorName),
-                'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
-                'postAuthorColor=' + encodeURIComponent(participant?.color ?? theme.accent),
-                'postCaption=' + encodeURIComponent(att.title ?? ''),
-                'postMediaColor1=' + encodeURIComponent(theme.accentDim),
-                'postMediaColor2=' + encodeURIComponent(theme.background),
-                'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
-              ].join('&');
-              router.push(('/buyer-post-viewer?' + qs) as never);
-            }
-          }
-        }}
-      >
+    // Default: post / profile card. Only a post with a postId has somewhere
+    // to go — everything else renders as a plain, non-interactive card (no
+    // press feedback, no chevron, no button role) instead of a dead tap.
+    const postId = att.type === 'post' ? att.meta?.postId : undefined;
+    const cardBody = (
+      <>
         <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={theme.accent} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {att.type === 'post' && (
-          <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
-        )}
+      </>
+    );
+    if (!postId) {
+      return (
+        <View
+          style={s.attachCard}
+          accessible
+          accessibilityLabel={[att.title, att.subtitle].filter(Boolean).join(', ') || (att.type === 'profile' ? 'Profile' : 'Post')}
+          testID="conversation-attachment-static"
+        >
+          {cardBody}
+        </View>
+      );
+    }
+    return (
+      <PressableScale rippleEnabled={false}
+        style={s.attachCard}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Open post${att.title ? `: ${att.title}` : ''}`}
+        onPress={() => {
+          const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
+          const qs = [
+            'postId=' + encodeURIComponent(postId),
+            'postAuthorName=' + encodeURIComponent(postAuthorName),
+            'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
+            'postAuthorColor=' + encodeURIComponent(participant?.color ?? theme.accent),
+            'postCaption=' + encodeURIComponent(att.title ?? ''),
+            'postMediaColor1=' + encodeURIComponent(theme.accentDim),
+            'postMediaColor2=' + encodeURIComponent(theme.background),
+            'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
+          ].join('&');
+          router.push(('/buyer-post-viewer?' + qs) as never);
+        }}
+      >
+        {cardBody}
+        <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
       </PressableScale>
     );
   }
@@ -1785,6 +1828,19 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   function openOptions() {
     if (isAgentConv) { openAgentOptions(); return; }
     if (!participant) return;
+    router.push(reportHref({
+      targetType: 'profile',
+      targetId: participant.userId,
+      label: participant.name,
+      ownerId: participant.userId,
+      ownerName: participant.name,
+    }) as never);
+  }
+
+  function openOptions() {
+    // The official, always-pinned Brandthread Agent thread has no Archive or
+    // Block — its header ⓘ opens the About sheet instead (agentAboutVisible).
+    if (!participant || isAgentConv) return;
     // Alert.alert() with a button array is a silent no-op on web (see
     // components/ui/ActionSheet.tsx's header comment) — this left the
     // header "..." menu completely dead in the web preview. showActionSheet
@@ -1803,8 +1859,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             try {
               const { archiveConversation } = await import('@/services/socialService');
               await archiveConversation(conv.id);
-            } catch {
-              // Best-effort — the conversation simply stays un-archived.
+            } catch (e) {
+              // Used to swallow the failure and navigate back anyway, as if
+              // it had archived — stay on the thread and say so instead.
+              Alert.alert('Couldn’t archive', apiErrorMessage(e, 'Please try again.'));
+              return;
             }
           }
           goBackOr(router);
@@ -1828,18 +1887,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               }
             },
           },
-      {
-        text: `Report ${participant.name}`,
-        onPress: () => {
-          router.push(reportHref({
-            targetType: 'profile',
-            targetId: participant.userId,
-            label: participant.name,
-            ownerId: participant.userId,
-            ownerName: participant.name,
-          }) as never);
-        },
-      },
+      { text: `Report ${participant.name}`, onPress: reportParticipant },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -1932,7 +1980,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     }
     deleteMessageForMe(conv.id, msg.id)
       .then(() => getMessages(conv.id).then(setMessages))
-      .catch(() => {});
+      .catch((e) => Alert.alert('Couldn’t delete message', apiErrorMessage(e, 'Please try again.')));
   }
 
   function sheetReport() {
@@ -1968,7 +2016,19 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     );
   }
 
-  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
+  function renderRow(info: ListRenderItemInfo<ListRow>) {
+    const content = renderRowContent(info);
+    if (info.item.type === 'message' && info.item.msg.id === highlightMsgId) {
+      return (
+        <View style={[s.focusedMsg, { backgroundColor: `${theme.text}1F` }]} testID="conversation-focused-message">
+          {content}
+        </View>
+      );
+    }
+    return content;
+  }
+
+  function renderRowContent({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       // Plain small gray centered text, like Instagram/Threads — no pill.
       return (
@@ -1982,7 +2042,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       return (
         <View style={s.unreadDividerWrap}>
           <View style={s.unreadDividerLine} />
-          <Text style={s.unreadDividerText}>Unread Messages</Text>
+          <Text style={s.unreadDividerText}>Unread messages</Text>
           <View style={s.unreadDividerLine} />
         </View>
       );
@@ -2086,6 +2146,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             activeOpacity={deepLink ? 0.7 : 1}
             onPress={() => { if (deepLink) router.push(deepLink as never); }}
+            accessibilityRole={deepLink ? 'link' : 'text'}
+            accessibilityLabel={[att.title, att.subtitle].filter(Boolean).join(', ') || 'Brandthread Agent card'}
           >
             <View style={[s.agentCardIconCircle, { backgroundColor: theme.accentDim }]}>
               {cardKind === 'thread_cash' ? (
@@ -2187,7 +2249,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
               ) : (
                 <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                  {participant?.avatarUri ? (
+                    <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatarImage} />
+                  ) : (
+                    <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                  )}
                 </View>
               )
             ) : <View style={s.msgAvatarSpacer} />
@@ -2242,7 +2308,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatar} />
             ) : (
               <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-                <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                {participant?.avatarUri ? (
+                  <CachedImage source={{ uri: participant.avatarUri }} style={s.msgAvatarImage} />
+                ) : (
+                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                )}
               </View>
             )
           ) : <View style={s.msgAvatarSpacer} />
@@ -2364,6 +2434,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 onPress={() => { if (!conv) return; const queuedId = clientIdFromOutboxMessageId(msg.id); if (queuedId && userId) { void retryOutboxMessage(userId, conv.id, queuedId).then(() => flushOutboxNow()); return; } void retryMessage(conv.id, msg.id).catch(() => {}); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
+                accessibilityRole="button"
+                accessibilityLabel="Message not sent. Retry"
               >
                 <Feather name="alert-circle" size={11} color={theme.error} />
                 <Text style={[s.retryText, { color: theme.error }]}>Tap to retry</Text>
@@ -2385,6 +2457,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                   onPress={() => handleReact(msg, kind)}
                   activeOpacity={0.7}
                   testID={`reaction-chip-${msg.id}-${kind}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${kind} reaction${count > 1 ? `, ${count}` : ''}`}
+                  accessibilityState={{ selected: mine === kind }}
                 >
                   <ReactionGlyph type={kind} size={12} color={mine === kind ? theme.accent : theme.muted} />
                   <Text style={[s.reactionCount, { color: mine === kind ? theme.accent : theme.muted }]}>
@@ -2435,6 +2510,30 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   useEffect(() => {
     focusHoldRef.current = null; focusScrollIdRef.current = null; setFocusedMessageId(null);
   }, [userId, params.id]);
+
+  // New focusMessageId (first open, or another search result) → queue it.
+  useEffect(() => {
+    if (!params.focusMessageId) return;
+    focusPendingRef.current = params.focusMessageId;
+    focusHoldRef.current = true;
+    hasScrolledToUnreadRef.current = true;
+  }, [params.focusMessageId]);
+
+  useEffect(() => {
+    const target = focusPendingRef.current;
+    if (!target) return;
+    const idx = listData.findIndex(r => r.type === 'message' && r.msg.id === target);
+    if (idx < 0) return;
+    focusPendingRef.current = null;
+    focusHoldLenRef.current = messages.length;
+    const scrollTimer = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      setHighlightMsgId(target);
+    }, 200);
+    const clearTimer = setTimeout(() => setHighlightMsgId(null), 1800);
+    return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listData.length, params.focusMessageId]);
 
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
@@ -2591,7 +2690,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                     <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarCircle} testID="conversation-avatar-image" />
                   ) : (
                     <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      {participant.avatarUri ? (
+                        <CachedImage source={{ uri: participant.avatarUri }} style={s.headerAvatarImage} />
+                      ) : (
+                        <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                      )}
                     </View>
                   )}
                   {participant.isOnline && <View style={[s.headerAvatarOnlineDot, { backgroundColor: ONLINE_GREEN }]} />}
@@ -2610,7 +2713,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                   )}
                 </View>
                 {statusLine ? (
-                  <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  <Text style={[s.headerStatusLine, { color: theme.muted }]} numberOfLines={1}>
                     {statusLine}
                   </Text>
                 ) : null}
@@ -2626,7 +2729,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         <View style={s.headerIconGroup}>
           {/* An AI account can't take a call — no voice/video icons for it,
               just the info icon below. */}
-          {conv && !isAgentConv && callsAvailable && (
+          {conv && !isAgentConv && callsAvailable && !requestLocked && (
             <PressableScale rippleEnabled={false}
               style={[s.roundBtn, isRequestMode && { opacity: 0.55 }]}
               disabled={isRequestMode}
@@ -2640,7 +2743,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               <Feather name="phone" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
-          {conv && !isAgentConv && callsAvailable && (
+          {conv && !isAgentConv && callsAvailable && !requestLocked && (
             <PressableScale rippleEnabled={false}
               style={[s.roundBtn, isRequestMode && { opacity: 0.55 }]}
               disabled={isRequestMode}
@@ -2656,7 +2759,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
           )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
+            onPress={() => { hapticPrimaryAction(); if (isAgentConv) setAgentAboutVisible(true); else openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-options"
             accessibilityRole="button"
@@ -2689,7 +2792,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             style={s.requestProfilePill}
             onPress={() => {
               hapticPrimaryAction();
-              if (isSeller) openParticipantProfile();
+              if (isSeller || participant?.accountType !== 'seller') openParticipantProfile();
               else if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
             }}
             accessibilityRole="button"
@@ -2709,10 +2812,14 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             if (isSeller) {
               router.push((conv?.contextOrderId ? '/order-detail?id=' + encodeURIComponent(conv.contextOrderId) : '/(tabs)/orders') as never);
             } else {
-              router.navigate('/(buyer)/orders' as never);
+              if (conv?.contextOrderId) router.push(('/buyer-order-detail?id=' + encodeURIComponent(conv.contextOrderId)) as never);
+              else router.navigate('/(buyer)/orders' as never);
             }
           }}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`View order ${conv.contextOrderNumber ?? ''}`.trim()}
+          testID="conversation-order-context"
         >
           <Feather name="package" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -3036,7 +3143,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                 <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
               </View>
             </PressableScale>
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo} accessibilityRole="button" accessibilityLabel="Video clip, under 1 minute">
               <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Video clip</Text>
@@ -3079,6 +3186,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: attachmentTab === 'product' }}
               >
                 <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
@@ -3088,6 +3197,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
               <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: attachmentTab === 'post' }}
               >
                 <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
@@ -3123,6 +3234,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                         style={s.productOption}
                         onPress={() => pickProduct(product)}
                         activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Attach ${product.name}`}
                       >
                         {product.images?.[0] ? (
                           <CachedImage source={{ uri: product.images[0] }} style={s.productThumb} recyclingKey={product.id} />
@@ -3167,6 +3280,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                       style={s.productOption}
                       onPress={() => pickPost(post)}
                       activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Attach post: ${post.caption?.trim() || 'Seller post'}`}
                     >
                       {post.mediaUrl ? (
                         <CachedImage source={{ uri: post.mediaUrl }} style={s.productThumb} recyclingKey={post.id} />
@@ -3288,7 +3403,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         menuItems={activeSheetMsg ? (
           [
             { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
-            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            ...(activeSheetMsg.text?.trim() ? [{ key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy }] : []),
             canUnsend(activeSheetMsg, isOwnSheetMsg && !isPreviewId(conv?.id ?? ''))
               ? { key: 'unsend', label: 'Unsend', icon: 'rotate-ccw', destructive: true, onPress: sheetUnsend }
               : null,
@@ -3328,12 +3443,19 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             setThreadCashMutual(null);
             const status = await api.social.status(sellerUserId);
             setThreadCashMutual(status.isMutual);
-          } catch {
-            // Following can still fail (rate limit, blocked, etc.) — the
-            // coin's own disabled state already reflects reality either way.
+          } catch (e) {
+            // Following can still fail (rate limit, blocked, etc.) — say so
+            // instead of silently leaving the person thinking it worked.
+            setErrorNotice(apiErrorMessage(e, 'Couldn’t follow. Please try again.'));
           }
         }}
         onDismiss={() => setThreadCashNotice(null)}
+      />
+
+      <Snackbar
+        visible={errorNotice != null}
+        message={errorNotice ?? ''}
+        onDismiss={() => setErrorNotice(null)}
       />
     </KeyboardAvoidingView>
   );
@@ -3457,7 +3579,7 @@ const requestPanelStyles = StyleSheet.create({
     gap: SP.xs,
   },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
-  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  subline: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, textAlign: 'center', marginBottom: SP.sm },
   actionsRow: { flexDirection: 'row', gap: SP.sm },
   // PressableScale applies `style` only to its inner view, never to the
   // outer node that takes part in this row — so the equal thirds live on a
@@ -3555,7 +3677,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     minWidth: 0,
   },
   headerName: {
-    fontSize: 16,
+    fontSize: FS.base,
     fontFamily: FONT.semibold,
     color: theme.text,
     letterSpacing: -0.2,
@@ -3589,7 +3711,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  headerAvatarImage: { width: 32, height: 32 },
   headerAvatarOfficial: { borderWidth: 1 },
   headerAvatarInitials: {
     fontSize: FS.sm,
@@ -3633,7 +3757,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: theme.success,
+    backgroundColor: theme.muted,
     borderWidth: 2,
     borderColor: theme.background,
   },
@@ -3709,7 +3833,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   listContent: {
     paddingVertical: SP.sm,
     paddingBottom: SP.md,
+    flexGrow: 1,
   },
+  listStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.md },
+  listStateTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
+  listStateRetry: {
+    height: 36, paddingHorizontal: SP.md, borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  listStateRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
 
   // Date separator — plain small gray centered text, no pill (IG-style).
   dateSeparatorWrap: {
@@ -3717,7 +3850,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginVertical: SP.lg,
   },
   dateSeparatorText: {
-    fontSize: 12,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: theme.muted,
   },
@@ -3749,10 +3882,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     marginBottom: 3,
   },
+  msgAvatarImage: { width: AVATAR_SIZE, height: AVATAR_SIZE },
   msgAvatar: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: AVATAR_GAP,
@@ -3764,7 +3899,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: AVATAR_GAP,
   },
   msgAvatarInitials: {
-    fontSize: 11,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
@@ -3894,7 +4029,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Message text — 15pt per spec; emoji font stack biases toward Apple's own
   // emoji glyphs on web instead of the OS-default Noto/Segoe blobs.
   msgText: {
-    fontSize: 15,
+    fontSize: FS.base,
     fontFamily: FONT.regular,
     lineHeight: 21,
     ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),
@@ -4160,6 +4295,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   // Seller side's "Orders from <buyer>" sheet (same sheet chrome as above).
+  focusedMsg:       { borderRadius: RADIUS.md },
   ordersMetaRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: 4, flexWrap: 'wrap' },
   ordersRetryBtn:   { marginTop: SP.sm, paddingHorizontal: 16, height: 36, borderRadius: ControlRadius.md, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center' },
   ordersRetryText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.background },

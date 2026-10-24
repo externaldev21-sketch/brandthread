@@ -38,28 +38,38 @@ export function ThemePickerSheet({
           scrollEnabled={false}
           contentContainerStyle={{ paddingTop: SP.sm }}
           ListHeaderComponent={(
+            <View style={s.tileCell}>
             <PressableScale rippleEnabled={false}
               style={s.tileWrap}
               onPress={() => { hapticSelection(); onPickDefault(); }}
               testID="theme-tile-default"
+              accessibilityRole="button"
+              accessibilityLabel="Default theme"
+              accessibilityState={{ selected: !currentThemeId }}
             >
               <View style={[s.tile, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
                 {!currentThemeId && <Icon name="check" size={ICON_SIZE} color={theme.text} />}
               </View>
               <Text style={[s.tileLabel, { color: theme.muted }]} numberOfLines={2}>Default</Text>
             </PressableScale>
+            </View>
           )}
           renderItem={({ item }) => (
+            <View style={s.tileCell}>
             <PressableScale rippleEnabled={false}
               style={s.tileWrap}
               onPress={() => { hapticSelection(); onPickTheme(item.id); }}
               testID={`theme-tile-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={item.name}
+              accessibilityState={{ selected: currentThemeId === item.id }}
             >
               <View style={[s.tile, { backgroundColor: item.swatch }]}>
                 {currentThemeId === item.id && <Icon name="check" size={ICON_SIZE} color={item.sentText} />}
               </View>
               <Text style={[s.tileLabel, { color: theme.muted }]} numberOfLines={2}>{item.name}</Text>
             </PressableScale>
+            </View>
           )}
         />
     </Sheet>
@@ -69,7 +79,8 @@ export function ThemePickerSheet({
 const ICON_SIZE = 18;
 
 const s = StyleSheet.create({
-  tileWrap: { width: '25%', alignItems: 'center', gap: 6, marginBottom: SP.md },
+  tileCell: { width: '25%' },
+  tileWrap: { alignItems: 'center', gap: 6, marginBottom: SP.md },
   tile: { width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   tileLabel: { fontSize: 11, fontFamily: FONT.medium, textAlign: 'center', lineHeight: 14 },
 });

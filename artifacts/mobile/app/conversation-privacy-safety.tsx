@@ -82,13 +82,13 @@ export default function ConversationPrivacySafetyScreen() {
       ) : (
       <>
       <View style={[s.list, { borderColor: theme.border }]}>
-        <PressableScale rippleEnabled={false} onPress={toggleBlock} testID="privacy-safety-block">
+        <PressableScale rippleEnabled={false} onPress={toggleBlock} accessibilityRole="button" testID="privacy-safety-block">
           <View style={[s.row, { borderBottomColor: theme.border }]}>
             <Icon name="slash" size={ICON.md} color={theme.error} style={{ width: 28 }} />
             <Text style={[s.rowTitle, { color: theme.error }]}>{isBlocked ? `Unblock ${participant.name}` : `Block ${participant.name}`}</Text>
           </View>
         </PressableScale>
-        <PressableScale rippleEnabled={false} onPress={report} testID="privacy-safety-report">
+        <PressableScale rippleEnabled={false} onPress={report} accessibilityRole="button" testID="privacy-safety-report">
           <View style={s.row}>
             <Icon name="alert-circle" size={ICON.md} color={theme.text} style={{ width: 28 }} />
             <Text style={[s.rowTitle, { color: theme.text }]}>Report {participant.name}</Text>
@@ -111,5 +111,5 @@ const makeStyles = () => StyleSheet.create({
   list: { marginTop: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
-  explainer: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, paddingHorizontal: SP.md, marginTop: SP.md },
+  explainer: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingHorizontal: SP.md, marginTop: SP.md },
 });

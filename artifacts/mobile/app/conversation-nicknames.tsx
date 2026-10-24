@@ -14,7 +14,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
 import { haptics } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
-import { isPreviewConversationId } from '@/lib/previewInbox';
+import { isPreviewConversationId, setPreviewConversationNickname } from '@/lib/previewInbox';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import { setConversationNickname } from '@/services/socialService';
 import { apiErrorMessage } from '@/lib/safety';
@@ -50,7 +50,9 @@ export default function ConversationNicknamesScreen() {
     hapticPrimaryAction();
     setSaving(true);
     try {
-      if (!isPreview) {
+      if (isPreview) {
+        setPreviewConversationNickname(params.id, params.participantUserId, nickname);
+      } else {
         if (params.role === 'seller') {
           await api.conversations.setNickname(conversationId, participant.userId, nickname);
         } else {
@@ -93,6 +95,7 @@ export default function ConversationNicknamesScreen() {
           placeholderTextColor={theme.muted}
           maxLength={60}
           autoFocus
+          accessibilityLabel={`Nickname for ${params.participantName}`}
           testID="conversation-nicknames-input"
         />
         <Button
