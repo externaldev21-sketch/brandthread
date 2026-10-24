@@ -68,6 +68,12 @@ export default function IntegrationsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
+  // Count only the integrations this screen lists: the server can report
+  // other keys (e.g. a Shopify import), which used to read "3 of 2".
+  const connectedCount = INTEGRATION_DEFS.filter((item) => (
+    item.isStripe ? isStripeFullyConnected(stripeStatus) : connectedKeys.has(item.key)
+  )).length;
+
   async function handleConnectStripe() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setToggling('stripe');
@@ -83,7 +89,7 @@ export default function IntegrationsScreen() {
       // The seller finishes onboarding in an external browser tab/window;
       // useFocusEffect's load() re-checks real status on return.
     } catch {
-      Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
+      Alert.alert('Couldn’t open Stripe', 'Could not open Stripe onboarding. Please try again.');
     } finally {
       setToggling(null);
     }
@@ -108,7 +114,7 @@ export default function IntegrationsScreen() {
             try {
               await api.seller.disconnectIntegration(item.key) as any;
               setConnectedKeys(prev => { const next = new Set(prev); next.delete(item.key); return next; });
-            } catch { Alert.alert('Error', 'Could not disconnect. Try again.'); }
+            } catch { Alert.alert(`Couldn’t disconnect ${item.label}`, 'Please try again.'); }
             finally { setToggling(null); }
           },
         },
@@ -126,7 +132,7 @@ export default function IntegrationsScreen() {
               try {
                 await api.seller.connectIntegration(item.key, {}) as any;
                 setConnectedKeys(prev => new Set([...prev, item.key]));
-              } catch { Alert.alert('Error', 'Could not connect. Try again.'); }
+              } catch { Alert.alert(`Couldn’t connect ${item.label}`, 'Please try again.'); }
               finally { setToggling(null); }
             },
           },
@@ -150,7 +156,7 @@ export default function IntegrationsScreen() {
             <View style={s.errorBox}>
               <Feather name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
               <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
-              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]}>
+              <TouchableOpacity onPress={load} style={[s.retryBtn, { borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel="Retry loading integrations">
                 <Text style={[s.retryBtnText, { color: colors.foreground }]}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -163,11 +169,14 @@ export default function IntegrationsScreen() {
                   <TouchableOpacity
                     key={item.key}
                     onPress={() => handleConnect(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
+                    accessibilityHint={connected ? (item.route ? `Opens ${item.label} settings` : undefined) : `Connect ${item.label}`}
                     activeOpacity={connected && !item.route ? 1 : 0.7}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
                     <View style={s.iconWrap}>
-                      <Feather name={item.icon} size={ICON.sm} color="#FFFFFF" />
+                      <Feather name={item.icon} size={ICON.sm} color={colors.foreground} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
@@ -194,7 +203,7 @@ export default function IntegrationsScreen() {
           {/* Connected count summary */}
           {!loading && !loadError && (
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              {connectedKeys.size + (isStripeFullyConnected(stripeStatus) ? 1 : 0)} of {INTEGRATION_DEFS.length} integrations connected
+              {connectedCount} of {INTEGRATION_DEFS.length} integrations connected
             </Text>
           )}
         </View>
@@ -210,7 +219,7 @@ const s = StyleSheet.create({
   loadingRow: { alignItems: 'center', paddingVertical: 30 },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
-  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 2 },
+  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', marginTop: 2 },
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },

@@ -88,7 +88,10 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
             testID="onboarding-brands-follow-all"
             style={[styles.followAllBtn, { borderColor: theme.border }]}
             onPress={followAll}
+            disabled={followedCount === brands.length}
             accessibilityRole="button"
+            accessibilityLabel="Follow all brands"
+            accessibilityState={{ disabled: followedCount === brands.length }}
           >
             <Feather name="plus" size={15} color={theme.text} />
             <Text style={[styles.followAllText, { color: theme.text }]}>
@@ -109,7 +112,7 @@ export function BrandsToFollowStep({ onLikedChange }: { onLikedChange?: (sellerI
       )}
 
       {!loading && !loadError && brands.length === 0 && (
-        <Text style={styles.emptyText}>No brands to show yet — check back soon.</Text>
+        <Text style={styles.emptyText}>No brands to follow yet. You can find brands anytime in Discover.</Text>
       )}
 
       <View style={styles.grid}>
@@ -162,7 +165,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   followAllBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 40,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 44,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
   followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

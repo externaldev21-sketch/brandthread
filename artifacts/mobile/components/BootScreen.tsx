@@ -12,7 +12,12 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 export default function BootScreen() {
   const { theme } = useAppTheme();
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
+    <View
+      style={[styles.root, { backgroundColor: theme.background }]}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading Brandthread"
+    >
       <BrandthreadLogo size={150} tintColor={theme.accentLight} />
     </View>
   );

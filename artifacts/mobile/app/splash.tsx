@@ -43,7 +43,12 @@ export default function SplashScreen() {
       {/* The onboarding thread starts here: it sews through the mark and
           carries on into the Welcome screen. Decorative only. */}
       <ThreadDraw height={180} color={theme.text} delay={200} duration={1600} style={styles.thread} />
-      <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+      <Animated.View
+        style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel="Brandthread"
+      >
         <BrandthreadLogo size={150} tintColor={theme.accentLight} />
       </Animated.View>
     </View>

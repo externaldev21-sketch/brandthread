@@ -185,8 +185,10 @@ export default function ThreadExplainerScreen() {
           { paddingBottom: insets.bottom + 16, opacity },
         ]}
       >
+        {/* Opaque from the button down, so feature cards never show beneath it. */}
         <LinearGradient
-          colors={['transparent', theme.background]}
+          colors={[`${theme.background}00`, theme.background]}
+          locations={[0, 0.35]}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
@@ -194,6 +196,8 @@ export default function ThreadExplainerScreen() {
           activeOpacity={0.88}
           onPress={handleEnterThread}
           style={styles.ctaBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Enter the Thread"
         >
           <LinearGradient
             colors={theme.primaryGradient}

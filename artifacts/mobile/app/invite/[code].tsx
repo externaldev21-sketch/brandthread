@@ -16,7 +16,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { API_BASE_URL } from '@/lib/api';
 import { FONT, FS, SP } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
-import { referralInviteePath } from '@/lib/referralCopy';
+import { REFERRAL_SUBHEAD, referralInviteePath } from '@/lib/referralCopy';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function InviteDeepLinkScreen() {
   const { theme } = useAppTheme();
@@ -40,29 +42,38 @@ export default function InviteDeepLinkScreen() {
 
   if (!isLoaded || !isSignedIn) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.text} />
+      <View style={[styles.root, styles.center, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.text} accessibilityLabel="Opening invite" />
       </View>
     );
   }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.lg }]}>
-      <Text style={[styles.title, { color: theme.text }]}>You are already on Brandthread</Text>
-      <Text style={[styles.body, { color: theme.muted }]}>
-        Invite links are for new members. Share yours and you both get $10 Thread Cash.
-      </Text>
-      <PrimaryButton
-        label="Share your invite"
-        onPress={() => router.replace('/buyer-invite' as never)}
-        style={{ alignSelf: 'stretch', marginTop: SP.lg }}
-      />
+      {/* Signed-in members land here from someone else's link: give them a way out. */}
+      <ScreenHeader title="Invite" onBack={() => goBackOr(router, '/')} />
+      <View style={[styles.center, styles.content]}>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">You're already on Brandthread</Text>
+        <Text style={[styles.body, { color: theme.muted }]}>
+          Invite links are for new members. {REFERRAL_SUBHEAD}
+        </Text>
+        {/* PrimaryButton's outer Pressable ignores alignSelf, so the stretch lives on a wrapper. */}
+        <View style={styles.cta}>
+          <PrimaryButton
+            label="Share your invite"
+            onPress={() => router.replace('/buyer-invite' as never)}
+          />
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
+  root: { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, paddingHorizontal: SP.xl },
+  cta: { alignSelf: 'stretch', marginTop: SP.lg },
   title: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
   body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, lineHeight: 20 },
 });

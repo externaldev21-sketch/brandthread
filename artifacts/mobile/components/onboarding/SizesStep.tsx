@@ -32,7 +32,7 @@ export function SizesStep({ sizes, onChange }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <StepHeadline>What sizes{'\n'}do you wear?</StepHeadline>
-      <StepSub>We will show the size that fits when you shop. Skip it and add sizes later.</StepSub>
+      <StepSub>We'll show the size that fits as you shop. You can skip this and add sizes later.</StepSub>
       {SURVEY_SIZE_CATEGORIES.map(({ key, label, options }, i) => (
         <Reveal key={key} index={i + 2} style={styles.section}>
           <Text style={styles.sectionTitle}>{label}</Text>
@@ -66,7 +66,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   section: { marginTop: SPACE.lg },
   sectionTitle: { ...TYPE.label, color: theme.text, fontFamily: 'Inter_600SemiBold', marginBottom: SPACE.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs },
+  // Every category has six sizes (two full rows of three), so spreading the
+  // cells lines the third column up with the right gutter.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: SPACE.xs, justifyContent: 'space-between' },
   cell: { width: '31.5%' },
   chip: {
     width: '100%', minHeight: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12,

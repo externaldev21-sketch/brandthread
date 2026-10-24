@@ -25,7 +25,7 @@ describe("seller pre-plan experience", () => {
     expect(source).toContain("Saved when your seller workspace is created.");
     expect(source).toContain("api.logo.onboardingSample");
     expect(source).toContain("onboarding-generate-sample");
-    expect(source).toContain("Your real AI sample is ready.");
+    expect(source).toContain("Your AI sample is ready.");
     expect(source).toContain("Retry");
     expect(source).toContain("Skip sample · Continue to plans");
     expect(source).toContain('accessibilityRole="radio"');

@@ -18,9 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 
 import {
-  BG, CARD, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
@@ -77,7 +75,10 @@ function TaskCard({
         <TouchableOpacity
           onPress={task.completed ? undefined : handleComplete}
           style={[ts.check, task.completed && ts.checkDone]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: task.completed }}
+          accessibilityLabel={task.completed ? `${task.label}, done` : `Mark ${task.label} complete`}
         >
           {task.completed && <Feather name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
@@ -92,14 +93,16 @@ function TaskCard({
               </View>
             )}
           </View>
-          <Text style={ts.desc} numberOfLines={1}>{task.description}</Text>
+          <Text style={ts.desc} numberOfLines={2}>{task.description}</Text>
         </View>
 
         {/* Right: action */}
         {!task.completed && (
           <TouchableOpacity
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSkip(task.id); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Skip ${task.label}`}
           >
             <Text style={ts.skip}>Skip</Text>
           </TouchableOpacity>
@@ -110,8 +113,8 @@ function TaskCard({
 }
 
 const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD,
-                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: colors.card,
+                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
                 paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },
@@ -120,12 +123,12 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
   checkDone:  { backgroundColor: colors.primary, borderColor: colors.primary },
   body:       { flex: 1 },
   labelRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 2 },
-  label:      { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
-  labelDone:  { textDecorationLine: 'line-through', color: MUTED },
-  desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  label:      { fontSize: FS.base, fontFamily: FONT.medium, color: colors.foreground },
+  labelDone:  { textDecorationLine: 'line-through', color: colors.mutedForeground },
+  desc:       { fontSize: FS.xs, lineHeight: 16, fontFamily: FONT.regular, color: colors.mutedForeground },
   activePill: { backgroundColor: colors.primary, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
   activePillText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.primaryForeground },
-  skip:       { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
+  skip:       { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -223,7 +226,7 @@ export default function SetupScreen() {
           )}
           {allDone && (
             <Text style={[s.progressNext, { color: theme.text }]}>
-              ✓ All required steps complete — you're ready to go!
+              ✓ All required steps complete. You're ready to publish.
             </Text>
           )}
         </GradientCard>
@@ -239,7 +242,7 @@ export default function SetupScreen() {
                 <Feather name="check-circle" size={ICON.lg} color={theme.text} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready!</Text>
+                <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready</Text>
                 <Text style={s.subtitle}>All required setup steps complete. Time to publish.</Text>
               </View>
             </View>
@@ -282,12 +285,12 @@ export default function SetupScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -0.7 },
-  subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.7 },
+  subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
   pctBadge:     { backgroundColor: colors.accent, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
   pctText:      { fontSize: FS.base, fontFamily: FONT.bold, color: colors.accentForeground },
   progressCard: { marginBottom: SP.md },
   progressThread: { width: '100%', marginBottom: SP.sm },
-  progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
   doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });

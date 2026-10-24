@@ -22,8 +22,10 @@ export function SellerPlanRecommendationStep({
   onContinue: () => void;
 }) {
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { packages } = useRevenueCat();
   const recommendation = recommendSellerPlan(brandStage, goals);
+  const selectedPlanName = SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name;
 
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
@@ -47,6 +49,9 @@ export function SellerPlanRecommendationStep({
               testID={`onboarding-plan-${plan.id}`}
               activeOpacity={0.82}
               onPress={() => onSelect(plan.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${plan.name}, ${price} per month${recommended ? ', recommended' : ''}`}
               style={[
                 styles.card,
                 selected && { borderColor: theme.accent },
@@ -77,36 +82,42 @@ export function SellerPlanRecommendationStep({
         })}
       </View>
 
-      <TouchableOpacity onPress={onContinue} activeOpacity={0.86} style={[styles.continue, { backgroundColor: theme.accent }]}>
+      <TouchableOpacity
+        onPress={onContinue}
+        activeOpacity={0.86}
+        style={[styles.continue, { backgroundColor: theme.accent }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Continue with ${selectedPlanName}`}
+      >
         <Text style={[styles.continueText, { color: theme.onAccent }]}>
-          Continue with {SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name}
+          Continue with {selectedPlanName}
         </Text>
       </TouchableOpacity>
       <Text style={styles.chargeNote}>No charge is made on this step.</Text>
     </ScrollView>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
   eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 2.4, marginBottom: 8 },
-  title: { color: '#FFF', fontSize: 36, lineHeight: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1.2 },
-  reason: { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 8 },
-  guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 6 },
+  title: { color: theme.text, fontSize: 36, lineHeight: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1.2 },
+  reason: { color: theme.muted, fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 8 },
+  guidance: { color: theme.subtle, fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 6 },
   trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   trialBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
   planRow: { gap: 10, paddingVertical: 18 },
-  card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
+  card: { width: '100%', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
-  planName: { color: '#FFF', fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 8 },
-  tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  price: { color: '#FFF', fontSize: 28, fontFamily: 'Inter_700Bold', marginTop: 12 },
-  period: { color: 'rgba(255,255,255,0.42)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  planName: { color: theme.text, fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 8 },
+  tagline: { color: theme.muted, fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  price: { color: theme.text, fontSize: 28, fontFamily: 'Inter_700Bold', marginTop: 12 },
+  period: { color: theme.subtle, fontSize: 12, fontFamily: 'Inter_400Regular' },
   features: { gap: 9, marginTop: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  feature: { flex: 1, color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
+  feature: { flex: 1, color: theme.muted, fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
   continue: { borderRadius: radius.md, minHeight: 56, justifyContent: 'center', alignItems: 'center' },
   continueText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  chargeNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: 'Inter_400Regular' },
+  chargeNote: { color: theme.subtle, fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: 'Inter_400Regular' },
 });

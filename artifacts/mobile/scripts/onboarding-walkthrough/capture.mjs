@@ -303,7 +303,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-generate-sample').waitFor({ timeout: 10_000 });
       await shot('plan-preview');
       await page.getByTestId('onboarding-generate-sample').click();
-      await page.getByText('Your real AI sample is ready.', { exact: false }).waitFor({ timeout: 15_000 });
+      await page.getByText('Your AI sample is ready.', { exact: false }).waitFor({ timeout: 15_000 });
       await shot('plan-preview-sample-ready');
       await page.getByTestId('onboarding-preview-continue').click();
     });

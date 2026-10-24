@@ -188,11 +188,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     justifyContent: 'center',
     backgroundColor: theme.accent,
   },
-  brandMarkText: {
-    color: theme.onAccent,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-  },
   brandName: {
     color: theme.text,
     fontFamily: 'Inter_700Bold',

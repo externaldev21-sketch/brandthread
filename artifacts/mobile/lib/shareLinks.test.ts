@@ -40,7 +40,7 @@ describe('parseShareLink', () => {
     expect(parseShareLink('https://www.brandthread.app/tag/Streetwear')?.href).toBe('/hashtag/streetwear');
     expect(parseShareLink('https://brandthread.app/place/pl_12345')?.href).toBe('/location/pl_12345');
     expect(parseShareLink('https://brandthread.app/u/Jordan_R')?.href).toBe('/u/jordan_r');
-    expect(parseShareLink('https://brandthread.app/store/product/prod_123456')?.href).toBe('/product-detail?id=prod_123456');
+    expect(parseShareLink('https://brandthread.app/store/product/prod_123456')?.href).toBe('/buyer-product-detail?productId=prod_123456');
     expect(parseShareLink('https://brandthread.app/store/novagoods')).toMatchObject({ kind: 'store', href: '/u/novagoods' });
     expect(parseShareLink('https://brandthread.app/c/col1')?.kind).toBe('collection');
     expect(parseShareLink('https://brandthread.app/drops/d1')?.kind).toBe('drop');

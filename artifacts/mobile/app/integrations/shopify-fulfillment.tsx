@@ -67,8 +67,8 @@ export default function ShopifyFulfillmentScreen() {
         return;
       }
       await load();
-    } catch (err: any) {
-      Alert.alert('Could not update fulfillment', String(err?.message ?? 'Please try again.'));
+    } catch {
+      Alert.alert('Could not update fulfillment', 'Check your connection and try again.');
     } finally {
       setBusy(false);
     }
@@ -76,7 +76,7 @@ export default function ShopifyFulfillmentScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ScreenHeader title="Fulfillment connections" />
         <View style={{ padding: 20, gap: 16 }}>
           <LoadingSkeleton height={92} />
@@ -87,13 +87,13 @@ export default function ShopifyFulfillmentScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader title="Fulfillment connections" />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
         <BrandthreadCard>
           <View style={styles.rowHeader}>
-            <View style={[styles.iconWrap, { backgroundColor: '#95BF4722' }]}>
-              <Feather name="shopping-bag" size={18} color="#5E8E3E" />
+            <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>
+              <Feather name="shopping-bag" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Fulfill orders through my Shopify store</Text>
@@ -105,6 +105,7 @@ export default function ShopifyFulfillmentScreen() {
               value={Boolean(status?.fulfillmentEnabled)}
               onValueChange={handleToggle}
               disabled={busy}
+              accessibilityLabel="Fulfill orders through my Shopify store"
             />
           </View>
 
@@ -119,6 +120,8 @@ export default function ShopifyFulfillmentScreen() {
                 onChangeText={setShopDomain}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="url"
+                accessibilityLabel="Shopify store domain"
               />
             </>
           )}
@@ -153,9 +156,13 @@ export default function ShopifyFulfillmentScreen() {
             style={styles.disconnectBtn}
             onPress={() => Alert.alert('Disconnect Shopify?', 'This turns off fulfillment forwarding and disconnects your store.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Disconnect', style: 'destructive', onPress: async () => { await api.shopify.disconnect(); await load(); } },
+              { text: 'Disconnect', style: 'destructive', onPress: async () => {
+                try { await api.shopify.disconnect(); await load(); }
+                catch { Alert.alert('Couldn’t disconnect', 'Shopify is still connected. Please try again.'); }
+              } },
             ])}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
           >
             <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Shopify</Text>
           </TouchableOpacity>

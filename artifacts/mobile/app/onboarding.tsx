@@ -226,7 +226,13 @@ function mapClerkError(err: any): string {
   if (msg.includes('rate limit') || msg.includes('too many'))
     return 'Too many attempts. Please wait and try again.';
 
-  return inner?.message || err?.message || 'Something went wrong. Please try again.';
+  // Only Clerk's own API errors (an `errors[]` entry or a bare ClerkAPIError,
+  // both with a string `code`) carry user-facing copy; a raw runtime exception
+  // (e.g. "Cannot read properties of null") must never reach the UI.
+  const clerkMessage = typeof inner?.code === 'string' && inner.code
+    ? (inner.longMessage ?? inner.message)
+    : undefined;
+  return clerkMessage || 'Something went wrong. Please try again.';
 }
 
 // ─── Shared UI ───────────────────────────────────────────────────────────────
@@ -278,14 +284,14 @@ const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet
   chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
-function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function Chip({ label, selected, onPress, multiple = false }: { label: string; selected: boolean; onPress: () => void; multiple?: boolean }) {
   const { theme } = useAppTheme();
   const sc = createSc(theme);
   return (
     <PressableScale
       style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityRole={multiple ? 'checkbox' : 'radio'}
+      accessibilityState={multiple ? { checked: selected } : { selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
     >
       <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
@@ -341,7 +347,7 @@ function InlineError({ message }: { message: string }) {
   return (
     <Reveal style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACE.sm }}>
       <Feather name="alert-circle" size={14} color={theme.error} />
-      <Text style={[TYPE.label, { color: theme.error, flex: 1 }]}>{message}</Text>
+      <Text style={[TYPE.label, { color: theme.error, flex: 1 }]} accessibilityLiveRegion="polite">{message}</Text>
     </Reveal>
   );
 }
@@ -469,10 +475,10 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
 
   const desc = flow === 'buyer'
     ? Platform.OS === 'web'
-      ? 'Browser notifications are not enabled here. You can turn on mobile alerts later from the Brandthread app.'
+      ? 'Alerts aren’t available in the browser. Turn them on anytime in the Brandthread mobile app.'
       : 'Get drop alerts, friend requests, messages and order updates.'
     : Platform.OS === 'web'
-      ? 'Browser notifications are not enabled here. You can turn on mobile alerts later from the Brandthread app.'
+      ? 'Alerts aren’t available in the browser. Turn them on anytime in the Brandthread mobile app.'
       : 'Get order, production, payout and customer alerts instantly.';
 
   const items = flow === 'buyer'
@@ -592,7 +598,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
         <View style={ss.features}>
           {(flow === 'buyer'
             ? ['Thread — your personal brand feed', 'Discover drops before they sell out', 'Chat directly with brands', 'Track every order in one place']
-            : ['Design Studio & AI tools ready', 'Manufacturer network unlocked', 'Your store is ready to launch', 'Analytics dashboard activated']
+            : ['Design Studio & AI tools ready', 'Manufacturer network unlocked', 'Storefront builder ready', 'Analytics dashboard activated']
           ).map((f, i) => (
             <Reveal key={f} delay={copyDelay} index={i + 3}>
               <View style={ss.featureRow}>
@@ -1129,6 +1135,8 @@ interface SharedAuthStepProps {
   /** Prefill last name (stored for profile write) */
   onLastNamePrefill: (lastName: string) => void;
   allowSignedInAccountCreation?: boolean;
+  /** Which path the account is for — only changes copy. */
+  flow: Flow;
 }
 
 function SharedAuthStep({
@@ -1136,6 +1144,7 @@ function SharedAuthStep({
   username, onUsernameChange, referralCode, onReferralCodeChange,
   onFirstNamePrefill, onLastNamePrefill,
   allowSignedInAccountCreation = false,
+  flow,
 }: SharedAuthStepProps) {
   const { theme } = useAppTheme();
   const ssa = createSsa(theme);
@@ -1156,6 +1165,8 @@ function SharedAuthStep({
   const [password, setPassword]       = useState('');
   const [confirmPassword, setConfirm] = useState('');
   const [code, setCode]               = useState('');
+  const [resending, setResending]     = useState(false);
+  const [resendNotice, setResendNotice] = useState('');
   const [showPw, setShowPw]           = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -1182,8 +1193,8 @@ function SharedAuthStep({
   }
   function requireConsent(): boolean {
     if (!agreedToTerms) {
+      // LegalConsent renders its own inline error under the checkbox.
       setConsentError(true);
-      setError('Please agree to the Terms of Service and Community Guidelines to continue.');
       return false;
     }
     recordConsent();
@@ -1311,6 +1322,21 @@ function SharedAuthStep({
     }
   }
 
+  async function handleResend() {
+    if (resending) return;
+    setResending(true);
+    setError('');
+    setResendNotice('');
+    try {
+      await signUp.verifications.sendEmailCode();
+      setResendNotice(`New code sent to ${email}.`);
+    } catch (e: any) {
+      setError(mapClerkError(e));
+    } finally {
+      setResending(false);
+    }
+  }
+
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     if (!requireConsent()) return;
     if (!requireAge()) return;
@@ -1351,7 +1377,7 @@ function SharedAuthStep({
               loading={clearingSession}
               disabled={clearingSession}
             />
-            <PillButton label="Continue with current account →" variant="ghost" onPress={onAuthComplete} />
+            <PillButton label="Continue with current account" variant="ghost" onPress={onAuthComplete} />
           </Reveal>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1404,9 +1430,16 @@ function SharedAuthStep({
           <Reveal index={3}>
             <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
           </Reveal>
-          <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>Resend</Text></Text>
+          <TouchableOpacity
+            style={ssa.resendBtn}
+            onPress={() => { void handleResend(); }}
+            disabled={resending}
+            accessibilityRole="button"
+            accessibilityLabel="Resend code"
+          >
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>{resending ? 'Sending…' : 'Resend'}</Text></Text>
           </TouchableOpacity>
+          {resendNotice ? <Text style={[ssa.hint, ssa.hintCentered]} accessibilityLiveRegion="polite">{resendNotice}</Text> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -1422,14 +1455,14 @@ function SharedAuthStep({
         showsVerticalScrollIndicator={false}
       >
         <StepHeadline>Create your{'\n'}account</StepHeadline>
-        <StepSub>Build your brand on Brandthread.</StepSub>
+        <StepSub>{flow === 'seller' ? 'Build your brand on Brandthread.' : 'Discover brands and shop the drops you love.'}</StepSub>
         <View style={ssa.formTop} />
 
         {/* Email */}
         <Reveal index={2}>
           <FloatingInput
             label="Email address"
-            placeholder="brand@yourstudio.co"
+            placeholder={flow === 'seller' ? 'brand@yourstudio.co' : 'you@example.com'}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -1494,7 +1527,6 @@ function SharedAuthStep({
 
         {/* Divider */}
         <View style={ssa.divider}>
-          <View style={ssa.divLine} />
           <View style={ssa.divLine} />
         </View>
 
@@ -1785,7 +1817,7 @@ function SellerPreviewStep({
                   <View style={[spreview.themeLine, { backgroundColor: preset.secondary }]} />
                 </LinearGradient>
                 <View style={spreview.themeNameRow}>
-                  <Text numberOfLines={1} style={spreview.themeName}>{preset.name}</Text>
+                  <Text numberOfLines={2} style={spreview.themeName}>{preset.name}</Text>
                   {selected ? <Feather name="check" size={13} color={theme.text} /> : null}
                 </View>
               </PressableScale>
@@ -1799,7 +1831,7 @@ function SellerPreviewStep({
         <View style={spreview.sampleHeader}>
           <View style={{ flex: 1 }}>
             <Text style={spreview.sectionLabel}>One free AI sample</Text>
-            <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
+            <Text style={spreview.sampleSub}>See your brand name as a logo.</Text>
           </View>
           <Feather name="zap" size={18} color={theme.text} />
         </View>
@@ -1817,7 +1849,7 @@ function SellerPreviewStep({
             <AiGeneratedBadge position="topLeft" />
             <View style={spreview.resultCaption}>
               <Feather name="check" size={15} color={theme.text} />
-              <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
+              <Text style={spreview.resultText}>Your AI sample is ready.</Text>
             </View>
           </View>
         </Reveal>
@@ -1836,7 +1868,13 @@ function SellerPreviewStep({
         <View style={spreview.errorBox}>
           <Feather name="alert-circle" size={14} color={theme.error} />
           <Text style={spreview.errorText}>{sampleError}</Text>
-          <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
+          <TouchableOpacity
+            onPress={() => { void handleGenerate(); }}
+            disabled={generating || !!sampleUri}
+            accessibilityRole="button"
+            accessibilityLabel="Retry AI sample"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
             <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -1864,7 +1902,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
   themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  themeName: { flex: 1, fontSize: 12, lineHeight: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
   sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
   sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
@@ -1874,7 +1912,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
   resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
-  errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
+  errorText: { flex: 1, fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', color: ERR },
   retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   continueWrap: { marginTop: SPACE.md },
   });
@@ -1972,6 +2010,13 @@ export default function OnboardingScreen() {
   const [brandStage, setBrandStage]       = useState('idea');
   const [goals, setGoals]                 = useState<string[]>(DEFAULT_SELLER_GOALS);
   const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
+  // Until the seller taps a plan, the selection follows the recommendation
+  // shown on the plan step (it used to stay on Starter under "We recommend …").
+  const planPickedRef = useRef(false);
+  const pickPlan = useCallback((planId: SellerPlanId) => {
+    planPickedRef.current = true;
+    setSelectedPlanId(planId);
+  }, []);
   const [selectedThemeId, setSelectedThemeId] = useState<AppThemeId>('monochrome');
   const [planPrepDone, setPlanPrepDone] = useState(false);
 
@@ -2478,13 +2523,13 @@ export default function OnboardingScreen() {
     if (flow === 'seller' && step === SELLER_STEP_INDEX.AUTH) return true;
     if (!flow) return false;
     if (flow === 'buyer') {
-      if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
+      if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 1;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
       if (step === BUYER_STEP_INDEX.SIZES) return true;
       if (step === BUYER_STEP_INDEX.BRANDS) return true;
     }
     if (flow === 'seller') {
-      if (step === SELLER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
+      if (step === SELLER_STEP_INDEX.NAME) return firstName.trim().length >= 1;
       if (step === SELLER_STEP_INDEX.BRAND_NAME) return brandName.trim().length >= 1;
       if (step === SELLER_STEP_INDEX.BRAND_STAGE) return !!brandStage;
       if (step === SELLER_STEP_INDEX.GOALS) return true;
@@ -2558,6 +2603,7 @@ export default function OnboardingScreen() {
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
             allowSignedInAccountCreation={isAddAccount}
+            flow={flow}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
@@ -2587,7 +2633,7 @@ export default function OnboardingScreen() {
                 onChangeText={setFirstName}
                 autoCapitalize="words"
                 maxLength={40}
-                valid={firstName.trim().length >= 2}
+                valid={firstName.trim().length >= 1}
               />
             </Reveal>
           </ScrollView>
@@ -2661,6 +2707,7 @@ export default function OnboardingScreen() {
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
             allowSignedInAccountCreation={isAddAccount}
+            flow={flow}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
@@ -2690,7 +2737,7 @@ export default function OnboardingScreen() {
                 onChangeText={setFirstName}
                 autoCapitalize="words"
                 maxLength={40}
-                valid={firstName.trim().length >= 2}
+                valid={firstName.trim().length >= 1}
               />
             </Reveal>
           </ScrollView>
@@ -2702,7 +2749,7 @@ export default function OnboardingScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <StepHeadline>What are you{'\n'}building?</StepHeadline>
-            <StepSub>Use your current name, a working name, or change it later.</StepSub>
+            <StepSub>Use your brand's name or a working title. You can change it later.</StepSub>
             <Reveal index={2} style={sm.inputWrap}>
               <FloatingInput
                 ref={brandNameInputRef}
@@ -2752,6 +2799,7 @@ export default function OnboardingScreen() {
               <Chip
                 key={g}
                 label={g}
+                multiple
                 selected={goals.includes(g)}
                 onPress={() => setGoals((prev) => prev.includes(g) ? prev.filter((v) => v !== g) : [...prev, g])}
               />
@@ -2775,7 +2823,7 @@ export default function OnboardingScreen() {
             brandStage={brandStage}
             goals={goals}
             selectedPlanId={selectedPlanId}
-            onSelect={setSelectedPlanId}
+            onSelect={pickPlan}
             onContinue={() => goNext()}
           />
         ) : (
@@ -2791,7 +2839,10 @@ export default function OnboardingScreen() {
               await api.auth.updateProfile({ accountType: 'seller' });
               return api.logo.onboardingSample(brandName.trim(), style);
             }}
-            onContinue={() => setPlanPrepDone(true)}
+            onContinue={() => {
+              if (!planPickedRef.current) setSelectedPlanId(recommendSellerPlan(brandStage, goals).planId);
+              setPlanPrepDone(true);
+            }}
           />
         )
       );

@@ -146,7 +146,6 @@ function PublicProfileLanding({
         style={{ width: layout.columnWidth }}
         contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
         showsVerticalScrollIndicator={false}
-        accessible
       >
         {/* Hero */}
         <View style={[styles.landingHero, { height: layout.heroHeight }]}>
@@ -362,7 +361,7 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={styles.root} accessibilityLabel="Loading profile" accessible>
+      <View style={styles.root}>
         <ScreenHeader title="Profile" onBack={() => goBackOr(router)} />
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>
@@ -372,7 +371,7 @@ export default function PublicProfileRoute() {
             <SkeletonBlock width="40%" height={14} />
           </View>
         </View>
-        <Text style={styles.loadingText}>Loading profile…</Text>
+        <Text style={styles.loadingText} accessibilityLiveRegion="polite">Loading profile…</Text>
       </View>
     );
   }
@@ -448,20 +447,6 @@ function makeStyles(theme: AppThemePreset) {
   root: { flex: 1, backgroundColor: theme.background },
 
   // ── Shared chrome ──────────────────────────────────────────────────────────
-  header: {
-    height: COMP.headerH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  backBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -661,12 +646,16 @@ function makeStyles(theme: AppThemePreset) {
   },
 
   // CTA block
+  // Stretch, not center: PressableScale's outer Pressable carries no style,
+  // so under alignItems:'center' the full-width buttons shrink-wrapped their
+  // labels (Join/Sign in rendered as cramped, unpadded chips).
   ctaBlock: {
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: SP.md,
   },
   ctaLabel: {
+    alignSelf: 'center',
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     color: theme.muted,

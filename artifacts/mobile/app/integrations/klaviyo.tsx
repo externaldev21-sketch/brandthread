@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FS } from '@/lib/theme';
+import { ApiError } from '@/lib/networkNotice';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -60,9 +61,11 @@ export default function KlaviyoIntegrationScreen() {
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const msg = String(err?.message ?? '');
+      const rejected = (err instanceof ApiError && (err.status === 400 || err.status === 401))
+        || msg.includes('401') || msg.toLowerCase().includes('invalid');
       Alert.alert(
         'Connection failed',
-        msg.includes('401') || msg.toLowerCase().includes('invalid')
+        rejected
           ? 'That API key was rejected by Klaviyo. Double-check it and try again.'
           : 'Could not reach Klaviyo. Please try again in a moment.',
       );
@@ -89,23 +92,27 @@ export default function KlaviyoIntegrationScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Disconnect', style: 'destructive', onPress: async () => {
-          await api.integrations.klaviyoDisconnect();
-          setStatus({ connected: false });
+          try {
+            await api.integrations.klaviyoDisconnect();
+            setStatus({ connected: false });
+          } catch {
+            Alert.alert('Couldn’t disconnect', 'Klaviyo is still connected. Please try again.');
+          }
         },
       },
     ]);
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Klaviyo" />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
-            <Feather name="zap" size={22} color={colors.primary} />
+            <Feather name="mail" size={22} color={colors.primary} />
           </View>
-          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
+          <Text style={[styles.heroTitle, { color: colors.foreground }]} accessibilityRole="header">Klaviyo email & SMS marketing</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
             Connect your existing Klaviyo account so the email and SMS subscribers you already built keep working here.
           </Text>
@@ -148,6 +155,8 @@ export default function KlaviyoIntegrationScreen() {
               onPress={handleSync}
               disabled={syncing}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: syncing, busy: syncing }}
             >
               {syncing ? <ActivityIndicator size="small" color={colors.foreground} /> : <Feather name="refresh-cw" size={15} color={colors.foreground} />}
               <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
@@ -157,6 +166,7 @@ export default function KlaviyoIntegrationScreen() {
               style={styles.disconnectBtn}
               onPress={handleDisconnect}
               activeOpacity={0.7}
+              accessibilityRole="button"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Klaviyo</Text>
@@ -174,12 +184,15 @@ export default function KlaviyoIntegrationScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
+              accessibilityLabel="Klaviyo private API key"
             />
             <TouchableOpacity
               style={[styles.connectBtn, { backgroundColor: colors.primary, opacity: connecting ? 0.7 : 1 }]}
               onPress={handleConnect}
               disabled={connecting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: connecting, busy: connecting }}
             >
               {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
               <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
@@ -187,8 +200,9 @@ export default function KlaviyoIntegrationScreen() {
 
             <TouchableOpacity
               style={styles.helpRow}
-              onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
+              onPress={() => { Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267').catch(() => {}); }}
               activeOpacity={0.7}
+              accessibilityRole="link"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Feather name="external-link" size={13} color={colors.primary} />

@@ -4,9 +4,10 @@
  * Route: /store/product/[productId]  (maps to https://brandthread.app/store/product/{id},
  * the canonical share URL built in app/product-detail.tsx).
  *
- * Product pages don't have their own screen at this path — the existing
- * product detail screen already renders from `?id=`, so this route just
- * forwards the path param into a `router.replace` and renders nothing.
+ * Shared product links are opened by shoppers (and guests), so this forwards
+ * to the buyer product page (`?productId=`) — not the seller's 8-tab
+ * product-management screen at /product-detail, which guests can't open at
+ * all (they were bounced to onboarding).
  */
 import { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,7 +18,7 @@ export default function ProductLinkRedirect() {
 
   useEffect(() => {
     if (!productId) return;
-    router.replace((`/product-detail?id=${encodeURIComponent(productId)}`) as never);
+    router.replace((`/buyer-product-detail?productId=${encodeURIComponent(productId)}`) as never);
   }, [productId, router]);
 
   return null;
