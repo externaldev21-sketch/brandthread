@@ -60,7 +60,6 @@ export const SCREENS = [
   ['onboarding', 'buyer', '/onboarding'],
   ['forgot-password', 'buyer', '/forgot-password'],
   ['help', 'buyer', '/help'],
-  ['share-profile', 'buyer', '/share-profile'],
   ['seller-dashboard', 'seller', '/(tabs)'],
   ['seller-products', 'seller', '/(tabs)/products'],
   ['seller-orders', 'seller', '/(tabs)/orders'],

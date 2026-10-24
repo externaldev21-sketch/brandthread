@@ -1,11 +1,10 @@
-import { Icon as Feather } from '@/components/ui/Icon';
 /**
- * Design Versions — /design-versions?projectId=<id>
+ * Design Versions — /design-versions?projectId=…
  *
- * Reached from the Design Studio canvas's Export sheet ("Version history").
- * Versions are snapshots saved on this device (designService createVersion);
- * the server keeps no per-version image, so Preview renders the snapshot's
- * own layers with the shared DesignLayerCompositor.
+ * Lists the snapshots created by the canvas's Share → Save version action.
+ * Restore writes a snapshot back over the project (after snapshotting the
+ * current state so the restore itself can be undone); Duplicate creates a new
+ * project from the version's snapshot, not from the project's current state.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -13,28 +12,25 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Modal, Pressable, useWindowDimensions,
+  Alert, ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Icon } from '@/components/ui/Icon';
+import { Icon as Feather } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, ORANGE,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, SecondaryButton, EmptyState, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getVersions, duplicateProject, createProject, updateProject, restoreVersion } from '@/services/designService';
-import { ORANGE } from '@/lib/theme';
+import { createVersion, getVersions, restoreVersion, duplicateVersion } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 
-const ACTION_HIT = { top: 13, bottom: 13, left: 8, right: 8 };
+const THUMB_SIZE = 56;
 
 function formatDate(iso: string): string {
   try {
@@ -49,7 +45,7 @@ function formatDate(iso: string): string {
 
 export default function DesignVersionsScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
   const styles = createStyles(theme);
   const router = useRouter();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -57,27 +53,26 @@ export default function DesignVersionsScreen() {
   const [versions, setVersions]   = useState<DesignVersion[]>([]);
   const [loading, setLoading]     = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState<DesignVersion | null>(null);
-  const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadVersions = useCallback(async () => {
     if (!projectId) { setLoading(false); return; }
-    getVersions(projectId)
-      .then(v => setVersions([...v].sort((a, b) => b.createdAt.localeCompare(a.createdAt))))
-      .catch(() => setVersions([]))
-      .finally(() => setLoading(false));
+    try {
+      const list = await getVersions(projectId);
+      setVersions([...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    } catch {
+      setVersions([]);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId]);
 
-  const handlePreview = useCallback((version: DesignVersion) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPreviewing(version);
-  }, []);
+  useEffect(() => { void loadVersions(); }, [loadVersions]);
 
   const handleRestore = useCallback((version: DesignVersion) => {
     Alert.alert(
-      'Restore Version',
-      `Restore "${version.label}"? Your project will be replaced with this version.`,
+      'Restore version',
+      `Replace the current project with "${version.label}"? Its current state is saved as a version first, so you can undo this.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -85,11 +80,13 @@ export default function DesignVersionsScreen() {
           onPress: async () => {
             setRestoring(version.id);
             try {
+              await createVersion(version.projectId, 'Before restore', true);
               const restored = await restoreVersion(version.id);
-              Alert.alert('Version restored', 'Your project now matches this version.');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               router.replace(`/design-canvas?id=${restored.id}` as never);
             } catch {
-              Alert.alert('Error', 'Failed to restore version. Please try again.');
+              Alert.alert('Could not restore', 'The project was not changed. Please try again.');
+              void loadVersions();
             } finally {
               setRestoring(null);
             }
@@ -97,26 +94,26 @@ export default function DesignVersionsScreen() {
         },
       ]
     );
-  }, [router]);
+  }, [router, loadVersions]);
 
   const handleDuplicate = useCallback(async (version: DesignVersion) => {
+    if (duplicating) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    let newProject: Awaited<ReturnType<typeof duplicateProject>> | null = null;
+    setDuplicating(version.id);
     try {
-      const snap = version.snapshot;
-      const created = await createProject(snap.type, `${snap.name} (${version.label})`, snap.canvas, snap.garmentType, snap.garmentColor);
-      newProject = await updateProject(created.id, { layers: snap.layers });
-    } catch { /* handled below */ }
-    if (newProject) {
+      const newProject = await duplicateVersion(version.id);
       router.push(`/design-canvas?id=${newProject.id}` as never);
-    } else {
-      Alert.alert('Error', 'Failed to duplicate project.');
+    } catch {
+      Alert.alert('Could not duplicate', 'No new project was created. Please try again.');
+    } finally {
+      setDuplicating(null);
     }
-  }, [router]);
+  }, [router, duplicating]);
 
   const renderItem = ({ item }: { item: DesignVersion }) => (
     <BrandthreadCard style={styles.versionCard}>
       <View style={styles.versionTop}>
+        <DesignLayerCompositor project={item.snapshot} displaySize={THUMB_SIZE} />
         <View style={styles.versionInfo}>
           {item.autoSaved && (
             <StatusBadge label="Auto-saved" variant="info" small />
@@ -124,64 +121,42 @@ export default function DesignVersionsScreen() {
           <Text style={styles.versionLabel}>{item.label}</Text>
           <Text style={styles.versionDate}>{formatDate(item.createdAt)}</Text>
         </View>
-        {restoring === item.id && (
+        {(restoring === item.id || duplicating === item.id) && (
           <ActivityIndicator color={PURPLE} size="small" />
         )}
       </View>
       <View style={styles.versionActions}>
         <TouchableOpacity
-          onPress={() => handlePreview(item)}
-          style={styles.actionBtn}
-          activeOpacity={0.8}
-          hitSlop={ACTION_HIT}
-          accessibilityRole="button"
-          accessibilityLabel={`Preview ${item.label}`}
-        >
-          <Icon name="eye" size={14} color={CYAN} />
-          <Text style={[styles.actionText, { color: CYAN }]}>Preview</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           onPress={() => handleRestore(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
-          disabled={restoring === item.id}
-          hitSlop={ACTION_HIT}
+          disabled={restoring !== null}
           accessibilityRole="button"
           accessibilityLabel={`Restore ${item.label}`}
+          testID={`design-version-restore-${item.id}`}
         >
-          <Icon name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
+          <Feather name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
           <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => handleDuplicate(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
-          hitSlop={ACTION_HIT}
+          disabled={duplicating !== null}
           accessibilityRole="button"
-          accessibilityLabel={`Duplicate ${item.label}`}
+          accessibilityLabel={`Duplicate ${item.label} as a new project`}
+          testID={`design-version-duplicate-${item.id}`}
         >
-          <Icon name="copy" size={14} color={ORANGE} />
+          <Feather name="copy" size={14} color={ORANGE} />
           <Text style={[styles.actionText, { color: ORANGE }]}>Duplicate</Text>
         </TouchableOpacity>
       </View>
     </BrandthreadCard>
   );
 
-  // No project open (direct link / preview) → nothing to list or save.
-  if (isMissingParam(projectId)) {
-    return (
-      <UnavailableScreen
-        title="Version history"
-        heading="No project open"
-        message="Open a project to see its saved versions."
-        icon="clock"
-      />
-    );
-  }
-
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Version history" />
+      <ScreenHeader title="Version History" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={styles.centered}>
@@ -195,60 +170,38 @@ export default function DesignVersionsScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <EmptyState
-              icon="clock"
-              title="No saved versions yet"
-              description={projectId ? 'Saved versions of this project will appear here.' : 'Open a project to see its version history.'}
-              action={{ label: projectId ? 'Back to project' : 'Go back', onPress: () => goBackOr(router) }}
-              style={styles.emptyState}
-            />
+            projectId ? (
+              <EmptyState
+                icon="clock"
+                title="No saved versions yet"
+                description="In the canvas, open Modify → Actions → Share and tap Save version."
+                action={{ label: 'Back to canvas', onPress: () => goBackOr(router) }}
+                style={styles.emptyState}
+                testID="design-versions-empty"
+              />
+            ) : (
+              <EmptyState
+                icon="clock"
+                title="No design selected"
+                description="Open a design in Design Studio to see its version history."
+                action={{ label: 'Open Design Studio', onPress: () => router.replace('/design' as never) }}
+                style={styles.emptyState}
+                testID="design-versions-no-project"
+              />
+            )
           }
           ListFooterComponent={
             versions.length > 0 ? (
               <View style={styles.autosaveNote}>
-                <Icon name="info" size={12} color={SUBTLE} />
+                <Feather name="info" size={12} color={SUBTLE} />
                 <Text style={styles.autosaveText}>
-                  A version is saved each time you tap Save in the editor. Versions are kept on this device.
+                  Versions are saved on this device. Restoring saves the current state as a version first.
                 </Text>
               </View>
             ) : null
           }
         />
       )}
-
-      {/* Version preview — renders the snapshot's own layers */}
-      <Modal visible={!!previewing} transparent animationType="fade" onRequestClose={() => setPreviewing(null)}>
-        <Pressable
-          style={[styles.previewOverlay, { backgroundColor: `${theme.background}E6`, paddingBottom: insets.bottom + SP.md }]}
-          onPress={() => setPreviewing(null)}
-          accessibilityRole="button"
-          accessibilityLabel="Close preview"
-        >
-          {previewing && (
-            <View style={styles.previewInner}>
-              <DesignLayerCompositor
-                project={previewing.snapshot}
-                displaySize={Math.min(windowWidth - SP.md * 2, 420)}
-                borderRadius={RADIUS.md}
-              />
-              <Text style={styles.versionLabel}>{previewing.label}</Text>
-              <Text style={styles.versionDate}>
-                {formatDate(previewing.createdAt)} · {previewing.snapshot.layers?.length ?? 0} layer{(previewing.snapshot.layers?.length ?? 0) === 1 ? '' : 's'}
-              </Text>
-              <View style={styles.versionActions}>
-                <TouchableOpacity onPress={() => { const v = previewing; setPreviewing(null); handleRestore(v); }} style={styles.actionBtn}>
-                  <Feather name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
-                  <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore as new project</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setPreviewing(null)} style={styles.actionBtn}>
-                  <Feather name="x" size={14} color={MUTED} />
-                  <Text style={[styles.actionText, { color: MUTED }]}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -262,7 +215,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyState: { marginTop: 60 },
 
   versionCard: { marginBottom: SP.sm },
-  versionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },
+  versionTop: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   versionInfo: { flex: 1, gap: 4 },
   versionLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   versionDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
@@ -276,8 +229,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginTop: SP.md, paddingHorizontal: SP.sm,
   },
   autosaveText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-
-  previewOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
-  previewInner: { alignItems: 'center', gap: SP.sm },
   });
 };

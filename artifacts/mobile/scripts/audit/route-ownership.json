@@ -42,7 +42,6 @@
     { "match": "/ai-mockup-chat", "owner": "design" },
     { "match": "/ai-photography-chat", "owner": "design" },
     { "match": "/bg-removal", "owner": "design" },
-    { "match": "/camera-capture", "owner": "design" },
     { "match": "/tech-pack-generator", "owner": "design" },
     { "match": "/lifestyle-images", "owner": "design" },
     { "match": "/mobile-app-builder", "owner": "design" },
@@ -205,7 +204,6 @@
     { "match": "/edit-profile", "owner": "profilesSocial" },
     { "match": "/seller-profile", "owner": "profilesSocial" },
     { "match": "/seller-reviews", "owner": "profilesSocial" },
-    { "match": "/share-profile", "owner": "profilesSocial" },
     { "match": "/u/", "owner": "profilesSocial" },
     { "match": "/following", "owner": "profilesSocial" },
 

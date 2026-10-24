@@ -147,7 +147,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/story-mention-viewer.tsx',
   'app/c/[collectionId].tsx',
   'app/call-screen.tsx',
-  'app/camera-capture.tsx',
   'app/community-guidelines.tsx',
   'app/design-canvas.tsx',
   // Editor chrome copied from Linktree's design editor: back, undo/redo, Cancel + Save.

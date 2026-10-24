@@ -244,7 +244,7 @@ const buyerProfile = {
 
 /** Everything a signed-in buyer's private account holds — none of it may ever render on a visitor view. */
 const PRIVATE_BUYER_TEXT = [
-  "Orders", "Order history", "Saved", "Liked", "Wishlist", "Cart", "Thread Cash", "Balance", "Addresses",
+  "Orders", "Order history", "Saved", "Liked", "Wishlist", "Cart", "Bag", "Thread Cash", "Balance", "Addresses",
   "Payment", "Returns", "Disputes", "Notifications", "Activity", "Settings", "Switch account", "Edit profile",
   "Drafts", "Email", "Phone", "Free Plan", "Professional dashboard",
 ];

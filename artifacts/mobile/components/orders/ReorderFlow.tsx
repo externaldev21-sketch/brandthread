@@ -92,7 +92,7 @@ export function useReorderFlow(options: { aboveTabBar?: boolean } = {}) {
       <Snackbar
         visible={!!message && !sheetOpen}
         message={message ?? ''}
-        actionLabel={outcome && outcome.addedUnits > 0 ? 'View cart' : undefined}
+        actionLabel={outcome && outcome.addedUnits > 0 ? 'View bag' : undefined}
         onAction={openCart}
         onDismiss={() => setMessage(null)}
         bottomOffset={options.aboveTabBar ? tabBarInset + SPACING.xs : undefined}
@@ -177,7 +177,7 @@ function ReorderSheet({
         )}
 
         <View style={styles.actions}>
-          {hasAdded && <Button label="View cart" icon="shopping-bag" onPress={onOpenCart} fullWidth />}
+          {hasAdded && <Button label="View bag" icon="shopping-bag" onPress={onOpenCart} fullWidth />}
           <Button label={hasAdded ? 'Keep browsing' : 'Close'} variant="secondary" onPress={onClose} fullWidth />
         </View>
       </View>

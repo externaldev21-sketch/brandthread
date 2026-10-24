@@ -63,6 +63,10 @@ import {
   purgeDeletedProjects,
   duplicateProject,
   updateProject,
+  createVersion,
+  getVersions,
+  duplicateVersion,
+  restoreVersion,
   initDesignService,
   getRecoverableLegacyProjectCount,
   recoverLegacyDesignProjects,
@@ -345,6 +349,61 @@ describe('designService — route and project integrity', () => {
 
     const projects = await getProjects();
     expect(projects.some(p => p.id === 'proj_legacy_1')).toBe(true);
+  });
+});
+
+describe('designService — versions', () => {
+  beforeEach(clearStorage);
+
+  const layer = (id: string) => ({
+    id, name: id, type: 'drawing' as const, visible: true, locked: false,
+    order: 0, opacity: 1,
+    transform: { x: 0, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1 },
+    data: { kind: 'drawing' as const, paths: [] },
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  });
+
+  it('createVersion snapshots the persisted project and getVersions lists it', async () => {
+    const proj = await createProject('canvas', 'Tee', { width: 1200, height: 1500 });
+    await updateProject(proj.id, { layers: [layer('v1_layer')] });
+    const version = await createVersion(proj.id);
+    expect(version.label).toBe('Manual save');
+    expect(version.snapshot.layers.map(l => l.id)).toEqual(['v1_layer']);
+    expect((await getVersions(proj.id)).map(v => v.id)).toEqual([version.id]);
+  });
+
+  it('duplicateVersion copies the version snapshot, not the current project state', async () => {
+    const proj = await createProject('canvas', 'Tee', { width: 1200, height: 1500 });
+    await updateProject(proj.id, { layers: [layer('v1_layer')] });
+    const version = await createVersion(proj.id, 'First draft');
+    // The project moves on after the version was saved.
+    await updateProject(proj.id, { layers: [layer('later_layer')], canvas: { ...proj.canvas, width: 3000 } });
+
+    const copy = await duplicateVersion(version.id);
+    expect(copy.id).not.toBe(proj.id);
+    expect(copy.name).toBe('Tee (First draft)');
+    expect(copy.status).toBe('draft');
+    expect(copy.layers.map(l => l.id)).toEqual(['v1_layer']);
+    expect(copy.canvas.width).toBe(1200);
+    // The original project is untouched and both now exist in the gallery.
+    expect((await getProject(proj.id))!.layers.map(l => l.id)).toEqual(['later_layer']);
+    expect((await getProjects()).map(p => p.id)).toEqual(expect.arrayContaining([proj.id, copy.id]));
+  });
+
+  it('duplicateVersion rejects an unknown version id without creating a project', async () => {
+    const before = (await getProjects()).length;
+    await expect(duplicateVersion('ver_missing')).rejects.toThrow('not found');
+    expect((await getProjects()).length).toBe(before);
+  });
+
+  it('restoreVersion writes the snapshot back over the same project id', async () => {
+    const proj = await createProject('canvas', 'Tee', {});
+    await updateProject(proj.id, { layers: [layer('v1_layer')] });
+    const version = await createVersion(proj.id);
+    await updateProject(proj.id, { layers: [layer('later_layer')] });
+    const restored = await restoreVersion(version.id);
+    expect(restored.id).toBe(proj.id);
+    expect(restored.layers.map(l => l.id)).toEqual(['v1_layer']);
   });
 });
 

@@ -1,8 +1,9 @@
 /**
- * Buyer protection copy — no new wording. The heading reuses the app's
- * existing "Purchase protection · Brandthread protected" label (buyer
- * settings), and the body is quoted verbatim from the Terms of Service in
- * content/legal.ts, the single legal source of truth.
+ * Buyer protection copy — no new wording. The heading is the app's
+ * "Purchase protection · Brandthread protected" label (shown by
+ * BuyerProtectionNote on product detail, checkout and order detail), and the
+ * body is quoted verbatim from the Terms of Service in content/legal.ts, the
+ * single legal source of truth.
  */
 import { LEGAL_DOCUMENTS } from './legal';
 

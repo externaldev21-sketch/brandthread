@@ -68,7 +68,7 @@ describe('status bar: a scroll-edge fade, never a solid strip', () => {
   });
 
   it('skips only genuinely immersive media / pre-shell routes', () => {
-    expect(isImmersiveTopRoute(['camera-capture'])).toBe(true);
+    expect(isImmersiveTopRoute(['create-post'])).toBe(true);
     expect(isImmersiveTopRoute(['buyer-story-viewer'])).toBe(true);
     expect(isImmersiveTopRoute(['(buyer)', 'feed'])).toBe(true);
     expect(isImmersiveTopRoute(['(tabs)', 'feed'])).toBe(true);

@@ -17,7 +17,7 @@ export const BUYER_NOTIFICATION_TYPES: NotificationTypeRow[] = [
   { key: 'new_drops',       label: 'Drops and live',        description: 'Drops and live from brands' },
   { key: 'saved_alerts',    label: 'Saved items alerts',    description: 'Restocks and price drops' },
   { key: 'price_alerts',    label: 'Launch alerts',         description: 'Launches you follow' },
-  { key: 'cart_reminders',  label: 'Cart reminders',        description: 'Items left in your cart' },
+  { key: 'cart_reminders',  label: 'Bag reminders',         description: 'Items left in your bag' },
 ];
 
 export const SELLER_NOTIFICATION_TYPES: NotificationTypeRow[] = [

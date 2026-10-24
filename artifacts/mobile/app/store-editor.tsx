@@ -802,7 +802,7 @@ export default function StoreEditor() {
           />
         </FieldRow>
         <SwitchRow label="Search" value={ts.headerSearch} onChange={v => handleThemeUpdate({ headerSearch: v })} />
-        <SwitchRow label="Cart" value={ts.headerCart} onChange={v => handleThemeUpdate({ headerCart: v })} />
+        <SwitchRow label="Bag" value={ts.headerCart} onChange={v => handleThemeUpdate({ headerCart: v })} />
         <SwitchRow label="Account" value={ts.headerAccount} onChange={v => handleThemeUpdate({ headerAccount: v })} />
         <SwitchRow label="Sticky Header" value={ts.stickyHeader} onChange={v => handleThemeUpdate({ stickyHeader: v })} />
         <SwitchRow label="Transparent Header" value={ts.transparentHeader} onChange={v => handleThemeUpdate({ transparentHeader: v })} />
@@ -949,7 +949,7 @@ export default function StoreEditor() {
         <View style={styles.divider} />
         <SwitchRow label="Size Guide" value={pp.sizeGuide} onChange={v => handleThemeUpdate({ productPage: { ...pp, sizeGuide: v } })} />
         <SwitchRow label="Reviews" value={pp.reviews} onChange={v => handleThemeUpdate({ productPage: { ...pp, reviews: v } })} />
-        <SwitchRow label="Sticky Cart" value={pp.stickyCart} onChange={v => handleThemeUpdate({ productPage: { ...pp, stickyCart: v } })} />
+        <SwitchRow label="Sticky Bag" value={pp.stickyCart} onChange={v => handleThemeUpdate({ productPage: { ...pp, stickyCart: v } })} />
         <SwitchRow label="Related Products" value={pp.relatedProducts} onChange={v => handleThemeUpdate({ productPage: { ...pp, relatedProducts: v } })} />
         <SwitchRow label="Seller Link" value={pp.sellerLink} onChange={v => handleThemeUpdate({ productPage: { ...pp, sellerLink: v } })} />
         <SwitchRow label="Seller Content" value={pp.sellerContent} onChange={v => handleThemeUpdate({ productPage: { ...pp, sellerContent: v } })} />

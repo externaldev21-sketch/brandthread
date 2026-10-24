@@ -125,12 +125,12 @@ function SavedItemRow({ item, onMove, onRemove }: {
         )}
         <View style={si.actions}>
           <Button
-            label="Move to cart"
+            label="Move to bag"
             size="small"
             variant="secondary"
             onPress={onMove}
             disabled={!item.isAvailable}
-            accessibilityHint={`Moves ${item.productName} to cart`}
+            accessibilityHint={`Moves ${item.productName} to bag`}
           />
           <Button
             label="Remove"
@@ -455,7 +455,7 @@ export default function CartScreen() {
     if (groups.length !== 1) {
       Alert.alert(
         'One store at a time',
-        'Rewards can be used when your cart has items from one seller. Check out each seller separately to use points.',
+        'Rewards can be used when your bag has items from one seller. Check out each seller separately to use points.',
       );
       return;
     }
@@ -516,7 +516,7 @@ export default function CartScreen() {
         const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
-          Alert.alert('Review your cart', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
+          Alert.alert('Review your bag', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
           setBusy(false);
           return;
         }
@@ -548,7 +548,7 @@ export default function CartScreen() {
               const sellerLabel = group.sellerName || 'One of the sellers';
               Alert.alert(
                 'Payments unavailable',
-                `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
+                `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your bag.'}`,
                 [{ text: 'OK' }],
               );
               setBusy(false);
@@ -626,7 +626,7 @@ export default function CartScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <BagHeader topInset={headerTopInset} onClose={closeBag} rightElement={hasItems ? (
-        <TouchableOpacity style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }} onPress={() => setEditMode(v => !v)} accessibilityRole="button" accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}>
+        <TouchableOpacity style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }} onPress={() => setEditMode(v => !v)} accessibilityRole="button" accessibilityLabel={editMode ? 'Done editing bag' : 'Edit bag'}>
           <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm }}>{editMode ? 'Done' : 'Edit'}</Text>
         </TouchableOpacity>
       ) : undefined} />

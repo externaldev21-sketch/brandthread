@@ -466,7 +466,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
        borderColor: '#F9731644',
     });
     expect(textContent(warning)).toContain('Payments unavailable');
-    expect(textContent(warning)).toContain('You can still add this item to your cart.');
+    expect(textContent(warning)).toContain('You can still add this item to your bag.');
 
     const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Payments unavailable' });
     expect(buyNow.props.disabled).toBe(true);

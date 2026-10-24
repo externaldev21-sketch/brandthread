@@ -1137,7 +1137,7 @@ function AnalyticsTab({
         <StatCard label="Revenue" value={formatCurrency(analytics.revenueCents)} icon="dollar-sign" accent={GOLD} style={{ minWidth: 120 }} />
         <StatCard label="Units Sold" value={String(analytics.unitsSold)} icon="shopping-bag" accent={theme.accent} style={{ minWidth: 120 }} />
         <StatCard label="Page Views" value={String(analytics.pageViews)} icon="eye" accent={theme.secondary} style={{ minWidth: 120 }} />
-        <StatCard label="Add to Cart" value={String(analytics.addToCartCount)} icon="shopping-cart" accent={BLUE} style={{ minWidth: 120 }} />
+        <StatCard label="Add to Bag" value={String(analytics.addToCartCount)} icon="shopping-cart" accent={BLUE} style={{ minWidth: 120 }} />
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
         <StatCard label="Conversion" value={`${(analytics.conversionRate * 100).toFixed(1)}%`} icon="trending-up" accent={SUCCESS} style={{ minWidth: 120 }} />

@@ -156,7 +156,6 @@ describe('seller bar full-screen deny-list', () => {
   // (position: absolute) would overlay their own bottom-anchored controls.
   const mustHideBar = [
     'create-post',
-    'camera-capture',
     'add-product',
     'plans',
     'design-canvas',

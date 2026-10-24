@@ -168,7 +168,7 @@ function BuyerTabLayout() {
 
       {/* No slot of their own — reached from Home, Profile or Inbox. */}
       <Tabs.Screen name="friends" options={{ title: 'Friends', href: null }} />
-      <Tabs.Screen name="cart" options={{ title: 'Cart', href: null }} />
+      <Tabs.Screen name="cart" options={{ title: 'Bag', href: null }} />
       <Tabs.Screen name="orders" options={{ title: 'Orders', href: null }} />
       <Tabs.Screen name="following" options={{ title: 'Following', href: null }} />
       <Tabs.Screen name="edit-profile" options={{ title: 'Edit profile', href: null }} />

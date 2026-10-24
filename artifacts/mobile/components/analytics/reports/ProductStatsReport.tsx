@@ -33,12 +33,12 @@ export default function ProductStatsReport() {
   return (
     <InsightFrame title="Product stats" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
-        <EmptyState icon="shopping-bag" title="No product activity" description={range === 'all' ? 'Product views, add-to-carts and purchases show here once shoppers find your products.' : 'No product views, add-to-carts or purchases in this period. Try a longer range.'} />
+        <EmptyState icon="shopping-bag" title="No product activity" description={range === 'all' ? 'Product views, add-to-bags and purchases show here once shoppers find your products.' : 'No product views, add-to-bags or purchases in this period. Try a longer range.'} />
       ) : (
         <>
           <KpiGrid range={range} items={[
             { key: 'views', label: 'Product views', value: formatCompactCount(t!.views), changePct: data.deltas.viewsPct, featured: true },
-            { key: 'carts', label: 'Added to cart', value: formatCompactCount(t!.addToCarts), changePct: data.deltas.addToCartsPct },
+            { key: 'carts', label: 'Added to bag', value: formatCompactCount(t!.addToCarts), changePct: data.deltas.addToCartsPct },
             { key: 'buys', label: 'Purchases', value: formatCompactCount(t!.purchases), changePct: data.deltas.purchasesPct },
             { key: 'rev', label: 'Product revenue', value: formatMoney(t!.revenueCents), changePct: data.deltas.revenuePct },
           ]} />
@@ -52,8 +52,8 @@ export default function ProductStatsReport() {
           <Card padded>
             {[
               { label: 'Viewed a product', value: t!.views, rate: null as string | null },
-              { label: 'Added to cart', value: t!.addToCarts, rate: t!.viewToCartPct === null ? null : `${t!.viewToCartPct}% of views` },
-              { label: 'Purchased', value: t!.purchases, rate: t!.cartToPurchasePct === null ? null : `${t!.cartToPurchasePct}% of carts` },
+              { label: 'Added to bag', value: t!.addToCarts, rate: t!.viewToCartPct === null ? null : `${t!.viewToCartPct}% of views` },
+              { label: 'Purchased', value: t!.purchases, rate: t!.cartToPurchasePct === null ? null : `${t!.cartToPurchasePct}% of bags` },
             ].map((step, i) => (
               <View key={step.label} style={{ marginTop: i ? SP.md : 0 }}>
                 <View style={s.rowBetween}>
@@ -76,7 +76,7 @@ export default function ProductStatsReport() {
                   thumbnailUrl={p.imageUrl}
                   icon="shopping-bag"
                   title={p.name}
-                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
+                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} bags · ${p.purchases} sold`}
                   value={formatMoney(p.revenueCents)}
                   valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}

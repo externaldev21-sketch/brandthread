@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -8,12 +8,10 @@ const routeFlag = readFileSync(resolve(process.cwd(), 'lib/sellerActivityRoute.t
 
 /**
  * Dev: add an Activity card to the Studio carousel, right after Analytics,
- * opening /seller-activity (built in parallel by another session). Since
- * that route doesn't exist on this branch yet and there's no runtime way to
- * ask Expo Router "does this route exist" (routes resolve from the file
- * system at build time), the card is gated behind a single boolean flag
- * (lib/sellerActivityRoute.ts) rather than shown unconditionally — flipping
- * that flag to true is the only change needed once the route lands.
+ * opening /seller-activity. There's no runtime way to ask Expo Router "does
+ * this route exist" (routes resolve from the file system at build time), so
+ * the card is gated behind a single boolean flag (lib/sellerActivityRoute.ts);
+ * the route has landed and the flag is now on.
  */
 describe('Studio carousel: Activity card, gated behind the /seller-activity route existing', () => {
   it('defines the activity item (label, icon, route) behind SELLER_ACTIVITY_ROUTE_LIVE in sellerControlCenter.ts', () => {
@@ -35,9 +33,11 @@ describe('Studio carousel: Activity card, gated behind the /seller-activity rout
     expect(orderBlock.indexOf("'activity'")).toBeLessThan(orderBlock.indexOf("'payouts'"));
   });
 
-  it('the flag defaults to false (route not live yet) with a doc comment explaining why and when to flip it', () => {
-    expect(routeFlag).toContain('export const SELLER_ACTIVITY_ROUTE_LIVE = false;');
+  it('the flag is true now that app/seller-activity.tsx exists, with a doc comment explaining the gate', () => {
+    expect(routeFlag).toContain('export const SELLER_ACTIVITY_ROUTE_LIVE = true;');
     expect(routeFlag).toContain('/seller-activity');
+    // The flag must never point the card at a route that isn't there.
+    expect(existsSync(resolve(process.cwd(), 'app/seller-activity.tsx'))).toBe(true);
   });
 
   it('has its own per-card micro-animation entry, same as every other card', () => {

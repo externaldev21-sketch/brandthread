@@ -208,7 +208,7 @@ export default function LoyaltyScreen() {
           >
              {redeeming
                ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
+               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Bag</Text>
             }
           </TouchableOpacity>
           <Text style={s.redeemDisabledNote}>Choose your points in your cart when you’re ready to check out.</Text>

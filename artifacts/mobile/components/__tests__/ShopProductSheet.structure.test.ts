@@ -13,7 +13,7 @@ const cartSource = readFileSync(
 
 describe('Thread shop drawer purchase actions', () => {
   it('labels cart with its icon; Buy now is text-only (no icon)', () => {
-    expect(sheetSource).toContain("phase === 'added' ? 'View cart' : 'Add to cart'");
+    expect(sheetSource).toContain("phase === 'added' ? 'View bag' : 'Add to bag'");
     expect(sheetSource).toContain('<Icon name="shopping-cart"');
     expect(sheetSource).toContain('<Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>');
     // Buy now dropped its circle-arrow icon — text only (single-product
@@ -57,8 +57,8 @@ describe('Thread shop drawer purchase actions', () => {
 
   it('keeps the product visible after adding and offers a direct View cart action', () => {
     expect(sheetSource).toContain("setShowAddedConfirmation(true)");
-    expect(sheetSource).toContain('<Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to cart</Text>');
-    expect(sheetSource).toContain("phase === 'added' ? 'View cart' : 'Add to cart'");
+    expect(sheetSource).toContain('<Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to bag</Text>');
+    expect(sheetSource).toContain("phase === 'added' ? 'View bag' : 'Add to bag'");
     expect(sheetSource).toContain("router.push('/(buyer)/cart'");
     expect(sheetSource).not.toContain('setFlyingToCart(false);\\n      dismissSheet(onClose)');
   });
