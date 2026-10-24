@@ -6,7 +6,7 @@
  *   top-left   host avatar · name, Follow pill under the name
  *   top-right  viewer-count pill · round chevron-down to leave
  *   right      More · Share · Shop (icon over a small label)
- *   bottom     chat rows (avatar, name, message) · "Say something..."
+ *   bottom     chat rows (avatar, name, message) · "Add a comment…"
  *              · the item being sold · one full-width Buy now pill
  *
  * Whatnot's yellow becomes white with black text; red is used only for the
@@ -201,7 +201,7 @@ export function LiveChatList({ messages, onLongPressMessage }: {
   );
 }
 
-// ─── "Say something..." ─────────────────────────────────────────────────────
+// ─── "Add a comment…" ───────────────────────────────────────────────────────
 
 export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => Promise<void> | void; disabled?: boolean }) {
   const [text, setText] = useState('');
@@ -220,14 +220,14 @@ export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => 
         value={text}
         onChangeText={setText}
         onSubmitEditing={() => { void submit(); }}
-        placeholder="Say something..."
+        placeholder="Add a comment…"
         placeholderTextColor={MEDIA.fgMuted}
         editable={!disabled}
         maxLength={300}
         returnKeyType="send"
         blurOnSubmit={false}
         style={styles.input}
-        accessibilityLabel="Say something in the live chat"
+        accessibilityLabel="Add a comment to the live chat"
         testID="live-comment-input"
       />
       {canSend && (
@@ -270,7 +270,7 @@ export function LiveProductCard({
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
           <Text style={styles.productMeta} numberOfLines={1}>
-            {product.remainingUnits != null ? `${product.remainingUnits} left` : 'Buy now'}
+            {product.remainingUnits === 0 ? 'Sold out' : product.remainingUnits != null ? `${product.remainingUnits} left` : 'Buy now'}
             {product.sizes?.length ? ` · ${product.sizes.length} sizes` : ''}
           </Text>
         </View>
@@ -284,6 +284,7 @@ export function LiveProductCard({
         disabled={action.disabled}
         style={[styles.buyBtn, action.disabled && { opacity: 0.5 }]}
         accessibilityRole="button"
+        accessibilityState={{ disabled: !!action.disabled }}
         accessibilityLabel={`${action.label}: ${product.name}`}
         testID={action.testID ?? 'live-buy'}
       >

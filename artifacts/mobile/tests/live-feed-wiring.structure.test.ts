@@ -38,7 +38,9 @@ describe('LIVE route', () => {
     for (const piece of ['<LiveHostRow', '<LiveTopRight', '<LiveChatList', '<LiveProductCard', '<LiveRail', '<LiveHeartLayer', '<LiveChatInput', '<LiveRtcVideo']) {
       expect(live).toContain(piece);
     }
-    expect(overlays).toContain('placeholder="Say something..."');
+    // One composer string across every live viewer (pager + old show link).
+    expect(overlays).toContain('placeholder="Add a comment…"');
+    expect(read('components/live/LiveAuctionCheckoutViewer.tsx')).toContain('placeholder="Add a comment…"');
     expect(overlays).toContain('Follow');
     expect(overlays).toContain('LIVE');
     // Chat bounds visible rows and animates each arriving message.
@@ -116,5 +118,39 @@ describe('Entry points', () => {
   it('Messages rows ring live people and tapping the avatar opens their live', () => {
     expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={-2} pressToWatch>');
     expect(inbox).toContain('<LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>');
+  });
+});
+
+describe('Viewer states (audit round 2)', () => {
+  it('a failed load can be retried from the empty state', () => {
+    const pagerHook = read('lib/live/useLivePager.ts');
+    expect(pagerHook).toContain('const refresh = useCallback(() => { void load(); }, [load]);');
+    expect(pagerHook).toMatch(/removeStream, refresh,\n\s*\};/);
+    expect(live).toContain("actionLabel={pager.error ? 'Try again' : 'Back'}");
+    expect(live).toContain('onAction={pager.error ? pager.refresh : close}');
+  });
+
+  it('a sold-out piece reads "Sold out" and cannot be bought', () => {
+    expect(live).toContain("pinned.remainingUnits === 0\n              ? { label: 'Sold out', onPress: () => {}, disabled: true }");
+    expect(overlays).toContain("product.remainingUnits === 0 ? 'Sold out'");
+    const sheet = read('components/live/LiveProductsSheet.tsx');
+    expect(sheet).toContain("{ label: 'Sold out', onPress: () => {}, disabled: true }");
+    expect(sheet).toContain('disabled={action.disabled}');
+  });
+
+  it('the old show link has explicit error and not-available states instead of an empty live UI', () => {
+    const viewer = read('components/live/LiveAuctionCheckoutViewer.tsx');
+    expect(viewer).toContain('testID="buyer-live-error"');
+    expect(viewer).toContain('testID="buyer-live-retry"');
+    expect(viewer).toContain('testID="buyer-live-unavailable"');
+    expect(viewer).toContain("setLoadError(friendlyError(e, 'We couldn’t load this live. Try again.'))");
+    expect(viewer).not.toContain('The replay will appear in the feed shortly.');
+    expect(viewer).toContain('/live-replays?sellerId=');
+    expect(viewer).toContain('{ bottom: 155 + insets.bottom }');
+  });
+
+  it('replay links without an id say the link is incomplete', () => {
+    expect(read('app/live-replay.tsx')).toContain("setError('no-link')");
+    expect(read('app/live-replays.tsx')).toContain('title="Replays not available"');
   });
 });

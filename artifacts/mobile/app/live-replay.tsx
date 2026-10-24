@@ -50,14 +50,14 @@ export default function LiveReplayScreen() {
   const [replay, setReplay] = useState<ShoppableReplay | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<'missing' | 'network' | null>(null);
+  const [error, setError] = useState<'no-link' | 'missing' | 'network' | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [attempt, setAttempt] = useState(0);
   const { openReport } = useReportSheet();
 
   useEffect(() => {
-    if (!streamId) { setLoading(false); setError('missing'); return undefined; }
+    if (!streamId) { setLoading(false); setError('no-link'); return undefined; }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -156,7 +156,11 @@ export default function LiveReplayScreen() {
         <EmptyState
           icon="video-off"
           title={error === 'network' ? "Couldn't load this replay" : 'Replay not available'}
-          description={error === 'network' ? 'Check your connection and try again.' : 'It may have been removed by the host.'}
+          description={error === 'network'
+            ? 'Check your connection and try again.'
+            : error === 'no-link'
+              ? 'This link is incomplete. Open the replay again from the seller’s profile.'
+              : 'It may have been removed by the host.'}
           action={error === 'network' ? { label: 'Try again', onPress: () => setAttempt(n => n + 1) } : undefined}
         />
       ) : (
