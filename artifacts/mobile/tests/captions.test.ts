@@ -50,3 +50,22 @@ describe('autoCaptions wiring', () => {
     expect(read('app/_layout.tsx')).toContain('name="post-captions-edit"');
   });
 });
+
+describe('post-captions-edit screen states', () => {
+  const src = read('app/post-captions-edit.tsx');
+
+  it('a failed captions fetch shows an error with retry, not the "No captions yet" empty state', () => {
+    expect(src).toContain("setPhase('error');");
+    expect(src).toContain("Couldn't load captions");
+    expect(src).toContain('testID="retry-load-captions"');
+  });
+
+  it('asks before discarding unsaved caption edits on back', () => {
+    expect(src).toContain("navigation.addListener('beforeRemove'");
+    expect(src).toContain('confirmAlert({');
+    expect(src).toContain("title: 'Discard caption edits?'");
+    expect(src).toContain('onBack={() => { void handleBack(); }}');
+    // A successful save leaves without the prompt.
+    expect(src).toMatch(/applyTrack\(updated\);\s*allowLeaveRef\.current = true;\s*goBackOr\(router\);/);
+  });
+});

@@ -428,6 +428,9 @@ export default function SellerStudioRadialMenu({
   const [open, setOpen] = useState(false);
   const resumeCardOnOpenRef = useRef(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
+  // A Growth card opened while the plan check is still loading: decided once
+  // the plan resolves instead of upselling a seller who may already pay.
+  const [pendingPlanItem, setPendingPlanItem] = useState<ControlCenterItem | null>(null);
 
   const [brandName, setBrandName] = useState<string | null>(null);
   // The seller's own account name/username — always populated by Clerk at
@@ -732,6 +735,33 @@ export default function SellerStudioRadialMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  /** Plan gate (plan already resolved) then navigation for a chosen card. */
+  const routeOrUpsell = useCallback((item: ControlCenterItem) => {
+    if (
+      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
+      item.growthOnly &&
+      (!!planError || !hasPlan('growth'))
+    ) {
+      if (planError) retryPlan();
+      setUpsellFeature(item.label);
+      return;
+    }
+    setNextPushAnimationNone();
+    // Retain explicit legacy origin handoffs and the general pop-to-menu tracking.
+    markStudioTileOpened(pathname, item.route);
+    if (item.id === 'payouts') {
+      router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'analytics') {
+      router.push({ pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'content') {
+      router.push({ pathname: '/content', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'community') {
+      router.push({ pathname: '/community', params: { from: STUDIO_MENU_ORIGIN } });
+    } else {
+      router.push(item.route as never);
+    }
+  }, [planError, hasPlan, retryPlan, router, pathname]);
+
   /** Release-to-select / tap-to-select: no closing animation at all — the
    *  page is just gone, in the same frame the navigation fires, per spec
    *  ("no slide, fade or delay"). */
@@ -755,30 +785,20 @@ export default function SellerStudioRadialMenu({
     labelExit.value = 0;
     setEntering(false);
     setOpen(false);
-    if (
-      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
-      item.growthOnly &&
-      (planLoading || !!planError || !hasPlan('growth'))
-    ) {
-      if (planError) retryPlan();
-      setUpsellFeature(item.label);
+    if (GROWTH_PLAN_ENFORCEMENT_ENABLED && item.growthOnly && planLoading) {
+      setPendingPlanItem(item);
       return;
     }
-    setNextPushAnimationNone();
-    // Retain explicit legacy origin handoffs and the general pop-to-menu tracking.
-    markStudioTileOpened(pathname, item.route);
-    if (item.id === 'payouts') {
-      router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
-    } else if (item.id === 'analytics') {
-      router.push({ pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN } });
-    } else if (item.id === 'content') {
-      router.push({ pathname: '/content', params: { from: STUDIO_MENU_ORIGIN } });
-    } else if (item.id === 'community') {
-      router.push({ pathname: '/community', params: { from: STUDIO_MENU_ORIGIN } });
-    } else {
-      router.push(item.route as never);
-    }
-  }, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading, planError, hasPlan, retryPlan, router, pathname]);
+    routeOrUpsell(item);
+  }, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading, routeOrUpsell]);
+
+  // Resolve a card held back by the plan check as soon as the plan loads.
+  useEffect(() => {
+    if (planLoading || !pendingPlanItem) return;
+    const item = pendingPlanItem;
+    setPendingPlanItem(null);
+    routeOrUpsell(item);
+  }, [planLoading, pendingPlanItem, routeOrUpsell]);
 
   // ── Gestures ─────────────────────────────────────────────────────────────────
   // Horizontal = scrub through cards, vertical = dismiss, near-zero movement

@@ -3,7 +3,7 @@
 // live camera with floating chrome. Layout follows TikTok's camera 1:1 —
 // X top-left, title pill top-center, icon rail on the right, swipeable
 // duration chips above a big round shutter, camera-roll thumb bottom-left,
-// flip bottom-right — reskinned to black/white/silver (LIVE red only for the
+// flip in the right rail — reskinned to black/white/silver (LIVE red only for the
 // recording state).
 //
 // `create-post.tsx` renders this as its opening step and owns what happens
@@ -494,7 +494,7 @@ export function CreateCamera({
       {/* ── Right rail: flip · flash · timer (icons only) ── */}
       {!isRecording ? (
         <View style={[s.rail, { top: topInset + 64 }]} pointerEvents="box-none">
-          <Pressable style={s.railBtn} onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))} accessibilityLabel="Flip camera" accessibilityRole="button">
+          <Pressable style={s.railBtn} onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))} accessibilityLabel="Flip camera" accessibilityRole="button" testID="create-camera-flip">
             <Icon name="refresh-cw" size={22} color={theme.text} style={shadow} />
           </Pressable>
           <Pressable style={s.railBtn} onPress={() => setFlash((v) => (v === 'off' ? 'on' : 'off'))} accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'} accessibilityRole="button">
@@ -513,7 +513,7 @@ export function CreateCamera({
         </View>
       ) : null}
 
-      {/* ── Bottom cluster: error · chips · roll · shutter · flip ── */}
+      {/* ── Bottom cluster: error · chips · roll · shutter ── */}
       <View style={[s.bottom, { paddingBottom: bottomPad }]} pointerEvents="box-none">
         {captureError ? (
           <Text style={[s.errorText, { color: theme.muted }, shadow]} accessibilityLiveRegion="polite">{captureError}</Text>
@@ -611,18 +611,9 @@ export function CreateCamera({
             />
           </Pressable>
 
-          {/* Flip (bottom-right) */}
-          {!isRecording ? (
-            <Pressable
-              style={[s.flip, { borderColor: theme.border, backgroundColor: CREATE_CANVAS.black }]}
-              onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))}
-              accessibilityLabel="Flip camera"
-              accessibilityRole="button"
-              testID="create-camera-flip"
-            >
-              <Icon name="refresh-cw" size={20} color={theme.text} />
-            </Pressable>
-          ) : <View style={s.flipSpacer} />}
+          {/* Flip lives only in the right rail (matches the other camera
+              screens); this spacer keeps the shutter row balanced. */}
+          <View style={s.flipSpacer} />
         </View>
       </View>
     </View>
@@ -684,8 +675,4 @@ const s = StyleSheet.create({
   flipSpacer: { position: 'absolute', right: 28, width: 44, height: 44 },
   shutter: { width: SHUTTER, height: SHUTTER, alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: SHUTTER_INNER, height: SHUTTER_INNER },
-  flip: {
-    position: 'absolute', right: 28, width: 44, height: 44, borderRadius: RADII.full, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-  },
 });

@@ -1,6 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal, Image } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Modal, Image, ActivityIndicator } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { showAlert } from '@/lib/actionSheet';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -8,7 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { getProjects, createProject, updateProject } from '@/services/designService';
 import { makeDurableUri } from '@/lib/imageUri';
 import { canvasPixelSize, buildImageLayer } from '@/lib/aiStudioCanvas';
@@ -53,9 +55,11 @@ const SIZE_PRESETS: SizePreset[] = [
 export default function AIStudioScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [newCanvasVisible, setNewCanvasVisible] = useState(false);
+  // New-canvas sheet tab: preset sizes, or an image already on the clipboard.
+  const [sheetTab, setSheetTab] = useState<'custom' | 'clipboard'>('custom');
+  const [clipState, setClipState] = useState<'checking' | 'has_image' | 'empty' | 'unsupported'>('checking');
   const [projects, setProjects] = useState<DesignProject[] | null>(null);
   const [projectsError, setProjectsError] = useState(false);
   // Content ends above the floating tab bar (shared app-wide rule).
@@ -81,10 +85,10 @@ export default function AIStudioScreen() {
     try {
       const proj = await createProject('canvas', preset.label, { ...canvasPixelSize(preset.dims), backgroundHex: '#FFFFFF' });
       router.push(`/design-canvas?id=${proj.id}` as never);
-    } catch { Alert.alert('Error', 'Could not create canvas.'); }
+    } catch { showAlert('Error', 'Could not create canvas.'); }
   }
 
-  async function openImageCanvas(asset: ImagePicker.ImagePickerAsset, name: string) {
+  async function openImageCanvas(asset: { uri: string; width?: number; height?: number }, name: string) {
     try {
       const uri = await makeDurableUri(asset.uri);
       const width = asset.width || 1080, height = asset.height || 1080;
@@ -93,17 +97,55 @@ export default function AIStudioScreen() {
         layers: [buildImageLayer({ id: `uid_${Date.now()}`, name, uri, width, height, now: new Date().toISOString() })],
       });
       router.push(`/design-canvas?id=${proj.id}` as never);
-    } catch { Alert.alert('Error', 'Could not import photo.'); }
+    } catch { showAlert('Error', 'Could not import photo.'); }
+  }
+
+  function openNewCanvasSheet() {
+    setSheetTab('custom');
+    setNewCanvasVisible(true);
+  }
+
+  async function checkClipboard() {
+    setClipState('checking');
+    try {
+      setClipState((await Clipboard.hasImageAsync()) ? 'has_image' : 'empty');
+    } catch {
+      setClipState('unsupported');
+    }
+  }
+
+  function switchSheetTab(tab: 'custom' | 'clipboard') {
+    Haptics.selectionAsync().catch(() => {});
+    setSheetTab(tab);
+    if (tab === 'clipboard') void checkClipboard();
+  }
+
+  async function createFromClipboard() {
+    let img: Awaited<ReturnType<typeof Clipboard.getImageAsync>>;
+    try {
+      img = await Clipboard.getImageAsync({ format: 'png' });
+    } catch {
+      img = null;
+    }
+    if (!img?.data) {
+      setClipState('empty');
+      showAlert('No image on your clipboard', 'Copy an image, then try again.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setNewCanvasVisible(false);
+    const uri = img.data.startsWith('data:') ? img.data : `data:image/png;base64,${img.data}`;
+    await openImageCanvas({ uri, width: img.size?.width, height: img.size?.height }, 'From Clipboard');
   }
 
   async function importFromLibrary() {
     let res: ImagePicker.ImagePickerResult;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to import artwork.'); return; }
+      if (!perm.granted) { showAlert('Permission needed', 'Allow photo access to import artwork.'); return; }
       res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
     } catch {
-      Alert.alert("Couldn't open your photos", 'Please try again.');
+      showAlert("Couldn't open your photos", 'Please try again.');
       return;
     }
     if (!res.canceled) {
@@ -116,10 +158,10 @@ export default function AIStudioScreen() {
     let res: ImagePicker.ImagePickerResult;
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
+      if (!perm.granted) { showAlert('Permission needed', 'Allow camera access to take a photo.'); return; }
       res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
     } catch {
-      Alert.alert("Couldn't open the camera", 'Please try again.');
+      showAlert("Couldn't open the camera", 'Please try again.');
       return;
     }
     if (!res.canceled) {
@@ -142,7 +184,6 @@ export default function AIStudioScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
             accessibilityRole="button"
             accessibilityState={{ selected: mode === 'ai' }}
-            hitSlop={{ top: 5, bottom: 5 }}
           >
             <Icon name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>Generate</Text>
@@ -154,7 +195,6 @@ export default function AIStudioScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
             accessibilityRole="button"
             accessibilityState={{ selected: mode === 'manual' }}
-            hitSlop={{ top: 5, bottom: 5 }}
           >
             <Icon name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
             <Text style={[styles.modeBtnText, { color: mode === 'manual' ? colors.foreground : colors.mutedForeground }]}>Manual Design</Text>
@@ -180,7 +220,7 @@ export default function AIStudioScreen() {
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="New canvas"
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
-              onPress={() => { setNewCanvasVisible(true); }}
+              onPress={openNewCanvasSheet}
             >
               <Icon name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>
@@ -199,7 +239,7 @@ export default function AIStudioScreen() {
               icon="edit-3"
               title="No designs yet"
               description="Start a canvas or import artwork."
-              action={{ label: 'New canvas', onPress: () => setNewCanvasVisible(true) }}
+              action={{ label: 'New canvas', onPress: openNewCanvasSheet }}
               style={{ marginTop: 24 }}
             />
           ) : (
@@ -221,7 +261,11 @@ export default function AIStudioScreen() {
                         backgroundColor: p.canvas.backgroundHex || '#FFFFFF',
                         ...(ratio >= 1 ? { width: '90%' } : { height: '90%' }),
                       }]}>
-                        {!p.thumbnail && <Icon name="image" size={18} color={colors.mutedForeground} />}
+                        {p.thumbnail ? (
+                          <Image source={{ uri: p.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+                        ) : (
+                          <Icon name="image" size={18} color={colors.mutedForeground} />
+                        )}
                       </View>
                     </View>
                     <Text style={[styles.canvasLabel, { color: colors.foreground }]} numberOfLines={1}>{p.name || 'Untitled design'}</Text>
@@ -265,18 +309,16 @@ export default function AIStudioScreen() {
             }
             if (tool.label === 'Tech Pack Generator') {
               router.push('/tech-pack-generator' as never);
-              return;
             }
-            setSelected(tool.label);
           }}
           activeOpacity={0.75}
           style={[
             styles.toolRow,
-            { backgroundColor: colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
+            { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? colors.accent : colors.secondary }]}>
-            <Icon name={tool.icon} size={18} color={selected === tool.label ? colors.primary : colors.mutedForeground} />
+          <View style={[styles.toolIcon, { backgroundColor: colors.secondary }]}>
+            <Icon name={tool.icon} size={18} color={colors.mutedForeground} />
           </View>
           <View style={styles.toolInfo}>
             <Text style={[styles.toolLabel, { color: colors.foreground }]}>{tool.label}</Text>
@@ -310,11 +352,55 @@ export default function AIStudioScreen() {
               </TouchableOpacity>
 
               <Text style={[styles.sheetTitle, { color: colors.foreground }]}>New canvas</Text>
-              <View style={styles.sheetSubRow}>
-                <Text style={[styles.sheetSubActive, { color: colors.foreground }]}>Custom Size</Text>
-                <Text style={[styles.sheetSubMuted, { color: colors.mutedForeground }]}>From Clipboard</Text>
+              <View style={styles.sheetSubRow} accessibilityRole="tablist">
+                {([['custom', 'Custom Size'], ['clipboard', 'From Clipboard']] as const).map(([id, label]) => {
+                  const on = sheetTab === id;
+                  return (
+                    <TouchableOpacity
+                      key={id}
+                      onPress={() => switchSheetTab(id)}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: on }}
+                      hitSlop={14}
+                      testID={`ai-studio-sheet-tab-${id}`}
+                    >
+                      <Text style={[on ? styles.sheetSubActive : styles.sheetSubMuted, { color: on ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
+              {sheetTab === 'clipboard' ? (
+                clipState === 'checking' ? (
+                  <View style={styles.clipStatus}><ActivityIndicator color={colors.mutedForeground} /></View>
+                ) : clipState === 'has_image' ? (
+                  <TouchableOpacity
+                    style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
+                    activeOpacity={0.7}
+                    onPress={() => { void createFromClipboard(); }}
+                    accessibilityRole="button"
+                    testID="ai-studio-clipboard-create"
+                  >
+                    <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>New canvas from clipboard image</Text>
+                    <Icon name="clipboard" size={16} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.clipStatus}>
+                    <Text style={[styles.sheetRowLabel, { color: colors.foreground, textAlign: 'center' }]}>
+                      {clipState === 'unsupported' ? "Can't read the clipboard here" : 'No image on your clipboard'}
+                    </Text>
+                    <Text style={[styles.sheetRowDims, { color: colors.mutedForeground, textAlign: 'center', marginTop: SP.xs }]}>
+                      {clipState === 'unsupported' ? 'Import the image from your photos instead.' : 'Copy an image, then check again.'}
+                    </Text>
+                    {clipState === 'empty' ? (
+                      <TouchableOpacity onPress={() => { void checkClipboard(); }} accessibilityRole="button" hitSlop={14} style={{ marginTop: SP.md }}>
+                        <Text style={[styles.sheetSubActive, { color: colors.foreground }]}>Check again</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                )
+              ) : (
+              <>
               <TouchableOpacity
                 style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
                 activeOpacity={0.7}
@@ -342,6 +428,8 @@ export default function AIStudioScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+              </>
+              )}
             </SheetRise>
           </View>
         </ModalSafeArea>
@@ -361,44 +449,45 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: FS.md, fontFamily: FONT.semibold, marginBottom: 12 },
 
   modeRow: { paddingHorizontal: 20, marginBottom: 16 },
-  modeSwitch: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 4 },
-  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 8 },
+  modeSwitch: { flexDirection: 'row', borderRadius: RADIUS.md, padding: 3, gap: SP.xs },
+  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: RADIUS.sm },
   modeBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 
-  manualTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  manualLinks: { flexDirection: 'row', gap: 18 },
+  manualTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
+  manualLinks: { flexDirection: 'row', gap: SP.md },
   manualLink: { fontSize: FS.sm, fontFamily: FONT.semibold },
   // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 34x34.
   newCanvasBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
-  canvasTile: { width: '100%', height: 110, borderRadius: 8, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  canvasTile: { width: '100%', height: 110, borderRadius: RADIUS.sm, borderWidth: 1, marginBottom: SP.sm, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   canvasLabel: { fontSize: FS.xs, fontFamily: FONT.semibold },
   canvasDims: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
-  toolIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, marginBottom: SP.sm, gap: 12 },
+  toolIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },
   toolLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   toolDesc: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  toolBadge: { paddingHorizontal: SP.sm, paddingVertical: 2, borderRadius: RADIUS.sm },
   toolBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
 
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
-  sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: SP.lg, borderBottomLeftRadius: RADIUS.lg, borderBottomRightRadius: RADIUS.lg },
   sheetCancel: { position: 'absolute', top: 16, right: 20 },
   sheetCancelText: { fontSize: FS.md, fontFamily: FONT.regular },
   sheetTitle: { fontSize: FS.h2, fontFamily: FONT.bold, marginBottom: 8 },
-  sheetSubRow: { flexDirection: 'row', gap: 18, marginBottom: 16 },
+  sheetSubRow: { flexDirection: 'row', gap: SP.md, marginBottom: SP.md },
   sheetSubActive: { fontSize: FS.sm, fontFamily: FONT.semibold },
   sheetSubMuted: { fontSize: FS.sm, fontFamily: FONT.regular },
-  sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 14 },
-  sheetGroup: { borderRadius: 12, overflow: 'hidden' },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.md, marginBottom: SP.md },
+  clipStatus: { alignItems: 'center', paddingVertical: SP.lg },
+  sheetGroup: { borderRadius: RADIUS.md, overflow: 'hidden' },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
   sheetRowBorder: { borderTopWidth: 1 },
   sheetRowLabel: { fontSize: FS.base, fontFamily: FONT.regular },
-  sheetRowRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  sheetRowRight: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   sheetRowProfile: { fontSize: FS.xs, fontFamily: FONT.regular },
   sheetRowDims: { fontSize: FS.sm, fontFamily: FONT.regular },
 });

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { Feather } from '@expo/vector-icons';
@@ -24,12 +24,14 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionH
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 import { radius } from '@/constants/radii';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
 const H_PAD   = 16;   // horizontal page padding (each side)
 const COL_GAP = 10;   // gap between columns
 const ROW_GAP = 10;   // gap between rows
+const PROJ_THUMB_SIZE = 52; // recent-project preview square
 
 function getColumns(screenWidth: number): number {
   if (screenWidth >= 600) return 3;
@@ -164,12 +166,16 @@ export default function StudioScreen() {
   // Plan upsell state
   const [upsellVisible,  setUpsellVisible]  = useState(false);
   const [upsellFeature,  setUpsellFeature]  = useState('');
+  // A Growth tool tapped while the plan check is still loading: held here and
+  // decided once the plan resolves, so paying sellers never see the upsell.
+  const [pendingTool,    setPendingTool]    = useState<StudioTool | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       return () => {
         setUpsellVisible(false);
         setUpsellFeature('');
+        setPendingTool(null);
       };
     }, []),
   );
@@ -207,14 +213,12 @@ export default function StudioScreen() {
     })();
   }, []);
 
-  const handleToolPress = useCallback(async (tool: StudioTool) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Gate Growth-only tools for Starter sellers
+  const openTool = useCallback((tool: StudioTool) => {
+    // Gate Growth-only tools for Starter sellers (plan already resolved here).
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
       GROWTH_REQUIRED_TOOLS.has(tool.id) &&
-      (planLoading || !!planError || !hasPlan('growth'))
+      (!!planError || !hasPlan('growth'))
     ) {
       if (planError) retryPlan();
       setUpsellFeature(tool.title);
@@ -227,7 +231,24 @@ export default function StudioScreen() {
       setOpenedFeatures(prev => [...prev, tool.id]);
       void markFeatureOpened(tool.id).catch(() => {});
     }
-  }, [router, hasPlan, planError, planLoading, retryPlan]);
+  }, [router, hasPlan, planError, retryPlan]);
+
+  const handleToolPress = useCallback((tool: StudioTool) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (GROWTH_PLAN_ENFORCEMENT_ENABLED && GROWTH_REQUIRED_TOOLS.has(tool.id) && planLoading) {
+      // Wait for the plan check instead of upselling a seller who may already pay.
+      setPendingTool(tool);
+      return;
+    }
+    openTool(tool);
+  }, [openTool, planLoading]);
+
+  useEffect(() => {
+    if (planLoading || !pendingTool) return;
+    const tool = pendingTool;
+    setPendingTool(null);
+    openTool(tool);
+  }, [planLoading, pendingTool, openTool]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -288,7 +309,9 @@ export default function StudioScreen() {
                   <View style={[s.toolIconBg, { backgroundColor: toolAccentDim }]}>
                     <Icon name={tool.icon} size={ICON.sm} color={toolAccent} />
                   </View>
-                  {isLocked ? (
+                  {pendingTool?.id === tool.id ? (
+                    <ActivityIndicator size="small" color={theme.muted} accessibilityLabel="Checking your plan" />
+                  ) : isLocked ? (
                     <LockBadge locked />
                   ) : tool.badge ? (
                     <NewFeatureBadge
@@ -348,12 +371,22 @@ export default function StudioScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${proj.name}`}
               >
-                <LinearGradient
-                  colors={theme.primaryGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.projThumb}
-                />
+                {/* Real preview: saved thumbnail, else the live layer composite;
+                    the gradient block only when there is no canvas data. */}
+                {proj.thumbnail ? (
+                  <Image source={{ uri: proj.thumbnail }} style={[s.projThumb, s.projThumbFrame]} resizeMode="cover" accessibilityIgnoresInvertColors />
+                ) : proj.canvas && Array.isArray(proj.layers) ? (
+                  <View style={[s.projThumb, s.projThumbFrame]}>
+                    <DesignLayerCompositor project={proj} displaySize={PROJ_THUMB_SIZE} borderRadius={RADIUS.xs} />
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={theme.primaryGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={s.projThumb}
+                  />
+                )}
                 <View style={s.projInfo}>
                   <Text style={s.projName} numberOfLines={1}>{proj.name}</Text>
                   <View style={s.projMeta}>
@@ -462,9 +495,9 @@ const makeStyles = (theme: any) => {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    gap: SP.xs,
+    paddingHorizontal: SP.sm + SP.xs,
+    paddingVertical: SP.sm,
     borderRadius: radius.sm,
     backgroundColor: accentDim,
     borderWidth: 1,
@@ -623,10 +656,16 @@ const makeStyles = (theme: any) => {
     padding: SP.md,
   },
   projThumb: {
-    width: 52,
-    height: 52,
+    width: PROJ_THUMB_SIZE,
+    height: PROJ_THUMB_SIZE,
     borderRadius: RADIUS.sm,
     flexShrink: 0,
+  },
+  projThumbFrame: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: background,
   },
   projInfo: {
     flex: 1,

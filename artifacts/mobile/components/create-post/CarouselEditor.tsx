@@ -203,7 +203,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
             {FILTER_PRESETS.map((p) => {
               const on = matchingPreset(live) === p.id;
               return (
-                <Pressable key={p.id} onPress={() => { tap(); setAdjust(p.adjust); }} style={ed.preset} accessibilityRole="button" accessibilityState={{ selected: on }} testID={`filter-${p.id}`}>
+                <Pressable key={p.id} onPress={() => { tap(); setAdjust(p.adjust); }} style={ed.preset} accessibilityRole="button" accessibilityLabel={`${p.label} filter`} accessibilityState={{ selected: on }} testID={`filter-${p.id}`}>
                   <Text style={[ed.presetLabel, { color: on ? CP.white : CP.silverDim }]}>{p.label}</Text>
                   <View style={[ed.presetThumb, on && { borderColor: CP.white }]}>
                     <SlideThumb slide={active} adjust={p.adjust} style={{ width: '100%', height: '100%' }} />
@@ -217,7 +217,11 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
         {tool === 'edit' && !editKey ? (
           <View style={ed.presetGrid}>
             {ADJUST_TOOLS.map((t) => (
-              <Pressable key={t.key} onPress={() => { tap(); setEditKey(t.key); setDraftValue(active.adjust); }} style={ed.preset} accessibilityRole="button" testID={`edit-${t.key}`}>
+              <Pressable key={t.key} onPress={() => { tap(); setEditKey(t.key); setDraftValue(active.adjust); }} style={ed.preset} accessibilityRole="button"
+                accessibilityLabel={t.label}
+                accessibilityState={{ selected: live[t.key] !== 0 }}
+                accessibilityValue={{ text: live[t.key] !== 0 ? String(live[t.key]) : 'Off' }}
+                testID={`edit-${t.key}`}>
                 <Text style={[ed.presetLabel, { color: live[t.key] ? CP.white : CP.silverDim }]}>{t.label}</Text>
                 <View style={[ed.toolCircle, live[t.key] !== 0 && { borderColor: CP.white }]}>
                   <Icon name={t.icon as any} size={22} color={CP.white} />

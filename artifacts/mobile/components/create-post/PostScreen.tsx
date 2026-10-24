@@ -196,7 +196,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
     <SubPage title="Edit cover" onBack={onBack} testID="cover-page">
       <ScrollView contentContainerStyle={s.coverGrid}>
         {media.slides.map((sl, i) => (
-          <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" accessibilityLabel={`Use slide ${i + 1} as cover`} testID={`cover-slide-${i}`}>
+          <Pressable key={sl.id} onPress={() => { tap(); onPick(i); }} style={[s.coverCell, i === media.coverIndex && s.coverCellOn]} accessibilityRole="button" accessibilityLabel={`Use slide ${i + 1} as cover`} accessibilityState={{ selected: i === media.coverIndex }} testID={`cover-slide-${i}`}>
             <CachedImage source={{ uri: sl.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             {i === media.coverIndex ? <View style={s.coverCheck}><Icon name="check" size={14} color={CP.black} /></View> : null}
           </Pressable>
@@ -653,7 +653,7 @@ export function PostScreen({
                 underlineColorAndroid="transparent"
               />
             </View>
-            <Pressable onPress={() => { if (media && !isPost) { tap(); setPage('cover'); } }} style={[s.cover, isPost && s.coverSmall, isPost && { order: -1 } as any, { aspectRatio: ratio }]} accessibilityRole="button" accessibilityLabel="Edit cover" testID="edit-cover" disabled={!media || isPost} {...({ dataSet: { textfitIgnore: '1' } } as object)}>
+            <Pressable onPress={() => { if (media && !isPost) { tap(); setPage('cover'); } }} style={[s.cover, isPost && s.coverSmall, isPost && { order: -1 } as any, { aspectRatio: ratio }]} accessibilityRole={media && !isPost ? 'button' : 'image'} accessibilityLabel={media && !isPost ? 'Edit cover' : 'Post cover'} testID="edit-cover" disabled={!media || isPost} {...({ dataSet: { textfitIgnore: '1' } } as object)}>
               {coverUri ? <CachedImage source={{ uri: coverUri }} style={StyleSheet.absoluteFill} contentFit="cover" />   : coverIsVideo ? <View style={[StyleSheet.absoluteFill, { backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center' }]}><Icon name="video" size={26} color={CP.silver} /></View> : null}
               {media && !isPost ? <Text style={s.coverLabel}>Edit cover</Text> : null}
             </Pressable>

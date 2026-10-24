@@ -159,8 +159,14 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
             onSwipe={() => {}}
             onCrop={(crop) => setSlides((prev) => prev.map((sl) => (sl.id === focused.id ? { ...sl, crop } : sl)))}
           />
+        ) : media.permission === 'denied' && !media.isWeb ? (
+          // Same denied state as the Thread gallery: copy plus a real Allow button.
+          <View style={s.deniedWrap} testID="picker-denied">
+            <Text style={s.previewHint}>Allow photo access to pick from your library</Text>
+            <PillButton label="Allow access" onPress={media.requestAccess} flex={false} style={{ marginTop: 16, paddingHorizontal: 28 }} testID="picker-allow-access" />
+          </View>
         ) : (
-          <Text style={s.previewHint}>{media.permission === 'denied' && !media.isWeb ? 'Allow photo access to pick from your library' : 'Choose photos or videos'}</Text>
+          <Text style={s.previewHint}>Choose photos or videos</Text>
         )}
       </View>
 
@@ -221,6 +227,7 @@ const s = StyleSheet.create({
   nextText: { fontFamily: FONT.bold, fontSize: 17 },
   preview: { height: 332, alignItems: 'center', justifyContent: 'center' },
   previewHint: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: 14 },
+  deniedWrap: { alignItems: 'center', paddingHorizontal: 24 },
   recentsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, height: 48 },
   recents: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   recentsText: { color: CP.white, fontFamily: FONT.bold, fontSize: 16 },
