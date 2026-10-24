@@ -23,6 +23,7 @@ import { encryptSecret, decryptSecret } from "../lib/shopifyCrypto";
 import { importShopifyProducts } from "../lib/shopify/productImport";
 import { registerWebhooksForConnection } from "../lib/shopify/webhooks";
 import { logger } from "../lib/logger";
+import { getSellerPayoutReadiness, payoutsNotReadyBody } from "../lib/payoutGate";
 
 const router = Router();
 router.use(requireAuth);
@@ -215,6 +216,11 @@ router.post("/products/import", requireRole("staff"), async (req, res) => {
   }
   if (publishStatus !== "draft" && publishStatus !== "active") {
     res.status(400).json({ error: "publishStatus must be 'draft' or 'active'" }); return;
+  }
+  if (publishStatus === "active") {
+    // Payout gate: imported listings can only go live once payouts are set up.
+    const payouts = await getSellerPayoutReadiness(ownerId);
+    if (!payouts.ready) { res.status(409).json(payoutsNotReadyBody(payouts)); return; }
   }
   const [row] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, ownerId)).limit(1);
   if (!row || row.status !== "connected") { res.status(400).json({ error: "Connect Shopify first" }); return; }

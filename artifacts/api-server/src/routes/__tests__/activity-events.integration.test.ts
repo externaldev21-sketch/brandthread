@@ -101,7 +101,7 @@ beforeAll(async () => {
     { clerkId: ownerId, email: `${ownerId}@test.local`, name: "Olive Owner", displayName: "Olive Owner", username: `olive_${suffix}`, accountType: "buyer", role: "buyer" },
     { clerkId: likerA, email: `${likerA}@test.local`, name: "Jay Park", displayName: "Jay Park", username: `jay_${suffix}`, accountType: "buyer", role: "buyer" },
     { clerkId: likerB, email: `${likerB}@test.local`, name: "Mina Cole", displayName: "Mina Cole", username: `mina_${suffix}`, accountType: "buyer", role: "buyer" },
-    { clerkId: sellerId, email: `${sellerId}@test.local`, name: "Seller", brandName: "North Loom", accountType: "seller", role: "owner" },
+    { clerkId: sellerId, email: `${sellerId}@test.local`, name: "Seller", brandName: "North Loom", accountType: "seller", role: "owner", stripeAccountId: `acct_${suffix}`, stripeAccountStatus: "active" },
     { clerkId: shopperId, email: `${shopperId}@test.local`, name: "Sam Shopper", displayName: "Sam Shopper", username: `sam_${suffix}`, accountType: "buyer", role: "buyer" },
   ]);
 

@@ -118,3 +118,6 @@ const styles = StyleSheet.create({
     height: 36,
   },
 });
+
+/** Shared with PayoutSetupCard so payout prompts use the same setup-card look. */
+export const setupCardStyles = styles;
