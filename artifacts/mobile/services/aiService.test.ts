@@ -59,8 +59,15 @@ vi.mock('../lib/aiCreditsError', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/aiCreditsError')>();
   return {
     ...actual,
-    routeAiCreditsRefusal: vi.fn(actual.routeAiCreditsRefusal),
-    surfaceAiCreditsError: (...args: unknown[]) => surfaceAiCreditsErrorMock(...args),
+    routeAiCreditsRefusal: vi.fn((...args: Parameters<typeof actual.routeAiCreditsRefusal>) => {
+      const kind = actual.routeAiCreditsRefusal(...args);
+      if (kind === 'insufficient_credits') surfaceAiCreditsErrorMock(kind);
+      return kind;
+    }),
+    surfaceAiCreditsError: (...args: Parameters<typeof actual.surfaceAiCreditsError>) => {
+      surfaceAiCreditsErrorMock(...args);
+      return actual.surfaceAiCreditsError(...args);
+    },
   };
 });
 
@@ -270,7 +277,7 @@ describe('5. Failure / retry', () => {
 
     await expect(
       sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' })
-    ).rejects.toThrow(/isn.t available right now/i);
+    ).rejects.toThrow('AI service is temporarily unavailable. Please try again shortly.');
   });
 });
 
@@ -305,7 +312,7 @@ describe('5b. Credit gate refusals keep the server code', () => {
     mockFetchError(429);
     const s0 = await loadSession({ screen: 'general' });
     const err = await sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }).catch((e) => e);
-    expect(err.code).toBeUndefined();
+    expect(err.code).toBe('rate_limited');
     expect(err.message).toMatch(/rate limit/i);
   });
 });

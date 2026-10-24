@@ -357,6 +357,63 @@ function AnalyticsRow({ label, value, detail }: { label: string; value: string; 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  engRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  engLabel: {
+    color: colors.mutedForeground,
+    fontSize: 13,
+    width: 110,
+  },
+  engBarBg: {
+    flex: 1,
+    height: 6,
+    backgroundColor: colors.background,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  engBarFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  engValue: {
+    color: colors.text,
+    fontSize: 12,
+    width: 50,
+    textAlign: 'right',
+  },
+  countryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  countryInitialsCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countryInitialsText: {
+    color: colors.mutedForeground,
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+  },
+  countryName: {
+    color: colors.text,
+    fontSize: 13,
+    width: 110,
+  },
+  countryPct: {
+    color: colors.text,
+    fontSize: 12,
+    width: 36,
+    textAlign: 'right',
+  },
   root: {
     flex: 1,
     backgroundColor: colors.background,

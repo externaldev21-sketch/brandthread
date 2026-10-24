@@ -32,3 +32,9 @@ Treat upstream “dead component” deletions as claims about the branch's origi
 **Why:** Newer screens can load supposedly unused components through dynamic `require()` calls that an import-only audit misses.
 
 **How to apply:** Search all tracked references, including lazy imports and `require()`, before accepting deletions. Retain live dependencies and use typechecking to catch unresolved modules.
+
+Verify browser-facing access restrictions with browser-style requests, not a bare HTTP client request.
+
+**Why:** A bare request returned 404 while the same app route served an interactive app shell with `Accept: text/html`. That 404 did not prove the pre-launch seal was active.
+
+**How to apply:** Send `Accept: text/html`, disable redirect following, and inspect the response body and Location header. Check the public root, an app route, and legal routes separately against the production-mode build and the published service.

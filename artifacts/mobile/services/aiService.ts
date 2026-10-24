@@ -379,7 +379,7 @@ export class AIServiceError extends Error {
   }
 }
 
-export const AI_DAILY_CAP_MESSAGE = 'Daily limit reached - resets tomorrow';
+export const AI_DAILY_CAP_MESSAGE = AI_CREDITS_ALERT_COPY.user_daily_cap.message;
 export const AI_NO_CREDITS_MESSAGE = "You're out of AI credits — add more to keep going.";
 export const AI_NETWORK_MESSAGE = "Couldn't reach Brandthread AI.";
 

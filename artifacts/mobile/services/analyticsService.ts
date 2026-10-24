@@ -279,10 +279,10 @@ export function mapProductionReport(data: any): ProductionAnalytics {
 
 export async function getContentAnalytics(_filter?: AnalyticsFilterState): Promise<ContentAnalytics> { return unavailable('Content'); }
 export async function getStoreAnalytics(filter?: AnalyticsFilterState): Promise<StoreAnalytics> {
-  return mapStoreReport(await analyticsRequest<any>('store', `/api/analytics/reports/store?${reportRangeQuery(filter)}`));
+  return mapStoreReport(await serviceRequest<any>(`/api/analytics/reports/store?${reportRangeQuery(filter)}`, {}, false));
 }
 export async function getMarketingAnalytics(filter?: AnalyticsFilterState): Promise<MarketingAnalytics> {
-  return mapMarketingReport(await analyticsRequest<any>('marketing', `/api/analytics/reports/marketing?${reportRangeQuery(filter)}`));
+  return mapMarketingReport(await serviceRequest<any>(`/api/analytics/reports/marketing?${reportRangeQuery(filter)}`, {}, false));
 }
 /** All-time push delivery + engagement totals for this store (aggregate only). */
 export async function getPushNotificationResults(): Promise<PushNotificationResults> {
@@ -298,14 +298,14 @@ export async function getPushNotificationResults(): Promise<PushNotificationResu
 }
 export async function getInventoryAnalytics(_filter?: AnalyticsFilterState): Promise<InventoryAnalytics> { return unavailable('Inventory'); }
 export async function getProductionAnalytics(filter?: AnalyticsFilterState): Promise<ProductionAnalytics> {
-  return mapProductionReport(await analyticsRequest<any>('production', `/api/analytics/reports/production?${reportRangeQuery(filter)}`));
+  return mapProductionReport(await serviceRequest<any>(`/api/analytics/reports/production?${reportRangeQuery(filter)}`, {}, false));
 }
 export async function getProfitAnalytics(filter?: AnalyticsFilterState): Promise<ProfitAnalytics> {
-  return mapProfitReport(await analyticsRequest<any>('profit', `/api/analytics/reports/profit?${reportRangeQuery(filter)}`));
+  return mapProfitReport(await serviceRequest<any>(`/api/analytics/reports/profit?${reportRangeQuery(filter)}`, {}, false));
 }
 /** Live Stripe balance plus the seller ledger's holds and allocations. */
 export async function getPayoutAnalytics(filter?: AnalyticsFilterState): Promise<PayoutAnalytics> {
-  const data = await analyticsRequest<any>('payouts', `/api/seller/analytics/payouts?period=${periodFor(filter)}`);
+  const data = await serviceRequest<any>(`/api/seller/analytics/payouts?period=${periodFor(filter)}`, {}, false);
   if (data?.stripeError) throw new Error("Couldn't load the live payout balance.");
   const next = data?.nextPayout;
   const money = (key: string, label: string, value: unknown) => metric(key, label, cents(value ?? 0, label), 'currency');
