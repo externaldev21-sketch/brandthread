@@ -11,7 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Ellipse, G, Path, Rect } from 'react-native-svg';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -34,9 +34,6 @@ import { MissingItemState } from '@/components/states/MissingItemState';
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
 
-const VIEWS = ['Front', 'Back', 'Detail', 'Flat Lay'] as const;
-type ViewTab = typeof VIEWS[number];
-
 const BG_OPTIONS = [
   { label: 'Black',  color: '#000000' },
   { label: 'White',  color: '#FFFFFF' },
@@ -57,7 +54,6 @@ export default function DesignMockupPreviewScreen() {
 
   const [project, setProject]       = useState<DesignProject | null>(null);
   const [loading, setLoading]       = useState(true);
-  const [activeView, setActiveView] = useState<ViewTab>('Front');
   const [bgColor, setBgColor]       = useState('#000000');
   const [shadow, setShadow]         = useState<ShadowStyle>('Soft');
   const [saving, setSaving]         = useState(false);
@@ -115,18 +111,36 @@ export default function DesignMockupPreviewScreen() {
       Alert.alert('Couldn’t capture mockup', 'Something went wrong capturing this preview. Please try again.');
       return;
     }
-    showActionSheet('Add to Product', 'Choose an option:', [
+    // Only "pick an existing product" exists: Add Product does not read a
+    // pending mockup, so a "Create new product" option opened a blank form.
+    showActionSheet('Add to Product', 'Pick the product this mockup should be added to.', [
       {
-        text: 'Existing product',
+        text: 'Choose product',
         onPress: () => router.push(('/(tabs)/products?pickForMockup=1&projectId=' + (project?.id ?? '')) as never),
-      },
-      {
-        text: 'Create new product',
-        onPress: () => router.push(('/add-product?mockupProjectId=' + (project?.id ?? '')) as never),
       },
       { text: 'Cancel', style: 'cancel', onPress: () => setPendingMockup(null) },
     ]);
   }, [project, router]);
+
+  // Shadow Style, drawn inside the garment SVG so it shows on every
+  // platform and is part of the saved/added mockup capture.
+  const renderShadow = (shapePath: string, groundY: number) => {
+    if (shadow === 'None') return null;
+    if (shadow === 'Drop') {
+      return <Path d={shapePath} fill="#000000" opacity={0.35} transform="translate(6, 8)" />;
+    }
+    if (shadow === 'Hard') {
+      return <Ellipse cx={100} cy={groundY} rx={66} ry={4} fill="#000000" opacity={0.6} />;
+    }
+    // Soft: stacked translucent ellipses read as a blurred contact shadow.
+    return (
+      <G>
+        <Ellipse cx={100} cy={groundY} rx={92} ry={7} fill="#000000" opacity={0.08} />
+        <Ellipse cx={100} cy={groundY} rx={76} ry={5} fill="#000000" opacity={0.12} />
+        <Ellipse cx={100} cy={groundY} rx={58} ry={3.5} fill="#000000" opacity={0.18} />
+      </G>
+    );
+  };
 
   const renderGarmentSvg = () => {
     const garment = project?.garmentType ?? 'tshirt';
@@ -134,10 +148,12 @@ export default function DesignMockupPreviewScreen() {
 
     if (garment === 'tshirt') {
       // T-shirt shape path
+      const tee = 'M60,10 L30,50 L0,40 L20,80 L40,70 L40,210 L160,210 L160,70 L180,80 L200,40 L170,50 L140,10 Q120,0 100,0 Q80,0 60,10 Z';
       return (
-        <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.7} viewBox="0 0 200 220">
+        <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.7} viewBox="-8 -4 216 228">
+          {renderShadow(tee, 214)}
           <Path
-            d="M60,10 L30,50 L0,40 L20,80 L40,70 L40,210 L160,210 L160,70 L180,80 L200,40 L170,50 L140,10 Q120,0 100,0 Q80,0 60,10 Z"
+            d={tee}
             fill={fill}
             stroke={PURPLE + '88'}
             strokeWidth={1.5}
@@ -149,7 +165,8 @@ export default function DesignMockupPreviewScreen() {
     // Default: rounded rect with label
     const label = garment.charAt(0).toUpperCase() + garment.slice(1);
     return (
-      <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.6} viewBox="0 0 200 250">
+      <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.6} viewBox="-8 -4 216 258">
+        {renderShadow('M26,10 L174,10 Q190,10 190,26 L190,224 Q190,240 174,240 L26,240 Q10,240 10,224 L10,26 Q10,10 26,10 Z', 244)}
         <Rect
           x={10} y={10} width={180} height={230}
           rx={16} ry={16}
@@ -185,23 +202,6 @@ export default function DesignMockupPreviewScreen() {
       <ScreenHeader title="Mockup preview" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* View tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow} testID="mockup-view-tabs">
-          {VIEWS.map(v => (
-            <TouchableOpacity
-              key={v}
-              onPress={() => { Haptics.selectionAsync(); setActiveView(v); }}
-              style={[styles.tabBtn, activeView === v && styles.tabBtnActive]}
-              activeOpacity={0.8}
-              hitSlop={{ top: 6, bottom: 6 }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeView === v }}
-            >
-              <Text style={[styles.tabText, activeView === v && styles.tabTextActive]}>{v}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
         {/* Main preview panel */}
         <View
           ref={previewShotRef}
@@ -228,7 +228,7 @@ export default function DesignMockupPreviewScreen() {
               {project.name}
             </Text>
             <Text style={[styles.overlayType, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#333' : MUTED }]}>
-              {GARMENT_TYPES.find(t => t.value === project.garmentType)?.label ?? project.garmentType ?? 'Garment'} · {activeView}
+              {GARMENT_TYPES.find(t => t.value === project.garmentType)?.label ?? project.garmentType ?? 'Garment'}
             </Text>
           </View>
         </View>
@@ -286,16 +286,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scrollContent: { paddingBottom: 120 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   disclaimer: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md },
-
-  tabsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  tabBtn: {
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: radius.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  tabBtnActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
-  tabText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  tabTextActive: { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
 
   previewPanel: {
     width: SCREEN_W,

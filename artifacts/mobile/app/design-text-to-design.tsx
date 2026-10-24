@@ -16,7 +16,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, TouchableOpacity, Pressable, StyleSheet, Image,
-  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions,
+  ActivityIndicator, Alert, Modal, TextInput, useWindowDimensions, Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useRouter } from 'expo-router';
@@ -25,7 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
-import { File, Paths } from 'expo-file-system';
+import { dataUrlToLocalFile } from '@/lib/aiToolMedia';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import Composer from '@/components/ui/Composer';
@@ -223,12 +223,25 @@ export default function AiDesignChatScreen() {
     }
   }
 
+  /**
+   * A URI short enough for a route param that Mockup to Model can read:
+   * a data URI becomes a cache file (native) or a blob URL (web); a remote
+   * (https), file or blob URI is already readable there (its service fetches
+   * the image) and passes through unchanged instead of being decoded as base64.
+   */
+  async function toHandoffUri(uri: string): Promise<string> {
+    if (!uri.startsWith('data:')) return uri;
+    if (Platform.OS === 'web') {
+      const blob = await (await fetch(uri)).blob();
+      return URL.createObjectURL(blob);
+    }
+    return dataUrlToLocalFile(uri, 'ai-design');
+  }
+
   async function handleSendToMockupToModel(version: DesignVersion) {
     try {
-      const b64 = version.imageUri.replace(/^data:image\/[a-z]+;base64,/, '');
-      const file = new File(Paths.cache, `ai-design-${Date.now()}.png`);
-      file.write(b64, { encoding: 'base64' });
-      router.push({ pathname: '/design-mockup-to-model', params: { seedMockupUri: file.uri } } as any);
+      const seedMockupUri = await toHandoffUri(version.imageUri);
+      router.push({ pathname: '/design-mockup-to-model', params: { seedMockupUri } } as any);
     } catch {
       Alert.alert("Couldn't send to Mockup to Model", 'Please try again.');
     }

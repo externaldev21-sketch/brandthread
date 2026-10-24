@@ -294,3 +294,52 @@ describe('retryMockupToModelRef', () => {
     ).rejects.toThrow('Retry failed');
   });
 });
+
+describe('cancellation signal', () => {
+  beforeEach(() => {
+    mockServiceRequest.mockReset();
+    setupFetchBlob({ mockup: 'mockup-content', 'ref-0': 'ref0-content' });
+  });
+
+  it('forwards the caller AbortSignal to the batch and retry requests', async () => {
+    const { generateMockupToModel, retryMockupToModelRef } = await import('../designService');
+    const controller = new AbortController();
+    mockServiceRequest.mockResolvedValueOnce({ results: [{ refIndex: 0, b64_json: 'aaaa' }], errors: [] });
+    await generateMockupToModel({ mockupUri: 'file://mockup', referenceUris: ['file://ref-0'], signal: controller.signal });
+    expect(mockServiceRequest.mock.calls[0][1].signal).toBe(controller.signal);
+
+    mockServiceRequest.mockResolvedValueOnce({ refIndex: 0, b64_json: 'bbbb' });
+    await retryMockupToModelRef({ mockupUri: 'file://mockup', referenceUri: 'file://ref-0', refIndex: 0, signal: controller.signal });
+    expect(mockServiceRequest.mock.calls[1][1].signal).toBe(controller.signal);
+  });
+});
+
+describe('generatePhotoshootShot', () => {
+  beforeEach(() => {
+    mockServiceRequest.mockReset();
+    setupFetchBlob({ product: 'product-content', 'ref-0': 'ref0-content' });
+  });
+
+  it('sends the chosen aspect ratio to /api/photography/generate', async () => {
+    const { generatePhotoshootShot } = await import('../designService');
+    mockServiceRequest.mockResolvedValueOnce({ b64_json: 'shot' });
+    const uri = await generatePhotoshootShot({ productImageUris: ['file://product'], referenceUris: ['file://ref-0'], ratio: '9:16' });
+    const [path, options] = mockServiceRequest.mock.calls[0] as [string, any];
+    expect(path).toBe('/api/photography/generate');
+    const body = JSON.parse(options.body);
+    expect(body.ratio).toBe('9:16');
+    expect(body.images).toHaveLength(2);
+    expect(body.prompt).toContain('Aspect ratio: 9:16.');
+    expect(uri).toBe('data:image/png;base64,shot');
+  });
+
+  it('rejects more than 4 photos in total before calling the API', async () => {
+    const { generatePhotoshootShot, PHOTOSHOOT_MAX_IMAGES } = await import('../designService');
+    expect(PHOTOSHOOT_MAX_IMAGES).toBe(4);
+    await expect(generatePhotoshootShot({
+      productImageUris: ['file://product', 'file://product'],
+      referenceUris: ['file://ref-0', 'file://ref-0', 'file://ref-0'],
+    })).rejects.toThrow(/at most 4/);
+    expect(mockServiceRequest).not.toHaveBeenCalled();
+  });
+});

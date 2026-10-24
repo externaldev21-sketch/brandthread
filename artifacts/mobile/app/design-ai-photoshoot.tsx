@@ -12,7 +12,7 @@ import { MEDIA } from '@/lib/theme';
  * explicit shared-components ask (these tools may merge later; sharing
  * the components now makes that a routing change, not a rewrite).
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Image, FlatList,
@@ -36,22 +36,20 @@ import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
 import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleKind } from '@/services/designTypes';
-import { generatePhotoshootShot, createBrandAsset } from '@/services/designService';
+import { generatePhotoshootShot, createBrandAsset, PHOTOSHOOT_MAX_IMAGES } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
-const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
-// the real generate call can still be rejected by the backend's own,
-// smaller total-image cap (artifacts/api-server/src/routes/photography.ts's
-// MAX_IMAGES = 4, server-owned, not touched here) — see handleGenerate's
-// catch. Flagged as a needs-backend item in the PR body: the seller-facing
-// "up to 6 references" UI exceeds what the server will actually accept
-// once product photos are added in too.
+// The generate endpoint accepts PHOTOSHOOT_MAX_IMAGES (4) photos in total,
+// product photos and creative reference photos combined, so every picker
+// below caps itself to what is left of that shared budget.
+const MAX_TOTAL_PHOTOS = PHOTOSHOOT_MAX_IMAGES;
+const PHOTO_LIMIT_COPY = `Up to ${MAX_TOTAL_PHOTOS} photos in total, product and reference photos combined.`;
 const SHOT_COUNTS = [1, 2, 4];
 const RATIOS: { value: ImageRatioKind; label: string }[] = [
   { value: '1:1', label: '1:1' },
@@ -80,29 +78,12 @@ const SCENE_TILE_LABEL: Partial<Record<SceneStyleKind, string>> = {
   luxury_interior: 'Luxury',
 };
 
-// Isolates the pinned dock's bottom offset in one place (still just this
-// one function to change if that math ever needs to differ). useHideTabBar()
-// below slides the floating seller tab bar away while this screen is
-// focused, but the slide is an animation, not instant — the bar is still
-// visible for a beat on mount/back-navigation — so the dock still reserves
-// the tab bar's own height on top of the safe-area inset, matching the
-// same (COMP.tabBarH + insets.bottom) pattern Mockup to Model's dock uses
-// after adopting the same hook, rather than assuming the bar is gone the
-// instant this screen mounts.
-function getAiToolDockBottomInset(insets: { bottom: number }): number {
-  return COMP.tabBarH + insets.bottom;
-}
-// The dock's own rendered height above that bottom inset (primary button +
-// its top padding + a small buffer) — used to size the ScrollView's own
-// bottom padding so scroll content always ends fully above the pinned
-// button, with no magic-number guess.
-const DOCK_CONTENT_HEIGHT = 52 + SP.lg + SP.lg;
-
 export default function AIPhotoshootScreen() {
   useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const dockBottomInset = getAiToolDockBottomInset(insets);
+  // useHideTabBar() hides the seller tab bar here, so this resolves to the
+  // safe-area floor rather than reserving the bar's height over empty space.
   const tabBarInset = useSellerTabBarInset();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -124,19 +105,33 @@ export default function AIPhotoshootScreen() {
   const [libraryIndex, setLibraryIndex] = useState<number | null>(null);
   const [savingAll, setSavingAll] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const requestRef = useRef<{ productImageUris: string[]; refUris: string[] } | null>(null);
+  const requestRef = useRef<{ productImageUris: string[]; refUris: string[]; ratio: ImageRatioKind } | null>(null);
 
   // Product picker source photos
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
   const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
   const [pickerImageUri, setPickerImageUri] = useState<string | null>(null);
+  // Product ids whose cover photo failed to load: shown with the placeholder.
+  const [brokenThumbs, setBrokenThumbs] = useState<Set<string>>(new Set());
 
-  useMemo(() => {
-    getProducts().then(setProducts).catch(() => setProducts([]));
+  useEffect(() => {
+    let alive = true;
+    getProducts()
+      .then((list) => { if (alive) setProducts(list); })
+      .catch(() => { if (alive) setProducts([]); });
+    return () => { alive = false; };
   }, []);
 
+  function alertPhotoLimit() {
+    Alert.alert('Photo limit reached', `${PHOTO_LIMIT_COPY} Remove one to add another.`);
+  }
+
   function toggleProduct(id: string) {
+    if (!selectedProductIds.has(id) && photosLeft <= 0) {
+      alertPhotoLimit();
+      return;
+    }
     setSelectedProductIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -146,9 +141,9 @@ export default function AIPhotoshootScreen() {
   }
 
   async function pickReferences() {
-    const remaining = MAX_REFS - refUris.length;
+    const remaining = photosLeft;
     if (remaining <= 0) {
-      Alert.alert('Maximum reached', `You can add at most ${MAX_REFS} reference photos.`);
+      alertPhotoLimit();
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -158,7 +153,7 @@ export default function AIPhotoshootScreen() {
       selectionLimit: remaining,
     });
     if (!res.canceled && res.assets.length > 0) {
-      setRefUris(prev => [...prev, ...res.assets.map(a => a.uri)].slice(0, MAX_REFS));
+      setRefUris(prev => [...prev, ...res.assets.map(a => a.uri).slice(0, remaining)]);
     }
   }
 
@@ -167,14 +162,19 @@ export default function AIPhotoshootScreen() {
   }
 
   async function pickUploadInsteadOfProduct() {
+    const remaining = photosLeft;
+    if (remaining <= 0) {
+      alertPhotoLimit();
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.92,
       allowsMultipleSelection: true,
-      selectionLimit: 4,
+      selectionLimit: remaining,
     });
     if (!res.canceled && res.assets.length > 0) {
-      setUploadedProductUris(prev => [...prev, ...res.assets.map(a => a.uri)].slice(0, 4));
+      setUploadedProductUris(prev => [...prev, ...res.assets.map(a => a.uri).slice(0, remaining)]);
     }
   }
   const [uploadedProductUris, setUploadedProductUris] = useState<string[]>([]);
@@ -188,11 +188,17 @@ export default function AIPhotoshootScreen() {
     return [...fromProducts, ...uploadedProductUris];
   }, [selectedProducts, uploadedProductUris]);
 
-  const canGenerate = productImageUris.length > 0;
+  const photosUsed = productImageUris.length + refUris.length;
+  const photosLeft = Math.max(0, MAX_TOTAL_PHOTOS - photosUsed);
+  const canGenerate = productImageUris.length > 0 && photosUsed <= MAX_TOTAL_PHOTOS;
 
   async function handleGenerate() {
-    if (!canGenerate) {
+    if (productImageUris.length === 0) {
       Alert.alert('Choose a product', 'Select at least one product photo, or upload one, first.');
+      return;
+    }
+    if (photosUsed > MAX_TOTAL_PHOTOS) {
+      Alert.alert('Too many photos', `${PHOTO_LIMIT_COPY} Remove ${photosUsed - MAX_TOTAL_PHOTOS} to continue.`);
       return;
     }
     if (isSellerDevPreview()) {
@@ -204,7 +210,7 @@ export default function AIPhotoshootScreen() {
       return;
     }
 
-    requestRef.current = { productImageUris, refUris };
+    requestRef.current = { productImageUris, refUris, ratio };
     const initialSlots: AiResultSlot[] = Array.from({ length: shotCount }, (_, i) => ({
       id: i,
       status: 'generating',
@@ -218,7 +224,7 @@ export default function AIPhotoshootScreen() {
 
     const results = await Promise.allSettled(
       initialSlots.map(() => generatePhotoshootShot({
-        productImageUris, referenceUris: refUris, prompt, sceneStyle, modelStyle,
+        productImageUris, referenceUris: refUris, prompt, sceneStyle, modelStyle, ratio,
       })),
     );
     setSlots(prev => prev.map((slot, i) => {
@@ -235,7 +241,7 @@ export default function AIPhotoshootScreen() {
     setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'generating', error: undefined } : s));
     try {
       const uri = await generatePhotoshootShot({
-        productImageUris: req.productImageUris, referenceUris: req.refUris, prompt, sceneStyle, modelStyle,
+        productImageUris: req.productImageUris, referenceUris: req.refUris, prompt, sceneStyle, modelStyle, ratio: req.ratio,
       });
       setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'done', imageUri: uri } : s));
     } catch (err: any) {
@@ -326,7 +332,7 @@ export default function AIPhotoshootScreen() {
         <AiToolProgressBar step={2} />
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + SP.xxl }]}
+          contentContainerStyle={[s.content, { paddingBottom: tabBarInset + SP.xxl }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={s.progressBar}>
@@ -432,28 +438,38 @@ export default function AIPhotoshootScreen() {
             )}
             {products.slice(0, 20).map((p) => {
               const selected = selectedProductIds.has(p.id);
-              const thumb = p.media?.[0]?.uri;
+              const thumb = brokenThumbs.has(p.id) ? undefined : p.media?.[0]?.uri;
               return (
                 <TouchableOpacity
                   key={p.id}
-                  style={[s.productTile, selected && s.productTileSelected]}
+                  style={s.productTileWrap}
                   onPress={() => toggleProduct(p.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${p.name}`}
                   accessibilityState={{ selected }}
                 >
-                  {thumb ? (
-                    <Image source={{ uri: thumb }} style={s.productTileImg} resizeMode="cover" />
-                  ) : (
-                    <View style={[s.productTileImg, s.productTileImgEmpty]}>
-                      <Icon name="package" size={ICON.md} color={SUBTLE} />
-                    </View>
-                  )}
-                  {selected && (
-                    <View style={s.productTileCheck}>
-                      <Icon name="check" size={12} color={BG} />
-                    </View>
-                  )}
+                  <View style={[s.productTile, selected && s.productTileSelected]}>
+                    {thumb ? (
+                      <Image
+                        source={{ uri: thumb }}
+                        style={s.productTileImg}
+                        resizeMode="cover"
+                        onError={() => setBrokenThumbs(prev => new Set(prev).add(p.id))}
+                      />
+                    ) : (
+                      <View style={[s.productTileImg, s.productTileImgEmpty]}>
+                        <Icon name="package" size={ICON.md} color={SUBTLE} />
+                      </View>
+                    )}
+                    {selected && (
+                      <View style={s.productTileCheck}>
+                        <Icon name="check" size={12} color={BG} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[s.presetTileLabel, selected && s.presetTileLabelActive]} numberOfLines={1}>
+                    {p.name || 'Untitled product'}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -463,7 +479,7 @@ export default function AIPhotoshootScreen() {
           <View style={{ marginTop: SP.sm }}>
             <ReferencePhotoTiles
               uris={uploadedProductUris}
-              max={4}
+              max={uploadedProductUris.length + photosLeft}
               onAdd={pickUploadInsteadOfProduct}
               onRemove={(i) => setUploadedProductUris(prev => prev.filter((_, idx) => idx !== i))}
               label="uploaded photo"
@@ -473,7 +489,8 @@ export default function AIPhotoshootScreen() {
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Creative reference photos</Text>
-        <ReferencePhotoTiles uris={refUris} max={MAX_REFS} onAdd={pickReferences} onRemove={removeRef} label="reference" />
+        <Text style={s.sectionSub}>{PHOTO_LIMIT_COPY} {photosLeft === 0 ? 'Limit reached.' : `${photosLeft} left.`}</Text>
+        <ReferencePhotoTiles uris={refUris} max={refUris.length + photosLeft} onAdd={pickReferences} onRemove={removeRef} label="reference" />
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Describe the shoot</Text>
@@ -513,7 +530,8 @@ export default function AIPhotoshootScreen() {
           })}
         </ScrollView>
 
-        <View style={[s.chipRow, { marginTop: SP.md }]}>
+        <Text style={[s.optionLabel, { marginTop: SP.md }]}>Model</Text>
+        <View style={s.chipRow}>
           {MODEL_STYLES.slice(0, 5).map((opt) => (
             <TouchableOpacity key={opt.value} style={[s.chip, modelStyle === opt.value && s.chipActive]} hitSlop={CHIP_HIT_SLOP} accessibilityRole="button" accessibilityState={{ selected: modelStyle === opt.value }} onPress={() => setModelStyle(opt.value)}>
               <Text style={[s.chipText, modelStyle === opt.value && s.chipTextActive]}>{opt.label}</Text>
@@ -621,6 +639,7 @@ const s = StyleSheet.create({
     backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12,
   },
   actionTileLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, textAlign: 'center', lineHeight: 14 },
+  productTileWrap: { width: PRODUCT_TILE, alignItems: 'center', gap: 6 },
   productTile: { width: PRODUCT_TILE, height: PRODUCT_TILE, borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, position: 'relative' },
   productTileSelected: { borderColor: FG, borderWidth: 2 },
   productTileImg: { width: '100%', height: '100%' },

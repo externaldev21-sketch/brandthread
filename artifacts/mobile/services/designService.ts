@@ -26,7 +26,7 @@ import {
   MockupToModelBatchResult,
   AIStyleKind, CampaignFormatKind, CampaignProject, CampaignAsset,
   GarmentType,
-  SceneStyleKind, ModelStyleKind, LightingStyleKind,
+  SceneStyleKind, ModelStyleKind, LightingStyleKind, ImageRatioKind,
 } from './designTypes';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -1512,12 +1512,13 @@ export async function saveColorPickerState(state: ColorPickerState): Promise<voi
 
 // ─── AI API helpers ───────────────────────────────────────────────────────────
 
-async function callGenerateAPI(endpoint: string, body: object): Promise<string> {
+async function callGenerateAPI(endpoint: string, body: object, signal?: AbortSignal): Promise<string> {
   // AI design actions require an authenticated seller. Never silently retry
   // without auth because that can disconnect generated assets from their owner.
   const data = await serviceRequest<{ b64_json: string }>(endpoint, {
     method: 'POST',
     body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   });
   return `data:image/png;base64,${data.b64_json}`;
 }
@@ -1567,8 +1568,9 @@ async function generateN(
   endpoint: string,
   body: object,
   count: number,
+  signal?: AbortSignal,
 ): Promise<string[]> {
-  const jobs = Array.from({ length: count }, () => callGenerateAPI(endpoint, body));
+  const jobs = Array.from({ length: count }, () => callGenerateAPI(endpoint, body, signal));
   return Promise.all(jobs);
 }
 
@@ -1620,6 +1622,8 @@ export async function generateSketchToDesign(req: {
   style: AIStyleKind;
   colorPalette?: string;
   count?: number;
+  /** Aborts the in-flight request(s) (e.g. the seller left the results). */
+  signal?: AbortSignal;
 }): Promise<GenerateDesignResult> {
   const count = req.count ?? 4;
   const prompt = `Convert this sketch to a garment design. Style: ${req.style}${req.colorPalette ? `. Colors: ${req.colorPalette}` : ''}.`;
@@ -1628,7 +1632,7 @@ export async function generateSketchToDesign(req: {
     prompt,
     referenceImage,
     mode: 'sketch_to_design',
-  }, count);
+  }, count, req.signal);
   return makeResult(prompt, req.style, imageUris);
 }
 
@@ -1639,6 +1643,8 @@ export async function generateMockupToModel(req: {
   mockupUri: string;
   referenceUris: string[];
   prompt?: string;
+  /** Aborts the in-flight request (e.g. the seller left the results screen). */
+  signal?: AbortSignal;
 }): Promise<MockupToModelBatchResult> {
   if (!req.mockupUri) throw new Error('A garment mockup image is required.');
   if (!Array.isArray(req.referenceUris) || req.referenceUris.length === 0) {
@@ -1661,6 +1667,7 @@ export async function generateMockupToModel(req: {
       references,
       ...(req.prompt ? { prompt: req.prompt } : {}),
     }),
+    ...(req.signal ? { signal: req.signal } : {}),
   });
 
   return {
@@ -1678,6 +1685,7 @@ export async function retryMockupToModelRef(req: {
   referenceUri: string;
   refIndex: number;
   prompt?: string;
+  signal?: AbortSignal;
 }): Promise<{ refIndex: number; imageUri: string }> {
   const mockup = await imageUriToDataUrl(req.mockupUri);
   const reference = await imageUriToDataUrl(req.referenceUri);
@@ -1691,6 +1699,7 @@ export async function retryMockupToModelRef(req: {
         refIndex: req.refIndex,
         ...(req.prompt ? { prompt: req.prompt } : {}),
       }),
+      ...(req.signal ? { signal: req.signal } : {}),
     },
   );
   return { refIndex: data.refIndex, imageUri: `data:image/png;base64,${data.b64_json}` };
@@ -1734,12 +1743,11 @@ export async function generatePhotoshoot(req: {
 // unmodified /photography/generate endpoint (it already accepts a generic
 // `images` array): no backend changes needed for this.
 //
-// The endpoint currently caps the combined image count at a small number
-// (artifacts/api-server/src/routes/photography.ts's MAX_IMAGES = 4,
-// server-owned — not touched here). The 400 it returns if exceeded
-// surfaces as this function's rejection; see design-ai-photoshoot.tsx's
-// MAX_REFS comment for the resulting seller-facing-cap-vs-backend-cap gap,
-// flagged as needs-backend in the PR body.
+// The endpoint caps the combined image count (product + reference photos)
+// at PHOTOSHOOT_MAX_IMAGES (artifacts/api-server/src/routes/photography.ts's
+// MAX_IMAGES). design-ai-photoshoot.tsx caps its pickers to the same total.
+// `ratio` picks the output canvas (square / portrait / landscape) server side.
+export const PHOTOSHOOT_MAX_IMAGES = 4;
 export async function generatePhotoshootShot(req: {
   productImageUris: string[];
   referenceUris: string[];
@@ -1747,18 +1755,28 @@ export async function generatePhotoshootShot(req: {
   sceneStyle?: SceneStyleKind;
   modelStyle?: ModelStyleKind;
   lightingStyle?: LightingStyleKind;
+  ratio?: ImageRatioKind;
 }): Promise<string> {
   const allUris = [...req.productImageUris, ...req.referenceUris];
   if (allUris.length === 0) throw new Error('Select at least one product photo.');
+  if (allUris.length > PHOTOSHOOT_MAX_IMAGES) {
+    throw new Error(`Use at most ${PHOTOSHOOT_MAX_IMAGES} photos in total (product and reference photos).`);
+  }
   const images = await Promise.all(allUris.map(imageUriToDataUrl));
   const describedPrompt = [
     req.prompt?.trim(),
     req.sceneStyle ? `Scene: ${req.sceneStyle}.` : '',
     req.modelStyle ? `Model: ${req.modelStyle}.` : '',
     req.lightingStyle ? `Lighting: ${req.lightingStyle}.` : '',
+    req.ratio ? `Aspect ratio: ${req.ratio}.` : '',
     'Use the uploaded creative reference photos (if any) to match scene, model, pose, and lighting — preserve the product exactly (logo, print, color, fabric texture unchanged).',
   ].filter(Boolean).join(' ');
-  return callGenerateAPI('/api/photography/generate', { images, prompt: describedPrompt, mode: 'photoshoot' });
+  return callGenerateAPI('/api/photography/generate', {
+    images,
+    prompt: describedPrompt,
+    mode: 'photoshoot',
+    ...(req.ratio ? { ratio: req.ratio } : {}),
+  });
 }
 
 // applyPromptEdit — accepts an object (used by design-prompt-edit.tsx)

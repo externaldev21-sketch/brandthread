@@ -10,6 +10,9 @@ export const openai: OpenAI = lazyOpenAiClient();
 
 export type ImageQuality = "low" | "medium" | "high" | "auto";
 
+/** Output sizes the image edit endpoint supports (square, portrait, landscape). */
+export type ImageEditSize = "1024x1024" | "1024x1536" | "1536x1024" | "auto";
+
 export interface ImageGenerationOptions {
   /**
    * Premium output is the default for every customer-facing image operation.
@@ -68,6 +71,8 @@ export async function editImages(
   options?: {
     background?: "transparent" | "opaque" | "auto";
     quality?: ImageQuality;
+    /** Output size; omitted keeps the provider default. */
+    size?: ImageEditSize;
   }
 ): Promise<Buffer> {
   const images = await Promise.all(
@@ -85,6 +90,7 @@ export async function editImages(
     prompt,
     quality: options?.quality ?? "high",
     ...(options?.background ? { background: options.background } : {}),
+    ...(options?.size ? { size: options.size } : {}),
   }), { onFallback: logImageModelFallback });
 
   const imageBase64 = response.data?.[0]?.b64_json ?? "";

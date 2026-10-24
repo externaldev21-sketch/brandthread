@@ -37,6 +37,19 @@ import type { Product, ProductMedia } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 import { minHitSlop } from '@/lib/hitSlop';
+import { showAlert } from '@/lib/actionSheet';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
+
+/** '#abc', 'abc', '#A1B2C3' → '#AABBCC' / '#A1B2C3'; anything else → null. */
+function normalizeHex(input: string): string | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(input.trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map(c => c + c).join('') : m[1];
+  return `#${h.toUpperCase()}`;
+}
+const HEX_HINT = 'Enter a hex colour like #1A1A1A.';
+// selectedGradient value meaning "use the Custom gradient From/To fields".
+const CUSTOM_GRADIENT = -1;
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
 
@@ -117,19 +130,28 @@ export default function DesignBgReplaceScreen({
   }
 
   async function handleGenerate() {
-    if (!imageUri) { Alert.alert('No source image', 'Please upload a source image first.'); return; }
+    if (!imageUri) { showAlert('No source image', 'Please upload a source image first.'); return; }
     if (bgTab === 'upload' && !uploadedBgUri) {
-      Alert.alert('No background image', 'Upload the background image you want to use.');
+      showAlert('No background image', 'Upload the background image you want to use.');
       return;
     }
     let prompt = '';
     let color: string | undefined;
     if (bgTab === 'color') {
-      color = selectedSwatchHex;
+      const custom = normalizeHex(customColor);
+      if (!custom) { showAlert('Check the custom colour', HEX_HINT); return; }
+      color = custom;
       prompt = `Solid color background: ${color}`;
     } else if (bgTab === 'gradient') {
-      const g = GRADIENT_PRESETS[selectedGradient];
-      prompt = `Gradient background from ${g.from} to ${g.to}`;
+      if (selectedGradient === CUSTOM_GRADIENT) {
+        const from = normalizeHex(customGradFrom);
+        const to = normalizeHex(customGradTo);
+        if (!from || !to) { showAlert('Check the custom gradient', HEX_HINT); return; }
+        prompt = `Gradient background from ${from} to ${to}`;
+      } else {
+        const g = GRADIENT_PRESETS[selectedGradient];
+        prompt = `Gradient background from ${g.from} to ${g.to}`;
+      }
     } else if (bgTab === 'upload') {
       prompt = 'Replace background with uploaded image';
     } else {
@@ -145,8 +167,10 @@ export default function DesignBgReplaceScreen({
         backgroundImageUri: bgTab === 'upload' ? uploadedBgUri ?? undefined : undefined,
       });
       setResultUri(res.resultUri);
-    } catch {
-      Alert.alert('Generation failed', 'Could not replace the background. Please try again.');
+    } catch (err) {
+      // aiToolErrorMessage routes a 402 out-of-credits to /ai-credits and
+      // gives the daily-cap / sign-in copy instead of one generic line.
+      showAlert('Generation failed', aiToolErrorMessage(err, 'Could not replace the background. Please try again.'));
     } finally {
       setIsGenerating(false);
     }
@@ -326,13 +350,19 @@ export default function DesignBgReplaceScreen({
               <Text style={[s.hexLabel, s.hexLabelInline]} numberOfLines={1}>Custom hex</Text>
               <TextInput
                 value={customColor}
-                onChangeText={(t) => { setCustomColor(t); setSelectedSwatchHex(t); }}
+                onChangeText={(t) => {
+                  setCustomColor(t);
+                  const hex = normalizeHex(t);
+                  if (hex) setSelectedSwatchHex(hex);
+                }}
                 placeholder="#000000"
                 placeholderTextColor={SUBTLE}
                 style={s.hexInput}
                 autoCapitalize="characters"
+                accessibilityLabel="Custom hex colour"
               />
             </View>
+            {!normalizeHex(customColor) && <Text style={s.hexError}>{HEX_HINT}</Text>}
           </View>
         )}
 
@@ -354,13 +384,16 @@ export default function DesignBgReplaceScreen({
             <View style={s.customGradRow}>
               <View style={s.customGradField}>
                 <Text style={s.hexLabel}>From</Text>
-                <TextInput value={customGradFrom} onChangeText={setCustomGradFrom} placeholder="#0EA5E9" placeholderTextColor={SUBTLE} style={s.hexInput} autoCapitalize="characters" />
+                <TextInput value={customGradFrom} onChangeText={(t) => { setCustomGradFrom(t); setSelectedGradient(CUSTOM_GRADIENT); }} onFocus={() => setSelectedGradient(CUSTOM_GRADIENT)} placeholder="#0EA5E9" placeholderTextColor={SUBTLE} style={[s.hexInput, selectedGradient === CUSTOM_GRADIENT && s.hexInputActive]} autoCapitalize="characters" accessibilityLabel="Custom gradient start colour" />
               </View>
               <View style={s.customGradField}>
                 <Text style={s.hexLabel}>To</Text>
-                <TextInput value={customGradTo} onChangeText={setCustomGradTo} placeholder="#22D3EE" placeholderTextColor={SUBTLE} style={s.hexInput} autoCapitalize="characters" />
+                <TextInput value={customGradTo} onChangeText={(t) => { setCustomGradTo(t); setSelectedGradient(CUSTOM_GRADIENT); }} onFocus={() => setSelectedGradient(CUSTOM_GRADIENT)} placeholder="#22D3EE" placeholderTextColor={SUBTLE} style={[s.hexInput, selectedGradient === CUSTOM_GRADIENT && s.hexInputActive]} autoCapitalize="characters" accessibilityLabel="Custom gradient end colour" />
               </View>
             </View>
+            {selectedGradient === CUSTOM_GRADIENT && (!normalizeHex(customGradFrom) || !normalizeHex(customGradTo)) && (
+              <Text style={s.hexError}>{HEX_HINT}</Text>
+            )}
           </View>
         )}
 
@@ -512,6 +545,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   customGradLabel:    { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.md, marginBottom: SP.sm },
   customGradRow:      { flexDirection: 'row', gap: SP.sm },
   customGradField:    { flex: 1, gap: SP.xs },
+  hexInputActive:     { borderColor: BORDER_ACTIVE },
+  hexError:           { marginTop: SP.xs, fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   bgUploadedRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
   bgUploadedText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   sceneGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },

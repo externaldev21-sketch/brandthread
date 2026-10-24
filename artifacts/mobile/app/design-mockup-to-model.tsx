@@ -30,7 +30,7 @@ import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-cont
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, COMP,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { saveImageToCameraRoll, saveAllToCameraRoll, shareImage } from '@/lib/aiToolMedia';
@@ -93,6 +93,15 @@ export default function MockupToModelScreen() {
   // Keep original inputs for retry
   const mockupUriRef = useRef<string | null>(null);
   const refUrisRef = useRef<string[]>([]);
+
+  // One controller per batch: going back, starting over or leaving the screen
+  // aborts the in-flight request (and any retries) so no stale result lands.
+  const batchAbortRef = useRef<AbortController | null>(null);
+  function cancelBatch() {
+    batchAbortRef.current?.abort();
+    batchAbortRef.current = null;
+  }
+  useEffect(() => () => cancelBatch(), []);
 
   // Track per-slot saving state for the Save icon
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
@@ -282,8 +291,13 @@ export default function MockupToModelScreen() {
     setIsGenerating(true);
     setHasResults(true);
 
+    cancelBatch();
+    const controller = new AbortController();
+    batchAbortRef.current = controller;
+
     try {
-      const batch = await generateMockupToModel({ mockupUri, referenceUris: refUris });
+      const batch = await generateMockupToModel({ mockupUri, referenceUris: refUris, signal: controller.signal });
+      if (controller.signal.aborted) return;
 
       setSlots(prev => {
         const next = [...prev];
@@ -296,10 +310,11 @@ export default function MockupToModelScreen() {
         return next.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', error: 'No result received.' } : slot);
       });
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const msg = aiToolErrorMessage(err, 'Generation failed. Please try again.');
       setSlots(prev => prev.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', error: msg } : slot));
     } finally {
-      setIsGenerating(false);
+      if (!controller.signal.aborted) setIsGenerating(false);
     }
   }
 
@@ -307,6 +322,8 @@ export default function MockupToModelScreen() {
     const mockup = mockupUriRef.current;
     const refUri = refUrisRef.current[refIndex];
     if (!mockup || !refUri) return;
+    if (!batchAbortRef.current) batchAbortRef.current = new AbortController();
+    const signal = batchAbortRef.current.signal;
 
     setSlots(prev => {
       const next = [...prev];
@@ -315,13 +332,15 @@ export default function MockupToModelScreen() {
     });
 
     try {
-      const result = await retryMockupToModelRef({ mockupUri: mockup, referenceUri: refUri, refIndex });
+      const result = await retryMockupToModelRef({ mockupUri: mockup, referenceUri: refUri, refIndex, signal });
+      if (signal.aborted) return;
       setSlots(prev => {
         const next = [...prev];
         if (next[result.refIndex]) next[result.refIndex] = { ...next[result.refIndex], status: 'done', imageUri: result.imageUri };
         return next;
       });
     } catch (err: any) {
+      if (signal.aborted) return;
       const msg = aiToolErrorMessage(err, 'Retry failed. Please try again.');
       setSlots(prev => {
         const next = [...prev];
@@ -348,9 +367,10 @@ export default function MockupToModelScreen() {
             if (isGenerating) {
               Alert.alert('Still generating', 'Photos are still being created. Go back anyway?', [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Go back', style: 'destructive', onPress: () => { setHasResults(false); setIsGenerating(false); setSlots([]); } },
+                { text: 'Go back', style: 'destructive', onPress: () => { cancelBatch(); setHasResults(false); setIsGenerating(false); setSlots([]); } },
               ]);
             } else {
+              cancelBatch();
               setHasResults(false);
               setSlots([]);
             }
@@ -358,7 +378,7 @@ export default function MockupToModelScreen() {
         />
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[s.content, { paddingBottom: insets.bottom + COMP.tabBarH + SP.xxl }]}
+          contentContainerStyle={[s.content, { paddingBottom: tabBarInset + SP.xxl }]}
           showsVerticalScrollIndicator={false}
         >
           {!allDone && (
@@ -412,7 +432,7 @@ export default function MockupToModelScreen() {
               label="Start over"
               icon="refresh-cw"
               variant="outline"
-              onPress={() => { setHasResults(false); setSlots([]); setMockupUri(null); setRefUris([]); }}
+              onPress={() => { cancelBatch(); setHasResults(false); setSlots([]); setMockupUri(null); setRefUris([]); }}
             />
           </View>
         </ScrollView>

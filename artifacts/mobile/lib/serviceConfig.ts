@@ -36,6 +36,15 @@ let _resolveConfigured: (() => void) | null = null;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
+ * AI image generation (services/designService.ts: mockup, photography,
+ * background removal) legitimately runs far past 15s — the same 90s ceiling
+ * lib/api.ts gives these endpoints, so a slow generation isn't cut off as
+ * a false "Request timed out".
+ */
+const AI_GENERATION_TIMEOUT_MS = 90_000;
+const AI_GENERATION_PATH = /^\/api\/(?:mockup\/generate|photography\/|bg-removal\/)/;
+
+/**
  * fetch() with a hard timeout. A plain fetch() never rejects or resolves on
  * its own if the connection just hangs — AbortController is the only way to
  * bound it. A timeout surfaces as ApiError(408) so it flows through the same
@@ -48,15 +57,23 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // A caller's own signal (e.g. a screen cancelling on unmount) also aborts
+  // the request; that abort is rethrown as-is, not reported as a timeout.
+  const callerSignal = init.signal ?? null;
+  const onCallerAbort = () => controller.abort();
+  if (callerSignal?.aborted) controller.abort();
+  else callerSignal?.addEventListener?.('abort', onCallerAbort);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (error) {
+    if (callerSignal?.aborted) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Try again.', code: 'timeout' } }));
     }
     throw error;
   } finally {
     clearTimeout(timer);
+    callerSignal?.removeEventListener?.('abort', onCallerAbort);
   }
 }
 
@@ -172,6 +189,7 @@ export async function serviceRequest<T = unknown>(
         serviceRequest<T>(path, options, reportErrors, attempt + 1))
     : null;
   const endSlowTracking = isRead && reportErrors ? slowRequests.start() : null;
+  const timeoutMs = !isRead && AI_GENERATION_PATH.test(path) ? AI_GENERATION_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
   let res: Response;
   try {
     res = await fetchWithTimeout(`${base}${versionApiPath(path)}`, {
@@ -182,9 +200,11 @@ export async function serviceRequest<T = unknown>(
         ...storeContextHeaders(),
         ...(options.headers ?? {}),
       },
-    });
+    }, timeoutMs);
   } catch (error) {
     endSlowTracking?.();
+    // Cancelled by the caller: not a network problem, so no retry or notice.
+    if (options.signal?.aborted) throw error;
     const quiet = retryQuietly(error);
     if (quiet) return quiet;
     const retry = !options.method || options.method === 'GET'

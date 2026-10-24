@@ -150,7 +150,10 @@ describe('QA-0115 mockup preview → add to product', () => {
     expect(preview).toContain("showActionSheet('Add to Product'");
     expect(preview).not.toMatch(/Alert\.alert\('Add to Product'/);
     expect(preview).toContain('setPendingMockup(');
-    expect(src('app/add-product.tsx')).toMatch(/takePendingMockup\(mockupProjectId\)/);
+    // Add Product never read a pending mockup, so the dead "Create new
+    // product" option was removed: Add to Product only routes to the picker.
+    expect(preview).toContain("/(tabs)/products?pickForMockup=1&projectId=");
+    expect(preview).not.toContain('/add-product?mockupProjectId=');
     const products = src('app/(tabs)/products.tsx');
     expect(products).toContain("params.pickForMockup === '1'");
     expect(products).toContain('attachMockupToListedProduct(');
