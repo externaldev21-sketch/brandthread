@@ -24,7 +24,7 @@ import React, {
 } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable,
-  Alert, ScrollView, TextInput, Modal, Dimensions, Share,
+  ScrollView, TextInput, Modal, Dimensions, Share,
   Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
   LayoutAnimation, UIManager, Linking,
 } from 'react-native';
@@ -145,7 +145,10 @@ import { getColorPickerState, saveColorPickerState } from '@/services/designServ
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
 import { radius } from '@/constants/radii';
+import { showAlert, confirmAlert } from '@/lib/actionSheet';
+import { computeCanvasFit } from '@/lib/canvasFit';
 import { SupportChatModal } from '@/components/SupportChatBubble';
+import { TopToast } from '@/components/ui/TopToast';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -202,6 +205,16 @@ const RN_SVG_BLEND_MODES = new Set<string>(['normal', 'multiply', 'screen', 'ove
 const DOCUMENT_PICKER_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/json'];
 
 
+// Friendly import-rejection copy. lib/fileValidator.ts reasons are
+// engineering strings (MIME / magic-byte details), so they're mapped to
+// plain-language messages here instead of being shown verbatim.
+const IMPORT_COPY = {
+  unsupported:     'Choose a PNG, JPG, GIF or WebP image, or a Brandthread design file (.json).',
+  tooLarge:        'This file is too large to import. Try a smaller file.',
+  invalidDesign:   "This file isn't a Brandthread design file, or it's damaged.",
+  contentMismatch: "This file doesn't look like the image type its name says. Save it again as PNG or JPG and retry.",
+} as const;
+
 const DEFAULT_PALETTE = [
   '#FFFFFF', '#000000', '#EF4444', '#F97316', '#EAB308',
   '#22C55E', '#0EA5E9', '#0F766E', '#EC4899', '#6B7280',
@@ -233,6 +246,10 @@ type HandleKind =
 const HS = 22; // tap target — larger than visual for 44pt finger usability
 // Distance (display px) from the layer's top edge up to the rotate handle.
 const ROTATE_HANDLE_OFFSET = 28;
+// Artboard fit insets inside the stage. The left reserve keeps the floating
+// size/opacity rail and Undo/Redo (left: 6 + 32pt buttons) off the artboard.
+const ARTBOARD_MARGIN = 14;
+const ARTBOARD_LEFT_RESERVE = 6 + 32 + 8;
 
 // Selection mode
 type SelectionSubMode = SelectionMode;
@@ -503,7 +520,28 @@ export default function DesignCanvasScreen() {
   refUriRef.current = referenceUri;
 
   // ── Canvas geometry ────────────────────────────────────────────────────────
-  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
+  // The artboard is ASPECT-FIT inside the measured stage (canvasOuter):
+  // one uniform logical → display scale, artboard centred in the space left
+  // after reserving the floating left rail (size/opacity/undo) and any
+  // docked sub-mode bar. canvasSize is the artboard's display size, so
+  // canvasSize.w / logicalW === canvasSize.h / logicalH === canvasFit.scale.
+  const [stageSize, setStageSize]         = useState({ w: 0, h: 0 });
+  const [colorSaveErrorKey, setColorSaveErrorKey] = useState<number | null>(null);
+  const [modeBarHeight, setModeBarHeight] = useState(0);
+  const modeBarActive = activeTopTool === 'select' || activeTopTool === 'transform' || activeTopTool === 'adjustments';
+  const canvasFit = useMemo(() => computeCanvasFit({
+    stageW: stageSize.w,
+    stageH: stageSize.h,
+    logicalW: project?.canvas.width  || 1080,
+    logicalH: project?.canvas.height || 1080,
+    insets: {
+      left:   ARTBOARD_LEFT_RESERVE,
+      right:  ARTBOARD_MARGIN,
+      top:    ARTBOARD_MARGIN + (modeBarActive ? modeBarHeight : 0),
+      bottom: ARTBOARD_MARGIN,
+    },
+  }), [stageSize.w, stageSize.h, project?.canvas.width, project?.canvas.height, modeBarActive, modeBarHeight]);
+  const canvasSize = useMemo(() => ({ w: canvasFit.width, h: canvasFit.height }), [canvasFit.width, canvasFit.height]);
   const [showGrid, setShowGrid]     = useState(false);
   const [showGuides, setShowGuides] = useState(false);
 
@@ -635,7 +673,7 @@ export default function DesignCanvasScreen() {
         : await createProject('canvas', 'Untitled Artwork', {});
       if (!proj) {
         if (!cancelled) setLoadFailed(true);
-        Alert.alert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
+        showAlert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
         return;
       }
       setProject(proj);
@@ -1142,8 +1180,8 @@ export default function DesignCanvasScreen() {
       setSelectedLayerId(targetId);
     } else {
       // No writable drawing layer — create one sized to logical canvas
-      const lw = projectRef.current?.canvas.width  || canvasSizeRef.current.w || 1080;
-      const lh = projectRef.current?.canvas.height || canvasSizeRef.current.h || 1080;
+      const lw = projectRef.current?.canvas.width  || 1080;
+      const lh = projectRef.current?.canvas.height || 1080;
       const maxOrder = current.reduce((m, l) => Math.max(m, l.order), 0);
       const newLayer: DesignLayer = {
         id: uid(), name: 'Drawing', type: 'drawing',
@@ -1669,8 +1707,8 @@ export default function DesignCanvasScreen() {
 
   // ─── Layer actions ─────────────────────────────────────────────────────────
   function handleAddDrawingLayer() {
-    const lw = project?.canvas.width  || canvasSize.w || 1080;
-    const lh = project?.canvas.height || canvasSize.h || 1080;
+    const lw = project?.canvas.width  || 1080;
+    const lh = project?.canvas.height || 1080;
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
     const newLayer: DesignLayer = {
       id: uid(), name: 'Layer', type: 'drawing',
@@ -1687,15 +1725,19 @@ export default function DesignCanvasScreen() {
   }
 
   function handleDeleteLayer(id: string) {
-    Alert.alert('Delete Layer', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => {
-        mutateLayer(prev => prev.filter(l => l.id !== id));
-        if (selectedLayerId === id) setSelectedLayerId(null);
-        closeSheet();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }},
-    ]);
+    const name = layers.find(l => l.id === id)?.name;
+    void confirmAlert({
+      title: name ? `Delete "${name}"?` : 'Delete layer?',
+      message: 'This removes the layer from your design.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    }).then(ok => {
+      if (!ok) return;
+      mutateLayer(prev => prev.filter(l => l.id !== id));
+      setSelectedLayerId(cur => (cur === id ? null : cur));
+      closeSheet();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    });
   }
 
   function handleDuplicateLayer(id: string) {
@@ -1714,7 +1756,7 @@ export default function DesignCanvasScreen() {
 
   function handleMergeLayers() {
     const drawingLayers = layers.filter(l => l.type === 'drawing');
-    if (drawingLayers.length < 2) { Alert.alert('Merge', 'Need at least 2 drawing layers.'); return; }
+    if (drawingLayers.length < 2) { showAlert('Nothing to merge', 'You need at least two drawing layers to merge.'); return; }
     const allPaths = drawingLayers.flatMap(l => (l.data as DesignDrawingLayer).paths);
     const maxOrder = drawingLayers.reduce((m, l) => Math.max(m, l.order), 0);
     const merged: DesignLayer = {
@@ -1807,7 +1849,7 @@ export default function DesignCanvasScreen() {
     const below = findLayerBelow(top);
     if (!below) return;
     if (top.type !== 'drawing' || below.type !== 'drawing') {
-      Alert.alert('Merge down', 'Only two drawing layers can be merged right now.');
+      showAlert("Can't merge these layers", 'Only drawing layers can be merged down right now.');
       return;
     }
     const topPaths = (top.data as DesignDrawingLayer).paths;
@@ -1838,8 +1880,8 @@ export default function DesignCanvasScreen() {
     const garmentType = project?.garmentType ?? 'tshirt';
     const garmentView = project?.garmentView ?? 'front';
     const def = getGarmentTemplate(garmentType, garmentView) ?? GARMENT_TEMPLATES[0];
-    const lw = project?.canvas.width  || canvasSize.w || 1080;
-    const lh = project?.canvas.height || canvasSize.h || 1080;
+    const lw = project?.canvas.width  || 1080;
+    const lh = project?.canvas.height || 1080;
     const templateLayer = buildGarmentTemplateLayer(def, lw, lh);
     mutateLayer(prev => [...prev.filter(l => !l.isTemplate), templateLayer]);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1911,7 +1953,7 @@ export default function DesignCanvasScreen() {
       setActiveTopTool('transform'); // see handleAddText's comment — same gap, same fix
       closeSheet();
     } catch {
-      Alert.alert('Error', 'Could not access photo library.');
+      showAlert("Couldn't open your photos", 'Allow photo access in Settings, then try again.');
     }
   }
 
@@ -1921,15 +1963,15 @@ export default function DesignCanvasScreen() {
     const newH = Number(resizeH.trim());
     if (!Number.isSafeInteger(newW) || !Number.isSafeInteger(newH) ||
         newW < 8 || newH < 8 || newW > 16384 || newH > 16384) {
-      Alert.alert(
+      showAlert(
         'Invalid size',
         'Width and height must be whole pixels between 8 and 16384. The canvas will not be silently downscaled.',
       );
       return;
     }
     if (!project) return;
-    const oldW = project.canvas.width  || canvasSize.w || 1080;
-    const oldH = project.canvas.height || canvasSize.h || 1080;
+    const oldW = project.canvas.width  || 1080;
+    const oldH = project.canvas.height || 1080;
     const sx = newW / oldW;
     const sy = newH / oldH;
     // Scale all layer transforms proportionally (they're in logical coords)
@@ -1957,12 +1999,12 @@ export default function DesignCanvasScreen() {
     setProject(p => p ? { ...p, canvas: { ...p.canvas, width: newW, height: newH } } : p);
     markDirty();
     closeSheet();
-    Alert.alert('Canvas resized', `${newW} × ${newH} px — layer positions scaled proportionally.`);
+    showAlert('Canvas resized', `${newW} × ${newH} px — layer positions scaled proportionally.`);
   }
 
   function handleSetCrop() {
-    const lw = project?.canvas.width  || canvasSize.w || 1080;
-    const lh = project?.canvas.height || canvasSize.h || 1080;
+    const lw = project?.canvas.width  || 1080;
+    const lh = project?.canvas.height || 1080;
     // Default crop: 80% safe-area centred on logical canvas
     const margin = 0.1;
     const x = Math.round(lw * margin);
@@ -1975,7 +2017,7 @@ export default function DesignCanvasScreen() {
     };
     setCropRect(newCrop);
     markDirty();
-    Alert.alert(
+    showAlert(
       'Crop guides set',
       `${newCrop.w}×${newCrop.h}px crop will be applied to PNG export and shown as red guides on canvas.`,
     );
@@ -1985,7 +2027,7 @@ export default function DesignCanvasScreen() {
   function handleClearCrop() {
     setCropRect(null);
     markDirty();
-    Alert.alert('Crop cleared', 'Export will use the full canvas dimensions.');
+    showAlert('Crop cleared', 'Export will use the full canvas dimensions.');
   }
 
   // ─── Flip transforms ──────────────────────────────────────────────────────
@@ -2007,7 +2049,7 @@ export default function DesignCanvasScreen() {
    * A second flip is the exact inverse: bounds and flag both revert.
    */
   function applyFlipX() {
-    const lw = project?.canvas.width || canvasSizeRef.current.w || 1080;
+    const lw = project?.canvas.width || 1080;
     mutateLayer(prev => prev.map(l => {
       const t = l.transform;
       return { ...l, transform: { ...t, x: lw - t.x - t.width, flipX: !t.flipX } };
@@ -2018,7 +2060,7 @@ export default function DesignCanvasScreen() {
   }
 
   function applyFlipY() {
-    const lh = project?.canvas.height || canvasSizeRef.current.h || 1080;
+    const lh = project?.canvas.height || 1080;
     mutateLayer(prev => prev.map(l => {
       const t = l.transform;
       return { ...l, transform: { ...t, y: lh - t.y - t.height, flipY: !t.flipY } };
@@ -2130,7 +2172,7 @@ export default function DesignCanvasScreen() {
   // ─── Cut / Copy / Paste for selected layers ───────────────────────────────
   function handleCut() {
     const selId = selectedLayerId;
-    if (!selId) { Alert.alert('Nothing selected', 'Select a layer first.'); return; }
+    if (!selId) { showAlert('Nothing selected', 'Select a layer first.'); return; }
     const layer = layers.find(l => l.id === selId);
     if (!layer) return;
     setClipboard([layer]);
@@ -2141,7 +2183,7 @@ export default function DesignCanvasScreen() {
 
   function handleCopyLayer() {
     const selId = selectedLayerId;
-    if (!selId) { Alert.alert('Nothing selected', 'Select a layer first.'); return; }
+    if (!selId) { showAlert('Nothing selected', 'Select a layer first.'); return; }
     const layer = layers.find(l => l.id === selId);
     if (!layer) return;
     setClipboard([{ ...layer }]);
@@ -2152,13 +2194,13 @@ export default function DesignCanvasScreen() {
     // Snapshot all current layers as clipboard (does NOT mutate original)
     const snap = JSON.parse(JSON.stringify(layers)) as DesignLayer[];
     setClipboard(snap);
-    Alert.alert('Canvas copied', 'Paste to create a copy of the current composition.');
+    showAlert('Canvas copied', 'Paste to create a copy of the current composition.');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   function handlePaste() {
     if (!clipboard || clipboard.length === 0) {
-      Alert.alert('Nothing to paste', 'Copy or cut a layer first.');
+      showAlert('Nothing to paste', 'Copy or cut a layer first.');
       return;
     }
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
@@ -2185,7 +2227,7 @@ export default function DesignCanvasScreen() {
         multiple: false,
       });
     } catch {
-      Alert.alert('Picker error', 'Could not open the document picker. Try again.');
+      showAlert("Couldn't open your files", 'Something went wrong opening the file picker. Try again.');
       return;
     }
 
@@ -2198,7 +2240,7 @@ export default function DesignCanvasScreen() {
     // ── Step 1: Strict MIME + extension pair check ───────────────────────────
     const pairResult = validateMimeExtPair(mime || null, asset.name);
     if (!pairResult.ok) {
-      Alert.alert('Unsupported file', pairResult.reason);
+      showAlert("Can't import this file", IMPORT_COPY.unsupported);
       return;
     }
 
@@ -2211,14 +2253,14 @@ export default function DesignCanvasScreen() {
         // Step 2: Actual byte-length gate — guards against missing/false metadata.
         const sizeResult = validateJsonByteLength(raw);
         if (!sizeResult.ok) {
-          Alert.alert('File too large', sizeResult.reason);
+          showAlert('File too large', IMPORT_COPY.tooLarge);
           return;
         }
 
         // Step 3: Strict JSON + schema validation — no unsafe casts.
         const jsonResult = validateBtJson(raw);
         if (!jsonResult.ok) {
-          Alert.alert('Cannot import', jsonResult.reason);
+          showAlert("Can't import this file", IMPORT_COPY.invalidDesign);
           return;
         }
 
@@ -2233,12 +2275,12 @@ export default function DesignCanvasScreen() {
         mutateLayer(prev => [...prev, ...incoming]);
         markDirty();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
+        showAlert(
           'Imported',
           `${incoming.length} layer${incoming.length === 1 ? '' : 's'} added from "${asset.name}".`,
         );
       } catch (e) {
-        Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
+        showAlert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
       }
       return;
     }
@@ -2252,7 +2294,7 @@ export default function DesignCanvasScreen() {
       const bytes     = new Uint8Array(buf, 0, Math.min(buf.byteLength, 16));
       const magicResult = validateMagicBytes(bytes, mime);
       if (!magicResult.ok) {
-        Alert.alert('Rejected', magicResult.reason);
+        showAlert("Can't import this image", IMPORT_COPY.contentMismatch);
         return;
       }
 
@@ -2286,7 +2328,7 @@ export default function DesignCanvasScreen() {
       markDirty();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
-      Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
+      showAlert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
     }
   }
 
@@ -2303,7 +2345,7 @@ export default function DesignCanvasScreen() {
       setReferenceVisible(true);
       markDirty();
     } catch {
-      Alert.alert('Error', 'Could not load reference image.');
+      showAlert("Couldn't load reference", 'That image could not be opened. Try another photo.');
     }
   }
 
@@ -2340,10 +2382,10 @@ export default function DesignCanvasScreen() {
       // Flush latest gen first — duplicateProject reads from the persisted project.
       await coordinatedSave();
       const copy = await duplicateProject(project.id);
-      Alert.alert('Saved', `"${copy.name}" saved to your gallery.`);
+      showAlert('Saved', `"${copy.name}" saved to your gallery.`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      Alert.alert('Error', 'Could not save a copy.');
+      showAlert("Couldn't save a copy", 'Something went wrong saving a copy of this design. Try again.');
     }
   }
 
@@ -2381,7 +2423,7 @@ export default function DesignCanvasScreen() {
         };
         triggerWebDownload(asset.uri, `${slug}_product.png`);
         void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        Alert.alert(
+        showAlert(
           'Design downloaded',
           `Your full-resolution PNG (${desc.width}×${desc.height}) has been downloaded. ` +
           'Upload it as the product photo in your Seller dashboard.',
@@ -2399,14 +2441,14 @@ export default function DesignCanvasScreen() {
       };
       const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
       if (mediaSaveResult !== 'saved') {
-        Alert.alert(
+        showAlert(
           mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
           mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
         );
         return;
       }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      Alert.alert(
+      showAlert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
         'Open "Add Product" in the Seller tab and select it as your product photo.',
@@ -2415,7 +2457,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.");
+      showAlert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2440,7 +2482,7 @@ export default function DesignCanvasScreen() {
         };
         triggerWebDownload(asset.uri, `${slug}_post.png`);
         void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        Alert.alert(
+        showAlert(
           'Design downloaded',
           `Full-resolution PNG (${desc.width}×${desc.height}) downloaded. ` +
           'Attach it when composing your Thread post.',
@@ -2458,14 +2500,14 @@ export default function DesignCanvasScreen() {
       };
       const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
       if (mediaSaveResult !== 'saved') {
-        Alert.alert(
+        showAlert(
           mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
           mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
         );
         return;
       }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      Alert.alert(
+      showAlert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
         'Open the Thread composer and select it to create a post.',
@@ -2474,7 +2516,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.");
+      showAlert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2498,13 +2540,13 @@ export default function DesignCanvasScreen() {
       // 3. If a mutation raced while createVersion was running, stay dirty.
       //    The next autosave / user press will persist the new edits.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Version saved', 'You can restore or duplicate it from Version history.', [
+      showAlert('Version saved', 'You can restore or duplicate it from Version history.', [
         { text: 'OK' },
         { text: 'Version history', onPress: () => handleOpenVersionHistory() },
       ]);
     } catch {
       setSaveStatus('unsaved');
-      Alert.alert(
+      showAlert(
         'Could not save',
         'Your latest edits are still on this screen. Try saving again before leaving.',
       );
@@ -2528,7 +2570,7 @@ export default function DesignCanvasScreen() {
     try {
       await coordinatedSave();
     } catch {
-      Alert.alert('Save failed', 'Save your latest edits before exporting so the file matches the canvas.');
+      showAlert('Save failed', 'Save your latest edits before exporting so the file matches the canvas.');
       return;
     }
     router.push(`/design-export?projectId=${encodeURIComponent(project.id)}` as never);
@@ -2550,7 +2592,7 @@ export default function DesignCanvasScreen() {
       goBackOr(router);
     } catch {
       setSaveStatus('unsaved');
-      Alert.alert(
+      showAlert(
         'Save failed',
         'Your latest edits have not been saved. Try again before leaving the canvas.',
       );
@@ -2738,7 +2780,7 @@ export default function DesignCanvasScreen() {
         if (sharingAvailable) {
           await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Export ${projectName}`, UTI: uti });
         } else {
-          Alert.alert(
+          showAlert(
             mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
             mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow media-library access in Settings to save the export.',
           );
@@ -2751,7 +2793,7 @@ export default function DesignCanvasScreen() {
         await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Share ${projectName}`, UTI: uti });
       } else {
         const suffix = desc.hasCrop ? ' (cropped)' : '';
-        Alert.alert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
+        showAlert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
       }
 
       await syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
@@ -2759,7 +2801,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
+      showAlert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -2811,13 +2853,13 @@ export default function DesignCanvasScreen() {
       };
 
       const available = await Sharing.isAvailableAsync();
-      if (!available) { Alert.alert('Sharing unavailable', 'System share sheet is not available.'); return; }
+      if (!available) { showAlert('Sharing unavailable', 'System share sheet is not available.'); return; }
       await Sharing.shareAsync(asset.uri, { mimeType: 'image/png', dialogTitle: `Share ${projectName}`, UTI: 'public.png' });
       await syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
     } catch (err: unknown) {
       console.error('[design-canvas] share failed', err);
-      Alert.alert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
+      showAlert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -2840,12 +2882,19 @@ export default function DesignCanvasScreen() {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 
+  // Palette / recent-colour persistence: a failed save is surfaced as a short
+  // non-blocking toast instead of being swallowed. The local state still
+  // updates, so the picker keeps working for this session.
+  function persistColorPickerState(state: Parameters<typeof saveColorPickerState>[0]) {
+    saveColorPickerState(state).catch(() => setColorSaveErrorKey(Date.now()));
+  }
+
   function applyColor(hex: string) {
     setPrevColor(drawColor); setDrawColor(hex);
     setPickerHex(hex.replace('#', '').toUpperCase());
     setColorRecents(prev => {
       const next = pushRecentColor(prev, hex);
-      saveColorPickerState({ recentColors: next, palettes: colorPalettesRef.current }).catch(() => {});
+      persistColorPickerState({ recentColors: next, palettes: colorPalettesRef.current });
       return next;
     });
   }
@@ -2853,7 +2902,7 @@ export default function DesignCanvasScreen() {
   function handleSaveToPalette(paletteId: string, hex: string) {
     setColorPalettes(prev => {
       const next = addColorToPalette(prev, paletteId, hex);
-      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      persistColorPickerState({ recentColors: colorRecentsRef.current, palettes: next });
       return next;
     });
   }
@@ -2861,7 +2910,7 @@ export default function DesignCanvasScreen() {
   function handleNewPalette() {
     setColorPalettes(prev => {
       const next = createPalette(prev, `Palette ${prev.length + 1}`);
-      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      persistColorPickerState({ recentColors: colorRecentsRef.current, palettes: next });
       return next;
     });
   }
@@ -2869,7 +2918,7 @@ export default function DesignCanvasScreen() {
   function handleRenamePalette(paletteId: string, name: string) {
     setColorPalettes(prev => {
       const next = renamePalette(prev, paletteId, name);
-      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      persistColorPickerState({ recentColors: colorRecentsRef.current, palettes: next });
       return next;
     });
   }
@@ -2877,7 +2926,7 @@ export default function DesignCanvasScreen() {
   function handleDeletePalette(paletteId: string) {
     setColorPalettes(prev => {
       const next = deletePalette(prev, paletteId);
-      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      persistColorPickerState({ recentColors: colorRecentsRef.current, palettes: next });
       return next;
     });
   }
@@ -2885,7 +2934,7 @@ export default function DesignCanvasScreen() {
   function handleSetDefaultPalette(paletteId: string) {
     setColorPalettes(prev => {
       const next = setDefaultPalette(prev, paletteId);
-      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      persistColorPickerState({ recentColors: colorRecentsRef.current, palettes: next });
       return next;
     });
   }
@@ -2979,16 +3028,27 @@ export default function DesignCanvasScreen() {
   const activeSize  = activeTopTool === 'eraser' ? eraserSize : activeTopTool === 'smudge' ? smudgeSize : brushSize;
 
   // Logical → display scale
-  const logicalW = project?.canvas.width  || canvasSize.w || 1080;
-  const logicalH = project?.canvas.height || canvasSize.h || 1080;
+  const logicalW = project?.canvas.width  || 1080;
+  const logicalH = project?.canvas.height || 1080;
   const exportX = cropRect?.x ?? 0;
   const exportY = cropRect?.y ?? 0;
   const exportW = cropRect?.w ?? logicalW;
   const exportH = cropRect?.h ?? logicalH;
-  const dispScaleX = canvasSize.w > 0 ? canvasSize.w / logicalW : 1;
-  const dispScaleY = canvasSize.h > 0 ? canvasSize.h / logicalH : 1;
+  // Uniform aspect-fit scale — X and Y are always identical (see canvasFit).
+  const dispScaleX = canvasFit.scale > 0 ? canvasFit.scale : 1;
+  const dispScaleY = dispScaleX;
   dispScaleXRef.current = dispScaleX;
   dispScaleYRef.current = dispScaleY;
+
+  const colorSaveToast = colorSaveErrorKey !== null ? (
+    <TopToast
+      key={colorSaveErrorKey}
+      message="Couldn't save your colours"
+      icon="alert-circle"
+      onDismiss={() => setColorSaveErrorKey(null)}
+      testID="colour-save-error-toast"
+    />
+  ) : null;
 
   /**
    * Render a layer group inside an SVG.
@@ -3494,7 +3554,13 @@ export default function DesignCanvasScreen() {
       )}
 
       {/* ── CANVAS AREA ── */}
-      <View style={styles.canvasOuter}>
+      <View
+        style={styles.canvasOuter}
+        onLayout={e => {
+          const { width, height } = e.nativeEvent.layout;
+          setStageSize(prev => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+        }}
+      >
 
         {/* Left sidebar: Procreate's own vertically-centred handles — size on
             top, opacity below, undo/redo beneath both — inset from the edge
@@ -3537,9 +3603,7 @@ export default function DesignCanvasScreen() {
               hitSlop={SIDEBAR_BTN_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Undo"
-              accessibilityRole="button"
               accessibilityState={{ disabled: !undoModelRef.current.canUndo }}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Icon name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
             </TouchableOpacity>
@@ -3549,9 +3613,7 @@ export default function DesignCanvasScreen() {
               hitSlop={SIDEBAR_BTN_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Redo"
-              accessibilityRole="button"
               accessibilityState={{ disabled: !undoModelRef.current.canRedo }}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Icon name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
             </TouchableOpacity>
@@ -3593,11 +3655,16 @@ export default function DesignCanvasScreen() {
         {/* Canvas-level touch listeners observe QuickMenu long-press while the
             active tool PanResponder retains gesture ownership. */}
         <View
-          style={styles.canvas}
-          onLayout={e => {
-            const { width, height } = e.nativeEvent.layout;
-            setCanvasSize({ w: width, h: height });
-          }}
+          style={[
+            styles.canvas,
+            {
+              left: canvasFit.offsetX,
+              top: canvasFit.offsetY,
+              width: canvasFit.width,
+              height: canvasFit.height,
+            },
+            canvasFit.scale <= 0 && styles.canvasUnmeasured,
+          ]}
           onTouchStart={handleCanvasTouchStart}
           onTouchMove={handleCanvasTouchMove}
           onTouchEnd={cancelQuickMenuLongPress}
@@ -4069,7 +4136,7 @@ export default function DesignCanvasScreen() {
           {/* Animation frame controls — shown when animEnabled */}
           {animEnabled && (
             <View style={styles.animBar}>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous frame"
+              <TouchableOpacity
                 style={styles.animBtn}
                 onPress={() => animGoToFrame(animCurrentFrame - 1)}
                 disabled={animCurrentFrame === 0}
@@ -4082,7 +4149,7 @@ export default function DesignCanvasScreen() {
               <Text style={styles.animFrameLabel}>
                 Frame {animCurrentFrame + 1}/{Math.max(1, animFrames.length)}
               </Text>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next frame"
+              <TouchableOpacity
                 style={styles.animBtn}
                 onPress={() => animGoToFrame(animCurrentFrame + 1)}
                 disabled={animCurrentFrame >= animFrames.length - 1}
@@ -4099,6 +4166,25 @@ export default function DesignCanvasScreen() {
             </View>
           )}
 
+          {/* Floating Text/Photo chips removed per Dev's feedback — Procreate
+              has no floating add buttons over the canvas. Equivalent, fuller
+              functionality (text, photo, camera, file, cut/copy/paste) lives
+              in the wrench icon's Add tab (WrenchActionsSheet), reached from
+              the top bar's row 2 wrench button. */}
+        </View>
+
+        {/* Sub-mode bars (Selection / Transform / Adjustments) dock at the
+            top of the stage. Their measured height is reserved in the
+            artboard fit (computeCanvasFit insets.top), so they never cover
+            the artboard. */}
+        {modeBarActive && (
+          <View
+            style={styles.modeBarDock}
+            onLayout={e => {
+              const h = Math.ceil(e.nativeEvent.layout.height);
+              setModeBarHeight(prev => (Math.abs(prev - h) > 0.5 ? h : prev));
+            }}
+          >
           {/* ── SELECTION MODE BAR ── */}
           {activeTopTool === 'select' && (
             <View style={styles.subModeBar} testID="selection-mode-bar">
@@ -4202,12 +4288,8 @@ export default function DesignCanvasScreen() {
             </View>
           )}
 
-          {/* Floating Text/Photo chips removed per Dev's feedback — Procreate
-              has no floating add buttons over the canvas. Equivalent, fuller
-              functionality (text, photo, camera, file, cut/copy/paste) lives
-              in the wrench icon's Add tab (WrenchActionsSheet), reached from
-              the top bar's row 2 wrench button. */}
-        </View>
+          </View>
+        )}
       </View>
 
       {/* ── SELECTION BAR ── */}
@@ -4269,7 +4351,7 @@ export default function DesignCanvasScreen() {
           closeSheet();
           try {
             const perm = await ImagePicker.requestCameraPermissionsAsync();
-            if (!perm.granted) { Alert.alert('Permission required', 'Camera access is needed.'); return; }
+            if (!perm.granted) { showAlert('Permission required', 'Camera access is needed.'); return; }
             const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
             if (result.canceled || !result.assets?.[0]) return;
             const uri = await makeDurableUri(result.assets[0].uri);
@@ -4291,7 +4373,7 @@ export default function DesignCanvasScreen() {
             mutateLayer(prev => [...prev, newLayer]);
             setSelectedLayerId(newLayer.id);
             setActiveTopTool('transform');
-          } catch { Alert.alert('Error', 'Could not take photo.'); }
+          } catch { showAlert("Couldn't take photo", 'Something went wrong with the camera. Try again.'); }
         }}
         onInsertFile={() => { closeSheet(); setTimeout(() => handleInsertFile(), 100); }}
         onAddText={() => { closeSheet(); openSheet('text'); }}
@@ -4454,8 +4536,10 @@ export default function DesignCanvasScreen() {
               onClose={closeSheet}
             />
           </View>
+          {activeSheet === 'color' && colorSaveToast}
         </View>
       </Modal>
+      {activeSheet !== 'color' && colorSaveToast}
       {/* ── LAYER MANAGER — Procreate's own full-height Layers sheet, dropping
           down from the top under the status bar, not a small corner popover. ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
@@ -4652,15 +4736,12 @@ export default function DesignCanvasScreen() {
             <Text style={styles.sheetTitle}>Canvas Info</Text>
             {[
               { label: 'Project Name', value: projectName },
-              { label: 'Logical Size',  value: `${logicalW} × ${logicalH} px` },
-              { label: 'Display Size',  value: `${Math.round(canvasSize.w)} × ${Math.round(canvasSize.h)} px` },
-              { label: 'Scale',         value: `${dispScaleX.toFixed(3)} × ${dispScaleY.toFixed(3)}` },
+              { label: 'Canvas Size',   value: `${logicalW} × ${logicalH} px` },
               { label: 'Layer Count',   value: `${layers.length}` },
               { label: 'Status',        value: (() => { const st = project?.status ?? 'draft'; return st.charAt(0).toUpperCase() + st.slice(1); })() },
               { label: 'Saved',         value: saveStatus === 'saved' ? 'Just now' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved changes' },
               { label: 'Background',    value: bgHex },
               { label: 'Crop',          value: cropRect ? `${Math.round(cropRect.w)}×${Math.round(cropRect.h)} @ (${Math.round(cropRect.x)},${Math.round(cropRect.y)}) — export will be cropped` : 'None' },
-            { label: 'Est. Size',     value: (() => { const bytes = JSON.stringify(layers).length; return bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes/1024).toFixed(1)} KB` : `${(bytes/1048576).toFixed(2)} MB`; })() },
             ].map(row => (
               <View key={row.label} style={styles.infoRow}>
                 <Text style={styles.infoLabel}>{row.label}</Text>
@@ -4888,7 +4969,7 @@ export default function DesignCanvasScreen() {
                         return (
                           <View key={row.key} style={styles.sliderRow}>
                             <Text style={[styles.sliderLabel, { minWidth: 72 }]}>{row.label}</Text>
-                            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease"
+                            <TouchableOpacity
                               style={styles.animBtn}
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.max(row.min, +(value - row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-dec`}
@@ -4901,7 +4982,7 @@ export default function DesignCanvasScreen() {
                             <View style={styles.sliderTrack}>
                               <View style={[styles.sliderFill, { width: `${Math.max(0, Math.min(100, pct))}%` }]} />
                             </View>
-                            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Increase ${row.key}`}
+                            <TouchableOpacity
                               style={styles.animBtn}
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.min(row.max, +(value + row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-inc`}
@@ -4988,18 +5069,14 @@ export default function DesignCanvasScreen() {
                   );
                 })()}
 
-                {/* Curve control-points: show tableValues string as visual approximation */}
+                {/* Curve preview: bars show the tone curve's output levels */}
                 {(() => {
                   const adj = selectedLayer.adjustments?.curves ?? defaultCurvesAdjustment();
                   const curve = adj[adjustmentsCurveChannel];
                   const tableVals = curveToTableValues(curve.points);
                   return (
                     <View style={{ marginBottom: SP.sm }}>
-                      <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular }}>
-                        Output: {tableVals}
-                      </Text>
-                      {/* Visual approximation bars */}
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 48, gap: 2, marginTop: SP.xs, backgroundColor: SURFACE, borderRadius: RADIUS.sm, padding: SP.xs }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 48, gap: 2, backgroundColor: SURFACE, borderRadius: RADIUS.sm, padding: SP.xs }}>
                         {tableVals.split(' ').map((v, i) => (
                           <View key={i} style={{
                             flex: 1,
@@ -5680,7 +5757,7 @@ function WrenchActionsSheet({
               />
               <ActionCell
                 icon="mail" label="Contact Support" sub="support@brandthread.app"
-                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => Alert.alert('Contact Support', 'Email us at support@brandthread.app.')); }}
+                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => showAlert('Contact Support', 'Email us at support@brandthread.app.')); }}
                 testID="help-support"
               />
               <ActionCell
@@ -5992,18 +6069,13 @@ const styles = StyleSheet.create({
 
   // Inset "page on a dark desk" look, Procreate-style: the artboard never
   // touches the screen edge — it floats with margin, soft rounded corners,
-  // and a shadow onto the dark canvasOuter surface behind it. NOTE: this is
-  // a fixed-margin inset, not true aspect-ratio-preserving letterboxing —
-  // for very tall/wide canvases the artboard will not exactly preserve its
-  // aspect ratio within this box. True letterbox-fit + pinch-to-zoom/pan is
-  // deliberately deferred to a follow-up (see PR notes) rather than rushed
-  // here, since canvasSize (read via onLayout below) drives the transform-
-  // handle coordinate math and a hasty aspect-fit change risks breaking it.
+  // and a shadow onto the dark canvasOuter surface behind it. Its size and
+  // position come from computeCanvasFit (lib/canvasFit.ts): a true
+  // aspect-fit with one uniform scale, centred in the stage after reserving
+  // the left rail and any docked sub-mode bar.
   canvas: {
-    flex: 1,
     backgroundColor: BG,
-    position: 'relative',
-    margin: 14,
+    position: 'absolute',
     borderRadius: RADIUS.md,
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -6012,6 +6084,10 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 10,
   },
+  canvasUnmeasured: { opacity: 0 },
+  // Sub-mode bars dock at the top of the stage; their height is reserved in
+  // the artboard fit so they never cover it.
+  modeBarDock: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 6 },
   inlineTextInput:{ position: 'absolute', backgroundColor: 'transparent', fontFamily: FONT.regular, padding: 4, minHeight: 40 },
 
   // Transform handle Pressable overlays — positioned absolutely on canvas View

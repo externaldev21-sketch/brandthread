@@ -29,6 +29,7 @@ import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrushDef, groupBrushesByCategory } from '@/lib/brushLibraryModel';
+import { confirmAlert } from '@/lib/actionSheet';
 
 const CATEGORY_ICONS: Record<string, IconName> = {
   Sketching: 'edit-3',
@@ -115,7 +116,15 @@ export default function BrushLibrary(props: BrushLibraryProps) {
               onSelect={() => { onSelectBrush(b.id); setOpenSwipeId(null); }}
               onShare={() => shareBrush(b)}
               onDuplicate={() => { onDuplicateBrush(b.id); setOpenSwipeId(null); }}
-              onDelete={() => { onDeleteBrush(b.id); setOpenSwipeId(null); }}
+              onDelete={() => {
+                setOpenSwipeId(null);
+                void confirmAlert({
+                  title: `Delete "${b.name}"?`,
+                  message: 'This brush will be removed from your library.',
+                  confirmLabel: 'Delete',
+                  destructive: true,
+                }).then(ok => { if (ok) onDeleteBrush(b.id); });
+              }}
               canDelete={brushes.length > 1}
             />
           ))}

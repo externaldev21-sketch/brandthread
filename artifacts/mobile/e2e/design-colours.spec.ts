@@ -255,6 +255,10 @@ test('Palettes tab: create, rename, set default, and delete a palette for real',
   // Delete it again — count drops back down.
   const deleteButtons = page.locator('[data-testid^="palette-delete-"]');
   await deleteButtons.last().click();
+  // Palette delete now asks for confirmation (confirmAlert → web alert host):
+  // button 0 is Cancel, button 1 is the destructive Delete.
+  await expect(page.locator('[data-testid="web-alert"]')).toBeVisible();
+  await page.locator('[data-testid="web-alert-button-1"]').click();
   await page.waitForTimeout(300);
   const finalCount = await page.locator('[data-testid^="palette-set-default-"]').count();
   expect(finalCount).toBe(beforeCount);

@@ -11,7 +11,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { confirmAlert } from '@/lib/actionSheet';
 import {
   BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -49,6 +50,44 @@ export interface ColorPickerProps {
 const DISC_SIZE = 220;
 const DISC_RADIUS = DISC_SIZE / 2;
 const SQUARE_SIZE = 220;
+
+// Hue/saturation wheel, drawn with react-native-svg (works on web and native
+// without Skia): HUE_WEDGES pie slices give the hue around the rim, matching
+// discPointToHs (hue counter-clockwise from 3 o'clock); a white→transparent
+// radial gradient fades saturation to 0 at the centre; a black overlay at
+// (1 − value) previews the current brightness.
+const HUE_WEDGES = 90;
+const HUE_WEDGE_PATHS: { d: string; fill: string }[] = (() => {
+  const r = DISC_RADIUS;
+  const step = 360 / HUE_WEDGES;
+  const pt = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return `${(r + Math.cos(rad) * r).toFixed(2)},${(r - Math.sin(rad) * r).toFixed(2)}`;
+  };
+  return Array.from({ length: HUE_WEDGES }, (_, i) => {
+    const centre = i * step;
+    // Slight overlap hides anti-aliasing seams between neighbouring wedges.
+    const a0 = centre - step / 2 - 0.4;
+    const a1 = centre + step / 2 + 0.4;
+    return { d: `M${r},${r} L${pt(a0)} A${r},${r} 0 0 0 ${pt(a1)} Z`, fill: `hsl(${Math.round(centre)},100%,50%)` };
+  });
+})();
+
+function HueSatWheel({ id, value }: { id: string; value: number }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width={DISC_SIZE} height={DISC_SIZE} pointerEvents="none">
+      <Defs>
+        <RadialGradient id={`${id}-sat`} cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      {HUE_WEDGE_PATHS.map((w, i) => <Path key={i} d={w.d} fill={w.fill} />)}
+      <Circle cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} fill={`url(#${id}-sat)`} />
+      <Circle cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} fill="#000000" opacity={Math.max(0, Math.min(1, 1 - value))} />
+    </Svg>
+  );
+}
 
 export default function ColorPicker(props: ColorPickerProps) {
   const {
@@ -200,9 +239,10 @@ export default function ColorPicker(props: ColorPickerProps) {
           <View style={s.discWrap}>
             <View
               {...discResponder.panHandlers}
-              style={[s.disc, { backgroundColor: `hsl(${hsv.h},100%,50%)` }]}
+              style={s.disc}
               testID="color-disc"
             >
+              <HueSatWheel id="cp-disc" value={hsv.v} />
               <View style={[s.discKnob, { left: knobX - 8, top: knobY - 8, backgroundColor: color, borderColor: knobColor }]} />
             </View>
             <Text style={s.sliderLabel}>Value: {Math.round(hsv.v * 100)}%</Text>
@@ -260,7 +300,6 @@ export default function ColorPicker(props: ColorPickerProps) {
 
         {tab === 'harmony' && (
           <View style={s.harmonyWrap} testID="color-harmony">
-            <Text style={s.sliderLabel}>{HARMONY_RULE_LABELS[harmonyRule]}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.sm }}>
               {HARMONY_RULES.map(rule => (
                 <TouchableOpacity
@@ -268,6 +307,8 @@ export default function ColorPicker(props: ColorPickerProps) {
                   style={[s.harmonyChip, harmonyRule === rule && s.harmonyChipActive]}
                   onPress={() => setHarmonyRule(rule)}
                   testID={`harmony-rule-${rule}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: harmonyRule === rule }}
                 >
                   <Text style={[s.harmonyChipText, harmonyRule === rule && { color: BG }]}>{HARMONY_RULE_LABELS[rule]}</Text>
                 </TouchableOpacity>
@@ -276,9 +317,10 @@ export default function ColorPicker(props: ColorPickerProps) {
             <View style={s.discWrap}>
               <View
                 {...harmonyDiscResponder.panHandlers}
-                style={[s.disc, { backgroundColor: `hsl(${hsv.h},100%,50%)` }]}
+                style={s.disc}
                 testID="color-harmony-disc"
               >
+                <HueSatWheel id="cp-harmony" value={hsv.v} />
                 <View style={[s.discKnob, { left: knobX - 8, top: knobY - 8, backgroundColor: color, borderColor: knobColor }]} />
                 {harmonyHues.map((h, i) => {
                   // Markers sit at a fixed outer radius, independent of the
@@ -377,8 +419,17 @@ export default function ColorPicker(props: ColorPickerProps) {
                       testID={`palette-rename-input-${p.id}`}
                     />
                   ) : (
-                    <TouchableOpacity onLongPress={() => { setEditingPaletteId(p.id); setEditingPaletteName(p.name); }}>
+                    <TouchableOpacity
+                      style={s.paletteNameBtn}
+                      onPress={() => { setEditingPaletteId(p.id); setEditingPaletteName(p.name); }}
+                      onLongPress={() => { setEditingPaletteId(p.id); setEditingPaletteName(p.name); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rename ${p.name}`}
+                      hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+                      testID={`palette-rename-${p.id}`}
+                    >
                       <Text style={s.paletteName}>{p.name}</Text>
+                      <Icon name="edit-2" size={12} color={SUBTLE} />
                     </TouchableOpacity>
                   )}
                   <View style={{ flexDirection: 'row', gap: SP.sm, alignItems: 'center' }}>
@@ -390,7 +441,16 @@ export default function ColorPicker(props: ColorPickerProps) {
                     <TouchableOpacity accessibilityRole="button" onPress={() => onSaveToPalette(p.id, color)} accessibilityLabel={`Add current color to ${p.name}`} testID={`palette-add-current-${p.id}`}>
                       <Icon name="plus-circle" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
-                    <TouchableOpacity accessibilityRole="button" onPress={() => onDeletePalette(p.id)} accessibilityLabel={`Delete ${p.name} palette`} testID={`palette-delete-${p.id}`}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => {
+                      void confirmAlert({
+                        title: `Delete "${p.name}"?`,
+                        message: p.colors.length
+                          ? `Its ${p.colors.length} colour${p.colors.length === 1 ? '' : 's'} will be removed.`
+                          : undefined,
+                        confirmLabel: 'Delete',
+                        destructive: true,
+                      }).then(ok => { if (ok) onDeletePalette(p.id); });
+                    }} accessibilityLabel={`Delete ${p.name} palette`} testID={`palette-delete-${p.id}`}>
                       <Icon name="trash-2" size={ICON.xs} color={SUBTLE} />
                     </TouchableOpacity>
                   </View>
@@ -535,6 +595,7 @@ const s = StyleSheet.create({
   swatch: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER },
   paletteBlock: { gap: 6, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, paddingTop: SP.sm },
   paletteHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  paletteNameBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   paletteName: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
 
   tabBar: {
