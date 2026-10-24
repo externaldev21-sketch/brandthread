@@ -609,7 +609,7 @@ export default function BuyerDropDetail() {
                   accent={theme.accent}
                 />
                 {!!drop.endsAt && (
-                  <TimeRemainingLabel endsAt={drop.endsAt} accent={theme.accent} />
+                  <TimeRemainingLabel endsAt={drop.endsAt} accent={theme.accent} label="Drop ends in" />
                 )}
               </View>
             )}

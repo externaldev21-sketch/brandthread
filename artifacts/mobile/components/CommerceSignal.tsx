@@ -190,7 +190,8 @@ export function ClaimedRemainingLabel({
 }
 
 // ─── TimeRemainingLabel ────────────────────────────────────────────────────────
-// Renders "HH:MM:SS" — hidden when endsAt absent or passed.
+// Renders "Ends in HH:MM:SS" — hidden when endsAt absent or passed. The
+// label says what ends (a bare clock read as an unexplained timer).
 // Ending-soon state uses the urgency accent (theme.accent), not RED.
 
 interface TimeRemainingProps {
@@ -200,10 +201,12 @@ interface TimeRemainingProps {
    * Falls back to theme.accent via internal hook when omitted.
    */
   accent?: string;
+  /** What ends, e.g. "Pre-orders close in", "Drop ends in". Defaults to "Ends in". */
+  label?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function TimeRemainingLabel({ endsAt, accent, style }: TimeRemainingProps) {
+export function TimeRemainingLabel({ endsAt, accent, label = 'Ends in', style }: TimeRemainingProps) {
   const { theme } = useAppTheme();
   const urgentColor = accent ?? theme.accent;
 
@@ -219,7 +222,7 @@ export function TimeRemainingLabel({ endsAt, accent, style }: TimeRemainingProps
       {isUrgent && <LivePulseDot color={urgentColor} />}
       {!isUrgent && <Icon name="clock" size={11} color={color} />}
       <Text style={[sig.labelBase, { color, marginLeft: 4, fontVariant: ['tabular-nums'] }]}>
-        {formatSecondsRemaining(secs)}
+        {`${label} ${formatSecondsRemaining(secs)}`}
       </Text>
     </View>
   );

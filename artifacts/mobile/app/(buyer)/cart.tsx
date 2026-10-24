@@ -12,7 +12,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 
-import { View, Text, ScrollView, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +31,7 @@ import { applyCartQuantity } from '@/lib/cartOptimistic';
 
 import * as Haptics from 'expo-haptics';
 
-import { getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot, saveForLater, moveToCart, removeSavedItem, groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart, estimateGroupShipping, totalShippingEstimate, replaceCartItemVariant, type ShippingEstimate, refreshCartStock, getSellerFreeShippingThreshold } from '@/services/cartService';
+import { getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot, saveForLater, moveToCart, removeSavedItem, groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart, replaceCartItemVariant, refreshCartStock, getSellerFreeShippingThreshold } from '@/services/cartService';
 
 import { FreeShippingStrip } from '@/components/cart/FreeShippingStrip';
 
@@ -104,8 +106,10 @@ const fmtPrice = formatCents;
 
 type RowPendingAction = NonNullable<BagLineBusy>;
 
-function SavedItemRow({ item, onMove, onRemove }: {
+function SavedItemRow({ item, busy, onMove, onRemove }: {
   item: SavedCartItem;
+  /** The action in flight for this row; both buttons ignore taps meanwhile. */
+  busy?: 'move' | 'remove';
   onMove: () => void;
   onRemove: () => void;
 }) {
@@ -114,7 +118,9 @@ function SavedItemRow({ item, onMove, onRemove }: {
   return (
     <View style={si.root}>
       <View style={si.img}>
-        <Icon name="bookmark" size={20} color={theme.muted} />
+        {item.imageUri
+          ? <CachedImage source={{ uri: item.imageUri }} style={si.productImage} contentFit="cover" recyclingKey={item.imageUri} />
+          : <Icon name="bookmark" size={20} color={theme.muted} />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>
@@ -129,7 +135,8 @@ function SavedItemRow({ item, onMove, onRemove }: {
             size="small"
             variant="secondary"
             onPress={onMove}
-            disabled={!item.isAvailable}
+            disabled={!item.isAvailable || !!busy}
+            loading={busy === 'move'}
             accessibilityHint={`Moves ${item.productName} to bag`}
           />
           <Button
@@ -137,6 +144,8 @@ function SavedItemRow({ item, onMove, onRemove }: {
             size="small"
             variant="tertiary"
             onPress={onRemove}
+            disabled={!!busy}
+            loading={busy === 'remove'}
             accessibilityHint={`Removes ${item.productName} from saved items`}
           />
         </View>
@@ -171,7 +180,7 @@ export default function CartScreen() {
       setSelectedIds(new Set());
       setEditMode(false);
     } catch (error) {
-      Alert.alert('Couldn’t remove items', error instanceof Error ? error.message : 'Try again.');
+      showAlert('Couldn’t remove items', friendlyError(error, 'Try again.'));
     } finally { setRemovingSelected(false); }
   }
   const scrollResetRef = useScrollReset<ScrollView>();
@@ -191,7 +200,6 @@ export default function CartScreen() {
   const { showUndo } = useUndoToast();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
-  const [shippingEstimates, setShippingEstimates] = useState<Record<string, ShippingEstimate | null>>({});
   // The line whose size/qty is being changed in the inline picker.
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -313,18 +321,12 @@ export default function CartScreen() {
       });
     return () => { active = false; };
   }, [bagProductIds, cartOwnerId]);
-  // Real shipping per seller group (the rate checkout will charge).
-  const groupsKey = groups.map(g => `${g.sellerId}:${g.subtotalCents}`).join('|');
-  useEffect(() => {
-    if (!groupsKey) return undefined;
-    let active = true;
-    const current = groupCartBySeller(cart.items);
-    void Promise.all(current.map(async g => [g.sellerId, await estimateGroupShipping(g.sellerId, g.subtotalCents)] as const))
-      .then(entries => { if (active) setShippingEstimates(Object.fromEntries(entries)); });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupsKey]);
-  const shippingTotal = totalShippingEstimate(groups.map(g => g.sellerId), shippingEstimates);
+  // Each seller's shipping for its current subtotal, from the same rate
+  // checkout builds its per-seller delivery groups from
+  // (cartService.fetchShippingRateDetails), so the brand lines and the
+  // "Shipping total" row match what checkout charges. Unknown stays unknown.
+  const shippingRates = useBagShippingRates(groups);
+  const shippingTotal = bagShippingTotal(groups, shippingRates);
   const summary = calculateCartSummary(cart.items, 0, shippingTotal ?? 0);
   const requestedPoints = Math.floor(Number(pointsInput));
   const maxRedeemablePoints = Math.min(
@@ -425,16 +427,29 @@ export default function CartScreen() {
     }
   }
 
-  async function handleMoveToCart(savedId: string) {
-    haptic('addToBag');
-    const newCart = await moveToCart(savedId);
-    setCart(newCart);
+  // Saved-for-later rows: one action at a time per row, so a double tap
+  // can't move or remove the same line twice.
+  const [pendingSaved, setPendingSaved] = useState<Record<string, 'move' | 'remove'>>({});
+  const pendingSavedRef = useRef(new Set<string>());
+  async function runSavedAction(savedId: string, action: 'move' | 'remove') {
+    if (pendingSavedRef.current.has(savedId)) return;
+    pendingSavedRef.current.add(savedId);
+    setPendingSaved(prev => ({ ...prev, [savedId]: action }));
+    try {
+      if (action === 'move') haptic('addToBag');
+      setCart(action === 'move' ? await moveToCart(savedId) : await removeSavedItem(savedId));
+    } catch (error) {
+      showAlert(
+        action === 'move' ? 'Couldn’t move to bag' : 'Couldn’t remove this item',
+        friendlyError(error, 'Try again.'),
+      );
+    } finally {
+      pendingSavedRef.current.delete(savedId);
+      setPendingSaved(prev => { const next = { ...prev }; delete next[savedId]; return next; });
+    }
   }
-
-  async function handleRemoveSaved(savedId: string) {
-    const newCart = await removeSavedItem(savedId);
-    setCart(newCart);
-  }
+  const handleMoveToCart = (savedId: string) => runSavedAction(savedId, 'move');
+  const handleRemoveSaved = (savedId: string) => runSavedAction(savedId, 'remove');
 
   function handleEditVariant(item: CartItem) {
     setEditingItem(item);
@@ -444,7 +459,7 @@ export default function CartScreen() {
     if (!editingItem) return;
     const result = await replaceCartItemVariant(editingItem.id, product, variant, quantity);
     if (!result.success) {
-      Alert.alert('Couldn’t update this item', result.message ?? 'Try again.');
+      showAlert('Couldn’t update this item', result.message ?? 'Try again.');
       return;
     }
     setCart(result.cart);
@@ -453,22 +468,22 @@ export default function CartScreen() {
 
   async function handleApplyPoints() {
     if (groups.length !== 1) {
-      Alert.alert(
+      showAlert(
         'One store at a time',
         'Rewards can be used when your bag has items from one seller. Check out each seller separately to use points.',
       );
       return;
     }
     if (!Number.isInteger(requestedPoints) || requestedPoints < 100) {
-      Alert.alert('Minimum 100 points', 'Use at least 100 points for $1.00 off.');
+      showAlert('Minimum 100 points', 'Use at least 100 points for $1.00 off.');
       return;
     }
     if (requestedPoints > loyaltyBalance) {
-      Alert.alert('Not enough points', `You have ${loyaltyBalance.toLocaleString()} points available.`);
+      showAlert('Not enough points', `You have ${loyaltyBalance.toLocaleString()} points available.`);
       return;
     }
     if (requestedPoints > maxRedeemablePoints) {
-      Alert.alert(
+      showAlert(
         'Choose fewer points',
         `You can use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`,
       );
@@ -491,7 +506,7 @@ export default function CartScreen() {
       setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
       setPointsInput('');
     } catch (error: any) {
-      Alert.alert("Couldn't apply points", error?.message ?? 'Try again.');
+      showAlert("Couldn't apply points", friendlyError(error, 'Try again.'));
     } finally {
       setRedeemingPoints(false);
     }
@@ -516,7 +531,7 @@ export default function CartScreen() {
         const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
-          Alert.alert('Review your bag', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
+          showAlert('Review your bag', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
           setBusy(false);
           return;
         }
@@ -534,7 +549,7 @@ export default function CartScreen() {
         storeCount: currentGroups.length, loyalty: !!loyaltyToApply, threadCash: !!threadCashToApply,
         paysInApp: !!isSignedIn && stripePaymentAvailable() && !hostedCheckoutFallback,
       })) {
-        Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
+        showAlert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
         setBusy(false);
         return;
       }
@@ -546,7 +561,7 @@ export default function CartScreen() {
             const status = await api.buyer.sellerPaymentStatus(group.sellerId);
             if (!status.ready) {
               const sellerLabel = group.sellerName || 'One of the sellers';
-              Alert.alert(
+              showAlert(
                 'Payments unavailable',
                 `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your bag.'}`,
                 [{ text: 'OK' }],
@@ -555,7 +570,7 @@ export default function CartScreen() {
               return;
             }
           } catch {
-            Alert.alert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
+            showAlert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
             setBusy(false);
             return;
           }
@@ -569,7 +584,7 @@ export default function CartScreen() {
       await createCheckoutSession(cart, true, items, loyaltyToApply);
       push(('/thread-checkout?source=cart') as never);
     } catch {
-      Alert.alert("Couldn't start checkout", 'Try again.');
+      showAlert("Couldn't start checkout", 'Try again.');
     }
     setBusy(false);
   }
@@ -588,7 +603,7 @@ export default function CartScreen() {
           productId: item.productId, title: item.productName, brand: item.sellerName, priceCents: item.priceCents,
         });
         if (!result.ok) {
-          Alert.alert('Couldn’t move to saves', 'Check your connection and try again.');
+          showAlert('Couldn’t move to saves', 'Check your connection and try again.');
           return;
         }
       }
@@ -666,6 +681,7 @@ export default function CartScreen() {
                             {freeShippingLabel(group.subtotalCents, freeShippingBySeller[group.sellerId])}
                           </Text>
                         )}
+                        <GroupShippingLine cents={shippingRates[group.sellerId]} sellerId={group.sellerId} />
                       </View>
                     </View>
                     <FreeShippingStrip sellerId={group.sellerId} sellerName={group.sellerName} subtotalCents={group.subtotalCents} hasPreOrder={group.hasPreOrder} />
@@ -765,8 +781,9 @@ export default function CartScreen() {
                       {idx > 0 && <View style={s.divider} />}
                       <SavedItemRow
                         item={item}
-                        onMove={() => handleMoveToCart(item.id)}
-                        onRemove={() => handleRemoveSaved(item.id)}
+                        busy={pendingSaved[item.id]}
+                        onMove={() => { void handleMoveToCart(item.id); }}
+                        onRemove={() => { void handleRemoveSaved(item.id); }}
                       />
                     </View>
                   ))}

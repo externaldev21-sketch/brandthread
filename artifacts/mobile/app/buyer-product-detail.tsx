@@ -6,7 +6,8 @@ import { hapticToggle, haptics, haptic } from '@/lib/haptics';
  */
 import { track } from '@/lib/analytics';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { containedPhotoBands, supportsTouchGestures } from '@/lib/touchInput';
 import { formatCalendarDate } from '@/lib/calendarDate';
 
 import { allOptionsSelected, onlyVariantSelection } from '@/lib/buyerProductSelection';
@@ -352,11 +353,13 @@ const DOUBLE_TAP_ZOOM = 2.5;
  * an unzoomed photo still swipes the gallery; `onZoomChange` lets the
  * gallery lock paging while a photo is zoomed.
  */
-function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeChange }: {
+function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeChange, onAspect }: {
   uri: string;
   brand?: string;
   name?: string;
   onOpen?: () => void;
+  /** The photo's own width / height once loaded (for overlays anchored to it). */
+  onAspect?: (aspect: number) => void;
   onZoomChange?: (zoomed: boolean) => void;
   onLoupeChange?: (active: boolean) => void;
 }) {
@@ -469,6 +472,10 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
           <CachedImage
             source={{ uri }}
             onError={() => setFailed(true)}
+            onLoad={(event) => {
+              const { width, height } = event.source ?? {};
+              if (width && height) onAspect?.(width / height);
+            }}
             style={StyleSheet.absoluteFill}
             contentFit="contain"
             accessibilityLabel="Product photo. Pinch or double-tap to zoom."
@@ -542,6 +549,13 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
   const [loupeActive, setLoupeActive] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // "Pinch to zoom" is a touch-only hint, pinned to the photo itself rather
+  // than the letterbox band a contained photo leaves around it.
+  const showPinchHint = useMemo(() => supportsTouchGestures(), []);
+  const [aspectByUri, setAspectByUri] = useState<Record<string, number>>({});
+  const onPhotoAspect = useCallback((uri: string, aspect: number) => {
+    setAspectByUri(prev => (prev[uri] === aspect ? prev : { ...prev, [uri]: aspect }));
+  }, []);
 
   useEffect(() => {
     if (!focusUri) return;
@@ -571,7 +585,7 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
           showsHorizontalScrollIndicator={false}
           renderItem={({ item, index }) => item.kind === 'video'
             ? <GalleryVideoSlide video={video!} active={index === activeIndex} width={GALLERY_WIDTH} height={GALLERY_HEIGHT} />
-            : <ZoomableGalleryImage uri={item.uri} brand={brand} name={name} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(images.indexOf(item.uri))} onLoupeChange={setLoupeActive} />}
+            : <ZoomableGalleryImage uri={item.uri} brand={brand} name={name} onAspect={(aspect) => onPhotoAspect(item.uri, aspect)} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(images.indexOf(item.uri))} onLoupeChange={setLoupeActive} />}
           getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
@@ -583,12 +597,19 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
           scrollEventThrottle={16}
         />
         <View style={galleryStyles.galleryShade} pointerEvents="none" />
-        {slides[activeIndex]?.kind !== 'video' && (
-          <View style={galleryStyles.galleryMeta} pointerEvents="none">
+        {showPinchHint && slides[activeIndex]?.kind === 'image' && (() => {
+          const bands = containedPhotoBands(GALLERY_WIDTH, GALLERY_HEIGHT, aspectByUri[slides[activeIndex].uri]);
+          return (
+          <View
+            style={[galleryStyles.galleryMeta, { left: SP.md + bands.horizontal, bottom: SP.md + bands.vertical }]}
+            pointerEvents="none"
+            testID="gallery-pinch-hint"
+          >
             <AppIcon name="maximize-2" size={13} color={ON_DARK} />
             <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
           </View>
-        )}
+          );
+        })()}
         {/* Polish 81: "3/8" next to the dots. */}
         {galleryCountLabel(activeIndex, slides.length) && (
           <View style={galleryStyles.galleryCount} pointerEvents="none" testID="gallery-count">
@@ -1846,7 +1867,12 @@ export default function BuyerProductDetailScreen() {
                 accent={theme.accent}
               />
               {!!demandEndsAt && (
-                <TimeRemainingLabel endsAt={demandEndsAt} accent={theme.accent} />
+                <TimeRemainingLabel
+                  endsAt={demandEndsAt}
+                  accent={theme.accent}
+                  // The server's endsAt is the pre-order closing date, else the drop's end.
+                  label={product.preOrderClosingDate ? 'Pre-orders close in' : 'Drop ends in'}
+                />
               )}
               <UrgencyBar
                 claimedUnits={demandClaimedUnits}
@@ -2439,7 +2465,7 @@ function SizeGuideSheet({ visible, chart, imageUri, onClose }: { visible: boolea
               accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
             />
           </View>
-          <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+          {supportsTouchGestures() && <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>}
         </>
       ) : null}
     </Sheet>

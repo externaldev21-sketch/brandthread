@@ -3,6 +3,7 @@
  * GET    /api/buyer/payment-methods        — list cards on file
  * POST   /api/buyer/payment-methods/:pmId/default — make a card the default
  * DELETE /api/buyer/payment-methods/:pmId  — detach a card
+ * POST   /api/buyer/payment-methods/setup-intent — start adding a card
  */
 import { Router } from "express";
 import Stripe from "stripe";
@@ -10,6 +11,7 @@ import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
+import { ensureStripeCustomer } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -62,6 +64,33 @@ router.get("/", async (req, res) => {
     return res.json({ paymentMethods });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── POST /api/buyer/payment-methods/setup-intent ────────────────────────────
+// Adds a card from the saved payment methods screen without a purchase. The
+// buyer's Stripe Customer is found or created the same way checkout does it
+// (ensureStripeCustomer), and the SetupIntent saves the card on it for later
+// off-session use. The app confirms it with Stripe's own card field, so card
+// data never reaches this server. Registered before /:pmId routes.
+router.post("/setup-intent", rateLimit("checkout"), async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  try {
+    const stripe = getStripe();
+    const customerId = await ensureStripeCustomer(stripe, clerkId);
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      usage: "off_session",
+      payment_method_types: ["card"],
+      metadata: { clerkUserId: clerkId, source: "buyer_payment_methods" },
+    });
+    if (!setupIntent.client_secret) {
+      return res.status(502).json({ error: "Couldn't start adding a card" });
+    }
+    return res.json({ clientSecret: setupIntent.client_secret, setupIntentId: setupIntent.id });
+  } catch (e: any) {
+    const status = typeof e?.status === "number" ? e.status : 500;
+    return res.status(status).json({ error: e.message });
   }
 });
 

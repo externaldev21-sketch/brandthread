@@ -28,6 +28,7 @@ import {
   APPLE_MERCHANT_ID, stripePublishableKey,
   type BillingDetails, type ConfirmOutcome, type ExpressPayProps, type GetClientSecret, type PaymentControllerApi,
 } from './stripePaymentTypes';
+import type { CardSetupControllerApi } from '@/components/payments/cardSetupTypes';
 
 // Type-only: erased at build time, so Expo Go never loads the native SDK.
 import type { PlatformPay as PlatformPayTypes } from '@stripe/stripe-react-native';
@@ -176,6 +177,40 @@ export const PaymentController = React.forwardRef<PaymentControllerApi>(function
       const clientSecret = await getClientSecret();
       if (!clientSecret) return null;
       return confirm(stripe, clientSecret, { paymentMethodId });
+    },
+  }), []);
+  return null;
+});
+
+// ─── Saving a card (SetupIntent) ─────────────────────────────────────────────
+
+/** Native: the same StripeProvider checkout uses; nothing is charged. */
+export function CardSetupProvider({ children }: { children: React.ReactNode; onUnavailable?: () => void }) {
+  return <StripePaymentProvider amountCents={0}>{children}</StripePaymentProvider>;
+}
+
+/** Native: Stripe's CardField works for a SetupIntent as it is. */
+export function SetupCardEntry(props: { onCompleteChange: (complete: boolean) => void; disabled?: boolean }) {
+  return <CardEntry {...props} />;
+}
+
+function fromSetupIntent(status: string | undefined): ConfirmOutcome {
+  if (status === 'Succeeded') return { status: 'succeeded' };
+  if (status === 'Processing') return { status: 'processing' };
+  return { status: 'failed', code: null, message: 'Your bank didn’t approve this card. Try again or use another card.' };
+}
+
+/** Confirms a SetupIntent with the card in <SetupCardEntry/>. 3DS is handled by the SDK. */
+export const CardSetupController = React.forwardRef<CardSetupControllerApi>(function CardSetupController(_props, ref) {
+  useImperativeHandle(ref, () => ({
+    async confirmSetup(getClientSecret: GetClientSecret) {
+      const stripe = sdk();
+      if (!stripe) return { status: 'failed', code: null, message: 'Adding a card isn’t available in this build.' };
+      const clientSecret = await getClientSecret();
+      if (!clientSecret) return null;
+      const { error, setupIntent } = await stripe.confirmSetupIntent(clientSecret, { paymentMethodType: 'Card' });
+      if (error) return failed(error as SdkError);
+      return fromSetupIntent(setupIntent?.status);
     },
   }), []);
   return null;

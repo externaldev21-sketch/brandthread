@@ -81,6 +81,7 @@ import {
   getFirstIncompleteCheckoutSection,
   mergeCheckoutFormState,
   withoutImplicitTermsAck,
+  withTaxEstimate,
   type CheckoutDisplayTotals,
 } from '@/lib/checkoutReadiness';
 import {
@@ -189,6 +190,11 @@ export default function BuyerCheckoutScreen() {
   // thread-checkout.tsx is a redirect alias — use ThreadPull transition if coming from there
   const usesThreadPull = pathname === '/thread-checkout';
   const leaveCheckout = () => (usesThreadPull ? back() : goBackOr(router));
+  const closeConfirmation = () => {
+    if (source !== 'buynow') { router.replace('/(buyer)/discover' as never); return; }
+    if (usesThreadPull) back();
+    else goBackOr(router, '/(buyer)/discover' as never);
+  };
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { isSignedIn } = useAuth();
@@ -540,8 +546,13 @@ export default function BuyerCheckoutScreen() {
   const tipGroups = quote?.value.groups ?? [];
   const tips = inApp ? tipsForRequest(tipChoices, tipGroups) : {};
 
-  // ── Server quote: real shipping + tax for the address (in-app only) ─────
-  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address, tips) : null;
+  // ── Server quote: real shipping + tax for the address ──────────────────
+  // In the app it prices the whole page. On the hosted path Stripe Checkout
+  // charges the final tax, so the quote only fills in the tax estimate once
+  // the address is complete (else "Calculated at payment").
+  const quoteBody = session && (inApp || payment.path === 'hosted') && canQuote(address)
+    ? buildQuoteBody(session, address, tips)
+    : null;
   const currentQuoteKey = quoteBody ? quoteKey(quoteBody) : null;
   useEffect(() => {
     if (!quoteBody || !currentQuoteKey || quote?.key === currentQuoteKey) return;
@@ -557,6 +568,8 @@ export default function BuyerCheckoutScreen() {
           const soldOut = soldOutFromError(err);
           if (soldOut) void handleSoldOut(soldOut);
           else if (apiError?.code === 'USE_HOSTED_CHECKOUT') setServerSaidHosted(true);
+          // A hosted-path estimate that fails just leaves "Calculated at payment".
+          else if (!inApp) return;
           else if (apiError && apiError.status >= 400 && apiError.status < 500 && apiError.status !== 429) {
             setError({ title: 'Some items in your order changed', message: apiError.message });
           }
@@ -1233,10 +1246,10 @@ export default function BuyerCheckoutScreen() {
         totalCents: quoted.totalCents,
         tipCents: activeQuote ? quoteTipCents(activeQuote) : 0,
       }
-    : sessionTotals;
-  const taxNote = quoted || previewOnly
-    ? undefined
-    : inApp ? 'Added with your address' : 'Calculated at payment';
+    : !inApp && activeQuote
+      ? withTaxEstimate(sessionTotals, quoteTotals(activeQuote).taxCents)
+      : sessionTotals;
+  const taxNote = quoted || previewOnly || (!inApp && activeQuote) ? undefined : 'Calculated at payment';
   const itemCount = current.deliveryGroups.reduce((sum, group) => sum + group.items.reduce((n, item) => n + item.quantity, 0), 0);
   const cardReady = !inApp || (savedCards.some(card => card.id === selectedCard) ? true : cardComplete);
   const formReady = getCheckoutBlockingSection(contact, address, current) === null && !(threadCashEligible && threadCash.busy);
@@ -1277,7 +1290,9 @@ export default function BuyerCheckoutScreen() {
     const confirmation = (
       <View style={styles.root}>
         {offer && stripePaymentAvailable() ? <PaymentController ref={offerControllerRef} /> : null}
-        {header('', () => router.replace('/(buyer)/discover' as never), 'Close')}
+        {/* Close goes back to where checkout started for Buy now (the product
+            page); a bag checkout just emptied the bag, so it goes to Discover. */}
+        {header('', closeConfirmation, 'Close')}
         <ScrollView
           contentContainerStyle={{ padding: GUTTER }}
           bounces={false}

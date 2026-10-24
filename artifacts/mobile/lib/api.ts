@@ -3202,6 +3202,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/buyer/payment-methods/${encodeURIComponent(pmId)}/default`, {},
         ),
       removePaymentMethod: (pmId: string) => del<{ ok: boolean }>(`/api/buyer/payment-methods/${encodeURIComponent(pmId)}`),
+      /** Starts adding a card without a purchase: a Stripe SetupIntent on the buyer's customer. */
+      createPaymentMethodSetupIntent: () =>
+        post<{ clientSecret: string; setupIntentId: string }>('/api/buyer/payment-methods/setup-intent', {}),
     },
     seller: {
       /** Get the current seller's profile (verified status, policies). */

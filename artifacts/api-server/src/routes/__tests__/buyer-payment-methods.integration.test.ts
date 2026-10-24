@@ -9,11 +9,14 @@ import { eq } from "drizzle-orm";
 const TEST_SUFFIX = crypto.randomBytes(6).toString("hex");
 const BUYER_ID = `payment-methods-buyer-${TEST_SUFFIX}`;
 const OTHER_BUYER_ID = `payment-methods-other-${TEST_SUFFIX}`;
+const NEW_BUYER_ID = `payment-methods-new-${TEST_SUFFIX}`;
 const BUYER_CUSTOMER_ID = `cus_buyer_${TEST_SUFFIX}`;
 const OTHER_CUSTOMER_ID = `cus_other_${TEST_SUFFIX}`;
 
 const fakeStripe = vi.hoisted(() => {
   const detached: string[] = [];
+  const setupIntents: any[] = [];
+  const createdCustomers: any[] = [];
   const customerUpdates: Array<{ id: string; params: any }> = [];
   const methods = new Map([
     [
@@ -64,6 +67,13 @@ const fakeStripe = vi.hoisted(() => {
   ]);
 
   const client = {
+    setupIntents: {
+      create: async (params: any) => {
+        const id = `seti_${setupIntents.length + 1}`;
+        setupIntents.push(params);
+        return { id, client_secret: `${id}_secret_test`, ...params };
+      },
+    },
     paymentMethods: {
       list: async ({ customer }: { customer: string }) => ({
         data: [...methods.values()].filter((method) => method.customer === customer),
@@ -82,6 +92,11 @@ const fakeStripe = vi.hoisted(() => {
           default_payment_method: id.includes("buyer") ? "pm_owner" : "pm_other",
         },
       }),
+      create: async (params: any) => {
+        const id = `cus_created_${createdCustomers.length + 1}`;
+        createdCustomers.push(params);
+        return { id, ...params };
+      },
       update: async (id: string, params: any) => {
         customerUpdates.push({ id, params });
         return { id, ...params };
@@ -91,12 +106,16 @@ const fakeStripe = vi.hoisted(() => {
 
   return {
     client,
+    createdCustomers,
+    setupIntents,
     customerUpdates,
     detached,
     methods,
     reset(ownerCustomerId: string, otherCustomerId: string) {
       customerUpdates.length = 0;
       detached.length = 0;
+      setupIntents.length = 0;
+      createdCustomers.length = 0;
       methods.get("pm_owner")!.customer = ownerCustomerId;
       methods.get("pm_other")!.customer = otherCustomerId;
       methods.get("pm_second")!.customer = "";
@@ -153,6 +172,13 @@ beforeAll(async () => {
       accountType: "buyer",
       stripeCustomerId: OTHER_CUSTOMER_ID,
     },
+    {
+      clerkId: NEW_BUYER_ID,
+      email: `${NEW_BUYER_ID}@test.local`,
+      name: "First Card Buyer",
+      role: "buyer",
+      accountType: "buyer",
+    },
   ]);
 
   const { default: buyerPaymentsRouter } = await import("../buyer-payments");
@@ -171,6 +197,7 @@ beforeEach(() => {
 afterAll(async () => {
   await db.delete(users).where(eq(users.clerkId, BUYER_ID));
   await db.delete(users).where(eq(users.clerkId, OTHER_BUYER_ID));
+  await db.delete(users).where(eq(users.clerkId, NEW_BUYER_ID));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -250,5 +277,63 @@ describe("buyer payment methods", () => {
     expect(result.status).toBe(403);
     expect(result.body.error).toBe("Not your payment method");
     expect(fakeStripe.detached).toEqual([]);
+  });
+
+  it("starts a SetupIntent on the buyer's existing Stripe Customer", async () => {
+    const result = await request(
+      "/api/buyer/payment-methods/setup-intent",
+      BUYER_ID,
+      "POST",
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      clientSecret: "seti_1_secret_test",
+      setupIntentId: "seti_1",
+    });
+    expect(fakeStripe.createdCustomers).toEqual([]);
+    expect(fakeStripe.setupIntents).toEqual([
+      expect.objectContaining({
+        customer: BUYER_CUSTOMER_ID,
+        usage: "off_session",
+        payment_method_types: ["card"],
+      }),
+    ]);
+  });
+
+  it("creates and stores a Stripe Customer for a buyer with no cards yet", async () => {
+    const first = await request(
+      "/api/buyer/payment-methods/setup-intent",
+      NEW_BUYER_ID,
+      "POST",
+    );
+
+    expect(first.status).toBe(200);
+    expect(fakeStripe.createdCustomers).toEqual([
+      expect.objectContaining({
+        email: `${NEW_BUYER_ID}@test.local`,
+        metadata: { clerkUserId: NEW_BUYER_ID },
+      }),
+    ]);
+    expect(fakeStripe.setupIntents[0].customer).toBe("cus_created_1");
+
+    const [row] = await db.select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users).where(eq(users.clerkId, NEW_BUYER_ID)).limit(1);
+    expect(row?.stripeCustomerId).toBe("cus_created_1");
+
+    // A second card reuses the stored customer instead of making another one.
+    await request("/api/buyer/payment-methods/setup-intent", NEW_BUYER_ID, "POST");
+    expect(fakeStripe.createdCustomers).toHaveLength(1);
+    expect(fakeStripe.setupIntents[1].customer).toBe("cus_created_1");
+  });
+
+  it("requires an authenticated buyer to start adding a card", async () => {
+    const result = await request(
+      "/api/buyer/payment-methods/setup-intent",
+      undefined,
+      "POST",
+    );
+    expect(result.status).toBe(401);
+    expect(fakeStripe.setupIntents).toEqual([]);
   });
 });

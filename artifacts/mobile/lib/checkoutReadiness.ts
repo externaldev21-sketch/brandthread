@@ -152,6 +152,21 @@ export interface CheckoutDisplayTotals {
  * single-seller orders only — so multi-seller orders never show it either).
  * Stripe remains the final authority on tax and the charged amount.
  */
+/**
+ * The hosted path's totals with a server tax estimate folded in (Stripe
+ * Checkout charges the final tax), so the "Estimated tax" line and the total
+ * still add up. A missing or invalid estimate leaves the totals unchanged.
+ */
+export function withTaxEstimate(totals: CheckoutDisplayTotals, taxCents: number): CheckoutDisplayTotals {
+  if (!Number.isSafeInteger(taxCents) || taxCents <= 0) return { ...totals, taxCents: Math.max(0, totals.taxCents) };
+  return {
+    ...totals,
+    taxCents: totals.taxCents + taxCents,
+    orderTotalCents: totals.orderTotalCents + taxCents,
+    totalCents: totals.totalCents + taxCents,
+  };
+}
+
 export function getCheckoutDisplayTotals(
   session: Pick<CheckoutSession, 'summary' | 'discounts' | 'deliveryGroups'> & Partial<Pick<CheckoutSession, 'threadCashRedemption'>>,
 ): CheckoutDisplayTotals {

@@ -37,7 +37,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { StarRating } from '@/components/StarRating';
 
-import { CachedImage } from '@/components/CachedImage';
+import { CachedImage, initialFor } from '@/components/CachedImage';
 import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
 
@@ -266,7 +266,10 @@ export function ProductReviewsSection({
                 <CachedImage source={{ uri: review.buyerAvatar }} style={s.avatar} recyclingKey={review.id} />
               ) : (
                 <View style={s.avatar}>
-                  <Text style={s.avatarText}>{(review.buyerName?.[0] ?? '?').toUpperCase()}</Text>
+                  {/* No name to take an initial from: a person glyph, never a "?". */}
+                  {review.buyerName && initialFor(review.buyerName) !== '?'
+                    ? <Text style={s.avatarText}>{initialFor(review.buyerName)}</Text>
+                    : <Icon name="user" size={16} color={MUTED} />}
                 </View>
               )}
               <View style={{ flex: 1 }}>
