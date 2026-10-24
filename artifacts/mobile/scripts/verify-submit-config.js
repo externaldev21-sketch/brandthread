@@ -28,19 +28,19 @@ const PLACEHOLDER_PREFIX = "REPLACE_WITH_";
 const IOS_FIELDS = [
   {
     field: "appleId",
-    env: ["EXPO_APPLE_ID", "EAS_APPLE_ID"],
+    env: ["APPLE_ID_EMAIL", "EXPO_APPLE_ID", "EAS_APPLE_ID"],
     format: /^\S+@\S+\.\S+$/,
     description: "the Apple ID email used to sign in to App Store Connect",
   },
   {
     field: "ascAppId",
-    env: ["EAS_ASC_APP_ID"],
+    env: ["ASC_APP_ID", "EAS_ASC_APP_ID"],
     format: /^\d{1,30}$/,
     description: "the numeric Apple ID shown in App Store Connect > your app > App Information",
   },
   {
     field: "appleTeamId",
-    env: ["EXPO_APPLE_TEAM_ID", "EAS_APPLE_TEAM_ID"],
+    env: ["APPLE_TEAM_ID", "EXPO_APPLE_TEAM_ID", "EAS_APPLE_TEAM_ID"],
     format: /^[A-Z0-9]{10}$/,
     description: "the 10-character Team ID from developer.apple.com > Account > Membership details",
   },
@@ -64,7 +64,7 @@ function resolveIosSubmitValues(config, env = process.env) {
     if (!value) {
       errors.push(`${names[0]} is not set; set it to ${description}`);
     } else if (!format.test(value)) {
-      errors.push(`${names[0]} "${value}" is not valid; it must be ${description}`);
+      errors.push(`${names[0]} is not valid; it must be ${description}`);
     } else {
       values[field] = value;
     }

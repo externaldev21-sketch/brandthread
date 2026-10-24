@@ -22,6 +22,10 @@ function quoteForCmd(arg) {
 
 /** Runs a command with inherited output. Returns the exit status. */
 function run(command, args, options = {}) {
+  if (command === 'eas' && !nativeEasCliAvailable()) {
+    args = ['dlx', 'eas-cli@25.3.0', ...args];
+    command = 'pnpm';
+  }
   const spawnOptions = { cwd: projectRoot, stdio: 'inherit', env: process.env, ...options };
   const result = isWindows
     ? spawnSync([command, ...args].map(quoteForCmd).join(' '), { ...spawnOptions, shell: true })
@@ -47,9 +51,20 @@ function capture(command, args, options = {}) {
   return { status: result.status ?? 1, stdout: result.stdout ?? '' };
 }
 
-function hasEasCli() {
+function nativeEasCliAvailable() {
   try {
     return capture('eas', ['--version'], { stdio: ['ignore', 'pipe', 'ignore'] }).status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function hasEasCli() {
+  if (nativeEasCliAvailable()) return true;
+  try {
+    return capture('pnpm', ['dlx', 'eas-cli@25.3.0', '--version'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).status === 0;
   } catch {
     return false;
   }

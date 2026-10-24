@@ -27,6 +27,7 @@ const { getLaunchConfigProblems } = require('./verify-launch-config');
 const { verifyAppIdentity } = require('./verify-app-identity');
 const { verifyAppleAuth } = require('./verify-apple-auth');
 const { verifyIosBuild } = require('./verify-ios-build');
+const { prepareAppleApiCredentials } = require('./apple-api-credentials');
 const {
   fail,
   readJson,
@@ -67,12 +68,19 @@ function main() {
   );
   console.log('\nStarting the iOS production build. When it finishes it is uploaded to TestFlight.\n');
 
-  const status = run('eas', [
-    'build',
-    '--platform', 'ios',
-    '--profile', 'production',
-    ...passthrough,
-  ]);
+  const credentials = process.env.ASC_PRIVATE_KEY ? prepareAppleApiCredentials() : null;
+  let status;
+  try {
+    status = run('eas', [
+      'build',
+      '--platform', 'ios',
+      '--profile', 'production',
+      ...(credentials && !passthrough.includes('--non-interactive') ? ['--non-interactive'] : []),
+      ...passthrough,
+    ], { env: credentials?.env || process.env });
+  } finally {
+    credentials?.cleanup();
+  }
   if (status !== 0) fail('The build did not start or failed. The log link above shows why.');
   if (passthrough.includes('--no-wait')) {
     console.log('\nBuild queued without waiting. When it finishes, upload it with:  pnpm run submit:ios\n');

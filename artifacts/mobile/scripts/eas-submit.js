@@ -18,6 +18,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { resolveIosSubmitValues } = require('./verify-submit-config');
+const { prepareAppleApiCredentials } = require('./apple-api-credentials');
 const { fail, projectRoot, requireEasCli, run } = require('./release-utils');
 
 const easJsonPath = path.join(projectRoot, 'eas.json');
@@ -40,6 +41,7 @@ function submitArgs(passthrough) {
 /** Runs `eas submit` with eas.json temporarily carrying the values. Returns the exit status. */
 function submitWithValues(values, passthrough, env = process.env, runImpl = run) {
   const original = fs.readFileSync(easJsonPath, 'utf8');
+  const credentials = env.ASC_PRIVATE_KEY ? prepareAppleApiCredentials(env) : null;
   const restore = () => {
     if (fs.readFileSync(easJsonPath, 'utf8') !== original) fs.writeFileSync(easJsonPath, original);
   };
@@ -48,12 +50,15 @@ function submitWithValues(values, passthrough, env = process.env, runImpl = run)
   process.on('SIGINT', ignore);
   process.on('SIGTERM', ignore);
   try {
-    fs.writeFileSync(easJsonPath, withIosSubmitValues(original, values));
-    return runImpl('eas', submitArgs(passthrough), {
-      env: { ...env, EXPO_APPLE_ID: values.appleId, EXPO_APPLE_TEAM_ID: values.appleTeamId },
+    fs.writeFileSync(easJsonPath, withIosSubmitValues(original, { ...values, ...credentials?.submitValues }));
+    const args = submitArgs(passthrough);
+    if (credentials && !args.includes('--non-interactive')) args.push('--non-interactive');
+    return runImpl('eas', args, {
+      env: { ...(credentials?.env || env), EXPO_APPLE_ID: values.appleId, EXPO_APPLE_TEAM_ID: values.appleTeamId },
     });
   } finally {
     restore();
+    credentials?.cleanup();
     process.off('SIGINT', ignore);
     process.off('SIGTERM', ignore);
   }
