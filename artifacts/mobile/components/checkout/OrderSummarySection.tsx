@@ -60,6 +60,16 @@ export function groupDeliveryWindow(group: Group, processingDays?: number | null
   });
 }
 
+/**
+ * A rate name that carries its own transit time ("Express courier (2–3 days)")
+ * sits right above the seller's processing window ("Ships in 3–5 business
+ * days"), which read as two contradicting estimates. The courier time starts
+ * once the order ships, so say so.
+ */
+export function serviceTitle(service: string, t: (key: string) => string = key => key): string {
+  return /\d/.test(service) ? `${service} ${t('after it ships')}` : service;
+}
+
 function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }: {
   group: Group; shippingCents: number | null; processingDays: number | null; first: boolean;
   ck: CheckoutColors; styles: ReturnType<typeof makeStyles>;
@@ -77,7 +87,7 @@ function SellerGroup({ group, shippingCents, processingDays, first, ck, styles }
         <Icon name="truck" size={14} color={ck.muted} style={{ marginTop: 2 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.deliveryTitle}>
-            {method ? method.service : t('No delivery option available')}
+            {method ? serviceTitle(method.service, t) : t('No delivery option available')}
             {shipping !== null ? ` · ${shipping === 0 ? t('Free') : formatCents(shipping)}` : ''}
           </Text>
           <Text style={styles.deliverySub}>

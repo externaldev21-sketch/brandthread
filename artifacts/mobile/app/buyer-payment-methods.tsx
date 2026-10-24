@@ -1,9 +1,10 @@
 /**
  * Brandthread — Buyer Payment Methods
- * Lists and manages saved Stripe payment methods.
+ * Lists and manages saved Stripe payment methods, and adds a card without a
+ * purchase (Stripe SetupIntent, components/payments/AddCardPanel).
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -27,6 +28,11 @@ import { Button, Card, ErrorState, IconButton } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 
 import { haptics } from '@/lib/haptics';
+import { showAlert, confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { stripePaymentAvailable } from '@/components/checkout/StripePayment';
+import { AddCardPanel, ADD_CARD_UNAVAILABLE_COPY } from '@/components/payments/AddCardPanel';
 
 import { TYPE_SCALE } from '@/constants/typography';
 
@@ -73,6 +79,15 @@ export default function BuyerPaymentMethodsScreen() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
+  const [addingCard, setAddingCard] = useState(false);
+  // Stripe.js failed to load on web after the panel opened.
+  const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
+  // In-app card entry needs a signed-in buyer, a dev/prod build with Stripe's
+  // native module (not Expo Go) and a publishable key; never in the preview.
+  const canAddCard = React.useMemo(
+    () => !!userId && !isBuyerDevPreview() && stripePaymentAvailable(),
+    [userId],
+  ) && !stripeLoadFailed;
 
   const load = async () => {
     setLoading(true);
@@ -103,35 +118,37 @@ export default function BuyerPaymentMethodsScreen() {
     try {
       await api.reviews.setDefaultPaymentMethod(pm.id);
       setPaymentMethods(prev => prev.map(p => ({ ...p, isDefault: p.id === pm.id })));
-    } catch {
-      Alert.alert("Couldn't set default card", 'Try again.');
+    } catch (err) {
+      showAlert("Couldn't set default card", friendlyError(err, 'Try again.'));
     } finally {
       setSettingDefault(null);
     }
   }
 
-  function confirmRemove(pm: PaymentMethod) {
-    Alert.alert(
-      'Remove card',
-      `Remove your ${pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1)} ending in ${pm.last4}?`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Remove card', style: 'destructive',
-          onPress: async () => {
-            setRemoving(pm.id);
-            try {
-              await api.reviews.removePaymentMethod(pm.id) as any;
-              setPaymentMethods(prev => prev.filter(p => p.id !== pm.id));
-            } catch {
-              Alert.alert("Couldn't remove card", 'Try again.');
-            } finally {
-              setRemoving(null);
-            }
-          },
-        },
-      ],
-    );
+  async function confirmRemove(pm: PaymentMethod) {
+    if (removing) return;
+    const confirmed = await confirmAlert({
+      title: 'Remove card',
+      message: `Remove your ${pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1)} ending in ${pm.last4}?`,
+      confirmLabel: 'Remove card',
+      cancelLabel: 'Keep',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setRemoving(pm.id);
+    try {
+      await api.reviews.removePaymentMethod(pm.id) as any;
+      setPaymentMethods(prev => prev.filter(p => p.id !== pm.id));
+    } catch (err) {
+      showAlert("Couldn't remove card", friendlyError(err, 'Try again.'));
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  function onCardAdded() {
+    setAddingCard(false);
+    void load();
   }
 
   return (
@@ -152,7 +169,9 @@ export default function BuyerPaymentMethodsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.desc}>
-            Payment methods saved from your Brandthread purchases.
+            {canAddCard
+              ? 'Cards you add here or use at checkout.'
+              : 'Payment methods saved from your Brandthread purchases.'}
           </Text>
 
           {loadFailed ? (
@@ -202,7 +221,7 @@ export default function BuyerPaymentMethodsScreen() {
                       <IconButton
                         name="trash-2"
                         accessibilityLabel={`Remove card ending in ${pm.last4}`}
-                        onPress={() => confirmRemove(pm)}
+                        onPress={() => { void confirmRemove(pm); }}
                         variant="plain"
                         color={palette.mutedForeground}
                         disabled={settingDefault !== null}
@@ -212,6 +231,29 @@ export default function BuyerPaymentMethodsScreen() {
                 </View>
               ))}
             </View>
+          )}
+
+          {!canAddCard ? (
+            <Text style={s.addCardNote} testID="add-card-unavailable">{ADD_CARD_UNAVAILABLE_COPY}</Text>
+          ) : addingCard ? (
+            <AddCardPanel
+              onAdded={onCardAdded}
+              onCancel={() => setAddingCard(false)}
+              onUnavailable={() => { setAddingCard(false); setStripeLoadFailed(true); }}
+            />
+          ) : (
+            <Button
+              label="Add card"
+              icon="plus"
+              onPress={() => setAddingCard(true)}
+              variant="secondary"
+              size="small"
+              fullWidth
+              disabled={settingDefault !== null || removing !== null}
+              accessibilityHint="Opens a secure Stripe card form"
+              style={s.addCardBtn}
+              testID="add-card"
+            />
           )}
 
           <View style={s.securityNote}>
@@ -240,6 +282,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   defaultBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: theme.success },
   pmMeta: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginTop: 2 },
   setDefaultBtn: { alignSelf: 'flex-start', marginTop: 2, minWidth: 0, paddingHorizontal: 0 },
+  addCardBtn: { minHeight: 44, marginBottom: SPACING.lg },
+  addCardNote: { ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18, marginBottom: SPACING.lg, paddingHorizontal: SPACING.sm },
   securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
   securityNoteText: { flex: 1, ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18 },
 });

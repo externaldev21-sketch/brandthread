@@ -417,8 +417,10 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
 
       {/* Live status tracker — visual centerpiece of the card. Labelled
           Ordered · Shipped · Delivered (item 81); cancelled / refunded /
-          disputed keep the shared timeline's exception pill. */}
-      {!autoRefunded && (
+          disputed keep the shared timeline's exception pill — except
+          cancelled, whose "Order cancelled" banner below already says it
+          (the pill was a second "Cancelled" right above it). */}
+      {!autoRefunded && order.status !== 'cancelled' && (
         <View style={styles.trackerWrap}>
           {isTerminalStatus
             ? <OrderStatusTimeline status={order.status} compact />
@@ -475,7 +477,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
             onPress={() => { haptic('select'); onTrack(order.id); }}
           >
             <Icon name="map-pin" size={12} color={theme.secondary} />
-            <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
+            <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track shipment</Text>
           </TouchableOpacity>
         )}
         {onReorder && canReorderStatus(order.status) && (

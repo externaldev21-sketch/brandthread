@@ -32,6 +32,7 @@ import {
   stripePublishableKey,
   type BillingDetails, type ConfirmOutcome, type ExpressPayProps, type GetClientSecret, type PaymentControllerApi,
 } from './stripePaymentTypes';
+import type { CardSetupControllerApi } from '@/components/payments/cardSetupTypes';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 /** Stripe.js couldn't load (offline, blocked by an extension or network). */
@@ -226,6 +227,78 @@ const ElementsPaymentController = React.forwardRef<PaymentControllerApi>(functio
       });
       if (error) return failed(error);
       return fromIntent(paymentIntent?.status);
+    },
+  }), [stripe, elements]);
+  return null;
+});
+
+// ─── Saving a card (SetupIntent) ─────────────────────────────────────────────
+
+/** Elements in setup mode: card only, nothing is charged. */
+export function CardSetupProvider({ children, onUnavailable }: { children: React.ReactNode; onUnavailable?: () => void }) {
+  const ck = useCheckoutColors();
+  const loader = stripeLoader();
+  useEffect(() => {
+    let active = true;
+    void loader?.then(stripe => { if (active && !stripe) onUnavailable?.(); });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loader]);
+  const options = useMemo<StripeElementsOptions>(() => ({
+    mode: 'setup',
+    currency: 'usd',
+    paymentMethodTypes: ['card'],
+    appearance: makeAppearance(ck),
+    fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap' }],
+  }), [ck]);
+  if (!loader) return <>{children}</>;
+  return <Elements stripe={loader} options={options}>{children}</Elements>;
+}
+
+/** Card number, expiry, CVC and the postcode Stripe asks for; no page-supplied billing fields here. */
+export function SetupCardEntry({ onCompleteChange }: { onCompleteChange: (complete: boolean) => void; disabled?: boolean }) {
+  if (!stripePaymentAvailable()) return null;
+  return (
+    <View testID="add-card-field">
+      <PaymentElement
+        options={{ layout: 'tabs', wallets: { applePay: 'never', googlePay: 'never' } }}
+        onChange={event => onCompleteChange(event.complete)}
+      />
+    </View>
+  );
+}
+
+function fromSetupIntent(status: string | undefined): ConfirmOutcome {
+  if (status === 'succeeded') return { status: 'succeeded' };
+  if (status === 'processing') return { status: 'processing' };
+  // requires_payment_method after a closed 3DS window
+  return { status: 'canceled' };
+}
+
+/** Stripe's hooks throw outside <Elements>, which only exists with a publishable key. */
+export const CardSetupController = React.forwardRef<CardSetupControllerApi>(function CardSetupController(_props, ref) {
+  if (!stripePaymentAvailable()) return null;
+  return <ElementsCardSetupController ref={ref} />;
+});
+
+const ElementsCardSetupController = React.forwardRef<CardSetupControllerApi>(function ElementsCardSetupController(_props, ref) {
+  const stripe = useStripe();
+  const elements = useElements();
+  useImperativeHandle(ref, () => ({
+    async confirmSetup(getClientSecret: GetClientSecret) {
+      if (!stripe || !elements) return { status: 'failed', code: null, message: 'The secure card form is still loading. Try again.' };
+      const { error: submitError } = await elements.submit();
+      if (submitError) return failed(submitError);
+      const clientSecret = await getClientSecret();
+      if (!clientSecret) return null;
+      const { error, setupIntent } = await stripe.confirmSetup({
+        elements,
+        clientSecret,
+        redirect: 'if_required',
+        confirmParams: { return_url: returnUrl() },
+      });
+      if (error) return failed(error);
+      return fromSetupIntent(setupIntent?.status);
     },
   }), [stripe, elements]);
   return null;

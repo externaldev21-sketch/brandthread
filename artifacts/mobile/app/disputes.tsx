@@ -8,11 +8,12 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
-import { formatCents } from '@/lib/money';
+import { formatDisputeAmount } from '@/lib/disputeMoney';
 import type { DisputeListItem } from '@/lib/disputeTypes';
 import { demoDisputes } from '@/components/disputes/demoDisputes';
 import { dueChipLabel, isFinalStatus, statusLabel } from '@/components/disputes/disputeUi';
@@ -41,6 +42,7 @@ export default function DisputesScreen() {
   const [items, setItems] = useState<DisputeListItem[] | null>(signedOutPreview ? (isPreviewDemoMode() ? demoDisputes() : []) : null);
   const [failed, setFailed] = useState(false);
   const [filter, setFilter] = useState<Filter>('open');
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (signedOutPreview) return;
@@ -66,6 +68,11 @@ export default function DisputesScreen() {
   }, [signedOutPreview]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await load(); } finally { setRefreshing(false); }
+  }, [load]);
 
   const shown = useMemo(
     () => (items ?? []).filter((d) => (filter === 'closed') === isFinalStatus(d.status)),
@@ -99,7 +106,21 @@ export default function DisputesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: tabBar.occupiedHeight + SP.lg, flexGrow: 1 }}
+        refreshControl={signedOutPreview ? undefined : (
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} />
+        )}
       >
+        {failed && items ? (
+          // Stale rows stay on screen; the refetch failure is a quiet inline retry.
+          <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md }} accessibilityLiveRegion="polite">
+            <RetryRow
+              label="Couldn't refresh chargebacks"
+              onRetry={() => void load()}
+              style={{ minHeight: 44 }}
+              testID="disputes-refresh-error"
+            />
+          </View>
+        ) : null}
         {failed && !items ? (
           <View style={{ padding: SP.md }}>
             <RetryRow label="Couldn't load chargebacks" onRetry={() => void load()} />
@@ -131,13 +152,13 @@ export default function DisputesScreen() {
                 onPress={() => router.push(`/dispute-detail?disputeId=${encodeURIComponent(d.id)}` as never)}
                 style={[styles.row, { borderBottomColor: colors.border }]}
                 accessibilityRole="button"
-                accessibilityLabel={`${formatCents(Math.round(d.amount * 100))} chargeback, ${statusLabel(d.status)}`}
+                accessibilityLabel={`${formatDisputeAmount(d.amount, d.currency)} chargeback, ${statusLabel(d.status)}`}
                 testID={`dispute-row-${d.id}`}
               >
                 <View style={{ flex: 1, gap: 6 }}>
                   <View style={styles.topLine}>
                     <Text style={[styles.amount, { color: colors.foreground }]}>
-                      {formatCents(Math.round(d.amount * 100))}
+                      {formatDisputeAmount(d.amount, d.currency)}
                     </Text>
                     {d.orderNumber ? (
                       <Text style={[styles.meta, { color: colors.mutedForeground }]}>{d.orderNumber}</Text>

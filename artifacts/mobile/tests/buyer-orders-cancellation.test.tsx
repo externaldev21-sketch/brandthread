@@ -39,6 +39,8 @@ vi.mock('react-native', () => {
       ...(data ?? []).map((item, index) => renderItem({ item, index })),
     ),
     RefreshControl: nativeComponent('RefreshControl'),
+    ScrollView: nativeComponent('ScrollView'),
+    Pressable: nativeComponent('Pressable'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     NativeModules: {},
     KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
@@ -78,6 +80,7 @@ vi.mock('@expo/vector-icons', () => ({
 
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
+  selectionAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },
 }));
 
@@ -142,6 +145,7 @@ vi.mock('@/lib/theme', () => ({
   RED: '#F87171',
   RED_DIM: '#3F2020',
   GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
+  ELEVATION: { background: '#000000', card: '#1C1C1E', sheet: '#1C1C1E', input: '#2C2C2E' },
   FONT: {
     regular: 'System',
     medium: 'System',
@@ -185,6 +189,7 @@ vi.mock('@/components/BrandthreadUI', () => {
     PrimaryButton: native('PrimaryButton'),
     BrandedLoader: native('BrandedLoader'),
     PressableScale: native('PressableScale'),
+    SearchBar: native('SearchBar'),
   };
 });
 
@@ -195,6 +200,15 @@ vi.mock('@/services/orderService', () => ({
 // Pulled in transitively (reorder flow → cart); the native module isn't
 // available under Vitest. This suite failed to load without it.
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'test-uuid' }));
+
+// The selected filter tab is persisted to storage; keep it per render here
+// so the Returns-tab tests don't leak "returns" into the next test.
+vi.mock('@/hooks/usePersistedChoice', () => ({
+  usePersistedChoice: <T,>(_key: string, initial: T) => {
+    const React = require('react') as typeof import('react');
+    return React.useState<T>(initial);
+  },
+}));
 
 vi.mock('@/services/buyerReturnsService', () => ({
   getBuyerReturns: getBuyerReturnsMock,
@@ -292,17 +306,19 @@ describe('buyer order cancellation banner', () => {
 
     renderer = await renderScreen();
 
-    // The card now also shows a compact OrderStatusTimeline, which renders its
-    // own 'x-circle' exception pill for a cancelled order alongside the
-    // cancellation banner's icon — both are red, so there are two now instead
-    // of one. The banner itself (checked below via its unique label/copy)
-    // still renders exactly once.
+    // Only the cancellation banner marks a cancelled order: the compact
+    // OrderStatusTimeline's "Cancelled" exception pill was a duplicate right
+    // above it and is no longer rendered for cancelled orders.
     const cancellationIcons = renderer.root.findAll(
       node => (node.type as unknown) === 'Feather'
         && node.props.name === 'x-circle'
         && node.props.color === '#F87171',
     );
-    expect(cancellationIcons).toHaveLength(2);
+    expect(cancellationIcons).toHaveLength(1);
+    // Only the cancelled card loses its timeline; the active order keeps its progress.
+    expect(renderer.root.findAll(
+      node => typeof node.type === 'function' && node.type.name === 'OrderStatusTimeline',
+    )).toHaveLength(0);
 
     const cancellationReasons = renderer.root.findAll(
       node => (node.type as unknown) === 'Text'
@@ -314,6 +330,22 @@ describe('buyer order cancellation banner', () => {
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Order cancelled',
     )).toHaveLength(1);
+  });
+
+  it('keeps the timeline exception pill for refunded orders (no banner there)', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [{ ...baseOrder, status: 'refunded', cancellationReason: null }],
+      error: null,
+    });
+
+    renderer = await renderScreen();
+
+    expect(renderer.root.findAll(
+      node => typeof node.type === 'function' && node.type.name === 'OrderStatusTimeline',
+    )).toHaveLength(1);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Order cancelled',
+    )).toHaveLength(0);
   });
 
   it('renders the friendly shared label for buyer_requested', async () => {
@@ -355,7 +387,9 @@ describe('buyer orders Returns tab and Track Shipment (items 108, 109)', () => {
   });
 
   async function openReturnsTab(r: ReactTestRenderer) {
-    const chip = r.root.findAll(node => (node.type as unknown) === 'FilterChip' && node.props.label === 'Returns')[0];
+    // The filters are now underlined text tabs (Pressable, role "tab").
+    const chip = r.root.findAll(node => (node.type as unknown) === 'Pressable'
+      && node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === 'Returns')[0];
     await act(async () => {
       chip.props.onPress();
       await flushPromises();

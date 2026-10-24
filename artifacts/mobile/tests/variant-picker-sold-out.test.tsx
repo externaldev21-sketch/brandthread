@@ -74,7 +74,7 @@ vi.mock('@/components/SizeRecommendationBadge', async () => {
   };
 });
 
-import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
+import { VariantPickerSheet, missingOptionsLabel } from '@/components/buy-now/VariantPickerSheet';
 import type { BuyerProduct } from '@/services/cartTypes';
 
 // Stock comes from the product's variants (adaptApiProduct maps stock → isAvailable).
@@ -187,9 +187,22 @@ describe('VariantPickerSheet size chips', () => {
     act(() => { tree = create(<VariantPickerSheet productId="p1" initialProduct={product} onClose={vi.fn()} onConfirm={vi.fn()} />); });
     const sheet = tree.root.findByType('Sheet' as never);
     expect(sheet.props.title).toBe('Choose options');
-    expect(sheet.props.primaryAction.label).toBe('Select options');
+    // Names the missing option rather than a generic "Select options".
+    expect(sheet.props.primaryAction.label).toBe('Select size');
     act(() => tree.root.findAllByType('Chip' as never)[0].props.onPress());
     expect(tree.root.findByType('Sheet' as never).props.primaryAction.label).toBe('Add to bag · $220.00');
     expect(tree.root.findByType('Sheet' as never).props.primaryAction.disabled).toBe(false);
+  });
+});
+
+describe('missingOptionsLabel', () => {
+  const options = [{ id: 'size', name: 'Size' }, { id: 'color', name: 'Color' }, { id: 'fit', name: 'Fit' }];
+  it('names one or two missing options', () => {
+    expect(missingOptionsLabel(options.slice(0, 1), {})).toBe('Select size');
+    expect(missingOptionsLabel(options.slice(0, 2), {})).toBe('Select size and color');
+    expect(missingOptionsLabel(options.slice(0, 2), { size: 'm' })).toBe('Select color');
+  });
+  it('falls back to the generic copy for three or more', () => {
+    expect(missingOptionsLabel(options, {})).toBe('Select options');
   });
 });

@@ -162,7 +162,10 @@ vi.mock('@/components/BrandthreadUI', () => {
   };
 });
 
-vi.mock('@/lib/theme', () => ({
+// Real tokens (ELEVATION, TYPE, …) under the suite's pinned overrides, so a
+// new token used by a shared component doesn't break this mock.
+vi.mock('@/lib/theme', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/theme')>()),
   BG: '#0A0A0B',
   SCREEN_BG: 'transparent',
   CARD: '#18181B',

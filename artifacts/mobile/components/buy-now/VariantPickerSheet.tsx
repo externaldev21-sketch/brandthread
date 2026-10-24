@@ -213,7 +213,7 @@ export function VariantPickerSheet({
   }
 
   const confirmLabel = !product ? 'Choose options'
-    : !allSelected ? 'Select options'
+    : !allSelected ? missingOptionsLabel(product.options, selections)
     : !variant ? 'Unavailable combination'
     : !variant.isAvailable ? 'Out of stock'
     : exceedsStock ? 'Reduce quantity'
@@ -351,6 +351,22 @@ export function VariantPickerSheet({
       <Snackbar visible={!!toast} message={toast ?? ''} topOffset={SP.md} />
     </Sheet>
   );
+}
+
+/**
+ * The confirm button's copy while options are missing: names what's left to
+ * pick ("Select size", "Select size and color") so the button says why it
+ * won't confirm yet, instead of a generic "Select options".
+ */
+export function missingOptionsLabel(
+  options: readonly Pick<BuyerProductOption, 'id' | 'name'>[],
+  selections: Record<string, string>,
+): string {
+  const missing = options.filter(option => !selections[option.id]).map(option => option.name.trim().toLowerCase()).filter(Boolean);
+  if (missing.length === 0) return 'Select options';
+  if (missing.length === 1) return `Select ${missing[0]}`;
+  if (missing.length === 2) return `Select ${missing[0]} and ${missing[1]}`;
+  return 'Select options';
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({

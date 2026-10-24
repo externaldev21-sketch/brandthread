@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, FormInput } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
-import { formatCents } from '@/lib/money';
+import { formatDisputeCents } from '@/lib/disputeMoney';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -107,6 +109,11 @@ export default function DisputeDetailScreen() {
   const [submittingEvidence, setSubmittingEvidence] = useState(false);
   const [internalNote, setInternalNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  // Synchronous double-tap guard: a second tap can land before the
+  // `addingNote` re-render disables the button.
+  const addingNoteRef = useRef(false);
+  // The dispute's own currency (Stripe code from the API); USD when absent.
+  const [currency, setCurrency] = useState<string | null>(null);
   const [conceding, setConceding] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
   const [evidenceFiles, setEvidenceFiles] = useState<DisputeEvidenceFile[]>([]);
@@ -139,6 +146,7 @@ export default function DisputeDetailScreen() {
           payment: { totalCents: demo.order.totalCents }, lineItems: [], shipments: [],
         });
         setEvidenceFiles(demo.files);
+        setCurrency(demo.item.currency ?? null);
         setEvidenceSubmittedAt(demo.item.evidenceSubmittedAt);
         setLoading(false);
         return;
@@ -168,6 +176,7 @@ export default function DisputeDetailScreen() {
           updatedAt:        data.updatedAt,
         };
         setDispute(mapped);
+        setCurrency(typeof data.currency === 'string' ? data.currency : null);
         setEvidenceFiles(data.evidenceFiles ?? []);
         setEvidenceSubmittedAt(data.evidenceSubmittedAt ?? null);
         setTimelineKey(k => k + 1);
@@ -278,7 +287,7 @@ export default function DisputeDetailScreen() {
   const handleSubmitEvidence = async () => {
     if (submittingEvidence) return;
     if (!evidenceDesc.trim()) {
-      Alert.alert('Add a description', 'Describe what this evidence shows.');
+      showAlert('Add a description', 'Describe what this evidence shows.');
       return;
     }
     setSubmittingEvidence(true);
@@ -292,14 +301,15 @@ export default function DisputeDetailScreen() {
       setEvidenceDesc('');
       await load();
     } catch (err: any) {
-      Alert.alert('Couldn’t submit evidence', 'Try again.');
+      showAlert('Couldn’t submit evidence', friendlyError(err, 'Try again.'));
     } finally {
       setSubmittingEvidence(false);
     }
   };
 
   const handleAddNote = async () => {
-    if (addingNote || !internalNote.trim()) return;
+    if (addingNoteRef.current || !internalNote.trim()) return;
+    addingNoteRef.current = true;
     setAddingNote(true);
     try {
       await api.disputes.submitEvidence(dispute!.id, {
@@ -309,16 +319,17 @@ export default function DisputeDetailScreen() {
       setInternalNote('');
       await load();
     } catch (err: any) {
-      Alert.alert('Couldn’t add note', 'Try again.');
+      showAlert('Couldn’t add note', friendlyError(err, 'Your note wasn’t saved. Try again.'));
     } finally {
+      addingNoteRef.current = false;
       setAddingNote(false);
     }
   };
 
   const handleConcede = () => {
-    Alert.alert(
+    showAlert(
       'Accept this dispute?',
-      `The buyer gets a full refund of ${formatCents(dispute!.amountCents)}. You can't undo this.`,
+      `The buyer gets a full refund of ${formatDisputeCents(dispute!.amountCents, currency)}. You can't undo this.`,
       [
         { text: 'Keep disputing', style: 'cancel' },
         {
@@ -331,7 +342,7 @@ export default function DisputeDetailScreen() {
               await api.disputes.accept(dispute!.id);
               await load();
             } catch (err: any) {
-              Alert.alert('Couldn’t accept this dispute', 'Try again.');
+              showAlert('Couldn’t accept this dispute', friendlyError(err, 'Try again.'));
             } finally {
               setConceding(false);
             }
@@ -342,7 +353,7 @@ export default function DisputeDetailScreen() {
   };
 
   const handleSubmitAll = () => {
-    Alert.alert(
+    showAlert(
       'Submit all evidence?',
       'This sends everything above to the card network for review. You can’t add more after this.',
       [
@@ -356,7 +367,7 @@ export default function DisputeDetailScreen() {
               await api.disputes.submitAll(dispute!.id);
               await load();
             } catch (err: any) {
-              Alert.alert('Couldn’t submit evidence', 'Try again.');
+              showAlert('Couldn’t submit evidence', friendlyError(err, 'Try again.'));
             } finally {
               setSubmittingAll(false);
             }
@@ -397,7 +408,7 @@ export default function DisputeDetailScreen() {
           </View>
           <View style={styles.alertAmountRow}>
             <Text style={styles.alertAmountLabel}>Disputed amount</Text>
-             <Text style={styles.alertAmount}>{formatCents(dispute.amountCents)}</Text>
+             <Text style={styles.alertAmount}>{formatDisputeCents(dispute.amountCents, currency)}</Text>
           </View>
           {dispute.evidenceDeadline && (
             <View style={styles.deadlineRow}>
@@ -442,7 +453,7 @@ export default function DisputeDetailScreen() {
           </View>
           <View style={styles.contextRow}>
             <Text style={styles.ctxLabel}>Total</Text>
-             <Text style={styles.ctxValue}>{formatCents(order.payment.totalCents)}</Text>
+             <Text style={styles.ctxValue}>{formatDisputeCents(order.payment.totalCents, currency)}</Text>
           </View>
           {order.lineItems.length > 0 && (
             <View style={styles.contextRow}>
@@ -618,7 +629,7 @@ export default function DisputeDetailScreen() {
               multiline
             />
             <SecondaryButton
-              label="Add note"
+              label={addingNote ? 'Adding note…' : 'Add note'}
               onPress={handleAddNote}
               disabled={addingNote || !internalNote.trim()}
               icon="plus"

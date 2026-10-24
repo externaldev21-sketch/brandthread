@@ -35,7 +35,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, ActivityIndicator, Linking, TouchableOpacity } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -52,6 +52,8 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/hooks/useApi';
 import { ReturnLabelCard } from '@/components/returns/ReturnLabelCard';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
+import { orderRef } from '@/lib/orderRef';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   adaptReturnRow, itemsTotalCents, refundDestination, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
@@ -98,6 +100,7 @@ export default function ReturnDetailScreen() {
   const [labelForm, setLabelForm] = useState<LabelForm>(EMPTY_LABEL_FORM);
   const [buyingLabel, setBuyingLabel] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const refundTextFor = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -208,7 +211,7 @@ export default function ReturnDetailScreen() {
 
   const header = (
     <ScreenHeader
-      title={view ? `Return · #${view.orderNumber}` : 'Return'}
+      title={view && orderRef(view.orderNumber) ? `Return · ${orderRef(view.orderNumber)}` : 'Return'}
       onBack={() => goBackOr(router)}
     />
   );
@@ -488,7 +491,7 @@ export default function ReturnDetailScreen() {
         <BrandthreadCard>
           <Text style={s.cardTitle}>Items</Text>
           {view.items.length === 0 ? (
-            <Text style={s.cardBody}>The whole order #{view.orderNumber}.</Text>
+            <Text style={s.cardBody}>{orderRef(view.orderNumber) ? `The whole order ${orderRef(view.orderNumber)}.` : 'The whole order.'}</Text>
           ) : view.items.map((item, idx) => (
             <View key={item.lineItemId} style={[s.itemRow, idx > 0 && s.itemBorder]}>
               <View style={{ flex: 1 }}>
@@ -508,7 +511,17 @@ export default function ReturnDetailScreen() {
           {view.evidenceUrls.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} style={{ marginTop: SP.sm }}>
               {view.evidenceUrls.map((uri, i) => (
-                <Image cachePolicy="memory-disk" key={`${uri}-${i}`} source={{ uri }} style={s.photo} accessibilityLabel={`Return photo ${i + 1}`} />
+                <TouchableOpacity
+                  key={`${uri}-${i}`}
+                  onPress={() => setViewerIndex(i)}
+                  activeOpacity={0.85}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Return photo ${i + 1}`}
+                  accessibilityHint="Opens the photo full size"
+                  testID={`return-photo-${i}`}
+                >
+                  <Image cachePolicy="memory-disk" source={{ uri }} style={s.photo} />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           ) : (
@@ -522,6 +535,12 @@ export default function ReturnDetailScreen() {
           ) : null}
           <Text style={s.meta}>Requested {fmtDateTime(view.createdAt)}</Text>
         </BrandthreadCard>
+        <PhotoViewer
+          visible={viewerIndex !== null}
+          images={view.evidenceUrls}
+          initialIndex={viewerIndex ?? 0}
+          onClose={() => setViewerIndex(null)}
+        />
 
         <Button
           label="View order"

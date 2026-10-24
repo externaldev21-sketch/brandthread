@@ -24,7 +24,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
   ActivityIndicator, Modal, TextInput, RefreshControl,
-  Linking, Platform,
+  Linking, Platform, type LayoutChangeEvent,
 } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
@@ -588,17 +588,24 @@ export function adaptOrderDetail(row: OrderDetailRow): BuyerOrderView {
 
 // ─── Exported sub-components ──────────────────────────────────────────────────
 
+/** Whether BuyerCancellationDetailsCard renders for this order. */
+export function showsCancellationDetails(
+  order: Pick<BuyerOrderView, 'status' | 'isCustomerVisible' | 'cancellationReason'>,
+): boolean {
+  return order.status === 'cancelled' && !!order.isCustomerVisible && !!order.cancellationReason;
+}
+
 export function BuyerCancellationDetailsCard({ order }: {
   order: Pick<BuyerOrderView, 'status' | 'isCustomerVisible' | 'cancellationReason' | 'cancellationNotes'>;
 }) {
   const { theme } = useAppTheme();
-  if (order.status !== 'cancelled' || !order.isCustomerVisible || !order.cancellationReason) return null;
+  if (!showsCancellationDetails(order)) return null;
   return (
     <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
       <GradientCard colors={[`${theme.error}24`, `${theme.error}0D`]} style={{ borderColor: `${theme.error}59` }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
           <Icon name="x-circle" size={ICON.sm} color={theme.error} />
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Order Cancelled</Text>
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Order cancelled</Text>
         </View>
         <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 }}>
           {cancellationReasonLabel(order.cancellationReason)}
@@ -647,7 +654,7 @@ export default function BuyerOrderDetailScreen() {
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
-  const { id, review: reviewParam } = useLocalSearchParams<{ id: string; review?: string }>();
+  const { id, review: reviewParam, focus: focusParam } = useLocalSearchParams<{ id: string; review?: string; focus?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -684,6 +691,26 @@ export default function BuyerOrderDetailScreen() {
   const [showReceiptSheet, setShowReceiptSheet] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [returnRequest, setReturnRequest] = useState<BuyerReturnSummary | null>(null);
+
+  // "Track order" / "Track shipment" entry points open this screen with
+  // `focus=tracking`: once the order is loaded and the tracking section has
+  // laid out, scroll straight to it (once). No tracking section yet (not
+  // shipped) → the screen just opens at the top as usual. onLayout +
+  // scrollTo work the same on native and web.
+  const scrollRef = useRef<ScrollView | null>(null);
+  const [contentY, setContentY] = useState<number | null>(null);
+  const [trackingSectionY, setTrackingSectionY] = useState<number | null>(null);
+  const focusedTrackingRef = useRef(false);
+  const wantsTrackingFocus = (Array.isArray(focusParam) ? focusParam[0] : focusParam) === 'tracking';
+  useEffect(() => {
+    if (!wantsTrackingFocus || focusedTrackingRef.current) return;
+    if (contentY == null || trackingSectionY == null) return;
+    focusedTrackingRef.current = true;
+    scrollRef.current?.scrollTo({ y: Math.max(0, contentY + trackingSectionY - SP.sm), animated: true });
+  }, [wantsTrackingFocus, contentY, trackingSectionY]);
+  const onTrackingSectionLayout = useCallback((e: LayoutChangeEvent) => {
+    setTrackingSectionY(e.nativeEvent.layout.y);
+  }, []);
 
   // Keep this order's tracking Live Activity in step with what's on screen
   // (iOS builds; a no-op elsewhere).
@@ -1045,6 +1072,7 @@ export default function BuyerOrderDetailScreen() {
   }
 
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
+  const cancellationCardShown = !order.delivery?.autoRefund && showsCancellationDetails(order);
   const shipment: ShipmentInfo = {
     status: order.status,
     trackingStatus: order.trackingStatus,
@@ -1068,6 +1096,7 @@ export default function BuyerOrderDetailScreen() {
       />
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: SP.md, paddingBottom: Math.max(insets.bottom, SP.md) + COMP.buttonH + SP.xl }}
         refreshControl={
@@ -1082,6 +1111,7 @@ export default function BuyerOrderDetailScreen() {
       )}
       {/* Centers content in a max-width column on iPad/landscape; each section
           below keeps its own SP.md gutter so phones render unchanged. */}
+      <View testID="buyer-order-detail-content" onLayout={(e: LayoutChangeEvent) => setContentY(e.nativeEvent.layout.y)}>
       <ResponsiveContainer style={{ paddingHorizontal: 0 }}>
         {/* ── 1. Status + Progress ─────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
@@ -1125,7 +1155,14 @@ export default function BuyerOrderDetailScreen() {
             DetailsCard / return request card / BuyerTrackingAlertCard) — this
             tracker itself collapses to a single exception pill for those. */}
         {order.delivery ? (
-          <View style={{ marginBottom: SP.xs }}>
+          <View
+            style={{ marginBottom: SP.xs }}
+            // The delivery tracker (carrier, tracking number, scans) is this
+            // order's tracking section; a full auto-refund has none.
+            {...(!order.delivery.autoRefund || order.delivery.autoRefund.partial
+              ? { testID: 'order-tracking-section', onLayout: onTrackingSectionLayout }
+              : null)}
+          >
             <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>
               {order.delivery.autoRefund ? 'Refund' : 'Delivery'}
             </Text>
@@ -1142,7 +1179,10 @@ export default function BuyerOrderDetailScreen() {
               />
             ) : null}
           </View>
-        ) : (
+        ) : cancellationCardShown ? null : (
+        // A cancelled order's progress card is only the "Order cancelled"
+        // exception pill; when the cancellation card below renders, it
+        // already says that (with the reason), so the pill is dropped.
         <View style={{ marginBottom: SP.md }}>
           <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order progress</Text>
           <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
@@ -1320,6 +1360,7 @@ export default function BuyerOrderDetailScreen() {
 
         {/* ── 5. Tracking ─────────────────────────────────────────────────── */}
         {!order.delivery && order.trackingNumber && (
+          <View testID="order-tracking-section" onLayout={onTrackingSectionLayout}>
           <SectionCard title="Tracking">
             <Text style={styles.trackingNumberDisplay}>{order.trackingNumber}</Text>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' }}>
@@ -1353,6 +1394,7 @@ export default function BuyerOrderDetailScreen() {
               />
             </View>
           </SectionCard>
+          </View>
         )}
 
         {/* Pre-order info */}
@@ -1414,6 +1456,7 @@ export default function BuyerOrderDetailScreen() {
         </View>
 
       </ResponsiveContainer>
+      </View>
       </ScrollView>
 
       {/* ── Bottom Action Bar ────────────────────────────────────────────── */}

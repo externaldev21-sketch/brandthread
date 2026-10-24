@@ -460,7 +460,8 @@ export function OrderConfirmationActions({
   function trackOrder() {
     // ONLY navigate with a verified server order ID — never the display number.
     if (!firstVerified?.id) return;
-    router.push(('/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id)) as never);
+    // focus=tracking: the order opens on its tracking section once there is one.
+    router.push(('/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id) + '&focus=tracking') as never);
   }
 
   const bottomPad = Math.max(insets.bottom, SP.sm) + SP.sm;

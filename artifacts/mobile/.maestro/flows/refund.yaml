@@ -9,8 +9,8 @@ name: refund
     timeout: 20000
 - tapOn: "Item damaged"
 - scrollUntilVisible:
-    element: "Submit Refund Request"
-- tapOn: "Submit Refund Request"
+    element: "Submit refund request"
+- tapOn: "Submit refund request"
 - extendedWaitUntil:
-    visible: "Refund Request Submitted"
+    visible: "Refund request submitted"
     timeout: 15000
