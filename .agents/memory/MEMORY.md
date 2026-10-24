@@ -1,6 +1,7 @@
 - [Brandthread theme](brandthread-theme.md) — buyer/seller chrome is strictly black, white, and gray; color is reserved for semantic status and authored content.
 - [Logo rollout scope](logo-rollout-policy.md) — replace approved artwork, not UI sizing or placement; preserve the master bytes and report conflicting tints.
 - [Mobile typecheck resources](mobile-typecheck-resources.md) — the full Expo/test graph needs more than a 4 GB V8 heap; an empty error list after exit 134 is not a pass.
+- [Expo validation time budgets](expo-validation-time-budgets.md) — distinguish cold export/import timeouts from code failures; timed-out tests can contaminate later shared fixtures.
 - [Brandthread design system](brandthread-woven-system.md) — system fonts, native icons and flat cards; preserve seller tab-bar swipe and glow.
 - [Runtime app themes](runtime-app-themes.md) — 12 account-scoped palettes have matching native launcher icons; null icon preference follows the active theme.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
