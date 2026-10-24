@@ -36,6 +36,8 @@ import { radius } from '@/constants/radii';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
 import { minHitSlop } from '@/lib/hitSlop';
+import { showToast } from '@/lib/toast';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 // Header "Invite" pill is 30pt tall; error-state "Retry" pill is 36pt tall.
 const INVITE_HIT_SLOP = minHitSlop({ height: 30 });
@@ -110,6 +112,7 @@ export default function TeamScreen() {
   const [activity, setActivity]   = useState<any[]>([]);
   const [hasMoreActivity, setHasMoreActivity] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [loading,  setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -151,11 +154,15 @@ export default function TeamScreen() {
   const loadMoreActivity = async () => {
     if (loadingMore) return;
     setLoadingMore(true);
+    setLoadMoreFailed(false);
     try {
       const a = await api.team.activity({ limit: ACTIVITY_PAGE, offset: activity.length });
       setActivity(prev => [...prev, ...(a.logs ?? [])]);
       setHasMoreActivity(!!a.hasMore);
-    } catch { /* ignore */ }
+    } catch {
+      // Keep the rows already shown; swap "Load more" for an inline retry.
+      setLoadMoreFailed(true);
+    }
     setLoadingMore(false);
   };
 
@@ -220,7 +227,7 @@ export default function TeamScreen() {
 
   const copyLink = async (url: string) => {
     await Clipboard.setStringAsync(url);
-    Alert.alert('Link copied', 'The invite link is on your clipboard.');
+    showToast('Link copied');
   };
 
   const shareLink = async (url: string) => {
@@ -458,7 +465,11 @@ export default function TeamScreen() {
                 </View>
               </View>
             ))}
-            {hasMoreActivity && (
+            {hasMoreActivity && loadMoreFailed && !loadingMore ? (
+              <View style={[styles.loadMoreRetry, { borderTopColor: colors.border }]}>
+                <RetryRow label="Couldn't load more activity" onRetry={loadMoreActivity} />
+              </View>
+            ) : hasMoreActivity && (
               <TouchableOpacity
                 onPress={loadMoreActivity}
                 activeOpacity={0.7}
@@ -570,6 +581,7 @@ const styles = StyleSheet.create({
   logAction: { fontSize: 13, fontFamily: FONT.medium },
   logMeta: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   loadMoreBtn: { padding: 14, alignItems: 'center', borderTopWidth: 1 },
+  loadMoreRetry: { padding: 12, alignItems: 'center', borderTopWidth: 1 },
   loadMoreText: { fontSize: 13, fontFamily: FONT.semibold },
   secRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   secLabel: { fontSize: 15, fontFamily: FONT.medium },

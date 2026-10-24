@@ -28,6 +28,7 @@ import { haptics, haptic } from '@/lib/haptics';
 
 
 import * as Clipboard from 'expo-clipboard';
+import { showToast } from '@/lib/toast';
 import { useApi } from '@/hooks/useApi';
 
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -131,6 +132,13 @@ function fmtValue(d: Pick<DiscountCode, 'type' | 'value'>) {
   if (d.type === 'fixed') return `${formatCents(Math.round(d.value * 100))} off`;
   if (d.type === 'free_shipping') return 'Free shipping';
   return 'Free item';
+}
+
+/** Splits option buttons into rows of two for the equal-width grids. */
+function pairs<T>(items: readonly T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
+  return rows;
 }
 
 function randomCode() {
@@ -413,7 +421,7 @@ export default function DiscountsScreen() {
   }
 
   function copyCode(codeValue: string) {
-    Clipboard.setStringAsync(codeValue);
+    void Clipboard.setStringAsync(codeValue).then(() => showToast('Code copied', codeValue));
   }
 
   const visibleGroups = useMemo(
@@ -565,15 +573,20 @@ export default function DiscountsScreen() {
             <View>
               <Text style={s.label}>Type</Text>
               <View style={s.typeGrid}>
-                {([
+                {pairs([
                   ['percentage', '% Percent off'],
                   ['fixed', '$ Fixed amount'],
                   ['free_shipping', 'Free shipping'],
                   ['free_item', 'Free item'],
-                ] as const).map(([t, label]) => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, discType === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptic('select'); setDiscType(t); }}>
-                    <Text style={[s.typeBtnText, discType === t && { color: theme.accent }]}>{label}</Text>
-                  </TouchableOpacity>
+                ] as const).map((row, ri) => (
+                  <View key={ri} style={s.typeRow}>
+                    {row.map(([t, label]) => (
+                      <TouchableOpacity key={t} style={[s.typeBtn, discType === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptic('select'); setDiscType(t); }}>
+                        <Text style={[s.typeBtnText, discType === t && { color: theme.accent }]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {row.length === 1 && <View style={s.typeCellSpacer} />}
+                  </View>
                 ))}
               </View>
             </View>
@@ -619,13 +632,18 @@ export default function DiscountsScreen() {
             {/* Applies to */}
             <View>
               <Text style={s.label}>Applies to</Text>
-              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                {((collections.length > 0 || appliesTo === 'collections'
+              <View style={s.typeGrid}>
+                {pairs((collections.length > 0 || appliesTo === 'collections'
                   ? ['entire_store', 'specific_products', 'collections']
-                  : ['entire_store', 'specific_products']) as AppliesTo[]).map(t => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, (collections.length > 0 || appliesTo === 'collections') && { flexGrow: 0, width: '48.5%' }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptic('select'); setAppliesTo(t); }}>
-                    <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : t === 'collections' ? 'Collections' : 'Specific products'}</Text>
-                  </TouchableOpacity>
+                  : ['entire_store', 'specific_products']) as AppliesTo[]).map((row, ri) => (
+                  <View key={ri} style={s.typeRow}>
+                    {row.map(t => (
+                      <TouchableOpacity key={t} style={[s.typeBtn, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { haptic('select'); setAppliesTo(t); }}>
+                        <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : t === 'collections' ? 'Collections' : 'Specific products'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {row.length === 1 && <View style={s.typeCellSpacer} />}
+                  </View>
                 ))}
               </View>
               {appliesTo === 'specific_products' && (
@@ -798,11 +816,16 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   summaryLine: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   label:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
+  labelHint:   { textTransform: 'none' },
   subLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
-  typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 12, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  // Rows of two equal cells (flex: 1 each, an empty spacer for an odd last
+  // one), so no button grows wider than its neighbour or stretches alone.
+  typeGrid:    { gap: 8 },
+  typeRow:     { flexDirection: 'row', gap: 8 },
+  typeCellSpacer: { flex: 1 },
+  typeBtn:     { flex: 1, flexBasis: 0, minWidth: 0, justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   typeBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   pickerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, marginTop: 8 },
   pickerRowText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },

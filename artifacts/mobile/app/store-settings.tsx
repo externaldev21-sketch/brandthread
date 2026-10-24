@@ -15,6 +15,12 @@ import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 import { ListRow } from '@/components/ui/ListRow';
 
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+
+import { TimeZonePicker } from '@/components/TimeZonePicker';
+
+import { showToast } from '@/lib/toast';
+
 import { haptics, haptic } from '@/lib/haptics';
 
 
@@ -158,7 +164,7 @@ export default function StoreSettingsScreen() {
       setCurrentSlug(result.slug);
       setHasStorePassword(result.hasStorePassword);
       setForm(f => ({ ...f, storeUrl: result.slug, storePassword: '' }));
-      Alert.alert('Saved', 'Store settings updated.');
+      showToast('Settings saved');
     } catch (e) {
       const fallback = "Couldn't save settings. Check your connection and try again.";
       const message = e instanceof ApiError
@@ -194,7 +200,9 @@ export default function StoreSettingsScreen() {
           <LoadingSkeleton height={100} />
         </View>
       ) : (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[ss.scroll, { paddingBottom: 60 + tabBarInset }]}>
+      // Keeps the focused field above the keyboard (8+ inputs; the lower ones
+      // used to sit under it).
+      <KeyboardAwareScrollViewCompat showsVerticalScrollIndicator={false} contentContainerStyle={[ss.scroll, { paddingBottom: 60 + tabBarInset }]}>
         {loadError ? <Text style={ss.errorText}>{loadError}</Text> : null}
 
         {/* STORE IDENTITY */}
@@ -275,13 +283,10 @@ export default function StoreSettingsScreen() {
           </FieldRow>
           <View style={ss.divider} />
           <FieldRow ss={ss} label="Time zone">
-            <TextInput returnKeyType="done"
-              style={ss.input}
+            <TimeZonePicker
               value={form.timezone}
-              onChangeText={v => patch({ timezone: v })}
-              placeholder="America/New_York"
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
+              onChange={v => patch({ timezone: v })}
+              testID="store-settings-timezone"
             />
           </FieldRow>
           <View style={ss.divider} />
@@ -401,7 +406,7 @@ export default function StoreSettingsScreen() {
           />
         </BrandthreadCard>
 
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
       )}
     </View>
   );
@@ -456,7 +461,6 @@ function makeStyles(colors: Colors) {
       minHeight: 44, justifyContent: 'center',
     },
     statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
-    saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
     errorText: {
       marginHorizontal: SP.md, marginTop: SP.md,
       fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.destructive,

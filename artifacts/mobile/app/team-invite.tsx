@@ -183,7 +183,7 @@ export default function TeamInviteScreen() {
             </Text>
             <View style={[styles.inviteMeta, { borderColor: colors.border }]}>
               <Icon name="mail" size={13} color={colors.mutedForeground} />
-              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Invite sent to {invite?.email}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{invite?.email ? `Invite sent to ${invite.email}` : 'Invite sent'}</Text>
             </View>
             {!isLoaded ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
