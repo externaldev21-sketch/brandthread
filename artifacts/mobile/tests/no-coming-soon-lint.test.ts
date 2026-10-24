@@ -85,6 +85,7 @@ const COMING_SOON_ALLOWLIST = new Set([
   'app/buyer-report.tsx',
   'app/buyer-settings.tsx',
   'app/manufacturer-messages.tsx',
+  'app/buyer-story-create.tsx',
   'app/quote-detail.tsx',
   'app/seller-settings.tsx',
   'components/ShopProductSheet.tsx',

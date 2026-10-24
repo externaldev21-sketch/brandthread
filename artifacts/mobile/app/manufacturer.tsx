@@ -17,7 +17,7 @@ export default function ManufacturerCompatibilityRoute() {
   return (
     <View style={styles.root}>
       <ActivityIndicator color={colors.primary} />
-      <Text style={[styles.label, { color: colors.mutedForeground }]}>Opening Manufacturer Hub…</Text>
+      <Text style={[styles.label, { color: colors.mutedForeground }]}>Opening the manufacturer hub…</Text>
     </View>
   );
 }

@@ -37,7 +37,7 @@ interface IntegrationDef {
 // Only integrations with a real, working connect flow ship here — no
 // "Coming soon" placeholder rows for OAuth flows that don't exist yet.
 const INTEGRATION_DEFS: IntegrationDef[] = [
-  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
+  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email and SMS marketing', route: '/integrations/klaviyo' },
   { key: 'stripe', label: 'Stripe', icon: 'credit-card', description: 'Payments and payouts', isStripe: true },
 ];
 
@@ -166,6 +166,9 @@ export default function IntegrationsScreen() {
                     key={item.key}
                     onPress={() => handleConnect(item)}
                     activeOpacity={connected && !item.route ? 1 : 0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
+                    accessibilityState={{ busy: isToggling }}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
                     <View style={s.iconWrap}>
@@ -196,7 +199,7 @@ export default function IntegrationsScreen() {
           {/* Connected count summary */}
           {!loading && !loadError && (
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              {connectedKeys.size + (isStripeFullyConnected(stripeStatus) ? 1 : 0)} of {INTEGRATION_DEFS.length} integrations connected
+              {INTEGRATION_DEFS.filter(d => (d.isStripe ? isStripeFullyConnected(stripeStatus) : connectedKeys.has(d.key))).length} of {INTEGRATION_DEFS.length} integrations connected
             </Text>
           )}
         </View>
@@ -214,13 +217,13 @@ const s = StyleSheet.create({
   retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 2 },
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
   iconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
   rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 16, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   connectedText: { fontSize: 11, fontFamily: FONT.semibold },
   connectBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 7 },
-  connectBtnText: { fontSize: 12, fontFamily: FONT.semibold },
+  connectBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   footerNote: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: 12 },
 });

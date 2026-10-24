@@ -187,8 +187,8 @@ export default function BillingScreen() {
       await restore();
       await loadStatus();
       Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
-    } catch (error: any) {
-      Alert.alert('Could not restore purchases', error?.message ?? 'Please try again.');
+    } catch {
+      Alert.alert('Could not restore purchases', 'Try again in a moment.');
     }
   }
 
@@ -311,7 +311,8 @@ export default function BillingScreen() {
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={colors.primary} />
+          <SkeletonBlock width="100%" height={120} />
+          <SkeletonBlock width="100%" height={56} />
         </View>
       </View>
     );
@@ -523,6 +524,8 @@ export default function BillingScreen() {
                   onPress={() => { haptic('select'); setFilter(f); }}
                   style={[styles.filterTab, { backgroundColor: filter === f ? colors.card : 'transparent' }]}
                   activeOpacity={0.7}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: filter === f }}
                 >
                   <Text style={[styles.filterTabText, { color: filter === f ? colors.foreground : colors.mutedForeground }]}>
                     {f === 'all' ? 'All' : f === 'paid' ? 'Paid' : 'Unpaid'}
@@ -590,7 +593,7 @@ export default function BillingScreen() {
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   container: { flex: 1 },
-  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  accessLoading: { padding: 16, gap: 8 },
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   section: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, gap: SPACING.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.sm },

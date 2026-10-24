@@ -17,6 +17,8 @@ import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 
 import { useApi } from '@/lib/api';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 
 import { formatCents } from '@/lib/money';
 
@@ -49,6 +51,7 @@ export default function TaxesDutiesScreen() {
   // Intl #109: the server says when duties are collected at checkout (DUTIES_AT_CHECKOUT_ENABLED).
   const [dutiesAtCheckout,   setDutiesAtCheckout]   = useState(false);
   const [annualReport,       setAnnualReport]       = useState<any>(null);
+  const [configError,        setConfigError]        = useState(false);
 
   const [savingTax,      setSavingTax]      = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
@@ -68,6 +71,7 @@ export default function TaxesDutiesScreen() {
       return;
     }
     setLoading(true);
+    setConfigError(false);
     try {
       const cfg = await api.taxes.status();
       setStripeTaxEnabled(cfg.stripeTaxEnabled ?? false);
@@ -278,7 +282,7 @@ export default function TaxesDutiesScreen() {
                 </Text>
               )}
               {annualReport?.forms?.length > 0 && (
-                <Text style={[styles.rowDescription, { color: colors.success }]}>
+                <Text style={[styles.rowDescription, { color: colors.foreground }]}>
                   Tax forms ready: {annualReport.forms.length}.
                 </Text>
               )}

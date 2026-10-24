@@ -33,6 +33,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
 import { radius } from '@/constants/radii';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
 import { minHitSlop } from '@/lib/hitSlop';
 
@@ -94,7 +95,7 @@ const ROLE_ACCESS: Record<string, string> = {
   packer: 'Orders to pack & ship',
   marketing: 'Ads, boosts & discount codes',
   viewer: 'Read-only analytics',
-  manager: 'Orders, Products, Inventory',
+  manager: 'Orders, products & inventory',
   staff: 'Fulfillment only',
 };
 
@@ -191,7 +192,7 @@ export default function TeamScreen() {
         );
         return;
       }
-      Alert.alert('Error', err.message ?? 'Failed to create invite');
+      Alert.alert("Couldn't create the invite", 'Check the email or username and try again.');
     } finally {
       setInviting(false);
     }
@@ -211,7 +212,7 @@ export default function TeamScreen() {
         ],
       );
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to regenerate invite');
+      Alert.alert("Couldn't refresh the link", 'Check your connection and try again.');
     } finally {
       setRegeneratingId(null);
     }
@@ -243,7 +244,7 @@ export default function TeamScreen() {
               await api.team.remove(member.id);
               setMembers(prev => prev.filter(m => m.id !== member.id));
             } catch (err: any) {
-              Alert.alert('Error', err.message ?? 'Failed to dismiss invite');
+              Alert.alert("Couldn't dismiss the invite", 'Check your connection and try again.');
             } finally {
               setDismissingId(null);
             }
@@ -303,6 +304,7 @@ export default function TeamScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.linkBtn, { borderColor: isExpired ? colors.warning + '44' : colors.border }]}
             disabled={isRegenerating || isDismissing}
+            accessibilityRole="button"
             accessibilityLabel={isExpired ? 'Regenerate expired invite' : 'Copy invite link'}
           >
             {isRegenerating
@@ -316,6 +318,7 @@ export default function TeamScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.dismissBtn, { borderColor: colors.border }]}
             disabled={isDismissing || isRegenerating}
+            accessibilityRole="button"
             accessibilityLabel="Dismiss expired invite"
           >
             {isDismissing
@@ -352,7 +355,15 @@ export default function TeamScreen() {
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
+          [0, 1, 2].map(i => (
+            <View key={i} style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <SkeletonBlock width={44} height={44} radius={22} />
+              <View style={[styles.memberInfo, { gap: 8 }]}>
+                <SkeletonLine width="50%" height={13} />
+                <SkeletonLine width="70%" height={11} />
+              </View>
+            </View>
+          ))
         ) : loadError ? (
           <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
@@ -432,7 +443,7 @@ export default function TeamScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {activity.length === 0 ? (
           <View style={{ padding: 16, alignItems: 'center' }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No activity yet</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{loadError ? "Couldn't load activity" : 'No activity yet'}</Text>
           </View>
         ) : (
           <>
@@ -451,6 +462,7 @@ export default function TeamScreen() {
               <TouchableOpacity
                 onPress={loadMoreActivity}
                 activeOpacity={0.7}
+                accessibilityRole="button"
                 style={[styles.loadMoreBtn, { borderTopColor: colors.border }]}
               >
                 {loadingMore

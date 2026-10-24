@@ -15,6 +15,8 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, ActivityIndicator, Platform } from 'react-native';
 
 import { Icon, Icon as AppIcon } from '@/components/ui/Icon';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { apiErrorMessage } from '@/lib/safety';
 
 import { InlineSlider } from '@/components/InlineSlider';
 
@@ -368,7 +370,7 @@ export default function DiscountsScreen() {
       }
       setShowModal(false);
     } catch (err: any) {
-      Alert.alert("Couldn't save the code", err?.message ?? 'Try again.');
+      Alert.alert("Couldn't save the code", apiErrorMessage(err, 'Check your connection and try again.'));
     } finally {
       setSaving(false);
     }
@@ -385,6 +387,7 @@ export default function DiscountsScreen() {
       await api.discountCodes.update(d.id, { active: nextActive });
     } catch {
       setDiscounts(prev => prev.map(x => x.id === d.id ? d : x));
+      Alert.alert("Couldn't update the code", 'Check your connection and try again.');
     }
   }
 
@@ -400,7 +403,10 @@ export default function DiscountsScreen() {
             return;
           }
           try { await api.discountCodes.delete(d.id); }
-          catch { loadDiscounts(); }
+          catch {
+            loadDiscounts();
+            Alert.alert("Couldn't delete the code", 'Check your connection and try again.');
+          }
         },
       },
     ]);
@@ -423,7 +429,9 @@ export default function DiscountsScreen() {
       />
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+        <View style={{ padding: SP.md, gap: SP.sm }}>
+          {[0, 1, 2].map(i => <SkeletonBlock key={i} width="100%" height={136} radius={RADIUS.md} />)}
+        </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -512,7 +520,7 @@ export default function DiscountsScreen() {
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
         <SafeAreaProvider style={s.modal}>
           <ScreenHeader
-            title={editingId ? 'Edit Discount Code' : 'New Discount Code'}
+            title={editingId ? 'Edit discount code' : 'New discount code'}
             variant="modal"
             onBack={() => setShowModal(false)}
           />
@@ -653,7 +661,7 @@ export default function DiscountsScreen() {
 
             {/* Min order */}
             <View>
-              <Text style={s.label}>Minimum order ($) <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
+              <Text style={s.label}>Minimum order ($) <Text style={s.labelHint}>(optional)</Text></Text>
               <TextInput
                 style={s.input}
                 value={displayPriceInput(minOrder)}
@@ -666,7 +674,7 @@ export default function DiscountsScreen() {
 
             {/* Min quantity */}
             <View>
-              <Text style={s.label}>Minimum items <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
+              <Text style={s.label}>Minimum items <Text style={s.labelHint}>(optional)</Text></Text>
               <TextInput
                 style={s.input}
                 value={minQuantity}
@@ -682,7 +690,7 @@ export default function DiscountsScreen() {
             <ActiveDatesFields value={schedule} onChange={setSchedule} />
 
             <PrimaryButton
-              label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
+              label={saving ? 'Saving…' : editingId ? 'Save changes' : 'Create code'}
               onPress={handleSave}
               disabled={saving}
             />
@@ -794,7 +802,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   linkText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   input:       { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   typeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  typeBtn:     { minWidth: '47%', flexGrow: 1, paddingVertical: 12, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   typeBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   pickerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, marginTop: 8 },
   pickerRowText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },

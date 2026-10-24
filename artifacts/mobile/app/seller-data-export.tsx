@@ -59,7 +59,7 @@ export default function SellerDataExportScreen() {
         const uri = file.uri;
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Data' });
+          await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export data' });
         } else {
           Alert.alert('Export ready', 'Open it from the share sheet.');
         }
@@ -91,7 +91,7 @@ export default function SellerDataExportScreen() {
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}
-        <Text style={styles.sectionLabel}>What to include</Text>
+        <Text style={styles.sectionLabel}>Include</Text>
         <View style={styles.card}>
           {INCLUDE_OPTIONS.map((opt, i) => {
             const checked = include.includes(opt.key);
@@ -101,6 +101,9 @@ export default function SellerDataExportScreen() {
                 style={[styles.optRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
                 onPress={() => toggleInclude(opt.key)}
                 activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                accessibilityLabel={opt.label}
               >
                 <View style={[styles.optIcon, { backgroundColor: checked ? theme.accentDim : theme.surface }]}>
                   <Icon name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
@@ -126,6 +129,8 @@ export default function SellerDataExportScreen() {
               style={[styles.formatBtn, format === f && styles.formatBtnActive]}
               onPress={() => setFormat(f)}
               activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: format === f }}
             >
               <Icon
                 name={f === 'json' ? 'code' : 'file-text'}
@@ -146,7 +151,7 @@ export default function SellerDataExportScreen() {
         <View style={styles.noteCard}>
           <Icon name="shield" size={14} color={theme.muted} />
           <Text style={styles.noteText}>
-            Exports contain only your own seller data. Customer PII is included — store securely and handle per your privacy policy.
+            Exports contain only your own store data, including customer names and contact details. Store the file securely and handle it according to your privacy policy.
           </Text>
         </View>
 
@@ -199,8 +204,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   optDesc:      { fontSize: 11, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   checkbox:     { width: 22, height: 22, borderRadius: 8, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: theme.accent, borderColor: theme.accent },
-  formatRow:    { flexDirection: 'row', gap: 10 },
-  formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14, alignItems: 'center', gap: 6 },
+  formatRow:    { flexDirection: 'row', gap: 12 },
+  formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 16, alignItems: 'center', gap: 8 },
   formatBtnActive: { borderColor: theme.accent, backgroundColor: theme.accentDim },
   formatLabel:  { fontSize: 15, fontFamily: FONT.bold, color: theme.muted },
   formatLabelActive: { color: theme.accentLight },

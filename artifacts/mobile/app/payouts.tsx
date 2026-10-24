@@ -112,9 +112,9 @@ export default function PayoutsScreen() {
 }
 
 function PayoutsScreenContent() {
+  const tabBarMetrics = useTabBarMetrics();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const tabBarMetrics = useTabBarMetrics(2); // seller bar: Studio + AI side circles
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -263,11 +263,8 @@ function PayoutsScreenContent() {
       }
       await WebBrowser.openBrowserAsync(data.url);
       await refreshConnectStatus();
-    } catch (error: any) {
-      const message = typeof error?.message === 'string' && error.message
-        ? error.message
-        : 'Could not open Stripe onboarding. Please try again.';
-      Alert.alert('Onboarding unavailable', message);
+    } catch {
+      Alert.alert('Onboarding unavailable', 'Could not open Stripe onboarding. Try again.');
     } finally {
       onboardingOpenRef.current = false;
       setIsConnecting(false);
@@ -415,7 +412,7 @@ function PayoutsScreenContent() {
       {activeTab === 'payouts' ? (
         <View style={[styles.list, payouts.length === 0 && { paddingTop: SP.lg }]}>
           {loading && !isPreview ? (
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: SP.sm }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
             </View>
           ) : loadError ? (
@@ -682,7 +679,7 @@ const createStyles = (theme: AppThemePreset) => {
   totalAmount:  { color: text, fontSize: FS.base, fontFamily: FONT.semibold, fontVariant: ['tabular-nums'] },
   bankCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
   bankLabel:    { color: text, fontSize: FS.base, fontFamily: FONT.medium },
-  bankSub:      { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  bankSub:      { color: muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 2 },
   settingsSection:{ backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
   sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm },
   settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: border },

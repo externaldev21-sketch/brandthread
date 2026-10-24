@@ -337,8 +337,8 @@ export default function PlansScreen() {
         return;
       }
       Alert.alert(
-        'Could not start checkout',
-        e?.message ?? 'Please check your connection and try again.',
+        "Couldn't start checkout",
+        'Please check your connection and try again.',
         [{ text: 'OK' }],
       );
     }
@@ -367,7 +367,7 @@ export default function PlansScreen() {
       setCurrentPlanStatus(status.status ?? null);
       Alert.alert('Purchases restored', 'Your subscription status has been refreshed.');
     } catch (e: any) {
-      Alert.alert('Could not restore purchases', e?.message ?? 'Please try again.');
+      Alert.alert("Couldn't restore purchases", 'Please check your connection and try again.');
     } finally {
       setLoadingId(null);
     }
@@ -440,8 +440,8 @@ export default function PlansScreen() {
       <View style={styles.awaitRoot}>
         <LinearGradient colors={theme.heroGradient as any} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={theme.accent} size="large" />
-        <Text style={styles.awaitTitle}>Confirming your trial…</Text>
-        <Text style={styles.awaitSub}>Confirming your plan — this takes a moment.</Text>
+        <Text style={styles.awaitTitle}>Confirming your plan…</Text>
+        <Text style={styles.awaitSub}>This takes a moment.</Text>
       </View>
     );
   }
@@ -517,7 +517,7 @@ export default function PlansScreen() {
 
         <SellerPaywallHeadline
           theme={theme}
-          eyebrow="BRANDTHREAD FOR SELLERS"
+          eyebrow="FOR SELLERS"
           title="Everything to build, run, and grow your brand"
           subtitle="One home for your storefront, production, and sales."
         />
@@ -564,7 +564,7 @@ export default function PlansScreen() {
           theme={theme}
           label={
             loadingId === selectedPlan.id
-              ? 'Starting trial…'
+              ? (hasRealTrialOffer ? 'Starting trial…' : 'Starting checkout…')
               : isCurrentSelected
                 ? 'Current plan'
                 : hasRealTrialOffer
@@ -600,6 +600,7 @@ export default function PlansScreen() {
             onPress={requestExit}
             disabled={loadingId !== null}
             activeOpacity={0.7}
+            accessibilityRole="button"
           >
             <Text style={styles.skipText}>Not now</Text>
             <Icon name="arrow-right" size={14} color={theme.muted} />
@@ -611,6 +612,8 @@ export default function PlansScreen() {
             onPress={handleRestore}
             disabled={loadingId !== null}
             testID="seller-revenuecat-restore"
+            accessibilityRole="button"
+            accessibilityLabel="Restore purchases"
           >
             {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
@@ -744,12 +747,12 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   phoneChartBar: { flex: 1, backgroundColor: theme.accent, borderRadius: 2, opacity: 0.85 },
   phoneRow: { height: 8, borderRadius: 4, backgroundColor: theme.border, width: '100%' },
 
-  commissionNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
+  commissionNote: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
 
   // Skip
   skipRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: SP.lg, marginTop: 4,
+    gap: SP.sm, paddingVertical: SP.lg, marginTop: SP.xs,
   },
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
@@ -757,11 +760,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   compareText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, textDecorationLine: 'underline' },
 
   // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
-  legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
-  legalFooterText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16, textAlign: 'center' },
-  legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  legalLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text, textDecorationLine: 'underline' },
-  legalLinkDivider: { fontSize: FS.xs, color: theme.muted },
+  legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 12 },
+  legalFooterText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18, textAlign: 'center' },
+  legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  legalLink: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, textDecorationLine: 'underline' },
+  legalLinkDivider: { fontSize: FS.sm, color: theme.muted },
 
   // Awaiting Stripe overlay
   awaitRoot: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },

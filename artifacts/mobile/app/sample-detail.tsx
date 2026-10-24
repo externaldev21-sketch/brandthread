@@ -42,7 +42,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   ACCENT_LIGHT,
-  SUCCESS, SUCCESS_DIM, RED, ORANGE, GOLD,
+  SUCCESS_DIM, RED,
   GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
@@ -61,13 +61,13 @@ const SAMPLE_STATUSES: SampleStatus[] = [
 const STATUS_LABELS: Record<string, string> = {
   requested: 'Requested',
   pending_payment: 'Awaiting payment',
-  awaiting_payment: 'Awaiting Payment',
+  awaiting_payment: 'Awaiting payment',
   paid: 'Paid',
-  in_development: 'In Development',
-  revision_requested: 'Revision Requested',
+  in_development: 'In development',
+  revision_requested: 'Revision requested',
   shipped: 'Shipped',
   delivered: 'Delivered',
-  review_needed: 'Review Needed',
+  review_needed: 'Review needed',
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
@@ -90,8 +90,8 @@ const STATUS_DESCRIPTIONS: Record<string, string> = {
 
 const TYPE_LABELS: Record<string, string> = {
   proto: 'Prototype',
-  size_set: 'Size Set',
-  pre_production: 'Pre-Production',
+  size_set: 'Size set',
+  pre_production: 'Pre-production',
   production: 'Production',
 };
 
@@ -147,12 +147,15 @@ function StarRow({
           key={i}
           onPress={() => !readonly && onRate?.(i)}
           disabled={readonly}
-          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          hitSlop={{ top: 12, bottom: 12, left: 2, right: 2 }}
+          accessibilityRole="button"
+          accessibilityLabel={`${i} star${i === 1 ? '' : 's'}`}
+          accessibilityState={{ selected: i <= rating, disabled: readonly }}
         >
           <Icon
             name="star"
             size={ICON.md}
-            color={i <= rating ? GOLD : BORDER}
+            color={i <= rating ? FG : BORDER}
           />
         </TouchableOpacity>
       ))}
@@ -189,7 +192,7 @@ function SampleTimeline({
   const isTerminal = normalizedStatus === 'rejected' || normalizedStatus === 'cancelled';
   const timelineStatuses = isTerminal
     ? (['requested', normalizedStatus] as SampleStatus[])
-    : SAMPLE_STATUSES;
+    : SAMPLE_STATUSES.filter(st => st !== 'revision_requested' || normalizedStatus === 'revision_requested');
   const currentIdx = timelineStatuses.indexOf(normalizedStatus as SampleStatus);
 
   return (
@@ -275,9 +278,9 @@ const tl = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: SUCCESS,
+    backgroundColor: FG,
     borderWidth: 1,
-    borderColor: SUCCESS,
+    borderColor: FG,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -323,7 +326,7 @@ const tl = StyleSheet.create({
     marginVertical: 2,
   },
   lineCompleted: {
-    backgroundColor: SUCCESS,
+    backgroundColor: FG,
   },
   textCol: {
     flex: 1,
@@ -664,7 +667,7 @@ export default function SampleDetailScreen() {
   if (loading) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Sample details" onBack={() => goBackOr(router)} />
         <View style={s.loadingContainer}>
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
@@ -693,7 +696,7 @@ export default function SampleDetailScreen() {
   if (!sample) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Sample details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="package"
@@ -712,10 +715,10 @@ export default function SampleDetailScreen() {
   // Derive primary bottom action
   const isPendingPayment = sample.status === 'pending_payment';
   const primaryLabel = isPendingPayment
-    ? (sample.manufacturerPayoutReady !== true ? 'Manufacturer payout setup required' : 'Pay Securely')
+    ? (sample.manufacturerPayoutReady !== true ? 'Manufacturer payout setup required' : 'Pay securely')
     : (canReview && !sample.review)
-      ? 'Write Review'
-      : 'Message Manufacturer';
+      ? 'Write review'
+      : 'Message manufacturer';
   const primaryIcon = (isPendingPayment
     ? (sample.manufacturerPayoutReady !== true ? 'alert-circle' : 'lock')
     : (canReview && !sample.review) ? 'star' : 'message-square') as 'alert-circle' | 'lock' | 'star' | 'message-square';
@@ -729,7 +732,7 @@ export default function SampleDetailScreen() {
   return (
     <BrandthreadScreen noSafeTop>
       <ScreenHeader
-        title="Sample Details"
+        title="Sample details"
         onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -753,7 +756,7 @@ export default function SampleDetailScreen() {
                   ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
                   : 'Pay securely. Funds are held until your sample ships.'}
               </Text>
-              {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
+              {!!paymentError && <Text style={[s.paymentError, { color: colors.destructive }]}>{paymentError}</Text>}
             </BrandthreadCard>
           )}
 
@@ -796,7 +799,7 @@ export default function SampleDetailScreen() {
               </Text>
             </View>
             <View style={s.infoRow}>
-              <Text style={s.infoLabel}>Est. Completion</Text>
+              <Text style={s.infoLabel}>Est. completion</Text>
               <Text style={s.infoValue}>{formatDate(sample.estimatedCompletionDate)}</Text>
             </View>
             {sample.trackingNumber && (
@@ -819,7 +822,7 @@ export default function SampleDetailScreen() {
           {/* ── IMAGES ───────────────────────────────────────────── */}
           <SectionHeader
             title="Images"
-            action={imageUploading ? undefined : { label: 'Add Image', onPress: handleAddImage }}
+            action={imageUploading ? undefined : { label: 'Add image', onPress: handleAddImage }}
             style={s.sectionHeader}
           />
           {imageUploading && (
@@ -847,7 +850,7 @@ export default function SampleDetailScreen() {
           {/* ── REVISION HISTORY ─────────────────────────────────── */}
           {sample.revisions.length > 0 && (
             <>
-              <SectionHeader title={`Revision History (${sample.revisions.length})`} style={s.sectionHeader} />
+              <SectionHeader title={`Revision history (${sample.revisions.length})`} style={s.sectionHeader} />
               {sample.revisions.map(rev => (
                 <BrandthreadCard key={rev.id} style={s.section}>
                   <View style={s.revHeader}>
@@ -882,7 +885,7 @@ export default function SampleDetailScreen() {
                   <View style={s.reviewHeader}>
                     <Text style={s.reviewDecisionLabel}>Decision</Text>
                     <StatusBadge
-                      label={sample.review.decision === 'approved' ? 'Approved' : sample.review.decision === 'rejected' ? 'Rejected' : 'Revision Requested'}
+                      label={sample.review.decision === 'approved' ? 'Approved' : sample.review.decision === 'rejected' ? 'Rejected' : 'Revision requested'}
                       variant={sample.review.decision === 'approved' ? 'success' : sample.review.decision === 'rejected' ? 'error' : 'warning'}
                     />
                   </View>
@@ -902,7 +905,7 @@ export default function SampleDetailScreen() {
                 </BrandthreadCard>
               ) : canReview && reviewMode ? (
                 <BrandthreadCard style={s.section} elevated>
-                  <Text style={s.reviewFormTitle}>Write a Review</Text>
+                  <Text style={s.reviewFormTitle}>Write a review</Text>
 
                   {/* Decision chips */}
                   <Text style={s.chipGroupLabel}>Decision</Text>
@@ -910,13 +913,16 @@ export default function SampleDetailScreen() {
                     {(
                       [
                         { key: 'approved', label: 'Approve', variant: 'success' },
-                        { key: 'revision_requested', label: 'Request Revision', variant: 'warning' },
+                        { key: 'revision_requested', label: 'Request revision', variant: 'warning' },
                         { key: 'rejected', label: 'Reject', variant: 'error' },
                       ] as const
                     ).map(opt => (
                       <TouchableOpacity
                         key={opt.key}
                         onPress={() => setReviewDecision(opt.key)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={opt.label}
+                        accessibilityState={{ selected: reviewDecision === opt.key, checked: reviewDecision === opt.key }}
                         style={[s.chip, reviewDecision === opt.key && s.chipActive]}
                       >
                         <Text style={[s.chipText, reviewDecision === opt.key && s.chipTextActive]}>
@@ -944,7 +950,7 @@ export default function SampleDetailScreen() {
                       multiline
                     />
                     <PrimaryButton
-                      label="Submit Review"
+                      label="Submit review"
                       onPress={handleSubmitReview}
                       loading={reviewSubmitting}
                       icon="send"
@@ -958,7 +964,7 @@ export default function SampleDetailScreen() {
               ) : canReview && !reviewMode ? (
                 <View style={s.section}>
                   <SecondaryButton
-                    label="Write Review"
+                    label="Write review"
                     onPress={() => setReviewMode(true)}
                     icon="star"
                   />
@@ -970,7 +976,7 @@ export default function SampleDetailScreen() {
           {/* ── REVISION REQUEST FORM ────────────────────────────── */}
           {revisionMode && (
             <>
-              <SectionHeader title="Request Revision" style={s.sectionHeader} />
+              <SectionHeader title="Request revision" style={s.sectionHeader} />
               <BrandthreadCard style={s.section} elevated>
                 <View style={s.formGap}>
                   <FormInput
@@ -980,7 +986,7 @@ export default function SampleDetailScreen() {
                     placeholder="e.g. Adjust collar width"
                   />
                   <FormInput
-                    label="Detailed Notes"
+                    label="Detailed notes"
                     value={revNotes}
                     onChange={setRevNotes}
                     placeholder="Describe the change needed in detail…"
@@ -992,6 +998,9 @@ export default function SampleDetailScreen() {
                       <TouchableOpacity
                         key={p}
                         onPress={() => setRevPriority(p)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`${p.charAt(0).toUpperCase() + p.slice(1)} priority`}
+                        accessibilityState={{ selected: revPriority === p, checked: revPriority === p }}
                         style={[s.chip, revPriority === p && s.chipActive]}
                       >
                         <Text style={[s.chipText, revPriority === p && s.chipTextActive]}>
@@ -1007,7 +1016,7 @@ export default function SampleDetailScreen() {
                     placeholder="2025-06-01"
                   />
                   <PrimaryButton
-                    label="Submit Revision"
+                    label="Submit revision"
                     onPress={handleSubmitRevision}
                     loading={revSubmitting}
                     icon="edit-3"
@@ -1027,7 +1036,7 @@ export default function SampleDetailScreen() {
           {/* Contextual: revision request button when review/delivered */}
           {(sample.status === 'review_needed' || sample.status === 'delivered') && (
             <SecondaryButton
-              label="Request Revision"
+              label="Request revision"
               onPress={() => setRevisionMode(true)}
               icon="edit-3"
               style={s.actionBtn}
@@ -1036,9 +1045,9 @@ export default function SampleDetailScreen() {
 
           {/* Help Center — always secondary */}
           <SecondaryButton
-            label="Help Center"
+            label="Help center"
             icon="help-circle"
-            onPress={() => Alert.alert('Help Center', 'Visit help.brandthread.com for support with your sample order.')}
+            onPress={() => router.push('/help' as never)}
             style={s.actionBtn}
             small
           />
@@ -1073,7 +1082,7 @@ const s = StyleSheet.create({
   },
   paymentTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
   paymentText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.md },
-  paymentError: { fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE, marginBottom: SP.sm },
+  paymentError: { fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: SP.sm },
   loadingContainer: {
     padding: SP.md,
     gap: SP.md,
@@ -1116,7 +1125,7 @@ const s = StyleSheet.create({
     flex: 1,
   },
   paidText: {
-    color: SUCCESS,
+    color: FG,
   },
 
   // Separator

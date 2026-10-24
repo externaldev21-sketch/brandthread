@@ -117,6 +117,7 @@ export default function ShopifyFulfillmentScreen() {
               value={Boolean(status?.fulfillmentEnabled)}
               onValueChange={handleToggle}
               disabled={busy}
+              accessibilityLabel="Fulfill orders through my Shopify store"
             />
           </View>
 
@@ -162,9 +163,15 @@ export default function ShopifyFulfillmentScreen() {
             style={styles.disconnectBtn}
             onPress={() => Alert.alert('Disconnect Shopify?', 'This turns off fulfillment forwarding and disconnects your store.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Disconnect', style: 'destructive', onPress: async () => { await api.shopify.disconnect(); await load(); } },
+              {
+                text: 'Disconnect', style: 'destructive', onPress: async () => {
+                  try { await api.shopify.disconnect(); await load(); }
+                  catch { Alert.alert('Couldn’t disconnect Shopify', 'Check your connection and try again.'); }
+                },
+              },
             ])}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
           >
             <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Shopify</Text>
           </TouchableOpacity>

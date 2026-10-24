@@ -36,6 +36,8 @@ export default function RequestSampleScreen() {
   const { manufacturerId } = useLocalSearchParams<{ manufacturerId?: string }>();
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [productType, setProductType] = useState('T-Shirt');
   const [quantity, setQuantity] = useState(1);
   const [colorway, setColorway] = useState('');
@@ -46,7 +48,6 @@ export default function RequestSampleScreen() {
   // A failed request is not the same as a delisted manufacturer: show a
   // retry instead of "no longer listed".
   const [loadError, setLoadError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -97,7 +98,7 @@ export default function RequestSampleScreen() {
         [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (error) {
-      Alert.alert('Could not send request', error instanceof Error ? error.message : 'Try again.');
+      Alert.alert('Couldn’t send request', 'Check your connection and try again.');
     } finally {
       setSending(false);
     }
@@ -176,7 +177,7 @@ export default function RequestSampleScreen() {
           accessibilityState={{ disabled: sending, busy: sending }}
         >
           {sending && <ActivityIndicator size="small" color={colors.primaryForeground} />}
-          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
+          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send request'}</Text>
         </TouchableOpacity>
       </View>
     </View>

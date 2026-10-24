@@ -35,6 +35,7 @@ import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 
 import { radius } from '@/constants/radii';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
@@ -189,7 +190,7 @@ export default function InviteManufacturerScreen() {
             {invites === null && !invitesError ? (
               <ActivityIndicator color={FG} style={{ marginVertical: SP.md }} />
             ) : invitesError ? (
-              <TouchableOpacity onPress={() => void loadInvites()}><Text style={[s.body, { color: ORANGE }]}>Invites couldn't be loaded. Tap to retry.</Text></TouchableOpacity>
+              <RetryRow label="Couldn't load your invites" onRetry={() => void loadInvites()} />
             ) : invites!.length === 0 ? (
               <Text style={s.body}>No invites yet. Links you create show up here with their status.</Text>
             ) : (
@@ -202,7 +203,7 @@ export default function InviteManufacturerScreen() {
                   {invite.status === 'accepted' ? (
                     <StatusBadge label="Joined" variant="success" small />
                   ) : (
-                    <TouchableOpacity onPress={() => void shareLink(invite)} style={s.resend} accessibilityLabel={`Share invite for ${invite.companyName}`}>
+                    <TouchableOpacity onPress={() => void shareLink(invite)} style={s.resend} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }} accessibilityRole="button" accessibilityLabel={`Share invite for ${invite.companyName}`}>
                       <Text style={s.resendText}>Share again</Text>
                     </TouchableOpacity>
                   )}
@@ -226,9 +227,9 @@ const s = StyleSheet.create({
   points: { gap: 8, marginTop: 4 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pointText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  error: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, marginTop: -6 },
+  error: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: -4 },
   successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(16,185,129,0.14)', alignItems: 'center', justifyContent: 'center' },
-  linkBox: { backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm + 2 },
+  linkBox: { backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm + 4 },
   linkText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   row: { flexDirection: 'row', gap: SP.sm },
   primaryBtn: { flex: 2, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: RADIUS.md },

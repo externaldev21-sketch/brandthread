@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadDraw } from '@/components/onboarding/ThreadLine';
 import { PillButton, Reveal, StepHeadline } from '@/components/onboarding/OnboardingUI';
-import { BG, BORDER, CARD, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
+import { BG, BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE } from '@/lib/theme';
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';

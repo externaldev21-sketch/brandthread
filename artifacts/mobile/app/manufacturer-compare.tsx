@@ -35,7 +35,7 @@ const LABEL_WIDTH = 110;
 type Row = { label: string; format: (m: Manufacturer) => string; numeric?: (m: Manufacturer) => number; lowerIsBetter?: boolean };
 
 const ROWS: Row[] = [
-  { label: 'MOQ', format: (m) => m.moq > 0 ? `${m.moq} units` : 'Contact', numeric: (m) => m.moq || Infinity, lowerIsBetter: true },
+  { label: 'Min. order', format: (m) => m.moq > 0 ? `${m.moq} units` : 'On request', numeric: (m) => m.moq || Infinity, lowerIsBetter: true },
   { label: 'Unit price', format: (m) => m.unitPriceMinCents > 0 ? `${formatCents(m.unitPriceMinCents)}–${formatCents(m.unitPriceMaxCents)}` : '—', numeric: (m) => m.unitPriceMinCents || Infinity, lowerIsBetter: true },
   { label: 'Lead time', format: (m) => m.leadTimeDays > 0 ? plural(m.leadTimeDays, 'day') : '—', numeric: (m) => m.leadTimeDays || Infinity, lowerIsBetter: true },
   { label: 'Rating', format: (m) => m.reviewCount > 0 ? `★ ${m.rating.toFixed(1)} (${m.reviewCount})` : 'Not rated', numeric: (m) => m.reviewCount > 0 ? m.rating : 0, lowerIsBetter: false },
@@ -51,6 +51,7 @@ export default function ManufacturerCompareScreen() {
 
   const [saved, setSaved] = useState<Manufacturer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -62,6 +63,7 @@ export default function ManufacturerCompareScreen() {
       return;
     }
     try {
+      setError(false);
       const ids = await getFavoriteManufacturerIds();
       const profiles = await Promise.all(ids.map((id) => getManufacturer(id)));
       const list = profiles.filter((m): m is Manufacturer => !!m);
@@ -69,6 +71,7 @@ export default function ManufacturerCompareScreen() {
       setSelected(new Set(list.slice(0, MIN_COMPARE).map((m) => m.id)));
     } catch {
       setSaved([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -90,10 +93,12 @@ export default function ManufacturerCompareScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Compare Suppliers" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare suppliers" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+      ) : error ? (
+        <EmptyState icon="alert-circle" title="Couldn't load your saved manufacturers" description="Check your connection and try again." action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} />
       ) : saved.length === 0 ? (
         <EmptyState icon="heart" title="No saved manufacturers yet" description="Save manufacturers from Discover, then compare them here." action={{ label: 'Browse manufacturers', onPress: () => router.push('/manufacturer-hub' as never) }} />
       ) : (
@@ -168,7 +173,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   pickerChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },
-  scrollContent: { paddingHorizontal: SP.md, paddingVertical: SP.md, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: SP.md, paddingVertical: SP.md, paddingBottom: 40, alignItems: 'flex-start' },
   labelCol: { width: LABEL_WIDTH, marginRight: 1 },
   labelHeader: { height: 72 },
   labelCell: { height: 44, justifyContent: 'center', borderTopWidth: 1, borderTopColor: theme.border, paddingRight: SP.sm },

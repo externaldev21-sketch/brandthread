@@ -85,6 +85,12 @@ const TABS: { key: Tab; label: string; icon: IconName }[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Raw enum -> sentence-case badge label, e.g. 'awaiting_payment' -> 'Awaiting payment'. */
+function statusLabel(status: string): string {
+  const text = status.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function fmtDate(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -189,7 +195,9 @@ export default function ManufacturerHub() {
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
-  const isTab = (value: unknown): value is Tab => TABS.some((item) => item.key === value);
+  // 'messages' has no segment in the strip but is still a valid deep-link
+  // target (profile "Inbox", Discover "See all", Orders empty state).
+  const isTab = (value: unknown): value is Tab => value === 'messages' || TABS.some((item) => item.key === value);
   const [activeTab, setActiveTab] = useState<Tab>(isTab(tab) ? tab : 'discover');
   const isSellerSetup = isSellerSetupOrigin(from);
 
@@ -541,7 +549,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const rails: { key: string; title: string; data: Manufacturer[] }[] = [
     { key: 'verified', title: 'Verified manufacturers', data: railVerified },
     { key: 'fast', title: 'Fast customization', data: railFastCustomization },
-    { key: 'moq', title: 'Low MOQ', data: railLowMoq },
+    { key: 'moq', title: 'Low minimum order', data: railLowMoq },
     { key: 'rated', title: 'Top-rated', data: railTopRated },
   ];
 
@@ -561,7 +569,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <Icon name="send" size={ICON.md} color={theme.onAccent} />
             </View>
             <View style={s.rfqCtaBody}>
-              <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for Quotation</Text>
+              <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for quotation</Text>
               <Text style={[s.rfqCtaSubtitle, getOnAccentTextStyle(theme)]}>Broadcast one request to up to 10 manufacturers</Text>
             </View>
             <Icon name="arrow-right" size={ICON.md} color={theme.onAccent} />
@@ -767,7 +775,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
-              description={favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
+              description={favoritesOnly
+                ? 'Save manufacturers from Discover and they will appear here.'
+                : (activeFilterCount(filters) > 0 || searchQuery) ? 'Try adjusting your search or filters.' : 'No manufacturers are listed yet.'}
               action={favoritesOnly
                 ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
                 : activeFilterCount(filters) > 0
@@ -870,12 +880,12 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             : `${formatCents(mfg.unitPriceMinCents)} – ${formatCents(mfg.unitPriceMaxCents)}`} <Text style={card.priceUnit}>/ unit</Text>
         </Text>
       )}
-      <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'Contact for MOQ'}</Text>
+      <Text style={card.moqLine} numberOfLines={1}>Min. order: {mfg.moq > 0 ? `${mfg.moq.toLocaleString('en-US')} pieces` : 'on request'}</Text>
       <Text style={card.specialties} numberOfLines={2}>
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <View style={card.detailStack}>
-        <Text style={card.stats} numberOfLines={1}>{mfg.leadTimeDays ? `${mfg.leadTimeDays}d lead time` : 'Lead time varies'}</Text>
+        <Text style={card.stats} numberOfLines={1}>{mfg.leadTimeDays ? `${mfg.leadTimeDays}-day lead time` : 'Lead time varies'}</Text>
         <Text style={card.response} numberOfLines={1}>{mfg.responseTimeHours > 0 ? `Replies in ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
       </View>
 
@@ -906,7 +916,7 @@ const makeCard = (theme: AppThemePreset) => StyleSheet.create({
   coverTouch:    { flex: 1 },
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: theme.accentLight },
+  coverFallbackText: { fontSize: FS.h2, fontFamily: FONT.bold, color: theme.accentLight },
   yearsBadge:    { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.pill, backgroundColor: 'rgba(10,10,11,0.78)' }, // theme-exempt: scrim over the cover photo
   yearsText:     { fontSize: 11, fontFamily: FONT.semibold, color: '#FAFAFA' }, // theme-exempt: text on the photo scrim
   saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
@@ -988,7 +998,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
           <Text style={fm.sectionLabel}>Sort by</Text>
           <View style={fm.chipRow}>
-            {([['recommended', 'Recommended'], ['experience', 'Most experience'], ['rating', 'Top rated'], ['moq', 'Lowest MOQ'], ['newest', 'Newest']] as const).map(([val, label]) => (
+            {([['recommended', 'Recommended'], ['experience', 'Most experience'], ['rating', 'Top rated'], ['moq', 'Lowest minimum order'], ['newest', 'Newest']] as const).map(([val, label]) => (
               <FilterChip key={val} label={label} active={local.sort === val} onPress={() => set('sort', val)} />
             ))}
           </View>
@@ -1135,7 +1145,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     return (
       <EmptyState
         icon="users"
-        title="Build your production network."
+        title="Build your production network"
         description="Message a manufacturer from Discover, or invite one you already work with. They'll appear here with their orders and messages."
         action={{ label: 'Invite a manufacturer', onPress: () => router.push('/invite-manufacturer' as never), icon: 'user-plus' }}
         style={s.emptyState}
@@ -1215,7 +1225,7 @@ const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
   counts:   { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   lastMsg:  { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
   divider:  { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
-  actionRow:{ flexDirection: 'row', gap: SP.xs },
+  actionRow:{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1292,20 +1302,31 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     quotesByRequest[q.quoteRequestId].push(q);
   });
 
-  if (!loading && quoteRequests.length === 0 && quotes.length === 0) {
+  if (loading && quoteRequests.length === 0 && quotes.length === 0) {
+    return <View style={s.skeletonList} testID="quotes-loading">{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
+  }
+
+  if (quoteRequests.length === 0 && quotes.length === 0) {
     return (
       <View style={s.flex}>
         <EmptyState
           icon="file-text"
-          title="Request your first production quote."
+          title="Request your first production quote"
           description="Send quote requests to manufacturers and compare their offers."
           action={{ label: 'Request a quote', onPress: () => router.push(quoteHref()), icon: 'plus' }}
           style={s.emptyState}
         />
-        <QuotesFAB router={router} />
       </View>
     );
   }
+
+  const handleWithdraw = (req: QuoteRequest) => {
+    Alert.alert('Withdraw this request?', 'The manufacturer will be notified.', [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Withdraw', style: 'destructive', onPress: () => withdrawQuoteRequest(req.id).then(load)
+        .catch(() => Alert.alert('Quote update failed', 'Could not withdraw this request. Refresh and try again.')) },
+    ]);
+  };
 
   return (
     <View style={s.flex}>
@@ -1316,7 +1337,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       >
         {quoteRequests.length > 0 && (
           <>
-            <SectionHeader title="Quote Requests" style={s.sectionHeader} />
+            <SectionHeader title="Quote requests" style={s.sectionHeader} />
             {quoteRequests.map(req => (
               <QuoteRequestCard
                 key={req.id}
@@ -1330,7 +1351,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
         )}
         {quotes.length > 0 && (
           <>
-            <SectionHeader title="Quotes Received" style={s.sectionHeader} />
+            <SectionHeader title="Quotes received" style={s.sectionHeader} />
             {quotes.map(q => (
               <QuoteReceivedCard
                 key={q.id}
@@ -1383,7 +1404,7 @@ function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: 
     <View style={qc.root}>
       <View style={qc.topRow}>
         <Text style={qc.productName} numberOfLines={1}>{req.productName}</Text>
-        <StatusBadge label={req.status.replace(/_/g, ' ')} variant={quoteRequestStatusVariant(req.status)} small />
+        <StatusBadge label={statusLabel(req.status)} variant={quoteRequestStatusVariant(req.status)} small />
       </View>
       {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
       <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
@@ -1481,7 +1502,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="package"
-        title="Your samples will appear here."
+        title="Your samples will appear here"
         description="Message a manufacturer about your design. When they send a sample card in chat, pay it there and track it here."
         action={{ label: 'Find a manufacturer', onPress: () => router.setParams({ tab: 'discover' } as never), icon: 'search' }}
         style={s.emptyState}
@@ -1499,7 +1520,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
           <View style={smpCard.root}>
             <View style={smpCard.topRow}>
               <Text style={smpCard.productName} numberOfLines={1}>{item.productName}</Text>
-              <StatusBadge label={item.status.replace(/_/g, ' ')} variant={sampleStatusVariant(item.status)} small />
+              <StatusBadge label={statusLabel(item.status)} variant={sampleStatusVariant(item.status)} small />
             </View>
             {!!item.manufacturerName && <Text style={smpCard.mfgName}>{item.manufacturerName}</Text>}
             {item.estimatedCompletionDate && (
@@ -1585,7 +1606,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="layers"
-        title="Bulk orders show up here."
+        title="Bulk orders show up here"
         description="When a manufacturer sends you a bulk order card in chat and you pay it, you can follow every stage of production here."
         action={{ label: 'Open messages', onPress: () => router.setParams({ tab: 'messages' } as never), icon: 'message-circle' }}
         style={s.emptyState}
@@ -1704,7 +1725,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
       <EmptyState
         icon="message-circle"
-        title="Manufacturer conversations will appear here."
+        title="Manufacturer conversations will appear here"
         description="Message manufacturers directly from their profiles or quote requests."
         style={s.emptyState}
       />
@@ -1809,7 +1830,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   resultCount:  { fontVariant: ['tabular-nums'],  fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
   skeletonList: { padding: SP.md, gap: SP.md },
   skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
-  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   skeletonTile: { width: '48%', height: 260, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning, backgroundColor: `${theme.warning}1F` },

@@ -40,15 +40,6 @@ const STATUS_OPTIONS: { value: StorePublishStatus; label: string }[] = [
   { value: 'unpublished', label: 'Unpublished' },
 ];
 
-function statusColor(st: StorePublishStatus, colors: Colors): string {
-  if (st === 'published') return colors.success;
-  if (st === 'draft') return colors.info;
-  if (st === 'password_protected') return colors.warning;
-  if (st === 'maintenance') return colors.warning;
-  if (st === 'unpublished') return colors.destructive;
-  return colors.mutedForeground;
-}
-
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
 const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese', 'Japanese'];
 const MEASUREMENTS: { value: 'imperial' | 'metric'; label: string }[] = [
@@ -186,7 +177,7 @@ export default function StoreSettingsScreen() {
         variant="push"
         rightElement={(
           <PrimaryButton
-            label={saving ? 'Saving...' : 'Save'}
+            label={saving ? 'Saving…' : 'Save'}
             onPress={handleSave}
             loading={saving}
             disabled={loading}
@@ -260,7 +251,7 @@ export default function StoreSettingsScreen() {
         </BrandthreadCard>
 
         {/* LOCALIZATION */}
-        <SectionHeader title="LOCALIZATION" style={ss.sectionHeader} />
+        <SectionHeader title="Localization" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <FieldRow ss={ss} label="Currency">
             <View style={ss.chipRow}>
@@ -309,7 +300,6 @@ export default function StoreSettingsScreen() {
           <View style={ss.chipRow}>
             {STATUS_OPTIONS.map(opt => {
               const isActive = form.storeStatus === opt.value;
-              const chipColor = statusColor(opt.value, colors);
               return (
                 <PressableScale
                   key={opt.value}
@@ -320,9 +310,9 @@ export default function StoreSettingsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={opt.label}
                   accessibilityState={{ selected: isActive }}
-                  style={[ss.statusChip, isActive && { borderColor: chipColor, backgroundColor: chipColor + '20' }]}
+                  style={[ss.statusChip, isActive && { borderColor: colors.foreground, backgroundColor: colors.secondary }]}
                 >
-                  <Text style={[ss.statusChipLabel, { color: isActive ? chipColor : colors.mutedForeground }]}>{opt.label}</Text>
+                  <Text style={[ss.statusChipLabel, { color: isActive ? colors.foreground : colors.mutedForeground }]}>{opt.label}</Text>
                 </PressableScale>
               );
             })}
@@ -447,13 +437,13 @@ function makeStyles(colors: Colors) {
     sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
     card: { marginHorizontal: SP.md, gap: SP.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-    fieldRow: { gap: 6 },
+    fieldRow: { gap: SP.sm },
     fieldLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold, color: colors.mutedForeground },
     input: {
       fontSize: FS.base, lineHeight: 19, fontFamily: FONT.regular, color: colors.foreground,
       backgroundColor: colors.secondary, borderRadius: RADIUS.sm,
       borderWidth: 1, borderColor: colors.border,
-      paddingHorizontal: SP.md, paddingVertical: 10,
+      paddingHorizontal: SP.md, paddingVertical: 12,
       minHeight: 44,
     },
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
@@ -461,7 +451,7 @@ function makeStyles(colors: Colors) {
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     chipScroll: { flexDirection: 'row', gap: SP.sm },
     statusChip: {
-      paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.md,
+      paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.md,
       borderWidth: 1, borderColor: colors.border,
       minHeight: 44, justifyContent: 'center',
     },

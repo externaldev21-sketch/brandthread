@@ -34,7 +34,8 @@ import { useColors } from '@/hooks/useColors';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
-import { PrimaryButton, SecondaryButton, BrandedLoadingState, HapticSwitch } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, PrimaryButton, SecondaryButton, BrandedLoadingState, HapticSwitch } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 import { useApi } from '@/lib/api';
 
@@ -61,11 +62,14 @@ export default function ProductBundleEditScreen() {
   const isNew = !bundleId;
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
 
   const [loading,  setLoading]  = useState(!isNew);
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Bundle fields
   const [name,        setName]        = useState('');
@@ -82,10 +86,13 @@ export default function ProductBundleEditScreen() {
   const [catalog,      setCatalog]      = useState<any[]>([]);
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState(false);
 
   // Load existing bundle
   useEffect(() => {
     if (isNew) return;
+    setLoading(true);
+    setLoadError(false);
     (api as any).bundles.get(bundleId!)
       ?.then((b: any) => {
         setName(b.name ?? '');
@@ -95,17 +102,18 @@ export default function ProductBundleEditScreen() {
         setItems(b.items ?? []);
         setSales(b.sales ?? null);
       })
-      ?.catch(() => {})
+      ?.catch(() => setLoadError(true))
       ?.finally(() => setLoading(false));
-  }, [bundleId]);
+  }, [bundleId, reloadKey]);
 
   // Load catalog when picker opens
   useEffect(() => {
     if (!pickerOpen || catalog.length > 0) return;
     setCatalogLoading(true);
+    setCatalogError(false);
     (api as any).products?.list?.()
       ?.then((rows: any[]) => setCatalog((rows ?? []).filter((p: any) => p.status === 'active')))
-      ?.catch(() => {})
+      ?.catch(() => setCatalogError(true))
       ?.finally(() => setCatalogLoading(false));
   }, [pickerOpen]);
 
@@ -147,7 +155,7 @@ export default function ProductBundleEditScreen() {
   // ── Save bundle ─────────────────────────────────────────────────────────────
   async function save() {
     const trimName = name.trim();
-    if (!trimName) { Alert.alert('Name required'); return; }
+    if (!trimName) { Alert.alert('Name required', 'Give your bundle a name.'); return; }
     const parsedBundlePriceCents = parseDecimalToCents(priceStr);
     if (parsedBundlePriceCents === null || parsedBundlePriceCents <= 0) {
       Alert.alert('Valid price required', 'Enter a price with up to two decimal places.');
@@ -197,6 +205,15 @@ export default function ProductBundleEditScreen() {
   }
 
   if (loading) return <BrandedLoadingState message="Loading bundle…" />;
+
+  if (loadError) {
+    return (
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
+        <BrandthreadHeader title="Edit bundle" onBack={() => goBackOr(router)} />
+        <ErrorState message="Couldn’t load this bundle." onRetry={() => setReloadKey(k => k + 1)} retryLabel="Try again" />
+      </View>
+    );
+  }
 
   return (
     <View style={s.root}>
@@ -293,6 +310,9 @@ export default function ProductBundleEditScreen() {
             disabled={isNew}
             accessibilityState={{ disabled: isNew }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Add product"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Icon name="plus" size={14} color={PURPLE_LIGHT} />
             <Text style={s.addItemBtnText}>Add product</Text>
@@ -331,6 +351,8 @@ export default function ProductBundleEditScreen() {
             <Text style={s.sectionTitle}>Your products</Text>
             {catalogLoading ? (
               <ActivityIndicator color={colors.accentForeground} style={{ marginVertical: SP.md }} />
+            ) : catalogError ? (
+              <Text style={s.emptyText}>Couldn’t load your products. Close and reopen to try again.</Text>
             ) : catalog.length === 0 ? (
               <Text style={s.emptyText}>No active products found.</Text>
             ) : (
@@ -340,6 +362,8 @@ export default function ProductBundleEditScreen() {
                   style={s.catalogRow}
                   onPress={() => { setPickerOpen(false); addItem(p); }}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${p.name} to bundle`}
                 >
                   <Text style={s.catalogName}>{p.name}</Text>
                   <Text style={s.catalogPrice}>{formatMoney(p.variants?.[0]?.priceCents ?? 0)}</Text>
@@ -350,7 +374,7 @@ export default function ProductBundleEditScreen() {
         )}
 
         {!isNew && (
-          <TouchableOpacity style={s.deleteBtn} onPress={deleteBundle} disabled={deleting} activeOpacity={0.7}>
+          <TouchableOpacity style={s.deleteBtn} onPress={deleteBundle} disabled={deleting} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Delete bundle">
             {deleting
               ? <ActivityIndicator color={RED} size="small" />
               : <Text style={s.deleteBtnText}>Delete bundle</Text>
@@ -375,7 +399,7 @@ const s = StyleSheet.create({
   content:      { padding: SP.md, gap: SP.md },
   sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs },
   fieldLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 4 },
-  fieldHint:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 17 },
+  fieldHint:    { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 18 },
   input:        { height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   multiline:    { height: 88, paddingTop: SP.sm, textAlignVertical: 'top' },
   // '$' sits inside the field: the row itself is the bordered input box.
@@ -387,13 +411,13 @@ const s = StyleSheet.create({
   savingsAmount:{ fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT, fontVariant: ['tabular-nums'] },
   toggleRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: BORDER },
   itemsHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
-  addItemBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: PURPLE_DIM, borderRadius: radius.sm },
-  addItemBtnText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT },
+  addItemBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: PURPLE_DIM, borderRadius: radius.sm },
+  addItemBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },
   newBundleHint:{ flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, padding: SP.sm, borderWidth: 1, borderColor: BORDER },
-  newBundleHintText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, flex: 1 },
+  newBundleHintText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, flex: 1 },
   itemRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.sm, padding: SP.sm, borderWidth: 1, borderColor: BORDER },
   itemImg:      { width: 44, height: 44, borderRadius: RADIUS.sm, backgroundColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  itemInfo:     { flex: 1, gap: 2 },
+  itemInfo:     { flex: 1, gap: SP.xs },
   itemName:     { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   itemVariant:  { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   itemPrice:    { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE_LIGHT, fontVariant: ['tabular-nums'] },

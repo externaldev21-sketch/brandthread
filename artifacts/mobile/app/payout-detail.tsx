@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
@@ -66,7 +65,6 @@ export default function PayoutDetailScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const api = useApi();
-  const tabBarMetrics = useTabBarMetrics(2);
   const { id } = useLocalSearchParams<{ id: string }>();
   const payoutId = typeof id === 'string' ? id : '';
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
@@ -152,7 +150,6 @@ export default function PayoutDetailScreen() {
     <View style={styles.root}>
       <ScreenHeader title="Payout" onBack={goBack} />
       <ScrollView
-        style={{ marginBottom: tabBarMetrics.occupiedHeight }}
         contentContainerStyle={[styles.content, !payout && !loading && !loadError && { flexGrow: 1, justifyContent: 'center' }]}
         showsVerticalScrollIndicator={false}
       >

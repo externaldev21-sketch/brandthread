@@ -42,6 +42,7 @@ import type { FinanceTransactionRow } from '@/lib/previewFinance';
 import { TABULAR_NUMS } from '@/constants/typography';
 
 import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 
 import { fetchStatementCsv, statementErrorLabel, statementFilename, STATEMENT_CSV_PATH } from '@/lib/financeStatement';
@@ -169,9 +170,9 @@ export default function FinanceScreen() {
   const totalNet = transactions.reduce((acc, t) => acc + (t.net ?? 0), 0);
 
   const overviewCards = [
-    { label: 'Available', value: formatCents(availAmt), color: colors.success, icon: 'trending-up' as const },
-    { label: 'Pending',   value: formatCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
-    { label: 'Net (recent)', value: formatCents(totalNet), color: colors.info, icon: 'percent' as const },
+    { label: 'Available', value: formatCents(availAmt), icon: 'trending-up' as const },
+    { label: 'Pending',   value: formatCents(pendAmt),  icon: 'activity' as const },
+    { label: 'Net (recent)', value: formatCents(totalNet), icon: 'percent' as const },
   ];
 
   // Build expenses list from real transactions
@@ -180,7 +181,6 @@ export default function FinanceScreen() {
      amount:   (t.net >= 0 ? '+' : '') + formatCents(t.net),
     date:     fmtDate(t.created),
     category: txCategory(t.type),
-    positive: t.net >= 0,
   }));
 
   // Fallback P&L data when not connected
@@ -195,9 +195,9 @@ export default function FinanceScreen() {
 
   const subPlan = currentPlanSummary(subStatus ?? { plan: null, status: null, amountCents: 0 });
   const documents = isPreviewMode ? [] : [
-    ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
-    { label: 'Monthly Statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) },
-    { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+    ...(!isReadOnly ? [{ label: 'Download statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    { label: 'Monthly statements (PDF / CSV)', icon: 'calendar' as const, onPress: () => router.push('/statements' as any) },
+    { label: 'Tax report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
     { label: 'Chargebacks', icon: 'shield' as const, trailing: 'chevron-right' as const, onPress: () => router.push('/disputes' as any) },
   ];
 
@@ -206,7 +206,8 @@ export default function FinanceScreen() {
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" />
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={colors.primary} />
+          <SkeletonBlock width="100%" height={140} />
+          <SkeletonBlock width="100%" height={160} />
         </View>
       </View>
     );
@@ -226,7 +227,7 @@ export default function FinanceScreen() {
       <ScreenHeader title="Finance" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 24, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
 
@@ -250,7 +251,7 @@ export default function FinanceScreen() {
               ) : null}
             </Text>
             {subStatus.trialEnd ? (
-              <Text style={[styles.subCardMeta, { color: colors.info }]}>Trial ends {subStatus.trialEnd}</Text>
+              <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Trial ends {subStatus.trialEnd}</Text>
             ) : subStatus.renewsOn ? (
               <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Renews {subStatus.renewsOn}</Text>
             ) : null}
@@ -347,7 +348,9 @@ export default function FinanceScreen() {
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent transactions</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ margin: 20 }} />
+          <View style={{ padding: 16, gap: 8 }}>
+            {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={52} />)}
+          </View>
         ) : balanceError ? (
           <View style={{ padding: 20, alignItems: 'flex-start' }}>
             <RetryRow label="Couldn't load transactions" onRetry={load} />
@@ -362,13 +365,13 @@ export default function FinanceScreen() {
           expenseRows.map((e, i) => (
             <View key={i} style={[styles.expRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
               <View style={styles.expLeft}>
-                <Text style={[styles.expName, { color: colors.foreground }]}>{e.name}</Text>
+                <Text style={[styles.expName, { color: colors.foreground }]} numberOfLines={1}>{e.name}</Text>
                 <View style={styles.expMeta}>
                   <Badge label={e.category} variant="default" />
                   <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
                 </View>
               </View>
-              <Text style={[styles.expAmount, TABULAR_NUMS, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
+              <Text style={[styles.expAmount, TABULAR_NUMS, { color: colors.foreground }]}>{e.amount}</Text>
             </View>
           ))
         )}
@@ -405,7 +408,7 @@ export default function FinanceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  accessLoading: { padding: 16, gap: 8 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: FONT.medium },
   pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },

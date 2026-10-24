@@ -5,12 +5,14 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Reached from More, Store, Gift cards.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Share, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BrandthreadScreen, HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { apiErrorMessage } from '@/lib/safety';
 import { CheckoutField, CheckoutSection, GUTTER, useCheckoutColors, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
@@ -78,7 +80,7 @@ export default function GiftCardsManageScreen() {
       setSettings(await api.giftCards.seller.saveSettings(patch));
     } catch (err) {
       setSettings(before);
-      setSaveError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t save that. Try again.');
+      setSaveError(apiErrorMessage(err, 'We couldn’t save that. Try again.'));
     }
   }
 
@@ -104,7 +106,7 @@ export default function GiftCardsManageScreen() {
       setIssueAmount(''); setIssueEmail(''); setIssueName('');
       await load();
     } catch (err) {
-      setIssueError(err instanceof ApiError && err.status < 500 ? err.message : 'We couldn’t issue that card. Try again.');
+      setIssueError(apiErrorMessage(err, 'We couldn’t issue that card. Try again.'));
     } finally {
       setIssuing(false);
     }
@@ -128,7 +130,11 @@ export default function GiftCardsManageScreen() {
       <ScreenHeader title="Gift cards" onBack={() => goBackOr(router)} />
       <View style={{ paddingHorizontal: GUTTER, paddingTop: SP.md }}>
         {loading ? (
-          <View style={s.center}><ActivityIndicator /></View>
+          <View style={{ gap: SP.md }}>
+            <SkeletonBlock width="100%" height={56} />
+            <SkeletonBlock width="100%" height={160} />
+            <SkeletonBlock width="100%" height={240} />
+          </View>
         ) : failed || !settings ? (
           <RetryRow label="Couldn’t load gift cards" onRetry={() => void load()} />
         ) : (
@@ -213,7 +219,6 @@ export default function GiftCardsManageScreen() {
 
 function makeStyles(ck: CheckoutColors) {
   return StyleSheet.create({
-    center: { alignItems: 'center', paddingTop: SP.xl },
     section: { marginTop: SP.sm },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm },
     title: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },

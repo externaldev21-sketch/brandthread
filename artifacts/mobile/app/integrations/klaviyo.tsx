@@ -4,6 +4,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useColors } from '@/hooks/useColors';
 
 import { Icon } from '@/components/ui/Icon';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 import { useRouter } from 'expo-router';
 
@@ -32,16 +34,21 @@ export default function KlaviyoIntegrationScreen() {
 
   const [status, setStatus] = useState<KlaviyoStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError(false);
     try {
       const res = await api.integrations.klaviyoStatus();
       setStatus(res);
     } catch {
-      setStatus({ connected: false });
+      // Don't show the connect form on a failed load — a connected seller
+      // would be told Klaviyo isn't connected.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -81,7 +88,7 @@ export default function KlaviyoIntegrationScreen() {
       const res = await api.integrations.klaviyoSync();
       setStatus(res);
     } catch {
-      Alert.alert('Sync failed', 'Could not refresh subscriber counts from Klaviyo.');
+      Alert.alert('Sync failed', 'Couldn’t refresh subscriber counts from Klaviyo. Try again.');
     } finally {
       setSyncing(false);
     }
@@ -92,8 +99,15 @@ export default function KlaviyoIntegrationScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Disconnect', style: 'destructive', onPress: async () => {
-          await api.integrations.klaviyoDisconnect();
-          setStatus({ connected: false });
+          setDisconnecting(true);
+          try {
+            await api.integrations.klaviyoDisconnect();
+            setStatus({ connected: false });
+          } catch {
+            Alert.alert('Couldn’t disconnect Klaviyo', 'Check your connection and try again.');
+          } finally {
+            setDisconnecting(false);
+          }
         },
       },
     ]);
@@ -103,19 +117,21 @@ export default function KlaviyoIntegrationScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Klaviyo" />
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
             <Icon name="zap" size={22} color={colors.primary} />
           </View>
-          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
+          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo email and SMS</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
             Connect your existing Klaviyo account so the email and SMS subscribers you already built keep working here.
           </Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
+          <LoadingSkeleton height={180} />
+        ) : loadError ? (
+          <ErrorState message="Couldn’t load your Klaviyo connection." onRetry={() => { setLoading(true); load(); }} retryLabel="Try again" />
         ) : status?.connected ? (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.connectedRow}>
@@ -128,11 +144,11 @@ export default function KlaviyoIntegrationScreen() {
             <View style={styles.statsRow}>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{(status.emailSubscriberCount ?? 0).toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Email subs</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Email subscribers</Text>
               </View>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{(status.smsSubscriberCount ?? 0).toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>SMS subs</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>SMS subscribers</Text>
               </View>
               <View style={styles.statBox}>
                 <Text style={[styles.statVal, { color: colors.foreground }]}>{status.listCount ?? 0}</Text>
@@ -151,18 +167,23 @@ export default function KlaviyoIntegrationScreen() {
               onPress={handleSync}
               disabled={syncing}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: syncing, busy: syncing }}
             >
               {syncing ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Icon name="refresh-cw" size={15} color={colors.foreground} />}
               <Text style={[styles.secondaryBtnText, { color: syncing ? TEXT_DISABLED : colors.foreground }]}>{syncing ? 'Syncing…' : 'Sync subscribers'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.disconnectBtn}
+              style={[styles.disconnectBtn, disconnecting && { opacity: 0.6 }]}
               onPress={handleDisconnect}
+              disabled={disconnecting}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: disconnecting, busy: disconnecting }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={[styles.disconnectText, { color: colors.destructive }]}>Disconnect Klaviyo</Text>
+              <Text style={[styles.disconnectText, { color: colors.destructive }]}>{disconnecting ? 'Disconnecting…' : 'Disconnect Klaviyo'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -183,6 +204,8 @@ export default function KlaviyoIntegrationScreen() {
               onPress={handleConnect}
               disabled={connecting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: connecting, busy: connecting }}
             >
               {connecting ? <ActivityIndicator size="small" color={TEXT_DISABLED} /> : <Icon name="link" size={16} color={colors.primaryForeground} />}
               <Text style={[styles.connectBtnText, { color: connecting ? TEXT_DISABLED : colors.primaryForeground }]}>{connecting ? 'Connecting…' : 'Connect Klaviyo'}</Text>
@@ -193,6 +216,7 @@ export default function KlaviyoIntegrationScreen() {
               onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="link"
             >
               <Icon name="external-link" size={13} color={colors.primary} />
               <Text style={[styles.helpText, { color: colors.primary }]}>Where do I find my Private API Key?</Text>

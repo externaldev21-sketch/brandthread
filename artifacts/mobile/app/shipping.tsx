@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Icon } from '@/components/ui/Icon';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { Badge } from '@/components/Badge';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,7 +81,7 @@ const CARRIER_SUGGESTIONS = [
 function emptyZoneForm(zoneType: ZoneType) {
   return {
     id: null as string | null,
-    name: zoneType === 'domestic' ? 'Domestic' : zoneType === 'rest_of_world' ? 'Rest of World' : '',
+    name: zoneType === 'domestic' ? 'Domestic' : zoneType === 'rest_of_world' ? 'Rest of world' : '',
     zoneType,
     countriesText: '',
     pricingModel: 'flat' as PricingModel,
@@ -107,8 +109,8 @@ function shipmentProgress(status: string): number {
 
 function shipmentStatusLabel(status: string): string {
   switch (status) {
-    case 'ready_to_ship': return 'Label Created';
-    case 'shipped':       return 'In Transit';
+    case 'ready_to_ship': return 'Label created';
+    case 'shipped':       return 'In transit';
     case 'delivered':     return 'Delivered';
     default:              return 'Processing';
   }
@@ -145,6 +147,9 @@ export default function ShippingScreen() {
   const [returnRowError, setReturnRowError] = useState<{ id: string; message: string } | null>(null);
   const [returnToast, setReturnToast] = useState<string | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
+  // Stats read '—' until their source loads, never a fake 0 on a failed fetch.
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
+  const [returnsLoaded, setReturnsLoaded] = useState(false);
 
   // Legacy flat-rate list — still supported server-side as a fallback, shown
   // read-only here once zones exist to avoid two competing editors.
@@ -153,6 +158,7 @@ export default function ShippingScreen() {
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [setupLoadError, setSetupLoadError] = useState<string | null>(null);
+  const zonesFailed = !!setupLoadError;
   const [shipFromCountry, setShipFromCountry] = useState('US');
   const [shipFromDraft, setShipFromDraft] = useState('US');
   // Intl #108/#109: server flags (absent = off) and the ship-from postal code live rates need.
@@ -185,6 +191,7 @@ export default function ShippingScreen() {
 
   const loadShipping = useCallback(() => {
     setZonesLoading(true);
+    setSetupLoadError(null);
     Promise.all([
       api.shippingZones.list(),
       api.shippingZones.getSettings(),
@@ -210,8 +217,8 @@ export default function ShippingScreen() {
   }, [api]);
 
   useEffect(() => {
-    api.returns.listSeller().then(data => setSellerReturns(data ?? [])).catch(() => {});
-    api.orders.list().then(data => setOrders(Array.isArray(data) ? data : [])).catch(() => {});
+    api.returns.listSeller().then(data => { setSellerReturns(data ?? []); setReturnsLoaded(true); }).catch(() => {});
+    api.orders.list().then(data => { setOrders(Array.isArray(data) ? data : []); setOrdersLoaded(true); }).catch(() => {});
   }, []);
 
   useFocusEffect(useCallback(() => { loadShipping(); }, [loadShipping]));
@@ -227,8 +234,7 @@ export default function ShippingScreen() {
 
   function shipmentBadge(status: string) {
     if (status === 'Delivered') return 'success';
-    if (status === 'Out for Delivery') return 'info';
-    if (status === 'In Transit') return 'gold';
+    if (status === 'In transit') return 'gold';
     return 'default';
   }
 
@@ -444,7 +450,7 @@ export default function ShippingScreen() {
 
   async function handleSavePreset() {
     const name = presetForm.name.trim();
-    if (!name) return Alert.alert('Name required', 'Give this package a name, like "Small Box".');
+    if (!name) return Alert.alert('Name required', 'Give this package a name, like "Small box".');
     const weightOz = Number(presetForm.weightOz);
     const lengthIn = Number(presetForm.lengthIn);
     const widthIn = Number(presetForm.widthIn);
@@ -513,7 +519,7 @@ export default function ShippingScreen() {
           { label: 'Returns', value: String(sellerReturns.length), color: colors.foreground },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statVal, { color: s.color }]}>{s.value}</Text>
+            <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
         ))}
@@ -672,6 +678,8 @@ export default function ShippingScreen() {
             <TouchableOpacity
               onPress={() => { setShipFromDraft(shipFromCountry); setShipFromEditing(true); }}
               style={[styles.countryPill, { borderColor: colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Home country ${shipFromCountry}. Edit`}
             >
               <Text style={[styles.countryPillText, { color: colors.foreground }]}>{shipFromCountry}</Text>
               <Icon name="edit-2" size={12} color={colors.mutedForeground} />
@@ -697,15 +705,15 @@ export default function ShippingScreen() {
       </Text>
 
       {zonesLoading ? (
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, padding: 24, alignItems: 'center' }]}>
-          <ActivityIndicator color={colors.mutedForeground} />
-        </View>
+        <SkeletonBlock width="100%" height={136} radius={14} style={{ marginBottom: 24 }} />
+      ) : zonesFailed && zones.length === 0 ? (
+        <RetryRow label="Couldn’t load your shipping zones" onRetry={loadShipping} style={{ marginBottom: 24 }} />
       ) : zones.length === 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emptySection}>
             <Icon name="globe" size={20} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No shipping zones yet</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Add a Domestic zone to start, then Rest of World for everywhere else.</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Add a domestic zone to start, then a rest-of-world zone for everywhere else.</Text>
           </View>
         </View>
       ) : (
@@ -1111,7 +1119,7 @@ export default function ShippingScreen() {
           <TextInput returnKeyType="done"
             value={presetForm.name}
             onChangeText={t => setPresetForm(f => ({ ...f, name: t }))}
-            placeholder="Small Box"
+            placeholder="Small box"
             placeholderTextColor={colors.mutedForeground}
             style={[styles.sheetInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
           />

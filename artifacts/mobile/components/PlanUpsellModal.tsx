@@ -77,7 +77,8 @@ export default function PlanUpsellModal({
 
   // For Growth plan, show the rich tool list; for Pro, fall back to the
   // original plain-text list.
-  const isGrowth = requiredPlan === 'growth';
+  const isGrowth = requiredPlan !== 'pro';
+  const otherToolCount = GROWTH_STUDIO_TOOLS.filter((tool) => tool.title !== featureName).length;
 
   // React Native modals render through a global portal. Do not leave even a
   // hidden portal mounted after a gated screen loses focus.
@@ -115,7 +116,7 @@ export default function PlanUpsellModal({
             <Text style={[s.headerTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Upgrade to {planLabel}</Text>
             <Text style={s.headerSubtitle}>
               <Text style={s.featureNameText}>{featureName}</Text>
-              {' '}and {isGrowth ? (GROWTH_STUDIO_TOOLS.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan{planPrice ? ` (${planPrice}/mo)` : ''}.
+              {' '}and {isGrowth ? `${otherToolCount} more tools are` : 'more features are'} available on the {planLabel} plan{planPrice ? ` (${planPrice}/mo)` : ''}.
             </Text>
           </LinearGradient>
 
@@ -314,7 +315,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   tappedBadge: {
     borderRadius: RADIUS.xs,
-    paddingHorizontal: 6,
+    paddingHorizontal: SP.sm,
     paddingVertical: 2,
   },
   tappedBadgeText: {
@@ -323,10 +324,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   toolDesc: {
     color: theme.muted,
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
     marginTop: 2,
-    lineHeight: 16,
+    lineHeight: 18,
   },
 
   // ── Divider ──
@@ -347,7 +348,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: `${theme.success}18`,
+    backgroundColor: theme.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -378,7 +379,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingVertical: SP.md,
   },
   laterText: {
-    color: theme.subtle,
+    color: theme.muted,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
   },

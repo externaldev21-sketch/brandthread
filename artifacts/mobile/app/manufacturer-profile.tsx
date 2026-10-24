@@ -13,7 +13,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
 
 import { CachedImage as Image } from '@/components/CachedImage';
 
@@ -207,9 +207,8 @@ export default function ManufacturerProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        stickyHeaderIndices={[0]}
       >
-        {/* ── Sticky Hero ── */}
+        {/* ── Hero ── */}
         <LinearGradient
           colors={theme.heroGradient}
           start={{ x: 0, y: 0 }}
@@ -234,7 +233,7 @@ export default function ManufacturerProfileScreen() {
 
           {/* Name + verified */}
           <View style={s.heroNameRow}>
-             <Text style={[s.heroName, getOnAccentTextStyle(theme)]}>{m.name}</Text>
+             <Text style={[s.heroName, { color: theme.text }]}>{m.name}</Text>
             {m.isVerified && (
               <View style={[s.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
                 <Icon name="check-circle" size={14} color={theme.secondary} />
@@ -350,7 +349,7 @@ export default function ManufacturerProfileScreen() {
                   )}
                   {cap.printMethods && cap.printMethods.length > 0 && (
                     <View style={{ marginTop: SP.sm }}>
-                      <Text style={s.capSubLabel}>Print Methods</Text>
+                      <Text style={s.capSubLabel}>Print methods</Text>
                       <View style={s.chipRow}>
                         {cap.printMethods.map(pm => <Chip key={pm} label={pm} color={PURPLE_DIM} textColor={PURPLE_LIGHT} />)}
                       </View>
@@ -374,7 +373,9 @@ export default function ManufacturerProfileScreen() {
                     {cert.issuer && <Text style={s.certMeta}>Issued by {cert.issuer}</Text>}
                     {cert.validUntil && <Text style={s.certMeta}>Valid until {cert.validUntil}</Text>}
                   </View>
-                  <StatusBadge label="Active" variant="success" small />
+                  {cert.validUntil && new Date(cert.validUntil).getTime() < Date.now()
+                    ? <StatusBadge label="Expired" variant="neutral" small />
+                    : <StatusBadge label="Active" variant="success" small />}
                 </View>
               ))}
             </SectionCard>
@@ -393,8 +394,8 @@ export default function ManufacturerProfileScreen() {
           <SectionCard title="Pricing">
             <View style={s.pricingGrid}>
               <View style={s.pricingItem}>
-                <Text style={s.pricingLabel}>MOQ</Text>
-                <Text style={s.pricingValue}>{m.moq} units</Text>
+                <Text style={s.pricingLabel}>Minimum order</Text>
+                <Text style={s.pricingValue}>{m.moq > 0 ? `${m.moq.toLocaleString('en-US')} units` : 'On request'}</Text>
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Unit Price</Text>
@@ -422,7 +423,7 @@ export default function ManufacturerProfileScreen() {
           </SectionCard>
 
           {/* ── Product / Sample Catalog ── */}
-          <SectionCard title="Product Catalog">
+          <SectionCard title="Product catalog">
             {productsLoading ? (
               <ActivityIndicator color={PURPLE} />
             ) : productsError ? (
@@ -452,7 +453,7 @@ export default function ManufacturerProfileScreen() {
                       {from !== undefined && (
                         <Text style={s.catalogPrice}>from {formatMoney(from)}/unit</Text>
                       )}
-                      <Text style={s.catalogMeta}>MOQ {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}d lead</Text>
+                      <Text style={s.catalogMeta}>Min. {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}-day lead</Text>
                       {product.priceTiers.length > 0 && (
                         <View style={s.tierMiniTable}>
                           {product.priceTiers.slice(0, 3).map((tier) => (
@@ -508,10 +509,10 @@ export default function ManufacturerProfileScreen() {
 
           {/* ── Shipping ── */}
           {m.shippingRegions.length > 0 && (
-            <SectionCard title="Shipping Regions">
+            <SectionCard title="Shipping regions">
               <View style={s.chipRow}>
                 {m.shippingRegions.map(r => (
-                  <Chip key={r} label={r} color={'rgba(16,185,129,0.12)'} textColor={SUCCESS} />
+                  <Chip key={r} label={r} color={CARD_ELEVATED} textColor={FG} />
                 ))}
               </View>
             </SectionCard>
@@ -520,22 +521,22 @@ export default function ManufacturerProfileScreen() {
           {/* ── Contact ── */}
           <SectionCard title="Contact">
             {m.email && (
-              <View style={s.contactRow}>
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(`mailto:${m.email}`)} accessibilityRole="link" accessibilityLabel={`Email ${m.email}`}>
                 <Icon name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
                 <Text style={s.contactText}>{m.email}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {m.website && (
-              <View style={s.contactRow}>
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(/^https?:\/\//i.test(m.website!) ? m.website! : `https://${m.website}`)} accessibilityRole="link" accessibilityLabel={`Open ${m.website}`}>
                 <Icon name="globe" size={ICON.sm} color={CYAN} />
                 <Text style={s.contactText}>{m.website}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {m.phone && (
-              <View style={s.contactRow}>
+              <TouchableOpacity style={s.contactRow} onPress={() => void Linking.openURL(`tel:${m.phone!.replace(/[^\d+]/g, '')}`)} accessibilityRole="link" accessibilityLabel={`Call ${m.phone}`}>
                 <Icon name="phone" size={ICON.sm} color={SUCCESS} />
                 <Text style={s.contactText}>{m.phone}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {!m.email && !m.website && !m.phone && (
               <Text style={s.noContact}>{m.contactHidden ? 'Contact details are shared after your first paid order.' : 'No contact information available.'}</Text>
@@ -547,7 +548,7 @@ export default function ManufacturerProfileScreen() {
       {/* ── Sticky Quote Button ── */}
       <View style={[s.stickyBottom, { paddingBottom: insets.bottom + SP.sm }]}>
         <PrimaryButton
-          label="Request Quote"
+          label="Request a quote"
           onPress={handleQuote}
           icon="file-text"
           style={{ marginHorizontal: SP.md }}
@@ -681,7 +682,7 @@ const s = StyleSheet.create({
   },
   certIcon: {
     width: 32, height: 32, borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(245,158,11,0.12)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center',
   },
   certName: {
     fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
@@ -701,7 +702,7 @@ const s = StyleSheet.create({
     fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED,
   },
   pricingValue: {
-    fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+    fontSize: FS.md, fontFamily: FONT.bold, color: FG,
   },
   requestSampleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
@@ -744,7 +745,7 @@ const s = StyleSheet.create({
   },
   contactRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingVertical: SP.xs,
+    paddingVertical: SP.xs, minHeight: COMP.minTouchTarget,
   },
   contactText: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: FG,

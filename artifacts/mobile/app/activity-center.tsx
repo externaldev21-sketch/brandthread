@@ -104,6 +104,7 @@ import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser 
 
 import { radius } from '@/constants/radii';
 import { ActivityTrendingBrands } from '@/components/activity/ActivityTrendingBrands';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { useActivityTrendingBrands } from '@/hooks/useActivityTrendingBrands';
 import { activityFooterParts, showsInlineTrending } from '@/lib/activityTrending';
 

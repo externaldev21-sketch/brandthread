@@ -93,8 +93,14 @@ export default function TeamInviteScreen() {
       await api.team.accept(String(token));
       await AsyncStorage.removeItem(PENDING_INVITE_KEY).catch(() => {});
       setAccepted(true);
-    } catch {
-      setError('This invite link is invalid or has expired.');
+    } catch (err: any) {
+      const status = err?.status;
+      setError(
+        status === 409 ? 'This invite has already been used.'
+          : status === 400 ? "You can't join your own team."
+          : status === 404 || status === 410 ? 'This invite link is invalid or has expired.'
+          : "Couldn't join the team. Check your connection and try again.",
+      );
     }
     setAccepting(false);
   };
@@ -124,7 +130,7 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               This invite link is no longer valid. Ask the store owner to send you a fresh one.
             </Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -135,7 +141,7 @@ export default function TeamInviteScreen() {
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite not available</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>{error}</Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -148,8 +154,8 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               You joined {brand} as {roleLabel}. You can now work in their store from the seller dashboard.
             </Text>
-            <TouchableOpacity onPress={goToDashboard} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Open Dashboard</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={goToDashboard} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Open dashboard</Text>
             </TouchableOpacity>
           </>
         ) : invite?.alreadyAccepted ? (
@@ -161,7 +167,7 @@ export default function TeamInviteScreen() {
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>
               This invite to join {brand} has already been used.
             </Text>
-            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border }]}>
               <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
             </TouchableOpacity>
           </>
@@ -180,17 +186,17 @@ export default function TeamInviteScreen() {
               <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Invite sent to {invite?.email}</Text>
             </View>
             {!isLoaded ? (
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 18 }} />
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
             ) : isSignedIn ? (
-              <TouchableOpacity onPress={acceptInvite} disabled={accepting} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary, opacity: accepting ? 0.6 : 1 }]}>
+              <TouchableOpacity accessibilityRole="button" onPress={acceptInvite} disabled={accepting} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary, opacity: accepting ? 0.6 : 1 }]}>
                 <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
-                  {accepting ? 'Joining…' : 'Accept Invite'}
+                  {accepting ? 'Joining…' : 'Accept invite'}
                 </Text>
               </TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity onPress={goToAuth} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign in / Create account to join</Text>
+                <TouchableOpacity accessibilityRole="button" onPress={goToAuth} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign in to join</Text>
                 </TouchableOpacity>
                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
                   After you sign in, we'll bring you right back here.
