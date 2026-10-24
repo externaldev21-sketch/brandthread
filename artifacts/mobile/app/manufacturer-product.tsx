@@ -5,8 +5,9 @@ import { CachedImage as Image } from '@/components/CachedImage';
  * Params: manufacturerId, productId
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator} from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui/Skeleton';
 import { useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -18,6 +19,16 @@ import { getManufacturerProduct, type ManufacturerProduct } from '@/services/man
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MissingItemState } from '@/components/states/MissingItemState';
+
+/**
+ * The tile is already labelled "Sample price", so drop a trailing "sample" /
+ * "/sample" / "per sample" from the manufacturer's free-text label
+ * ("$82 sample" → "$82").
+ */
+function samplePriceValue(label: string | null, cents: number): string {
+  const trimmed = label?.replace(/\s*(?:\/|\bper\b)?\s*sample\s*$/i, '').trim();
+  return trimmed || formatCents(cents);
+}
 
 export default function ManufacturerProductScreen() {
   const { theme } = useAppTheme();
@@ -52,7 +63,7 @@ export default function ManufacturerProductScreen() {
     <View style={s.root}>
       <ScreenHeader title={product?.name ?? 'Product'} onBack={() => goBackOr(router)} />
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+        <ProductSkeleton s={s} />
       ) : error ? (
         <EmptyState icon="alert-circle" title="Couldn't load this product" description="Check your connection and try again." action={{ label: 'Try again', onPress: load }} />
       ) : !product ? (
@@ -61,7 +72,7 @@ export default function ManufacturerProductScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
           {product.images.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={s.gallery}>
-              {product.images.map((uri, index) => <Image cachePolicy="memory-disk" key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />)}
+              {product.images.map((uri, index) => <Image cachePolicy="memory-disk" key={`${uri}-${index}`} source={{ uri }} style={[s.galleryImage, { width: windowWidth }]} />)}
             </ScrollView>
           ) : (
             <View style={[s.gallery, s.galleryFallback]}><Icon name="package" size={ICON.xxl} color={theme.subtle} /></View>
@@ -77,7 +88,7 @@ export default function ManufacturerProductScreen() {
             <View style={s.statsGrid}>
               <View style={s.statItem}>
                 <Icon name="package" size={ICON.sm} color={theme.text} />
-                <Text style={s.statLabel}>MOQ</Text>
+                <Text style={s.statLabel}>Min. order</Text>
                 <Text style={s.statValue}>{product.moq.toLocaleString('en-US')} units</Text>
               </View>
               <View style={s.statItem}>
@@ -88,7 +99,7 @@ export default function ManufacturerProductScreen() {
               <View style={s.statItem}>
                 <Icon name="scissors" size={ICON.sm} color={theme.text} />
                 <Text style={s.statLabel}>Sample price</Text>
-                <Text style={s.statValue}>{product.samplePriceLabel ?? formatCents(product.samplePriceCents)}</Text>
+                <Text style={s.statValue}>{samplePriceValue(product.samplePriceLabel, product.samplePriceCents)}</Text>
               </View>
             </View>
 
@@ -139,12 +150,30 @@ export default function ManufacturerProductScreen() {
   );
 }
 
+/** Page-shaped placeholder: gallery, title, description, stat tiles and a price table. */
+function ProductSkeleton({ s }: { s: ReturnType<typeof makeS> }) {
+  return (
+    <View testID="product-loading" accessibilityLabel="Loading product">
+      <SkeletonBlock width="100%" height={220} radius={0} />
+      <View style={s.body}>
+        <SkeletonLine width="60%" height={20} />
+        <SkeletonLine width="90%" />
+        <SkeletonLine width="75%" />
+        <View style={s.statsGrid}>
+          {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="31%" height={72} radius={RADIUS.md} style={s.skeletonStat} />)}
+        </View>
+        <SkeletonLine width="40%" height={16} style={s.skeletonSection} />
+        {[0, 1, 2].map((i) => <SkeletonBlock key={i} width="100%" height={36} radius={RADIUS.sm} />)}
+      </View>
+    </View>
+  );
+}
+
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingBottom: SP.xxl },
   gallery: { height: 220, backgroundColor: theme.cardElevated },
-  galleryImage: { width: 360, height: 220 },
+  galleryImage: { height: 220 },
   galleryFallback: { alignItems: 'center', justifyContent: 'center' },
   body: { padding: SP.md, gap: SP.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
@@ -165,5 +194,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   chip: { paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
   chipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text },
+  skeletonStat: { flex: 1 },
+  skeletonSection: { marginTop: SP.md },
   footer: { padding: SP.md, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background },
 });

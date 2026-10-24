@@ -14,6 +14,8 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 
 import { haptics, haptic } from '@/lib/haptics';
 
+import { showToast } from '@/lib/toast';
+
 
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@clerk/expo';
@@ -128,7 +130,7 @@ function PayoutsScreenContent() {
   // ?bt_preview=seller with no real signed-in account: no token to fetch
   // real payout data with — resolve straight to the honest empty/no-history
   // state (same convention as the isPreviewMode guard in app/(tabs)/orders.tsx).
-  const { currentRole, isLoadingRole } = useTeamRole();
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
   const [loading,   setLoading]   = useState(true);
@@ -226,7 +228,7 @@ function PayoutsScreenContent() {
     setCashOutVisible(false);
     void threadCash.reload();
     void load(); // the cash-out is a real Stripe transfer — refresh the payout balance too
-    Alert.alert('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
+    showToast('Cashed out', `${formatCents(result.threadCashCents)} Thread Cash moved to your payout balance as ${formatCents(result.payoutCents)}.`);
   }
 
   // Load on every focus (first mount included): the balance and history are
@@ -293,6 +295,19 @@ function PayoutsScreenContent() {
         <View style={{ padding: SP.md, gap: SP.sm }}>
           <LoadingSkeleton height={140} />
           <LoadingSkeleton height={44} />
+        </View>
+      </View>
+    );
+  }
+
+  // A failed role lookup is not "no access": offer a retry instead of the
+  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  if (!isPreview && roleError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payouts" onBack={() => { leaveSetupDestination(); }} />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load payouts" onRetry={retryRole} />
         </View>
       </View>
     );

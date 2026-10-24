@@ -1,4 +1,5 @@
 import { haptics, haptic } from '@/lib/haptics';
+import { showToast } from '@/lib/toast';
 
 /**
  * Seller Plan & billing — one screen modelled on Shopify's Settings → Plan
@@ -74,11 +75,18 @@ import { isNativeStorePlan, lowerPlanId, planDateLine, planFacts, planPriceLabel
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
-type Bill = { id: string; date: string; note: string; amountCents: number; currency: string; status: 'Paid' | 'Unpaid' };
+type Bill = { id: string; label: string; date: string; note: string; amountCents: number; currency: string; status: 'Paid' | 'Unpaid' };
 
-function toBills(invoices: PreviewInvoice[]): Bill[] {
+/** "Bill #A1B2C3D4-0001" from Stripe's invoice number, else "Bill · Sep 2026" — never the raw `in_…` id. */
+function billLabel(invoice: PreviewInvoice & { number?: string | null }): string {
+  if (invoice.number) return `Bill #${invoice.number}`;
+  return `Bill · ${new Date(invoice.created).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+}
+
+function toBills(invoices: Array<PreviewInvoice & { number?: string | null }>): Bill[] {
   return invoices.map((invoice) => ({
     id: invoice.id,
+    label: billLabel(invoice),
     date: new Date(invoice.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     note: invoice.description,
     amountCents: invoice.amountCents,
@@ -186,7 +194,7 @@ export default function BillingScreen() {
     try {
       await restore();
       await loadStatus();
-      Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
+      showToast('Purchases restored', 'Your subscription has been refreshed.');
     } catch {
       Alert.alert('Could not restore purchases', 'Try again in a moment.');
     }
@@ -194,8 +202,9 @@ export default function BillingScreen() {
 
   function exportBills() {
     
-    const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
-    Share.share({ message: `Billing History\n\n${text}` });
+    if (bills.length === 0) return;
+    const text = bills.map(b => `${b.date} — ${b.label}, ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
+    Share.share({ message: `Billing history\n\n${text}` });
   }
 
   /** App Store / Google Play plans answer 409 NATIVE_SUBSCRIPTION — they're managed in the store. */
@@ -362,7 +371,8 @@ export default function BillingScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Billing"
-        rightElement={!isReadOnly ? (
+        // One export control (Past bills has none), and only once there's a bill to export.
+        rightElement={!isReadOnly && bills.length > 0 ? (
           <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Export billing history">
             <Icon name="share" size={17} color={colors.foreground} />
           </TouchableOpacity>
@@ -547,8 +557,8 @@ export default function BillingScreen() {
                   style={[styles.billRow, i !== filteredBills.length - 1 && styles.hairlineBottom]}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.billId, { color: colors.foreground }]} numberOfLines={1}>{bill.note}</Text>
-                    <Text style={[styles.billNote, { color: colors.mutedForeground }]}>{bill.date}</Text>
+                    <Text style={[styles.billId, { color: colors.foreground }]} numberOfLines={1}>{bill.label}</Text>
+                    <Text style={[styles.billNote, { color: colors.mutedForeground }]} numberOfLines={1}>{bill.date} · {bill.note}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <Text style={[styles.billAmount, { color: colors.foreground }]}>{formatCents(bill.amountCents, bill.currency)}</Text>

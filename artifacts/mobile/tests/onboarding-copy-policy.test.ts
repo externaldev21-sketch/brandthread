@@ -51,7 +51,7 @@ describe('professional app copy, with original thread decoration preserved', () 
   it('keeps the existing thread renderers and their original dimensions', () => {
     expect(read('app/setup.tsx')).toContain('<ThreadProgress');
     expect(read('app/manufacturer-onboard.tsx')).toContain(
-      '<ThreadDraw height={72} color={FG} delay={150} duration={1200} style={s.heroThread} />',
+      '<ThreadDraw height={72} color={theme.text} delay={150} duration={1200} style={s.heroThread} />',
     );
     const splash = read('components/splash/AppIntroSplash.tsx');
     expect(splash).toContain("M6,58 C34,10 50,96 78,50 C98,18 108,74 132,42 C144,26 152,40 166,32");

@@ -383,6 +383,32 @@ router.post("/native/sync", requireRole("owner"), async (req, res) => {
 });
 
 /**
+ * One row of the owner's bill history. `number` is Stripe's human invoice
+ * number (e.g. "A1B2C3D4-0001"); drafts don't have one yet, so it's nullable
+ * and the app falls back to the bill's month instead of the raw `in_…` id.
+ */
+export function invoiceSummary(invoice: {
+  id?: string | null;
+  number?: string | null;
+  created: number;
+  description?: string | null;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  status?: string | null;
+}) {
+  return {
+    id:          invoice.id,
+    number:      invoice.number ?? null,
+    created:     new Date(invoice.created * 1000).toISOString(),
+    description: invoice.description ?? "Subscription invoice",
+    amountCents: invoice.amount_paid || invoice.amount_due,
+    currency:    invoice.currency,
+    status:      invoice.status === "paid" ? "paid" : "unpaid",
+  };
+}
+
+/**
  * GET /api/seller/subscription/invoices
  * Returns a minimal invoice history for the store owner. Invoice and payment
  * details must never be exposed through a joined-store team context.
@@ -403,16 +429,7 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
     }
 
     const result = await stripe.invoices.list({ customer: user.stripeCustomerId, limit: 50 });
-    res.json({
-      invoices: result.data.map((invoice) => ({
-        id:          invoice.id,
-        created:     new Date(invoice.created * 1000).toISOString(),
-        description: invoice.description ?? "Subscription invoice",
-        amountCents: invoice.amount_paid || invoice.amount_due,
-        currency:    invoice.currency,
-        status:      invoice.status === "paid" ? "paid" : "unpaid",
-      })),
-    });
+    res.json({ invoices: result.data.map(invoiceSummary) });
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) {

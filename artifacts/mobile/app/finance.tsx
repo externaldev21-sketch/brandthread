@@ -78,7 +78,7 @@ export default function FinanceScreen() {
   const isDemoPreview = isPreviewMode && isPreviewDemoMode();
   const isSignedOutSellerPreview = (isPreviewMode && !userId) || (isPreviewMode && (!isAuthLoaded || !isSignedIn));
   const skipProtectedReads = isPreviewMode || isSignedOutSellerPreview;
-  const { currentRole, isLoadingRole } = useTeamRole();
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [transactions, setTransactions] = useState<FinanceTransactionRow[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
@@ -193,6 +193,8 @@ export default function FinanceScreen() {
      { label: 'Net (recent)',  value: formatCents(totalNet),          color: totalNet >= 0 ? colors.primary : colors.destructive, highlight: true },
   ];
 
+  const showRecentTransactions = !(isDemoPreview && !isReadOnly && (summary?.activity.length ?? 0) > 0);
+
   const subPlan = currentPlanSummary(subStatus ?? { plan: null, status: null, amountCents: 0 });
   const documents = isPreviewMode ? [] : [
     ...(!isReadOnly ? [{ label: 'Download statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
@@ -208,6 +210,19 @@ export default function FinanceScreen() {
         <View style={styles.accessLoading}>
           <SkeletonBlock width="100%" height={140} />
           <SkeletonBlock width="100%" height={160} />
+        </View>
+      </View>
+    );
+  }
+
+  // A failed role lookup is not "no access": offer a retry instead of the
+  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  if (!isPreviewMode && roleError) {
+    return (
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <ScreenHeader title="Finance" />
+        <View style={styles.accessLoading}>
+          <RetryRow label="Couldn't load finance" onRetry={retryRole} />
         </View>
       </View>
     );
@@ -344,7 +359,9 @@ export default function FinanceScreen() {
         )}
       </View>
 
-      {/* Recent transactions */}
+      {/* Recent transactions — in demo every row is one of the demo orders
+          Money activity already lists, so the list is shown once, not twice. */}
+      {showRecentTransactions && (<>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent transactions</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
@@ -376,6 +393,7 @@ export default function FinanceScreen() {
           ))
         )}
       </View>
+      </>)}
 
       {/* Documents */}
       {documents.length > 0 && (

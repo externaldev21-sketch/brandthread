@@ -209,6 +209,7 @@ vi.mock('@/lib/theme', () => ({
   GRID_MAX_WIDTH: 1080,
   BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
   TABULAR: { fontVariant: ['tabular-nums'] },
+  COMP: { buttonH: 52, buttonHSm: 44, inputH: 52, tabBarH: 72, headerH: 56, cardRadius: 14, iconBtn: 44, minTouchTarget: 44 },
   TEXT: {
     title1: { fontSize: 28 }, title2: { fontSize: 22 }, headline: { fontSize: 17 }, body: { fontSize: 17 },
     subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 },
@@ -352,13 +353,13 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('keeps the checkout error fallback for non-role failures', async () => {
+  it('shows friendly checkout copy (not the raw API error) for non-role failures', async () => {
     checkoutMock.mockRejectedValueOnce(serverError());
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-change-growth');
 
-    expect(alertMock).toHaveBeenCalledWith('Checkout error', 'API 500: Billing service unavailable.');
+    expect(alertMock).toHaveBeenCalledWith('Checkout error', "Couldn't open checkout. Try again.");
     renderer.unmount();
   });
 
@@ -375,14 +376,14 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('keeps the portal error fallback for non-role failures', async () => {
+  it('shows friendly portal copy (not the raw API error) for non-role failures', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(serverError());
     api.seller.subscription.status.mockResolvedValue({ ...ENDED_PLAN });
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-cancel');
 
-    expect(alertMock).toHaveBeenCalledWith('Portal error', 'API 500: Billing service unavailable.');
+    expect(alertMock).toHaveBeenCalledWith('Portal error', "Couldn't open billing portal. Try again.");
     renderer.unmount();
   });
 

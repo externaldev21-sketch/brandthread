@@ -20,8 +20,8 @@ describe('seller demo products and finance fixtures', () => {
     expect(summary.lifetime.grossSales.amount).toBeGreaterThan(0);
     expect(summary.activity.length).toBeGreaterThan(0);
     expect(summary.connected).toBe(false);
-    expect(summary.available).toBeNull();
-    expect(summary.pending).toBeNull();
+    expect(summary.available?.amount).toBe(0);
+    expect(summary.pending?.amount).toBe(0);
     expect(summary.paidOut.amount).toBe(0);
     expect(summary.paidOut.toBank).toBeNull();
   });

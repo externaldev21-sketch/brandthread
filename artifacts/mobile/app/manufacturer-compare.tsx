@@ -5,8 +5,9 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { plural } from '@/lib/plural';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { Icon } from '@/components/ui/Icon';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -15,7 +16,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { getPreviewManufacturers } from '@/lib/previewManufacturers';
 import { formatCents } from '@/lib/money';
-import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
+import { getFavoriteManufacturerIds, getManufacturersByIds } from '@/services/manufacturerService';
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
@@ -31,17 +32,25 @@ const MAX_COMPARE = 4;
 const MIN_COMPARE = 2;
 const COL_WIDTH = 180;
 const LABEL_WIDTH = 110;
+const HEADER_HEIGHT = 72;
+const ROW_HEIGHT = 44;
 
-type Row = { label: string; format: (m: Manufacturer) => string; numeric?: (m: Manufacturer) => number; lowerIsBetter?: boolean };
+type Row = {
+  label: string;
+  format: (m: Manufacturer) => string;
+  icon?: (m: Manufacturer) => IconName | undefined;
+  numeric?: (m: Manufacturer) => number;
+  lowerIsBetter?: boolean;
+};
 
 const ROWS: Row[] = [
   { label: 'Min. order', format: (m) => m.moq > 0 ? `${m.moq} units` : 'On request', numeric: (m) => m.moq || Infinity, lowerIsBetter: true },
   { label: 'Unit price', format: (m) => m.unitPriceMinCents > 0 ? `${formatCents(m.unitPriceMinCents)}–${formatCents(m.unitPriceMaxCents)}` : '—', numeric: (m) => m.unitPriceMinCents || Infinity, lowerIsBetter: true },
   { label: 'Lead time', format: (m) => m.leadTimeDays > 0 ? plural(m.leadTimeDays, 'day') : '—', numeric: (m) => m.leadTimeDays || Infinity, lowerIsBetter: true },
-  { label: 'Rating', format: (m) => m.reviewCount > 0 ? `★ ${m.rating.toFixed(1)} (${m.reviewCount})` : 'Not rated', numeric: (m) => m.reviewCount > 0 ? m.rating : 0, lowerIsBetter: false },
+  { label: 'Rating', format: (m) => m.reviewCount > 0 ? `${m.rating.toFixed(1)} (${m.reviewCount})` : 'Not rated', icon: (m) => m.reviewCount > 0 ? 'star' : undefined, numeric: (m) => m.reviewCount > 0 ? m.rating : 0, lowerIsBetter: false },
   { label: 'Response time', format: (m) => m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : '—', numeric: (m) => m.responseTimeHours || Infinity, lowerIsBetter: true },
   { label: 'Years active', format: (m) => m.yearsInBusiness > 0 ? `${m.yearsInBusiness} yrs` : '—', numeric: (m) => m.yearsInBusiness, lowerIsBetter: false },
-  { label: 'Verified', format: (m) => m.isVerified ? '✓ Verified' : '✗ Unverified' },
+  { label: 'Verified', format: (m) => m.isVerified ? 'Verified' : 'Unverified', icon: (m) => m.isVerified ? 'check-circle' : 'x-circle' },
 ];
 
 export default function ManufacturerCompareScreen() {
@@ -65,8 +74,9 @@ export default function ManufacturerCompareScreen() {
     try {
       setError(false);
       const ids = await getFavoriteManufacturerIds();
-      const profiles = await Promise.all(ids.map((id) => getManufacturer(id)));
-      const list = profiles.filter((m): m is Manufacturer => !!m);
+      // One batched request; keep the favourites order.
+      const byId = new Map((await getManufacturersByIds(ids)).map((m) => [m.id, m]));
+      const list = ids.map((id) => byId.get(id)).filter((m): m is Manufacturer => !!m);
       setSaved(list);
       setSelected(new Set(list.slice(0, MIN_COMPARE).map((m) => m.id)));
     } catch {
@@ -96,7 +106,7 @@ export default function ManufacturerCompareScreen() {
       <ScreenHeader title="Compare suppliers" onBack={() => goBackOr(router)} />
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
+        <CompareSkeleton s={s} />
       ) : error ? (
         <EmptyState icon="alert-circle" title="Couldn't load your saved manufacturers" description="Check your connection and try again." action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} />
       ) : saved.length === 0 ? (
@@ -120,39 +130,46 @@ export default function ManufacturerCompareScreen() {
           {compared.length < MIN_COMPARE ? (
             <EmptyState icon="git-branch" title={`Select at least ${MIN_COMPARE} manufacturers`} description="Choose which saved suppliers to compare side by side." />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+            // Labels sit outside the horizontal ScrollView so they stay put
+            // while the supplier columns scroll; fixed row heights keep the
+            // two sides aligned.
+            <View style={s.table}>
               <View style={s.labelCol}>
                 <View style={s.labelHeader} />
-                {ROWS.map((row) => <View key={row.label} style={s.labelCell}><Text style={s.labelText}>{row.label}</Text></View>)}
+                {ROWS.map((row) => <View key={row.label} style={s.labelCell}><Text style={s.labelText} numberOfLines={2}>{row.label}</Text></View>)}
               </View>
-              {compared.map((m) => {
-                const bestValues = ROWS.filter((r) => r.numeric).map((row) => {
-                  const vals = compared.map((mm) => row.numeric!(mm));
-                  return row.lowerIsBetter ? Math.min(...vals) : Math.max(...vals);
-                });
-                return (
-                  <View key={m.id} style={s.col}>
-                    <TouchableOpacity style={s.colHeader} onPress={() => router.push(`/manufacturer-profile?id=${m.id}` as never)} activeOpacity={0.85}>
-                      <Text style={s.mfgName} numberOfLines={2}>{m.name}</Text>
-                      <Text style={s.location} numberOfLines={1}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
-                    </TouchableOpacity>
-                    {ROWS.map((row, idx) => {
-                      const val = row.format(m);
-                      const isBest = row.numeric && compared.length > 1 && row.numeric(m) === bestValues[ROWS.filter((r) => r.numeric).indexOf(row)];
-                      return (
-                        <View key={row.label} style={[s.cell, isBest && s.cellBest]}>
-                          <Text style={[s.cellText, isBest && s.cellTextBest]} numberOfLines={2}>{val}</Text>
-                        </View>
-                      );
-                    })}
-                    <TouchableOpacity style={s.quoteBtn} onPress={() => router.push(`/quote-request?manufacturerId=${m.id}` as never)} hitSlop={QUOTE_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel={`Request quote from ${m.name}`}>
-                      <Icon name="file-text" size={13} color={theme.onAccent} />
-                      <Text style={s.quoteBtnText}>Request quote</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.valuesScroll} contentContainerStyle={s.scrollContent}>
+                {compared.map((m) => {
+                  const bestValues = ROWS.filter((r) => r.numeric).map((row) => {
+                    const vals = compared.map((mm) => row.numeric!(mm));
+                    return row.lowerIsBetter ? Math.min(...vals) : Math.max(...vals);
+                  });
+                  return (
+                    <View key={m.id} style={s.col}>
+                      <TouchableOpacity style={s.colHeader} onPress={() => router.push(`/manufacturer-profile?id=${m.id}` as never)} activeOpacity={0.85}>
+                        <Text style={s.mfgName} numberOfLines={2}>{m.name}</Text>
+                        <Text style={s.location} numberOfLines={1}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
+                      </TouchableOpacity>
+                      {ROWS.map((row) => {
+                        const val = row.format(m);
+                        const icon = row.icon?.(m);
+                        const isBest = row.numeric && compared.length > 1 && row.numeric(m) === bestValues[ROWS.filter((r) => r.numeric).indexOf(row)];
+                        return (
+                          <View key={row.label} style={[s.cell, isBest && s.cellBest]}>
+                            {icon ? <Icon name={icon} size={ICON.xs} color={isBest ? theme.accentLight : theme.text} /> : null}
+                            <Text style={[s.cellText, isBest && s.cellTextBest]} numberOfLines={2}>{val}</Text>
+                          </View>
+                        );
+                      })}
+                      <TouchableOpacity style={s.quoteBtn} onPress={() => router.push(`/quote-request?manufacturerId=${m.id}` as never)} hitSlop={QUOTE_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel={`Request quote from ${m.name}`}>
+                        <Icon name="file-text" size={13} color={theme.onAccent} />
+                        <Text style={s.quoteBtnText}>Request quote</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
         </>
       )}
@@ -160,9 +177,36 @@ export default function ManufacturerCompareScreen() {
   );
 }
 
+/** Table-shaped placeholder: picker chips, then the label column and two supplier columns. */
+function CompareSkeleton({ s }: { s: ReturnType<typeof makeS> }) {
+  return (
+    <View testID="compare-loading" accessibilityLabel="Loading saved manufacturers">
+      <View style={[s.pickerWrap, s.skeletonPicker]}>
+        {[0, 1, 2].map((i) => <SkeletonBlock key={i} width={96} height={34} radius={radius.sm} />)}
+      </View>
+      <View style={s.table}>
+        <View style={s.labelCol}>
+          <View style={s.labelHeader} />
+          {ROWS.map((row) => <View key={row.label} style={s.labelCell}><SkeletonBlock width={64} height={10} radius={4} /></View>)}
+        </View>
+        <View style={s.skeletonCols}>
+          {[0, 1].map((col) => (
+            <View key={col} style={s.col}>
+              <View style={s.colHeader}>
+                <SkeletonBlock width="80%" height={14} radius={4} />
+                <SkeletonBlock width="55%" height={10} radius={4} style={s.skeletonSub} />
+              </View>
+              {ROWS.map((row) => <View key={row.label} style={s.cell}><SkeletonBlock width="60%" height={12} radius={4} /></View>)}
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerWrap: { paddingTop: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm },
   pickerLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, marginLeft: SP.md, marginBottom: SP.xs },
   // 5pt padding offset by an equal negative margin: the row doesn't move, but
@@ -173,19 +217,25 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   pickerChipActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   pickerChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   pickerChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },
-  scrollContent: { paddingHorizontal: SP.md, paddingVertical: SP.md, paddingBottom: 40, alignItems: 'flex-start' },
-  labelCol: { width: LABEL_WIDTH, marginRight: 1 },
-  labelHeader: { height: 72 },
-  labelCell: { height: 44, justifyContent: 'center', borderTopWidth: 1, borderTopColor: theme.border, paddingRight: SP.sm },
+  table: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: SP.md, paddingTop: SP.md },
+  valuesScroll: { flex: 1 },
+  scrollContent: { paddingRight: SP.md, paddingBottom: 40, alignItems: 'flex-start' },
+  // Offset by the columns' 1pt top border so label rows line up with value rows.
+  labelCol: { width: LABEL_WIDTH, paddingTop: 1 },
+  labelHeader: { height: HEADER_HEIGHT },
+  labelCell: { height: ROW_HEIGHT, justifyContent: 'center', borderTopWidth: 1, borderTopColor: theme.border, paddingRight: SP.sm },
   labelText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   col: { width: COL_WIDTH, marginLeft: SP.sm, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
-  colHeader: { height: 72, padding: SP.sm, justifyContent: 'center', backgroundColor: theme.cardElevated },
+  colHeader: { height: HEADER_HEIGHT, padding: SP.sm, justifyContent: 'center', backgroundColor: theme.cardElevated },
   mfgName: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
   location: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  cell: { height: 44, justifyContent: 'center', paddingHorizontal: SP.sm, borderTopWidth: 1, borderTopColor: theme.border },
+  cell: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingHorizontal: SP.sm, borderTopWidth: 1, borderTopColor: theme.border },
   cellBest: { backgroundColor: theme.accentDim },
-  cellText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
+  cellText: { flexShrink: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
   cellTextBest: { color: theme.accentLight, fontFamily: FONT.bold },
   quoteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 40, margin: SP.sm, borderRadius: RADIUS.sm, backgroundColor: theme.accent },
   quoteBtnText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent },
+  skeletonPicker: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md },
+  skeletonCols: { flex: 1, flexDirection: 'row', overflow: 'hidden' },
+  skeletonSub: { marginTop: SP.xs },
 });

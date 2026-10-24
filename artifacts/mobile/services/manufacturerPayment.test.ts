@@ -10,7 +10,9 @@ import {
   createSampleCheckoutSession,
   getBulkWalletOptions,
   getProductionOrder,
+  getManufacturersByIds,
   getSample,
+  getSamples,
   payBulkOrderFromWallet,
   submitSampleReview,
   addSampleRevision,
@@ -104,5 +106,54 @@ describe('manufacturer order payment service contracts', () => {
 
     await expect(getSample('sample_1')).resolves.toMatchObject({ manufacturerPayoutReady: false });
     await expect(getProductionOrder('bulk_1')).resolves.toMatchObject({ manufacturerPayoutReady: true });
+  });
+
+  it('treats every status after payment as paid and maps the completion date', async () => {
+    const base = { orderType: 'sample', priceCents: 2500, revision: 1, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+    serviceRequest.mockResolvedValueOnce([
+      { ...base, id: 'unpaid', status: 'pending_payment' },
+      { ...base, id: 'paid', status: 'payment_received' },
+      { ...base, id: 'sewing', status: 'cut_and_sew' },
+      { ...base, id: 'shipped', status: 'shipped', shippedAt: '2026-02-01T00:00:00.000Z' },
+      { ...base, id: 'delivered', status: 'delivered', shippedAt: '2026-02-01T00:00:00.000Z', deliveredAt: '2026-02-05T00:00:00.000Z' },
+      { ...base, id: 'approved', status: 'approved' },
+      { ...base, id: 'reversed', status: 'delivered', paymentReviewState: 'reversed' },
+      { ...base, id: 'cancelled', status: 'cancelled' },
+    ]);
+    const samples = Object.fromEntries((await getSamples()).map((sample) => [sample.id, sample]));
+    expect(samples.unpaid.paymentStatus).toBe('pending');
+    expect(samples.cancelled.paymentStatus).toBe('pending');
+    expect(samples.reversed.paymentStatus).toBe('pending');
+    for (const id of ['paid', 'sewing', 'shipped', 'delivered', 'approved']) {
+      expect(samples[id].paymentStatus).toBe('paid');
+    }
+    expect(samples.delivered).toMatchObject({
+      estimatedCompletionDate: '2026-02-05T00:00:00.000Z',
+      shippedDate: '2026-02-01T00:00:00.000Z',
+      deliveredDate: '2026-02-05T00:00:00.000Z',
+    });
+    expect(samples.paid.estimatedCompletionDate).toBeUndefined();
+  });
+});
+
+describe('getManufacturersByIds', () => {
+  beforeEach(() => serviceRequest.mockReset());
+  const a = 'b7d2c2d0-a3ae-4d65-90e4-d777f1f1bca1';
+  const b = 'c8e3d3e1-b4bf-4e76-a1f5-e888f2f2cdb2';
+
+  it('dedupes ids and fetches them in a single request', async () => {
+    serviceRequest.mockResolvedValueOnce([
+      { id: a, businessName: 'Porto Knit', country: 'Portugal', photos: [] },
+      { id: b, businessName: 'Lisbon Leather', country: 'Portugal', photos: [] },
+    ]);
+    const result = await getManufacturersByIds([a, b, a, '']);
+    expect(serviceRequest).toHaveBeenCalledTimes(1);
+    expect(serviceRequest).toHaveBeenCalledWith(`/api/manufacturers/partners?ids=${a},${b}`);
+    expect(result.map((item) => [item.id, item.name])).toEqual([[a, 'Porto Knit'], [b, 'Lisbon Leather']]);
+  });
+
+  it('makes no request for an empty list', async () => {
+    await expect(getManufacturersByIds([])).resolves.toEqual([]);
+    expect(serviceRequest).not.toHaveBeenCalled();
   });
 });

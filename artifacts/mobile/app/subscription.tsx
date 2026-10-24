@@ -11,7 +11,7 @@
  * from the shared plan config (lib/sellerPlanConfig.ts).
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Linking, AppState, AppStateStatus, Platform } from 'react-native';
 
 import { useAuth } from '@clerk/expo';
 
@@ -22,6 +22,10 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { haptics, haptic } from '@/lib/haptics';
+
+import { showToast } from '@/lib/toast';
+
+import { friendlyError } from '@/lib/friendlyError';
 
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -37,6 +41,7 @@ import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 import { formatCents } from '@/lib/money';
 
@@ -98,7 +103,7 @@ export default function SubscriptionScreen() {
   const [compareOpen, setCompareOpen] = useState(false);
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'billing'>('plan');
-  const { currentRole, isLoadingRole } = useTeamRole();
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [statusLoading, setStatusLoading] = useState(!isSellerPreview);
   const [statusLoaded, setStatusLoaded] = useState(false);
@@ -275,7 +280,7 @@ export default function SubscriptionScreen() {
         Alert.alert('Only the store owner can do this');
         return;
       }
-      Alert.alert('Checkout error', e?.message ?? 'Could not start checkout. Please try again.');
+      Alert.alert('Checkout error', friendlyError(e, "Couldn't open checkout. Try again."));
     }
   }
 
@@ -311,7 +316,7 @@ export default function SubscriptionScreen() {
         Alert.alert('Only the store owner can do this');
         return;
       }
-      Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
+      Alert.alert('Portal error', friendlyError(e, "Couldn't open billing portal. Try again."));
     }
   }
 
@@ -387,7 +392,7 @@ export default function SubscriptionScreen() {
       await restore();
       invalidatePlanCache();
       await fetchStatus();
-      Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
+      showToast('Purchases restored', 'Your subscription has been refreshed.');
     } catch (e: any) {
       Alert.alert("Couldn't restore purchases", 'Please check your connection and try again.');
     }
@@ -447,8 +452,23 @@ export default function SubscriptionScreen() {
     return (
       <View style={styles.root}>
         <ScreenHeader title="Subscription" />
-        <View style={styles.accessLoading}>
-          <ActivityIndicator color={theme.accent} />
+        <View style={styles.accessSkeleton}>
+          <SkeletonBlock width="100%" height={44} radius={RADIUS.lg} />
+          <SkeletonBlock width="100%" height={160} radius={RADIUS.xl} />
+          <SkeletonBlock width="100%" height={232} radius={RADIUS.lg} />
+        </View>
+      </View>
+    );
+  }
+
+  // A failed role lookup is not "no access": offer a retry instead of the
+  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  if (!isSellerPreview && roleError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Subscription" />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load your subscription" onRetry={retryRole} />
         </View>
       </View>
     );
@@ -493,7 +513,11 @@ export default function SubscriptionScreen() {
             {!statusUnavailable && (
             <LinearGradient colors={theme.primaryGradient as any} style={styles.currentPlanCard}>
               {statusLoading ? (
-                <ActivityIndicator color={theme.onAccent} />
+                <View style={styles.currentPlanSkeleton} accessibilityLabel="Loading your plan">
+                  <SkeletonBlock width={88} height={13} />
+                  <SkeletonBlock width={140} height={24} />
+                  <SkeletonBlock width="70%" height={13} />
+                </View>
               ) : (
                 <>
                   <View style={styles.currentPlanRow}>
@@ -675,7 +699,8 @@ const createStyles = (theme: AppThemePreset) => {
   } = theme;
   return StyleSheet.create({
   root:               { flex: 1, backgroundColor: 'transparent' },
-  accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  accessSkeleton:     { padding: SP.md, gap: SP.sm },
+  currentPlanSkeleton:{ gap: SP.sm },
   tabRow:             { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
   tab:                { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
   tabActive:          { borderBottomWidth: 2, borderBottomColor: FG },

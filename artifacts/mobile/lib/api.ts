@@ -3427,6 +3427,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         invoices: () => get<{
           invoices: Array<{
             id: string;
+            /** Stripe's human invoice number ("A1B2C3D4-0001"); null on a draft. */
+            number?: string | null;
             created: string;
             description: string;
             amountCents: number;

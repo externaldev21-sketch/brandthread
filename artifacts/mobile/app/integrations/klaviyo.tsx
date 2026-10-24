@@ -16,6 +16,7 @@ import { useApi } from '@/hooks/useApi';
 import { ApiError } from '@/lib/networkNotice';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { showToast } from '@/lib/toast';
 
 import { FS, FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
 
@@ -68,7 +69,7 @@ export default function KlaviyoIntegrationScreen() {
       setStatus(res);
       setApiKey('');
       
-      Alert.alert('Connected', 'Your existing Klaviyo email & SMS subscribers are now synced.');
+      showToast('Klaviyo connected', 'Your existing email & SMS subscribers are now synced.');
     } catch (err: any) {
       haptic('error');
       const msg = String(err?.message ?? '');

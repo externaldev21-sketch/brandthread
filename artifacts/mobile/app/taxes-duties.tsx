@@ -18,6 +18,8 @@ import { Feather } from '@expo/vector-icons';
 
 import { useApi } from '@/lib/api';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { showAlert } from '@/lib/actionSheet';
+import { showToast } from '@/lib/toast';
 import { SkeletonLine } from '@/components/ui/Skeleton';
 
 import { formatCents } from '@/lib/money';
@@ -96,10 +98,10 @@ export default function TaxesDutiesScreen() {
       if (next) {
         await api.taxes.enable();
         setProviderConfigured(true);
-        Alert.alert('Automatic tax turned on', "Tax will be calculated from the buyer's checkout destination when an applicable registration is active.");
+        showToast('Automatic tax turned on', "Tax will be calculated from the buyer's checkout destination when an applicable registration is active.");
       } else {
         await api.taxes.config({ stripeTaxEnabled: false });
-        Alert.alert('Automatic tax turned off', 'Brandthread will stop calculating tax at checkout for your store.');
+        showToast('Automatic tax turned off', 'Brandthread will stop calculating tax at checkout for your store.');
       }
     } catch {
       setStripeTaxEnabled(previous);
@@ -261,7 +263,18 @@ export default function TaxesDutiesScreen() {
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
-            <Icon name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+            <TouchableOpacity
+              onPress={() => showAlert(
+                'Registrations and filing',
+                "You register for sales tax in each place you're required to, and file returns there. Stripe Tax uses those registrations to collect tax at checkout. Brandthread shows your 1099-K totals but doesn't register or file for you.",
+              )}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              style={{ marginLeft: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="About registrations and filing"
+            >
+              <Icon name="info" size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
           </View>
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
             Brandthread doesn't determine nexus, register you, or file returns. Review your obligations with a qualified accountant.

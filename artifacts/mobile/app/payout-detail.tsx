@@ -11,6 +11,7 @@ import { saveDownloadedFile } from '@/lib/fileDownload';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { EmptyState } from '@/components/layout';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { useApi } from '@/lib/api';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { hasPayoutsAccess, isManagerRole } from '@/lib/roleError';
@@ -67,10 +68,13 @@ export default function PayoutDetailScreen() {
   const api = useApi();
   const { id } = useLocalSearchParams<{ id: string }>();
   const payoutId = typeof id === 'string' ? id : '';
-  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const isPreviewMode = isSellerDevPreview();
-  const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
-  const { currentRole, isLoadingRole } = useTeamRole();
+  // lib/api.ts rejects every request in the seller web preview, signed in or
+  // not, so any preview (and any missing session) skips the API — a signed-in
+  // preview used to land on "Owner access required".
+  const isPreview = isPreviewMode || (!authLoaded || !isSignedIn);
+  const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
 
   const [detail, setDetail] = useState<PayoutDetail | null>(null);
@@ -132,6 +136,19 @@ export default function PayoutDetailScreen() {
       </View>
     );
   }
+  // A failed role lookup is not "no access": offer a retry instead of the
+  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  if (!isPreview && roleError) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Payout" onBack={goBack} />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load this payout" onRetry={retryRole} />
+        </View>
+      </View>
+    );
+  }
+
   if (!isPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>
@@ -158,7 +175,14 @@ export default function PayoutDetailScreen() {
         ) : loadError ? (
           <ErrorState message="Couldn't load this payout." onRetry={() => { void load(); }} />
         ) : !payout ? (
-          <EmptyState icon="inbox" title="Payout not found" message="" compact />
+          <EmptyState
+            icon="inbox"
+            title="Payout not found"
+            message="This payout may have been removed or the link is out of date."
+            actionLabel="Back to payouts"
+            onAction={() => { router.replace('/payouts' as never); }}
+            compact
+          />
         ) : (
           <>
             <View style={styles.hero}>

@@ -6,8 +6,12 @@
  * them automatically, with tracking synced back. Separate from "Import from
  * Shopify" on the Products page — this never touches the catalog.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput, AppState } from 'react-native';
+
+import { useFocusEffect } from 'expo-router';
+
+import { RetryRow } from '@/components/ui/RetryRow';
 
 import { Icon } from '@/components/ui/Icon';
 
@@ -34,19 +38,37 @@ export default function ShopifyFulfillmentScreen() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [shopDomain, setShopDomain] = useState('');
+  // A failed status call is not "Not connected": keep the last known status
+  // (if any) and offer a retry instead.
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await api.shopify.status();
       setStatus(res);
+      setLoadError(false);
     } catch {
-      setStatus({ connected: false, fulfillmentEnabled: false, fulfillmentEligible: false });
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
   }, [api]);
 
-  useEffect(() => { load(); }, [load]);
+  const retry = useCallback(() => {
+    // Nothing on screen yet: show the skeleton while retrying.
+    if (!status) setLoading(true);
+    void load();
+  }, [load, status]);
+
+  // Shopify's OAuth runs in the browser: re-check whenever the seller comes
+  // back to this screen or to the app, instead of guessing with a timer.
+  useFocusEffect(useCallback(() => {
+    void load();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load();
+    });
+    return () => sub.remove();
+  }, [load]));
 
   async function handleToggle(value: boolean) {
     setBusy(true);
@@ -63,14 +85,12 @@ export default function ShopifyFulfillmentScreen() {
         }
         const { authorizeUrl } = await api.shopify.connectStart(shopDomain.trim(), 'fulfillment');
         await Linking.openURL(authorizeUrl);
-        setTimeout(load, 4000);
         return;
       }
       const res = await api.shopify.fulfillmentEnable();
       if (res.needsUpgrade) {
         const { authorizeUrl } = await api.shopify.connectStart(status.shopDomain ?? '', 'fulfillment');
         await Linking.openURL(authorizeUrl);
-        setTimeout(load, 4000);
         return;
       }
       if (res.warning) Alert.alert('Tracking sync not set up', String(res.warning));
@@ -95,10 +115,24 @@ export default function ShopifyFulfillmentScreen() {
     );
   }
 
+  if (!status) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScreenHeader title="Fulfillment connections" />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load your Shopify connection" onRetry={retry} testID="shopify-fulfillment-retry" />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader title="Fulfillment connections" />
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 60 }}>
+        {loadError && (
+          <RetryRow label="Couldn't refresh your Shopify connection" onRetry={retry} style={{ marginBottom: 16 }} testID="shopify-fulfillment-refresh-retry" />
+        )}
         <BrandthreadCard>
           <View style={styles.rowHeader}>
             <View style={[styles.iconWrap, { backgroundColor: `${colors.primary}18` }]}>

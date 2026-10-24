@@ -18,11 +18,33 @@
  * a colored initial), rather than inventing placeholder photos this repo
  * has no bundled assets or CDN convention for.
  */
-import type { Manufacturer } from '@/services/manufacturerTypes';
+import type { Manufacturer, ManufacturerReview } from '@/services/manufacturerTypes';
 import type { ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 function iso(daysAgo: number): string {
   return new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+}
+
+/**
+ * The latest few reviews behind each fixture's `reviewCount`. Without them the
+ * profile hero said "4.9 (87 reviews)" while its Reviews section said
+ * "No reviews yet".
+ */
+function previewReviews(
+  manufacturerId: string,
+  rows: readonly [sellerName: string, rating: number, comment: string, daysAgo: number][],
+): ManufacturerReview[] {
+  return rows.map(([sellerName, rating, comment, daysAgo], i) => ({
+    id: `${manufacturerId}-review-${i + 1}`,
+    sellerId: `preview-seller-${i + 1}`,
+    sellerName,
+    rating,
+    qualityRating: rating,
+    communicationRating: Math.min(5, rating + (i % 2)),
+    deliveryRating: Math.max(1, rating - (i === 2 ? 1 : 0)),
+    comment,
+    createdAt: iso(daysAgo),
+  }));
 }
 
 export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
@@ -37,7 +59,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     materials: ['Cotton fleece', 'French terry', 'Organic cotton'],
     moq: 150, samplePriceMinCents: 3500, samplePriceMaxCents: 8500,
     unitPriceMinCents: 1400, unitPriceMaxCents: 2600, leadTimeDays: 28, responseTimeHours: 6,
-    rating: 4.9, reviewCount: 87, reviews: [], isVerified: true,
+    rating: 4.9, reviewCount: 87,
+    reviews: previewReviews('preview-mfg-porto-knit', [
+      ['Northline Studio', 5, 'Fleece came back exactly to spec. Great communication on the colour lab dips.', 6],
+      ['Saltwater Supply', 5, 'Second run with them; sizing was consistent across the whole order.', 19],
+      ['Common Thread Co.', 4, 'Excellent quality. Bulk shipped a few days after the quoted date.', 41],
+    ]), isVerified: true,
     shippingRegions: ['EU', 'US', 'UK'], website: 'https://portoknit.example',
     isPublicDirectory: true, priceRangeLabel: '$14–$26', sampleTurnaround: '10 days', bulkTurnaround: '28 days',
     createdAt: iso(400),
@@ -52,7 +79,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     certifications: [], materials: ['Cotton', 'Cotton/poly blends'],
     moq: 50, samplePriceMinCents: 2500, samplePriceMaxCents: 6000,
     unitPriceMinCents: 1100, unitPriceMaxCents: 1900, leadTimeDays: 21, responseTimeHours: 4,
-    rating: 4.7, reviewCount: 142, reviews: [], isVerified: true,
+    rating: 4.7, reviewCount: 142,
+    reviews: previewReviews('preview-mfg-la-garment', [
+      ['Pacific Basics', 5, 'Garment dye shades matched our swatches on the first try.', 4],
+      ['Low Tide Label', 4, 'Fast samples and easy to reach. One carton was short two units, fixed quickly.', 23],
+      ['Desert Bloom', 5, 'Small-batch run was clean and on time.', 58],
+    ]), isVerified: true,
     shippingRegions: ['US'], isPublicDirectory: true,
     priceRangeLabel: '$11–$19', sampleTurnaround: '7 days', bulkTurnaround: '21 days',
     createdAt: iso(300),
@@ -68,7 +100,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     materials: ['Nylon', 'Polyester', 'GORE-TEX'],
     moq: 300, samplePriceMinCents: 6000, samplePriceMaxCents: 15000,
     unitPriceMinCents: 1800, unitPriceMaxCents: 4200, leadTimeDays: 35, responseTimeHours: 12,
-    rating: 4.6, reviewCount: 64, reviews: [], isVerified: true,
+    rating: 4.6, reviewCount: 64,
+    reviews: previewReviews('preview-mfg-harbour', [
+      ['Ridge & Range', 5, 'Shell jackets passed our water test. Seams are well taped.', 9],
+      ['Urban Fjord', 4, 'Great development team. Embroidery needed one revision.', 33],
+      ['Coastline Goods', 4, 'Solid quality. Lead time ran a week over.', 72],
+    ]), isVerified: true,
     shippingRegions: ['Global'], isPublicDirectory: true,
     priceRangeLabel: '$18–$42', sampleTurnaround: '14 days', bulkTurnaround: '35 days',
     createdAt: iso(500),
@@ -84,7 +121,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     materials: ['Organic cotton'],
     moq: 200, samplePriceMinCents: 2000, samplePriceMaxCents: 4500,
     unitPriceMinCents: 600, unitPriceMaxCents: 1200, leadTimeDays: 30, responseTimeHours: 10,
-    rating: 4.8, reviewCount: 53, reviews: [], isVerified: true,
+    rating: 4.8, reviewCount: 53,
+    reviews: previewReviews('preview-mfg-tiruppur', [
+      ['Good Cotton Club', 5, 'GOTS paperwork came with the shipment. Tees feel great.', 11],
+      ['Plain Folk', 5, 'Very responsive and the jersey weight is spot on.', 27],
+      ['Kinfolk Basics', 4, 'Good quality. Freight booking took a few extra days.', 64],
+    ]), isVerified: true,
     shippingRegions: ['Global'], isPublicDirectory: true,
     priceRangeLabel: '$6–$12', sampleTurnaround: '9 days', bulkTurnaround: '30 days',
     createdAt: iso(600),
@@ -99,7 +141,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     certifications: [], materials: ['Full-grain leather', 'Suede'],
     moq: 100, samplePriceMinCents: 4500, samplePriceMaxCents: 9500,
     unitPriceMinCents: 2200, unitPriceMaxCents: 4800, leadTimeDays: 40, responseTimeHours: 8,
-    rating: 4.9, reviewCount: 38, reviews: [], isVerified: true,
+    rating: 4.9, reviewCount: 38,
+    reviews: previewReviews('preview-mfg-oaxaca', [
+      ['Mesa Footwear', 5, 'Beautiful hand finishing on the uppers.', 8],
+      ['Field Day Goods', 5, 'They caught a pattern issue before cutting. Saved us a run.', 30],
+      ['Adobe & Co.', 4, 'Lovely leather. Samples took a little longer than quoted.', 55],
+    ]), isVerified: true,
     shippingRegions: ['US', 'Mexico'], isPublicDirectory: true,
     priceRangeLabel: '$22–$48', sampleTurnaround: '12 days', bulkTurnaround: '40 days',
     createdAt: iso(700),
@@ -114,7 +161,12 @@ export const PREVIEW_MANUFACTURERS: Manufacturer[] = [
     certifications: [], materials: ['Cotton', 'Tri-blend'],
     moq: 25, samplePriceMinCents: 1500, samplePriceMaxCents: 3000,
     unitPriceMinCents: 500, unitPriceMaxCents: 950, leadTimeDays: 10, responseTimeHours: 2,
-    rating: 4.5, reviewCount: 29, reviews: [], isVerified: false,
+    rating: 4.5, reviewCount: 29,
+    reviews: previewReviews('preview-mfg-quiet-print', [
+      ['Weekend Club', 5, 'Prints were crisp and turnaround was four days, as promised.', 3],
+      ['Static Radio', 4, 'Good water-based prints. One colour ran slightly light.', 17],
+      ['Paper Moon', 4, 'Easy to work with for a small run.', 46],
+    ]), isVerified: false,
     shippingRegions: ['EU'], isPublicDirectory: true,
     priceRangeLabel: '$5–$9.50', sampleTurnaround: '4 days', bulkTurnaround: '10 days',
     createdAt: iso(200),

@@ -24,9 +24,12 @@ import { getManufacturer, saveQuoteRequestDraft, submitQuoteRequest } from '@/se
 
 import type { Manufacturer } from '@/services/manufacturerTypes';
 import { radius } from '@/constants/radii';
+import { showToast } from '@/lib/toast';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Shorts', 'Jacket', 'Hat', 'Custom'];
 const QUANTITIES = [1, 3, 5, 10];
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 export default function RequestSampleScreen() {
   const colors = useColors();
@@ -42,6 +45,8 @@ export default function RequestSampleScreen() {
   const [quantity, setQuantity] = useState(1);
   const [colorway, setColorway] = useState('');
   const [size, setSize] = useState('M');
+  // "Other" swaps the size chips' value for a typed one (e.g. 3XL, 32x30, One size).
+  const [customSize, setCustomSize] = useState(false);
   const [notes, setNotes] = useState('');
   const [contact, setContact] = useState('');
   const [sending, setSending] = useState(false);
@@ -92,11 +97,8 @@ export default function RequestSampleScreen() {
         currentStep: 5,
       });
       await submitQuoteRequest(draft.id);
-      Alert.alert(
-        'Sample request sent',
-        `Your request is now visible to ${manufacturer.name}.`,
-        [{ text: 'Done', onPress: () => goBackOr(router) }],
-      );
+      showToast('Sample request sent', `Your request is now visible to ${manufacturer.name}.`);
+      goBackOr(router);
     } catch (error) {
       Alert.alert('Couldn’t send request', 'Check your connection and try again.');
     } finally {
@@ -105,7 +107,30 @@ export default function RequestSampleScreen() {
   }
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
+    return (
+      <View style={styles.root}>
+        <ScreenHeader
+          title="Request Sample"
+          onBack={() => { goBackOr(router); }}
+        />
+        <View style={styles.content} accessibilityLabel="Loading sample request form" testID="request-sample-loading">
+          {[5, 4].map((count, field) => (
+            <View key={field} style={styles.field}>
+              <SkeletonBlock width={90} height={12} radius={4} />
+              <View style={styles.chips}>
+                {Array.from({ length: count }, (_, i) => <SkeletonBlock key={i} width={64} height={COMP.minTouchTarget} radius={radius.md} />)}
+              </View>
+            </View>
+          ))}
+          {[0, 1, 2].map((field) => (
+            <View key={`input-${field}`} style={styles.field}>
+              <SkeletonBlock width={80} height={12} radius={4} />
+              <SkeletonBlock width="100%" height={COMP.minTouchTarget} radius={12} />
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   }
 
   if (!manufacturer && loadError) {
@@ -162,7 +187,17 @@ export default function RequestSampleScreen() {
           </View>
         </Field>
         <Field label="Colorway"><TextInput returnKeyType="done" accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
-        <Field label="Size"><TextInput returnKeyType="done" accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Size">
+          <View style={styles.chips}>
+            {SIZES.map((item) => (
+              <Chip key={item} label={item} active={!customSize && item === size} onPress={() => { setCustomSize(false); setSize(item); }} color={colors.primary} />
+            ))}
+            <Chip label="Other" active={customSize} onPress={() => { if (!customSize) { setCustomSize(true); setSize(''); } }} color={colors.primary} />
+          </View>
+          {customSize && (
+            <TextInput returnKeyType="done" accessibilityLabel="Custom size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholder="e.g. 3XL, 32x30 or One size" placeholderTextColor={colors.mutedForeground} style={styles.input} autoFocus />
+          )}
+        </Field>
         <Field label="Reply contact"><TextInput returnKeyType="done" accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" /></Field>
         <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
@@ -208,11 +243,6 @@ function Chip({ label, active, onPress, color }: { label: string; active: boolea
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: colors.text, fontSize: 16, fontFamily: FONT.bold, textAlign: 'center' },
-  headerSub: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 120, gap: 20 },
   field: { gap: 8 },
   label: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.semibold },
