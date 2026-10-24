@@ -304,5 +304,16 @@ if (!workspacePreview) {
   fs.copyFileSync(path.join(outputDir, 'index.html'), path.join(outputDir, 'app-shell.html'));
   fs.writeFileSync(path.join(outputDir, 'index.html'), landingHtml);
   writePrelaunchLegalPages(outputDir, projectRoot);
+  // Publish the server and HTML from the same build, and exercise the actual
+  // packaged entrypoint before allowing this production build to succeed.
+  const verification = spawnSync(
+    process.execPath,
+    [path.join(__dirname, 'verify-production-web.cjs'), '--package'],
+    { cwd: projectRoot, env, stdio: 'inherit' },
+  );
+  if (verification.error || verification.status !== 0) {
+    console.error('Production web packaging/seal verification failed.');
+    process.exit(verification.status || 1);
+  }
 }
 console.log('Web export complete.');

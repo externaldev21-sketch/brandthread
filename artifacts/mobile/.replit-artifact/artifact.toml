@@ -14,16 +14,20 @@ localPort = 18115
 [services.development]
 run = "pnpm --filter @workspace/mobile run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/mobile", "run", "build" ]
+[services.production.build]
+args = [ "pnpm", "--filter", "@workspace/mobile", "run", "build" ]
+
+[services.production.build.env]
+NODE_ENV = "production"
 
 [services.production.run]
-args = [ "node", "artifacts/mobile/server/serve.js" ]
+args = [ "node", "artifacts/mobile/static-build-runtime/serve.js" ]
 
 [services.production.run.env]
 PORT = "18115"
 BASE_PATH = "/"
 NODE_ENV = "production"
+EXPO_WEB_BUILD_DIR = "static-build"
 
 [services.production.health.startup]
 path = "/status"

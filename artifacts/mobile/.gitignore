@@ -8,6 +8,7 @@ node_modules/
 dist/
 web-build/
 static-build/
+static-build-runtime/
 
 # crisp crawl output (scripts/crisp/crawl.mjs): screenshots + report
 .crisp-crawl/

@@ -19,18 +19,23 @@ owner explicitly authorizes opening the app at launch. PUBLIC_APP_ENABLED is
 the shared launch switch: false (also the default) seals production; true
 opens it. Workspace dev/fast preview must remain usable with the switch off.
 
-Verify the actual production export separately from the fast-preview export.
-The production default document must be the pre-launch cover; preserve the
-Expo shell in the build, but never serve it publicly while the seal is closed.
+Verify the actual production export separately from the fast-preview export,
+together with the exact server packaged for that release. Source-only gate
+tests are not sufficient evidence. The production default document must be
+the pre-launch cover; preserve the Expo shell in the build, but never serve
+it publicly while the seal is closed.
 
 **Why:** Rebuilding the fast preview alone left an older full landing in the
-production output, so the public Instagram link still exposed account/pricing
-entry instead of the approved waitlist.
+production output. Later, passing local source-server tests still did not
+establish that the deployed web release contained the seal. An acknowledged
+publish or a fresh Autoscale process startup is not proof of a new web release.
 
 **How to apply:** Before reporting a landing ready to publish, build the
-production target and test its root with the production static server, not
-only the development or fast-preview root. Keep waitlist submissions
-same-origin so deployment routes them to its production API/database.
+production target with an explicit production environment and test its root,
+app-route redirects, and legal documents through its packaged server. Then
+verify live HTTP responses after publishing rather than inferring rollout
+from build success alone. Keep waitlist submissions same-origin so deployment
+routes them to its production API/database.
 
 Do not use REPLIT_ENVIRONMENT alone to decide whether a request is deployed.
 
