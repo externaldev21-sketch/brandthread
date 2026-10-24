@@ -7,6 +7,8 @@ import { CachedImage as Image } from '@/components/CachedImage';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { SP } from '@/lib/theme';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +31,6 @@ export default function EmailCampaignComposeScreen() {
   const c = useColors();
   const api = useApi();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { id: routeId } = useLocalSearchParams<{ id?: string }>();
   const mode = emailMode();
 
@@ -46,21 +47,31 @@ export default function EmailCampaignComposeScreen() {
   const [missingAddress, setMissingAddress] = useState(false);
   const [productsList, setProductsList] = useState<PickProduct[]>([]);
   const [busy, setBusy] = useState<null | 'save' | 'test' | 'send'>(null);
+  const [storeName, setStoreName] = useState('Your store');
+  // A failed load must not leave an empty, editable form: saving it would
+  // overwrite the stored campaign with blanks.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let off = false;
     (async () => {
+      setLoadError(false);
       try {
         if (mode !== 'live') {
           setStatus(mode === 'demo' ? DEMO_STATUS : FRESH_STATUS);
           setCounts((mode === 'demo' ? DEMO_AUDIENCE : EMPTY_AUDIENCE).counts);
           setMissingAddress(mode === 'demo' ? !DEMO_SETTINGS.postalAddress : true);
           if (mode === 'demo') {
+            setStoreName(DEMO_SETTINGS.fromName || DEMO_SETTINGS.defaultFromName);
             setProductsList(getPreviewSellerProducts().slice(0, 4).map((p: any) => ({
               id: p.id, name: p.name, image: null, priceCents: p.priceCents ?? p.variants?.[0]?.priceCents ?? null,
             })));
             const d = DEMO_CAMPAIGNS.find((x) => x.id === routeId);
-            if (d) { setSubject(d.subject); setPreheader(d.preheader); setAudience(d.audience); setBody(d.body); }
+            if (d) {
+              setSubject(d.subject); setPreheader(d.preheader); setAudience(d.audience); setBody(d.body);
+              setCtaLabel(d.body.cta?.label ?? ''); setCtaUrl(d.body.cta?.url ?? '');
+            }
           }
           return;
         }
@@ -69,6 +80,7 @@ export default function EmailCampaignComposeScreen() {
         ]);
         if (off) return;
         setStatus(s); setCounts(a.counts); setMissingAddress(!settings.postalAddress.trim());
+        setStoreName(settings.fromName?.trim() || settings.defaultFromName || 'Your store');
         setProductsList((Array.isArray(prods) ? prods : []).map((p: any) => ({
           id: p.id, name: p.name,
           image: Array.isArray(p.images) && typeof p.images[0] === 'string' && p.images[0].startsWith('https://') ? p.images[0] : null,
@@ -85,7 +97,7 @@ export default function EmailCampaignComposeScreen() {
       } finally { if (!off) setLoading(false); }
     })();
     return () => { off = true; };
-  }, [api, routeId, mode]);
+  }, [api, routeId, mode, reloadToken]);
 
   const fullBody = useMemo<EmailCampaignBody>(() => ({
     ...body,
@@ -144,7 +156,7 @@ export default function EmailCampaignComposeScreen() {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(9, 0, 0, 0);
     Alert.alert('Schedule', 'When should it go out?', [
       { text: 'In 1 hour', onPress: () => doSend(at(3600_000)) },
-      { text: 'Tomorrow at 9:00', onPress: () => doSend(tomorrow.toISOString()) },
+      { text: 'Tomorrow at 9 AM', onPress: () => doSend(tomorrow.toISOString()) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -158,8 +170,9 @@ export default function EmailCampaignComposeScreen() {
   const selected = body.productIds.map((pid) => productsList.find((p) => p.id === pid)).filter(Boolean) as PickProduct[];
   const hasContent = !!(fullBody.headline || fullBody.text || fullBody.imageUrl || fullBody.productIds.length || fullBody.cta);
   const canSend = mode === 'live' && !!status?.enabled && !!subject.trim() && hasContent && !missingAddress && (counts?.[audience] ?? 0) > 0;
+  // The full "not set up" message is already the Notice at the top.
   const sendHint = !status?.enabled
-    ? (status?.message ?? 'Email sending isn\'t set up yet. Drafts are saved and nothing is sent.')
+    ? 'Sending is unavailable until email is set up.'
     : missingAddress ? 'Add your mailing address in Sender details before sending.'
     : (counts?.[audience] ?? 0) === 0 ? 'No one in this audience can receive email yet.'
     : !subject.trim() ? 'Add a subject line.' : !hasContent ? 'Add some content.' : null;
@@ -167,8 +180,19 @@ export default function EmailCampaignComposeScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: c.background }}>
-        <ScreenHeader title="Campaign" />
+        <ScreenHeader title="Edit campaign" />
         <ActivityIndicator color={c.foreground} style={{ marginTop: 40 }} />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background }}>
+        <ScreenHeader title={routeId ? 'Edit campaign' : 'New campaign'} />
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't load this campaign" onRetry={() => { setLoading(!!routeId); setReloadToken((n) => n + 1); }} />
+        </View>
       </View>
     );
   }
@@ -176,7 +200,7 @@ export default function EmailCampaignComposeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title={id ? 'Edit campaign' : 'New campaign'} />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {status && !status.enabled && <Notice text={status.message ?? 'Email sending isn\'t set up yet. Drafts are saved and nothing is sent.'} />}
 
         <Text style={[st.label, { color: c.foreground }]}>To</Text>

@@ -38,7 +38,8 @@ import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle, StatTile } from '@/components/analytics/AnalyticsKit';
 import { AnalyticsReportsList } from '@/components/analytics/AnalyticsReportsList';
-import { useReportBottomInset } from '@/components/analytics/InsightFrame';
+import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
@@ -74,6 +75,9 @@ function changePct(current: number, previous: number, hasPrevious: boolean): num
 
 const formatChartDollars = formatDollarsCompact;
 
+const CHART_HEIGHT = 140;
+const EMPTY_CHART_HEIGHT = 120;
+
 const CHART_TITLE: Record<InsightRange, string> = {
   today: 'Revenue by hour', week: 'Revenue by day', month: 'Revenue by day', year: 'Revenue by month', all: 'Revenue',
 };
@@ -94,10 +98,14 @@ export default function AnalyticsScreen() {
   const { userId } = useAuth();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
-  const bottomInset = useReportBottomInset();
+  // Tab screen: clears the floating seller bar itself (pushed reports get
+  // that clearance from the stack scene instead, see InsightFrame).
+  const bottomInset = useTabBarClearance(2);
 
   const [range, setRange]           = useState<InsightRange>(DEFAULT_INSIGHT_RANGE);
   const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const loadedRef = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary]       = useState<SummaryData>({ visits: 0, revenueCents: 0 });
   const [bars, setBars]             = useState<RevenueBar[]>([]);
@@ -133,6 +141,7 @@ export default function AnalyticsScreen() {
           revenueChangePct: changePct(home.totalCents, home.previous.totalCents, hasPrevious),
         });
       }
+      loadedRef.current = true;
       if (preview || !userId) {
         setLives([]);
       } else {
@@ -141,7 +150,9 @@ export default function AnalyticsScreen() {
         setLives(Array.isArray(recentLives?.lives) ? recentLives.lives : []);
       }
     } catch {
-      // silent read failure: keep whatever state was last set
+      // A failed refresh keeps the last good numbers; a failed first load
+      // shows an error instead of zeros that look like real data.
+      if (loadGenerationRef.current === generation && !loadedRef.current) setLoadError(true);
     }
 
     if (loadGenerationRef.current === generation) {
@@ -155,7 +166,7 @@ export default function AnalyticsScreen() {
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (loading && bars.length === 0) {
+  if (loading && bars.length === 0 && !loadError) {
     return (
       <View style={{ flex: 1 }}>
         <ScreenHeader title="Analytics" onBack={onBack} />
@@ -167,6 +178,7 @@ export default function AnalyticsScreen() {
   // ── Display values ─────────────────────────────────────────────────────────
   const displayRevenue = formatMoney(summary.revenueCents);
   const chartPoints = bars.map(b => ({ label: b.label, value: b.cents }));
+  const chartEmpty = !bars.some(b => b.cents > 0);
   const hasDelta = summary.visitsChangePct !== undefined || summary.revenueChangePct !== undefined;
   const comparedTo = hasDelta ? previousPeriodLabel(range) : null;
   const summarySentence = analyticsSummary({
@@ -205,6 +217,12 @@ export default function AnalyticsScreen() {
 
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           {/* Each key metric opens its report (Shopify Analytics). */}
+          {loadError ? (
+            <View style={s.errorWrap}>
+              <ErrorState message="Couldn't load analytics." onRetry={() => load()} />
+            </View>
+          ) : (
+            <>
           <View style={s.statsRow}>
             <TouchableOpacity
               style={{ flex: 1, minWidth: 0 }}
@@ -230,11 +248,13 @@ export default function AnalyticsScreen() {
             </View>
           </View>
 
-          {/* ── Revenue chart for the selected range ──────────────────────── */}
-          <Card padded>
-            <SectionTitle>Revenue</SectionTitle>
-            <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" height={bars.some(b => b.cents > 0) ? 140 : 120} />
-          </Card>
+              {/* ── Revenue chart for the selected range ──────────────────── */}
+              <Card padded>
+                <SectionTitle>Revenue</SectionTitle>
+                <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" height={chartEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT} />
+              </Card>
+            </>
+          )}
 
           {/* ── Reports (appended) ─────────────────────────────────────────── */}
           <AnalyticsReportsList />
@@ -268,6 +288,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   content: { paddingTop: SP.md },
 
   statsRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+  statCell: { flex: 1, minWidth: 0 },
+  errorWrap: { paddingVertical: SP.xl },
 
   advancedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
   advancedLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },

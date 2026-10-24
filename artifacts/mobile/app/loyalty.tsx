@@ -36,7 +36,6 @@ function fmtDate(iso: string) {
 export default function LoyaltyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -102,10 +101,10 @@ export default function LoyaltyScreen() {
   async function handleRedeem() {
     const pts = parseInt(redeemPts, 10);
     if (!pts || pts < 100) {
-      Alert.alert('Minimum 100 Points', 'You need at least 100 points to redeem ($1.00 off).'); return;
+      Alert.alert('Minimum 100 points', 'You need at least 100 points to redeem ($1.00 off).'); return;
     }
     if (pts > balance) {
-      Alert.alert('Insufficient Points', `You only have ${balance.toLocaleString()} points.`); return;
+      Alert.alert('Not enough points', `You only have ${balance.toLocaleString()} points.`); return;
     }
     // Redemptions are deliberately created in the cart, where they are
     // persisted with the checkout session and applied to Stripe immediately.
@@ -119,8 +118,11 @@ export default function LoyaltyScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: headerTopInset }]}>
-        <ActivityIndicator color={theme.accent} />
+      <View style={s.root}>
+        <ScreenHeader title="Rewards" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accent} />
+        </View>
       </View>
     );
   }
@@ -200,13 +202,16 @@ export default function LoyaltyScreen() {
             onPress={handleRedeem}
             disabled={redeeming || balance < 100}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Use points in cart"
+            accessibilityState={{ disabled: redeeming || balance < 100 }}
           >
              {redeeming
                ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
                : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
             }
           </TouchableOpacity>
-          <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>
+          <Text style={s.redeemDisabledNote}>Choose your points in your cart when you’re ready to check out.</Text>
           {balance < 100 && (
             <Text style={s.redeemDisabledNote}>You need at least 100 points to redeem.</Text>
           )}
@@ -243,7 +248,7 @@ export default function LoyaltyScreen() {
             <Icon name="star" size={32} color={theme.border} />
             <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No points yet</Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 }}>
-              Make a purchase or refer a friend to start earning rewards.
+              Points you earn and redeem show up here.
             </Text>
           </View>
         )}

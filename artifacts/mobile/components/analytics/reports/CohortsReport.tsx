@@ -1,3 +1,4 @@
+import { formatCents } from '@/lib/money';
 /**
  * Advanced Analytics — Brandthread Pro.
  * New module (existing analytics screens are unchanged and stay free):
@@ -125,10 +126,10 @@ export default function CohortsReport() {
       {loading ? (
         <AnalyticsSkeleton kpiCount={2} listRows={4} />
       ) : locked ? (
-        <View style={s.centered}><ProLockedState source="analytics-advanced" /></View>
+        <View style={s.centered}><ProLockedState source="analytics-cohorts" title="Customer cohorts are a Pro feature" /></View>
       ) : loadError || !data ? (
         <View style={s.centered}>
-          <ErrorState message="Couldn't load advanced analytics." onRetry={() => load()} />
+          <ErrorState message="Couldn't load customer cohorts." onRetry={() => load()} />
         </View>
       ) : (
         <ScrollView
@@ -184,8 +185,28 @@ export default function CohortsReport() {
             ))}
           </Card>
           {data.cohorts.every((c) => c.customers === 0) ? (
-            <Text style={s.note}>Cohorts fill in as customers place orders.</Text>
-          ) : null}
+            <Card><Text style={s.empty}>Cohorts fill in as customers place orders.</Text></Card>
+          ) : (
+            <Card>
+              <View style={s.row}>
+                <Text style={[s.cell, s.monthCell, s.head]}>Month</Text>
+                <Text style={[s.cell, s.head]}>Customers</Text>
+                <Text style={[s.cell, s.head]}>Repeat</Text>
+                <Text style={[s.cell, s.revCell, s.head]}>Revenue</Text>
+              </View>
+              {data.cohorts.map((c) => (
+                <React.Fragment key={c.month}>
+                  <CardDivider />
+                  <View style={s.row}>
+                    <Text style={[s.cell, s.monthCell, s.value]}>{monthLabel(c.month)}</Text>
+                    <Text style={[s.cell, s.value]}>{c.customers}</Text>
+                    <Text style={[s.cell, s.value]}>{c.repeatRate}%</Text>
+                    <Text style={[s.cell, s.revCell, s.value]}>{formatCents(c.revenueCents)}</Text>
+                  </View>
+                </React.Fragment>
+              ))}
+            </Card>
+          )}
         </ScrollView>
       )}
     </View>
@@ -203,7 +224,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   cell: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground, textAlign: 'right' },
   monthCell: { textAlign: 'left' },
   revCell: { flex: 1.4 },
-  head: { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
+  head: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground },
   value: { fontFamily: FONT.semibold },
-  note: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center' },
+  empty: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, padding: SP.md },
 });

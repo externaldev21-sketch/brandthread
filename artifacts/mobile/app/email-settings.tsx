@@ -2,7 +2,6 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type EmailSettings } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -10,13 +9,12 @@ import { HapticSwitch } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { Field, SolidButton } from '@/components/email/EmailUI';
 import { DEMO_SETTINGS, EMPTY_SETTINGS, emailMode } from '@/lib/emailMarketing';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 
 export default function EmailSettingsScreen() {
   const c = useColors();
   const api = useApi();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [form, setForm] = useState<EmailSettings | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,6 +28,10 @@ export default function EmailSettingsScreen() {
 
   const save = async () => {
     if (!form) return;
+    if (form.replyTo.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.replyTo.trim())) {
+      Alert.alert('Check your reply-to email', 'Enter a full email address, like hello@yourstore.com.');
+      return;
+    }
     if (mode !== 'live') { router.back(); return; }
     setSaving(true);
     try {
@@ -45,7 +47,7 @@ export default function EmailSettingsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title="Sender details" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 140 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
         {error ? <RetryRow label="Couldn't load sender details" onRetry={load} /> : !form ? (
           <ActivityIndicator color={c.foreground} style={{ marginTop: 32 }} />
         ) : (

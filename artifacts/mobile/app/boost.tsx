@@ -337,14 +337,13 @@ function PostThumbnail({ target }: { target: BoostTarget }) {
   const thumbnailUrl = target.mediaUrls?.[0] ?? target.mediaUrl;
 
   // Honest UI: a post with no real thumbnail shows a plain card, never a
-  // generic film-strip icon standing in for a real image.
-  if (!thumbnailUrl) {
-    return <View style={tc.fallback} />;
-  }
-
+  // generic film-strip icon standing in for a real image. The Video /
+  // Slideshow label still shows, so the tile isn't an anonymous blank box.
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      {thumbnailUrl
+        ? <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        : <View style={tc.fallback} />}
       <View style={tc.badgeRow}>
         {target.mediaKind === 'video' ? (
           <View style={tc.badge}>
@@ -465,7 +464,7 @@ export default function BoostScreen() {
   // Post analytics opens Boost with `?targetType=post&targetId=<postId>`.
   const preselectPostId = boostPreselectPostId(params);
 
-  const bottomPad = insets.bottom + 90;
+  const bottomPad = insets.bottom + SP.xl;
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
   );
@@ -848,7 +847,7 @@ export default function BoostScreen() {
     const newStatus = isActive ? 'paused' : 'cancelled';
     const title     = isActive ? 'Pause boost' : 'Cancel boost';
     const message   = isActive
-      ? 'Pause this boost? You can reactivate it later by contacting support.'
+      ? 'You can reactivate it later by contacting support.'
       : boost.status === 'in_review'
         ? (nativeRail
           ? 'Cancel this boost? Your payment will be returned as credit for your next boost.'
@@ -907,7 +906,7 @@ export default function BoostScreen() {
             {selectedTarget.caption || 'Untitled post'}
           </Text>
           <Text style={s.targetBannerMeta}>
-            {selectedTarget.mediaKind === 'video' ? 'Video' : `Slideshow · ${selectedTarget.imageCount ?? ''} images`}
+            {selectedTarget.mediaKind === 'video' ? 'Video' : selectedTarget.imageCount ? `Slideshow · ${selectedTarget.imageCount} images` : 'Slideshow'}
             {' · '}
             {fmtRelativeDay(selectedTarget.createdAt)}
           </Text>
@@ -915,6 +914,7 @@ export default function BoostScreen() {
         <TouchableOpacity
           onPress={() => { setSelectedTarget(null); setStep(0); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
           accessibilityLabel="Change post"
         >
           <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' }}>Change</Text>
@@ -963,7 +963,7 @@ export default function BoostScreen() {
 
     return (
       <View style={{ marginTop: SP.xl }}>
-        <Text style={s.sectionHeading}>Past Boosts</Text>
+        <Text style={s.sectionHeading}>Your boosts</Text>
         {boosts.map((b) => (
           <View key={b.id} style={s.historyCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
@@ -1037,9 +1037,11 @@ export default function BoostScreen() {
           {renderSummaryCard()}
 
           <Text style={s.stepHeading}>Choose a post to promote</Text>
-          <Text style={s.stepSub}>
-            Only your published videos and slideshows (2+ images) are eligible.
-          </Text>
+          {targets.length > 0 && (
+            <Text style={s.stepSub}>
+              Only your published videos and slideshows (2+ images) are eligible.
+            </Text>
+          )}
 
           {loadingTargets ? (
             <View style={s.centeredState}>
@@ -1047,9 +1049,9 @@ export default function BoostScreen() {
             </View>
           ) : targetsError ? (
             <EmptyState
-              icon="lock"
-              title="Sign in to continue"
-              description="Your session may have expired. Sign in again to load your eligible posts."
+              icon="alert-circle"
+              title="Couldn't load your posts"
+              description="Check your connection and try again. If this keeps happening, sign out and back in."
               action={{ label: 'Retry', onPress: loadTargets }}
               compact
             />
@@ -1058,7 +1060,7 @@ export default function BoostScreen() {
               icon="film"
               title="No eligible posts yet"
               description="Publish a video or a slideshow with 2+ images, then come back to Promote."
-              action={{ label: 'Create a Post', onPress: () => router.push('/create-post') }}
+              action={{ label: 'Create a post', onPress: () => router.push('/create-post') }}
               compact
             />
           ) : (
@@ -1120,7 +1122,7 @@ export default function BoostScreen() {
 
     return (
       <View style={{ flex: 1 }}>
-        {renderHeader('Boost')}
+        {renderHeader('Promote')}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}
@@ -1297,7 +1299,7 @@ const s = StyleSheet.create({
   },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: 2 },
-  summaryLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  summaryLabel: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED },
   summaryDivider: { width: 1, backgroundColor: BORDER },
 
   // Step headings
@@ -1313,7 +1315,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: CARD,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: BORDER,
     position: 'relative',
   },
   gridTileSelected: { borderColor: FG },
@@ -1371,7 +1373,7 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   targetBannerCaption: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 2 },
-  targetBannerMeta:    { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  targetBannerMeta:    { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED },
 
   // Slider card
   sliderCard: {
@@ -1399,7 +1401,7 @@ const s = StyleSheet.create({
   reachLabel:       { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   reachValue:       { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: 2 },
   reachDailyBudget: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
-  reachDisclaimer:  { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 16 },
+  reachDisclaimer:  { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, lineHeight: 16 },
 
   // Sticky bottom
   stickyBottom: {
@@ -1421,7 +1423,7 @@ const s = StyleSheet.create({
     minHeight: 52,
   },
   primaryBtnText: { fontFamily: FONT.bold, fontSize: FS.md, color: '#000' },
-  paymentNote:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, textAlign: 'center', marginTop: SP.sm },
+  paymentNote:    { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, textAlign: 'center', marginTop: SP.sm },
 
   // History
   sectionHeading: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
@@ -1434,7 +1436,7 @@ const s = StyleSheet.create({
     marginBottom: SP.sm,
   },
   historyMeta:      { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
-  historyMetaSmall: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+  historyMetaSmall: { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE },
   statusBadge:      { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2 },
   statusBadgeText:  { fontFamily: FONT.semibold, fontSize: FS.xs },
   progressTrack:    { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
@@ -1459,6 +1461,6 @@ const s = StyleSheet.create({
     marginTop: SP.xl,
     marginBottom: SP.lg,
   },
-  successTitle: { fontFamily: FONT.bold, fontSize: FS.xl * 1.2, color: FG, marginBottom: SP.sm, textAlign: 'center' },
+  successTitle: { fontFamily: FONT.bold, fontSize: FS.xxl, color: FG, marginBottom: SP.sm, textAlign: 'center' },
   successSub:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
 });

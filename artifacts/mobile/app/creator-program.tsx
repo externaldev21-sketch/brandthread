@@ -163,7 +163,7 @@ export default function CreatorProgramScreen() {
                       <Text style={[s.code, { color: theme.text }]} selectable>{b.code}</Text>
                     </View>
                     <KeyStatRow label="Commission" value={pct(b.commissionPercent)} />
-                    <KeyStatRow label="Window" value={`${b.windowDays} days`} />
+                    <KeyStatRow label="Attribution window" value={`${b.windowDays} days`} />
                     <KeyStatRow label="Buyer discount" value={b.buyerDiscountPercent > 0 ? `${pct(b.buyerDiscountPercent)} off` : 'None'} last />
                     <View style={s.row}>
                       <ActionButton label="Copy code" flex outline onPress={() => copy(b.code, 'Code')} />

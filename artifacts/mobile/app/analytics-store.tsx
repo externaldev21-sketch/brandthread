@@ -160,6 +160,8 @@ export default function AnalyticsStoreScreen() {
                   onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
                   style={s.secRow}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${sec.label}, edit store sections`}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={s.secLabel}>{sec.label}</Text>
@@ -168,7 +170,7 @@ export default function AnalyticsStoreScreen() {
                       <Text style={s.dotSep}>·</Text>
                       <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
                       <Text style={s.dotSep}>·</Text>
-                      <Text style={[s.secStat, { color: sec.ctr > 20 ? colors.success : sec.ctr > 10 ? colors.warning : colors.destructive }]}>{sec.ctr.toFixed(1)}% CTR</Text>
+                      <Text style={[s.secStat, { color: sec.ctr > 20 ? colors.success : sec.ctr > 10 ? colors.warning : colors.destructive }]}>{sec.ctr.toFixed(1)}% click rate</Text>
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
@@ -183,7 +185,8 @@ export default function AnalyticsStoreScreen() {
         </>
       )}
 
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -194,13 +197,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   scroll:   { flex: 1, backgroundColor: 'transparent' },
   loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
-  funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
+  funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 4, minHeight: COMP.minTouchTarget },
   funnelLeft:{ flex: 1, gap: 6 },
   funnelLabel:{ fontSize: FS.sm, fontFamily: FONT.medium, color: colors.foreground },
   funnelRight:{ alignItems: 'flex-end', marginLeft: SP.sm, minWidth: 60 },
   funnelCount:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
   funnelDrop:{ fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  secRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
+  secRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 4, minHeight: COMP.minTouchTarget },
   secLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 4 },
   secMeta:  { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   secStat:  { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },

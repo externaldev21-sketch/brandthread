@@ -3,6 +3,8 @@
  * Route: /customer-orders?customerId=<uuid>
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { SP } from '@/lib/theme';
 import {
   View, Text, ScrollView, StyleSheet,
   ActivityIndicator, TouchableOpacity,
@@ -68,6 +70,13 @@ function orderMetaLine(name: string | undefined, order: Order): string {
 
 function cents(c: number) {
   return formatCents(c);
+}
+
+// Raw order statuses ("delivered", "partially_refunded") as sentence-case
+// badge labels, matching the other seller StatusBadge call sites.
+function statusLabel(status: string): string {
+  const text = status.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export default function CustomerOrdersScreen() {
@@ -140,9 +149,20 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={customer?.name ?? 'Customer Orders'} onBack={() => goBackOr(router, '/customers')} />
+      <ScreenHeader title={customer?.name ?? 'Customer orders'} onBack={() => goBackOr(router, '/customers')} />
 
-      {loading ? (
+      {!customerId ? (
+        // No customerId in the URL: nothing to load (this used to render an
+        // empty "Order history — No orders yet" card as if it were a real
+        // customer with no orders).
+        <View style={s.center}>
+          <Feather name="user-x" size={28} color={colors.mutedForeground} />
+          <Text style={[s.errorText, { color: colors.mutedForeground }]}>
+            This customer couldn't be found.
+          </Text>
+          <Button label="Back to customers" variant="secondary" size="small" style={s.retryBtn} onPress={() => goBackOr(router, '/customers')} />
+        </View>
+      ) : loading ? (
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -264,7 +284,7 @@ export default function CustomerOrdersScreen() {
 
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
+  scroll:       { padding: SP.md, paddingBottom: SP.xl, gap: SP.md },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   errorText:    { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 24 },
   retryBtn:     { marginTop: 8 },

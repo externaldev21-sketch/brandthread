@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { SP } from '@/lib/theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -164,9 +165,12 @@ export default function PostAnalyticsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.notFound}>
-        <ActivityIndicator color={colors.primary} />
-        <Text style={styles.notFoundText}>Loading post…</Text>
+      <View style={styles.root}>
+        <ScreenHeader title="Post Analytics" onBack={() => goBackOr(router)} />
+        <View style={styles.notFound}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.notFoundText}>Loading stats…</Text>
+        </View>
       </View>
     );
   }
@@ -176,12 +180,20 @@ export default function PostAnalyticsScreen() {
       <View style={styles.root}>
         <ScreenHeader title="Post Analytics" onBack={() => goBackOr(router)} />
         <View style={styles.notFound}>
-          <EmptyState
-            icon="bar-chart-2"
-            title="Couldn't load stats"
-            description="Pull to refresh or try again."
-            action={{ label: 'Try again', onPress: loadPost }}
-          />
+          {postId ? (
+            <EmptyState
+              icon="bar-chart-2"
+              title="Couldn't load stats"
+              description="Check your connection and try again."
+              action={{ label: 'Try again', onPress: loadPost }}
+            />
+          ) : (
+            <EmptyState
+              icon="bar-chart-2"
+              title="Post not found"
+              description="Open stats from one of your posts."
+            />
+          )}
         </View>
       </View>
     );
@@ -189,6 +201,9 @@ export default function PostAnalyticsScreen() {
 
   const { post, metrics } = analytics;
   const gradColors = postTypeGradient(post.mediaType ?? 'image', colors.primary, colors);
+  const caption = post.caption?.trim();
+  // Watch time only means something for video; a photo post never records it.
+  const showWatchTime = metrics.retention.tracked || post.mediaType === 'video' || post.mediaType === 'behind_scenes';
 
   return (
     <View style={styles.root}>
@@ -205,7 +220,7 @@ export default function PostAnalyticsScreen() {
         <View style={styles.previewCard}>
           <LinearGradient colors={gradColors} style={styles.previewThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
           <View style={styles.previewMeta}>
-            <Text style={styles.previewCaption} numberOfLines={2}>{post.caption ?? ''}</Text>
+            <Text style={[styles.previewCaption, !caption && { color: colors.mutedForeground }]} numberOfLines={2}>{caption || 'No caption'}</Text>
             <View style={styles.previewBadgeRow}>
               <View style={styles.typeBadge}>
                 <Text style={styles.typeBadgeText}>{String(post.mediaType ?? 'post').replace('_', ' ')}</Text>
@@ -252,13 +267,24 @@ export default function PostAnalyticsScreen() {
               ? `${formatNumber(metrics.retention.sampleCount)} watch samples`
               : 'Shown after valid watch-time events are recorded'}
           />
+          {showWatchTime && (
+            <AnalyticsRow
+              label="Average watch time"
+              value={metrics.retention.tracked
+                ? `${(metrics.retention.averageWatchTimeSeconds ?? 0).toFixed(1)}s`
+                : 'Not tracked'}
+              detail={metrics.retention.tracked
+                ? `Based on ${formatNumber(metrics.retention.sampleCount)} views`
+                : 'Shown once viewers watch this video'}
+            />
+          )}
         </View>
 
-        {(!metrics.views.tracked || !metrics.retention.tracked) && (
+        {(!metrics.views.tracked || (showWatchTime && !metrics.retention.tracked)) && (
           <View style={styles.availabilityNote}>
             <Icon name="info" size={18} color={colors.primary} />
             <Text style={styles.unavailableText}>
-              Unavailable metrics are labeled “Not tracked.” Brandthread never estimates post performance.
+              Metrics marked “Not tracked” have no recorded data for this post yet. We never estimate post performance.
             </Text>
           </View>
         )}
@@ -267,6 +293,8 @@ export default function PostAnalyticsScreen() {
           <TouchableOpacity
             style={styles.quickActionBoostWrap}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Boost post"
             onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
           >
             <LinearGradient colors={colors.gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
@@ -548,8 +576,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 12,
   },
   notFoundText: {
-    color: colors.text,
-    fontSize: 16,
+    color: colors.mutedForeground,
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
     textAlign: 'center',
   },
 
@@ -594,9 +623,10 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   scroll: {
     flex: 1,
   },
+  // The stack scene already ends above the floating seller tab bar.
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.lg,
   },
 
   // ── Post Preview Card ──
@@ -638,7 +668,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   typeBadgeText: {
     color: colors.mutedForeground,
-    fontSize: 11,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
     textTransform: 'capitalize',
   },
   statusBadge: {
@@ -688,7 +719,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   heroLabel: {
     color: colors.mutedForeground,
-    fontSize: 12,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
   },
   heroChange: {
     color: colors.success,
@@ -699,9 +731,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   // ── Section Title ──
   sectionTitle: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: FS.base,
     fontFamily: FONT.semibold,
-    marginTop: 24,
+    marginTop: SP.lg,
     marginBottom: 12,
   },
 
@@ -720,8 +752,10 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontFamily: FONT.bold,
   },
   unavailableText: {
+    flex: 1,
     color: colors.mutedForeground,
-    fontSize: 13,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
     lineHeight: 19,
   },
   availabilityNote: {
@@ -753,12 +787,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   analyticsDetail: {
     color: colors.mutedForeground,
-    fontSize: 11,
+    fontSize: FS.meta,
+    fontFamily: FONT.regular,
     lineHeight: 16,
   },
   analyticsValue: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: FS.base,
     fontFamily: FONT.bold,
     textAlign: 'right',
   },

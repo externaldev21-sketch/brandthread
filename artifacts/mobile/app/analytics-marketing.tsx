@@ -30,7 +30,7 @@ function RevenueBar({ label, valueCents, totalCents, color }: { label: string; v
   const pct = totalCents > 0 ? Math.round((valueCents / totalCents) * 100) : 0;
   return (
     <View style={{ marginBottom: SP.sm + 4 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
         <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground }}>{label}</Text>
         <Text style={{ fontSize: FS.xs, fontFamily: FONT.bold, color: colors.foreground }}>
           {formatCents(valueCents)} <Text style={{ color: colors.subtle }}>({pct}%)</Text>
@@ -52,6 +52,8 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
       onPress={() => { Haptics.selectionAsync(); router.navigate('/(tabs)/marketing' as never); }}
       style={s.rowItem}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`${c.name}, ${formatCents(c.revenueCents)} revenue`}
     >
       <View style={[s.rowIcon, { backgroundColor: typeColor + '22' }]}>
         <Feather name={typeIcon} size={14} color={typeColor} />
@@ -166,12 +168,17 @@ export default function AnalyticsMarketingScreen() {
           <View style={s.heroCard}>
             <Text style={s.heroLabel}>Marketing Revenue</Text>
             <Text style={s.heroValue}>{data.marketingRevenue.formatted}</Text>
-            {typeof data.marketingRevenue.changePct === 'number' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Feather name="trending-up" size={12} color={colors.success} />
-                <Text style={s.heroChange}>+{data.marketingRevenue.changePct.toFixed(1)}% vs prev period</Text>
-              </View>
-            )}
+            {typeof data.marketingRevenue.changePct === 'number' && (() => {
+              const change = data.marketingRevenue.changePct as number;
+              const up = change >= 0;
+              const tone = up ? colors.success : colors.destructive;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.xs }}>
+                  <Feather name={up ? 'trending-up' : 'trending-down'} size={12} color={tone} />
+                  <Text style={[s.heroChange, { color: tone }]}>{up ? '+' : '−'}{Math.abs(change).toFixed(1)}% vs previous period</Text>
+                </View>
+              );
+            })()}
           </View>
 
           {/* Revenue by channel */}
@@ -246,7 +253,8 @@ export default function AnalyticsMarketingScreen() {
         </>
       )}
 
-      <View style={{ height: 120 }} />
+      {/* The stack scene already ends above the floating seller tab bar. */}
+      <View style={{ height: SP.lg }} />
     </ScrollView>
       )}
     </View>
@@ -259,9 +267,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   content:  { paddingHorizontal: SP.md },
   heroCard: { backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg, alignItems: 'center' },
   heroLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: SP.sm },
-  heroValue:{ fontSize: 40, fontFamily: FONT.bold, color: colors.foreground },
+  heroValue:{ fontSize: FS.h1, fontFamily: FONT.bold, color: colors.foreground },
   heroChange:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.success },
-  recoveredRow:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  recoveredRow:{ flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.xs },
   recoveredText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   recoveredAmount:{ fontSize: FS.sm, fontFamily: FONT.bold },
   rowItem:{ flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, gap: SP.sm },

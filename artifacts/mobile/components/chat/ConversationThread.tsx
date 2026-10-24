@@ -1825,7 +1825,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     );
   }
 
-  function openOptions() {
+  function reportParticipant() {
     if (isAgentConv) { openAgentOptions(); return; }
     if (!participant) return;
     router.push(reportHref({
@@ -3838,7 +3838,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   listStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.md },
   listStateTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
   listStateRetry: {
-    height: 36, paddingHorizontal: SP.md, borderRadius: radius.sm,
+    height: 36, paddingHorizontal: SP.md, borderRadius: ControlRadius.sm,
     borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center',
   },

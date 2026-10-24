@@ -132,8 +132,12 @@ export default function MarketingScreen() {
     }, [api, reloadToken]),
   );
 
+  // Brief "copied" check on the tapped row so the copy isn't silent.
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const copyDiscountCode = useCallback(async (code: string) => {
     await Clipboard.setStringAsync(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode((cur) => (cur === code ? null : cur)), 1500);
   }, []);
 
   return (
@@ -173,13 +177,14 @@ export default function MarketingScreen() {
       <TouchableOpacity
         style={[styles.klaviyoBtn, { backgroundColor: klaviyo?.connected ? colors.card : colors.primary, borderColor: colors.border, borderWidth: klaviyo?.connected ? 1 : 0 }]}
         activeOpacity={0.85}
+        accessibilityRole="button"
         onPress={() => {
           router.push('/integrations/klaviyo' as never);
         }}
       >
         <Icon name={klaviyo?.connected ? 'check-circle' : 'zap'} size={16} color={klaviyo?.connected ? colors.success : colors.primaryForeground} />
         <Text style={[styles.klaviyoText, { color: klaviyo?.connected ? colors.foreground : colors.primaryForeground }]}>
-          {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo: Email Marketing & SMS'}
+          {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo for email and SMS'}
         </Text>
       </TouchableOpacity>
 
@@ -198,7 +203,7 @@ export default function MarketingScreen() {
           compact
           icon="tv"
           title="No campaigns yet"
-          description="Create a Meta ad to put your products in front of new buyers."
+          description="Create an ad to put your products in front of new buyers."
           style={styles.emptyFlat}
           action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
             router.push('/design-campaign' as never);
@@ -277,7 +282,7 @@ export default function MarketingScreen() {
                 onPress={() => copyDiscountCode(d.code)}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel={`Copy code ${d.code}`}
+                accessibilityLabel={copiedCode === d.code ? `Code ${d.code} copied` : `Copy code ${d.code}`}
               >
                 <Icon name="copy" size={15} color={colors.mutedForeground} />
               </TouchableOpacity>
@@ -372,6 +377,7 @@ export default function MarketingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerIconBtn: { width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs, minHeight: COMP.headerH },
   pageTitle: { fontSize: FS.xl, fontFamily: FONT.bold, letterSpacing: -0.3, marginBottom: 2 },
   pageSubtitle: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 20 },

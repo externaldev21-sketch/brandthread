@@ -61,8 +61,8 @@ function GoalCard({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
           </View>
         </View>
         <Text style={s.big}>{fmt(goal.actual, goal.metric)}</Text>
-        <Text style={s.meta}>of {fmt(goal.target, goal.metric)}  ·  {Math.round(goal.progressPct)}%</Text>
-        <View style={{ marginVertical: SP.sm + 2 }}><ProgressBar pct={pct} height={8} /></View>
+        <Text style={s.meta}>of {fmt(goal.target, goal.metric)} · {Math.round(goal.progressPct)}%</Text>
+        <View style={{ marginVertical: SP.sm + SP.xs }}><ProgressBar pct={pct} height={8} /></View>
         <Text style={s.meta}>
           {goal.status === 'achieved'
             ? `${fmt(goal.actual - goal.target, goal.metric)} over target.`
@@ -155,14 +155,14 @@ export default function GoalsReport() {
             })}
           </View>
           <Text style={s.fieldLabel}>Period</Text>
-          <SegmentedPills<GoalPeriod> options={GOAL_PERIODS.map(p => ({ key: p.key, label: p.label.replace('This ', '') }))} value={period} onChange={setPeriod} />
+          <SegmentedPills<GoalPeriod> options={GOAL_PERIODS.map(p => ({ key: p.key, label: p.label.replace('This ', '').replace(/^./, c => c.toUpperCase()) }))} value={period} onChange={setPeriod} />
           <Text style={s.fieldLabel}>Target</Text>
           <View style={s.inputWrap}>
             {metric === 'revenue' && <Text style={s.inputPrefix}>$</Text>}
             <TextInput returnKeyType="done"
               value={text}
               onChangeText={setText}
-              keyboardType="decimal-pad"
+              keyboardType={metric === 'revenue' ? 'decimal-pad' : 'number-pad'}
               placeholder={metric === 'revenue' ? '0.00' : '0'}
               placeholderTextColor={colors.mutedForeground}
               style={s.input}
@@ -179,7 +179,7 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   title: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
   statusChip: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: SP.sm, paddingVertical: 3 },
   statusText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.foreground },
-  big: { fontSize: 28, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.5 },
+  big: { fontSize: FS.xxl, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.5 },
   meta: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
   fieldLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: SP.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.md },

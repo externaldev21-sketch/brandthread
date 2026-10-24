@@ -33,14 +33,14 @@ export default function CreatorProgramJoinScreen() {
   const [applied, setApplied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!ref) { setLoading(false); setError('No brand selected'); return; }
+    if (!ref) { setLoading(false); setError('No brand selected.'); return; }
     if (previewOnly) {
       setInfo(isPreviewDemoMode() ? {
         sellerId: 'demo-brand-1', brandName: 'Northline Studio', username: ref, imageUrl: null,
         program: { enabled: true, commissionPercent: 10, buyerDiscountPercent: 10, windowDays: 30, autoApprove: false },
         mine: null, isOwnBrand: false,
       } : null);
-      setError(isPreviewDemoMode() ? null : 'Sign in to join a creator program');
+      setError(isPreviewDemoMode() ? null : 'Sign in to join a creator program.');
       setLoading(false);
       return;
     }
@@ -48,7 +48,7 @@ export default function CreatorProgramJoinScreen() {
       setInfo(await api.affiliate.brand(ref));
       setError(null);
     } catch (e: any) {
-      setError(e?.status === 404 ? 'We couldn\'t find that brand' : 'retry');
+      setError(e?.status === 404 ? 'We couldn\'t find that brand.' : 'retry');
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,10 @@ export default function CreatorProgramJoinScreen() {
         {loading ? <ActivityIndicator color={theme.text} /> : error === 'retry' ? (
           <RetryRow label="Couldn't load this program" onRetry={load} />
         ) : !info ? (
-          <Text style={s.sub}>{error}</Text>
+          <>
+            <Text style={s.sub}>{error}</Text>
+            <ActionButton label="Open creator program" outline onPress={() => router.replace('/creator-program' as any)} />
+          </>
         ) : (
           <>
             <Text style={s.name}>{info.brandName}</Text>

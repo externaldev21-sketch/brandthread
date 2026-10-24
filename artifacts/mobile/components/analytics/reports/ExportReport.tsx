@@ -75,6 +75,7 @@ export default function ExportReport() {
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Export" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: bottom }} showsVerticalScrollIndicator={false}>
+        <SectionTitle>Date range</SectionTitle>
         <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={setRange} />
         <SectionTitle>Include</SectionTitle>
         <Card>
@@ -96,6 +97,7 @@ export default function ExportReport() {
         </Card>
         <SectionTitle>Format</SectionTitle>
         <SegmentedPills<'csv' | 'pdf'> options={[{ key: 'csv', label: 'CSV' }, { key: 'pdf', label: 'PDF' }]} value={format} onChange={setFormat} />
+        {picked.length === 0 && <Text style={s.hint}>Select at least one section to export.</Text>}
         <PrimaryButton label={busy ? 'Preparing…' : `Export ${format.toUpperCase()}`} icon="download" onPress={onExport} loading={busy} disabled={busy || picked.length === 0} />
       </ScrollView>
     </View>

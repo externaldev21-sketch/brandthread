@@ -37,7 +37,12 @@ type Review = {
 function Stars({ rating }: { rating: number }) {
   const { theme } = useAppTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
+    <View
+      style={{ flexDirection: 'row', gap: 2 }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${rating} out of 5 stars`}
+    >
       {[1, 2, 3, 4, 5].map((i) => (
         <Icon
           key={i}
@@ -68,7 +73,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
       setReplyText('');
       onReplySubmitted();
     } catch {
-      Alert.alert('Error', 'Could not post reply. Please try again.');
+      Alert.alert("Couldn't post reply", 'Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -116,6 +121,9 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
           style={s.replyBtn}
           onPress={() => setReplying(true)}
           activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Reply publicly to ${buyerLabel}`}
         >
           <Icon name="message-square" size={13} color={theme.accentLight} />
           <Text style={s.replyBtnText}>Reply publicly</Text>
@@ -134,12 +142,14 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
             numberOfLines={3}
             maxLength={500}
             autoFocus
+            accessibilityLabel="Public reply"
           />
           <View style={s.replyActions}>
             <TouchableOpacity
               style={s.cancelBtn}
               onPress={() => { setReplying(false); setReplyText(''); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
             >
               <Text style={s.cancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -148,11 +158,14 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
               onPress={handleSubmitReply}
               disabled={!replyText.trim() || submitting}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Post reply"
+              accessibilityState={{ disabled: !replyText.trim() || submitting, busy: submitting }}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color={theme.onAccent} />
               ) : (
-                <Text style={s.submitText}>Post Reply</Text>
+                <Text style={s.submitText}>Post reply</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -235,7 +248,7 @@ export default function SellerReviewsScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="My Reviews" />
+      <ScreenHeader title="Reviews" />
 
       {/* Stats strip */}
       {reviews.length > 0 && (
@@ -257,7 +270,7 @@ export default function SellerReviewsScreen() {
           <View style={s.statDivider} />
           <View style={s.stat}>
             <Text style={s.statVal}>{reviews.length - replied}</Text>
-            <Text style={s.statLabel}>Pending</Text>
+            <Text style={s.statLabel}>Awaiting reply</Text>
           </View>
         </View>
       )}
@@ -315,7 +328,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   statLabel:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 
-  scroll:     { padding: 16, paddingBottom: 100, gap: 12 },
+  scroll:     { padding: SP.md, paddingBottom: SP.xl, gap: 12 },
 
   reviewCard: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 12 },
   reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

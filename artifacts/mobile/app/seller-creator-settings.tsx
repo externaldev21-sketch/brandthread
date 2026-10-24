@@ -28,9 +28,9 @@ function Field({ label, value, onChange, suffix, help }: { label: string; value:
           style={{ flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text }}
           accessibilityLabel={label}
         />
-        <Text style={{ fontFamily: FONT.medium, color: theme.muted }}>{suffix}</Text>
+        <Text style={{ fontFamily: FONT.medium, fontSize: FS.base, color: theme.muted }}>{suffix}</Text>
       </View>
-      {help ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 16 }}>{help}</Text> : null}
+      {help ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.xs, lineHeight: 16 }}>{help}</Text> : null}
     </View>
   );
 }
@@ -74,6 +74,9 @@ export default function SellerCreatorSettingsScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const save = async () => {
+    setMsg(null);
+    // Number('') is 0, so an emptied field would otherwise save as 0.
+    if ([commission, discount, windowDays, holdDays, minPayout].some((v) => v.trim() === '')) { setMsg('Enter numbers in every field.'); return; }
     const body = {
       ...(commission !== savedCommission ? { commissionPercent: commission } : {}),
       buyerDiscountPercent: Number(discount),

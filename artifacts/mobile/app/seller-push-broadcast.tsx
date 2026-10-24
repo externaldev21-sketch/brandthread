@@ -39,7 +39,6 @@ export default function SellerPushBroadcastScreen() {
   const api = useApi();
   const router = useRouter();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -110,7 +109,7 @@ export default function SellerPushBroadcastScreen() {
     try {
       setReview(await api.sellerPush.preview(payload));
     } catch (e: any) {
-      setError(e?.message || 'Could not review this message.');
+      setError(e?.message || "Couldn't review this push.");
     } finally { setBusy(false); }
   }
 
@@ -143,10 +142,10 @@ export default function SellerPushBroadcastScreen() {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title="Follower push" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 140 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
           {loading ? <ActivityIndicator color={c.foreground} style={{ marginVertical: 40 }} /> : loadError ? (
             <View style={{ gap: SP.sm }}>
-              <Text style={[styles.note, { color: c.mutedForeground }]}>Couldn't load your push status.</Text>
+              <Text style={[styles.note, { color: c.mutedForeground }]}>Couldn't load follower push.</Text>
               <Button label="Try again" variant="secondary" onPress={() => { setLoading(true); load(); }} />
             </View>
           ) : (

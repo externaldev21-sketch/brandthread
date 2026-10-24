@@ -3,13 +3,13 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { ListRow } from '@/components/ui/ListRow';
 import { SectionHeader } from '@/components/SectionHeader';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, phaseLabel, timeLeft } from '@/lib/sellerEngagement';
 import { canEditGiveaway } from '@/lib/giveawayEditForm';
@@ -19,7 +19,6 @@ export default function SellerGiveawayDetail() {
   const api = useApi();
   const router = useRouter();
   const c = useColors();
-  const insets = useSafeAreaInsets();
   const [g, setG] = useState<any>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -27,6 +26,7 @@ export default function SellerGiveawayDetail() {
   const [redrawFor, setRedrawFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [copied, setCopied] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const load = useCallback(async () => {
     try { setG(await api.sellerGiveaways.get(String(id))); setFailed(false); } catch { setFailed(true); }
@@ -39,7 +39,7 @@ export default function SellerGiveawayDetail() {
     try { const r = await fn(); if (r && r.winners) setG(r); else await load(); } catch (e: any) { setError(e?.message || "Couldn't update the giveaway. Try again."); await load(); } finally { setBusy(null); }
   }
 
-  if (failed) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><Text style={[styles.note, { color: c.mutedForeground, padding: SP.md }]}>Couldn't load this giveaway.</Text></View>;
+  if (failed) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><View style={{ padding: SP.md }}><RetryRow label="Couldn't load this giveaway" onRetry={() => { setFailed(false); setG(null); load(); }} /></View></View>;
   if (!g) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><ActivityIndicator color={c.foreground} style={{ marginTop: 40 }} /></View>;
 
   const active = g.winners.filter((w: any) => w.status === 'active');
@@ -48,11 +48,11 @@ export default function SellerGiveawayDetail() {
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <ScreenHeader title="Giveaway" />
-      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: c.foreground }]}>{g.title}</Text>
         <Text style={[styles.note, { color: c.mutedForeground }]}>{g.prizeText}</Text>
         <Text style={[styles.meta, { color: c.mutedForeground }]}>
-          {phaseLabel(g.phase)}{g.phase === 'live' ? ` · ${timeLeft(g.endsAt)}` : ` · ends ${formatDay(g.endsAt)}`}
+          {phaseLabel(g.phase)}{g.phase === 'live' ? ` · ${timeLeft(g.endsAt)}` : g.phase === 'upcoming' ? ` · starts ${formatDay(g.startsAt)}` : ` · ended ${formatDay(g.endsAt)}`}
         </Text>
 
         <View style={[styles.grid, { borderColor: c.border }]}>
@@ -87,6 +87,7 @@ export default function SellerGiveawayDetail() {
                       style={[styles.input, { color: c.foreground, borderColor: c.border }]} accessibilityLabel="Redraw reason" />
                     <Button label="Redraw this winner" variant="secondary" loading={busy === `redraw${w.id}`} disabled={reason.trim().length < 3}
                       onPress={() => run(`redraw${w.id}`, async () => { const r = await api.sellerGiveaways.redraw(g.id, w.id, reason.trim()); setRedrawFor(null); setReason(''); return r; })} />
+                    <Button label="Cancel" variant="tertiary" size="compact" onPress={() => { setRedrawFor(null); setReason(''); }} />
                   </View>
                 ) : <Button label="Redraw" variant="tertiary" size="compact" onPress={() => setRedrawFor(w.id)} />}
               </View>
@@ -106,7 +107,7 @@ export default function SellerGiveawayDetail() {
             <SectionHeader title="Draw log" />
             {g.draws.map((d: any) => (
               <Text key={d.id} style={[styles.note, { color: c.mutedForeground, marginBottom: 6 }]}>
-                Draw {d.drawNumber} · {new Date(d.drawnAt).toLocaleString('en-US')} · {d.eligibleCount} eligible · fingerprint {d.eligibleHash.slice(0, 12)}{d.reason ? ` · ${d.reason}` : ''}
+                Draw {d.drawNumber} · {new Date(d.drawnAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })} · {d.eligibleCount} eligible · fingerprint {d.eligibleHash.slice(0, 12)}{d.reason ? ` · ${d.reason}` : ''}
               </Text>
             ))}
           </>
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, marginBottom: SP.md },
   cell: { flex: 1, paddingVertical: 18, alignItems: 'center', gap: 4 },
   value: { fontSize: FS.xl, fontFamily: FONT.bold },
-  label: { fontSize: FS.xs, fontFamily: FONT.regular },
+  label: { fontSize: FS.meta, fontFamily: FONT.regular },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: SP.md },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular },
 });

@@ -1,3 +1,4 @@
+import { proUpgradeHref } from '@/lib/proPerks';
 /**
  * Advanced analytics (Pro) — average order value, conversion, repeat buyers,
  * refunds, sales by channel and top customers. Gated by the seller's real
@@ -47,7 +48,7 @@ function ProGate() {
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.md }}>
             Average order value, conversion, repeat buyers, refunds, sales by channel and top customers.
           </Text>
-          <View style={{ width: '100%' }}><PrimaryButton label="See plans" onPress={() => router.push('/plans' as never)} /></View>
+          <View style={{ width: '100%' }}><PrimaryButton label="See plans" onPress={() => router.push(proUpgradeHref('analytics-advanced') as never)} /></View>
         </View>
       </View>
     </View>
@@ -85,7 +86,7 @@ function AdvancedReport() {
           <KpiGrid range={range} items={[
             { key: 'aov', label: 'Average order', value: formatMoney(t!.averageOrderCents), changePct: data.deltas.averageOrderPct, featured: true },
             { key: 'conv', label: 'Conversion', value: `${t!.conversionPct}%`, changePct: data.deltas.conversionPct },
-            { key: 'repeat', label: 'Repeat buyers', value: `${t!.repeatBuyerPct}%`, changePct: null },
+            { key: 'repeat', label: 'Repeat buyers', value: `${t!.repeatBuyerPct}%`, changePct: null, caption: `${formatCompactCount(t!.repeatBuyers)} returning` },
             { key: 'refund', label: 'Refund rate', value: `${t!.refundRatePct}%`, changePct: data.deltas.refundRatePct, invert: true },
           ]} />
 

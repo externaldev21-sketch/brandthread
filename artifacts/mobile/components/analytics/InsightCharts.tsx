@@ -65,7 +65,7 @@ const kpiStyles = (colors: Colors) => StyleSheet.create({
   label: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground },
   value: { fontSize: FS.xl, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.3 },
   deltaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 16 },
-  deltaNone: { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
+  deltaNone: { fontSize: FS.meta, fontFamily: FONT.medium, color: colors.mutedForeground },
   caption: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, flexShrink: 1 },
 });
 
@@ -91,7 +91,8 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
   const levels = [0, 0.5, 1].map(f => Math.round(topVal * f));
   // Gutter sized to the longest axis label so "$1.2k" / "12,000" never clip.
   const yLabelW = allZero ? 24 : Math.max(32, Math.min(72, Math.max(...levels.map(v => fmt(v).length)) * 7 + 10));
-  const plotW = chartWidth - yLabelW;
+  // Right inset keeps the end-of-line dot (r 3.5) from being cut in half by the SVG edge.
+  const plotW = chartWidth - yLabelW - 4;
   const x = (i: number) => yLabelW + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
   const y = (v: number) => top + plotH - (v / topVal) * plotH;
   const linePath = n > 0 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ') : '';

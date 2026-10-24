@@ -6,7 +6,6 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type EmailCampaign, type EmailMarketingStatus } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -36,7 +35,6 @@ export default function EmailCampaignsScreen() {
   const c = useColors();
   const router = useRouter();
   const api = useApi();
-  const insets = useSafeAreaInsets();
   const [campaigns, setCampaigns] = useState<EmailCampaign[] | null>(null);
   const [status, setStatus] = useState<EmailMarketingStatus | null>(null);
   const [error, setError] = useState(false);
@@ -63,8 +61,8 @@ export default function EmailCampaignsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <ScreenHeader title="Email" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 140 }} showsVerticalScrollIndicator={false}>
+      <ScreenHeader title="Email campaigns" />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: SP.xl }} showsVerticalScrollIndicator={false}>
         {status && !status.enabled && (
           <Notice text={status.message ?? 'Email sending isn\'t set up yet. Drafts are saved and nothing is sent.'} />
         )}
@@ -80,7 +78,7 @@ export default function EmailCampaignsScreen() {
         ) : campaigns === null ? (
           <ActivityIndicator color={c.foreground} style={{ marginTop: 24 }} />
         ) : campaigns.length === 0 ? (
-          <Text style={[st.empty, { color: c.mutedForeground }]}>No campaigns yet.</Text>
+          <Text style={[st.empty, { color: c.mutedForeground }]}>No campaigns yet. Tap New campaign to write your first email.</Text>
         ) : (
           campaigns.map((cmp, i) => (
             <View key={cmp.id}>

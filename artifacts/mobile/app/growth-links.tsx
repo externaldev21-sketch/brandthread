@@ -12,9 +12,11 @@ import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Card, AnalyticsSkeleton } from '@/components/analytics/AnalyticsKit';
 import { MetricTiles, dollars } from '@/components/growth/GrowthUI';
-import { listLinks, type TrackedLink } from '@/services/growthService';
+import { listLinks, UTM_PRESETS, type TrackedLink } from '@/services/growthService';
 
 const DEST_LABEL = { store: 'Store', product: 'Product', bio: 'Link in bio' } as const;
+/** "instagram" -> "Instagram", "newsletter" -> "Email": the preset's own label when the source matches one. */
+const sourceLabel = (src: string | null) => UTM_PRESETS.find((p) => p.source === src)?.label ?? src ?? '';
 
 export default function GrowthLinksScreen() {
   const colors = useColors();
@@ -39,7 +41,7 @@ export default function GrowthLinksScreen() {
         <AnalyticsSkeleton kpiCount={3} listRows={3} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: SP.md, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         >
           {links.length === 0 ? (
@@ -62,12 +64,12 @@ export default function GrowthLinksScreen() {
                   key={l.id}
                   onPress={() => router.push(`/growth-link-detail?id=${encodeURIComponent(l.id)}` as never)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open ${l.label || l.utmSource} link`}
+                  accessibilityLabel={`Open ${l.label || sourceLabel(l.utmSource)} link`}
                 >
                   <Card padded>
-                    <Text style={[s.title, { color: colors.foreground }]} numberOfLines={1}>{l.label || `${l.utmSource} · ${l.utmMedium}`}</Text>
+                    <Text style={[s.title, { color: colors.foreground }]} numberOfLines={1}>{l.label || `${sourceLabel(l.utmSource)} · ${l.utmMedium}`}</Text>
                     <Text style={[s.sub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      {DEST_LABEL[l.destinationType]} · {l.utmSource}{l.utmCampaign ? ` · ${l.utmCampaign}` : ''}
+                      {DEST_LABEL[l.destinationType]} · {sourceLabel(l.utmSource)}{l.utmCampaign ? ` · ${l.utmCampaign}` : ''}
                     </Text>
                     <Text style={[s.url, { color: colors.subtle }]} numberOfLines={1}>{l.url}</Text>
                     <View style={[s.stats, { borderTopColor: colors.border }]}>

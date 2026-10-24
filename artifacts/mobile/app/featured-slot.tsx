@@ -40,6 +40,7 @@ import { formatCents } from '@/lib/money';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 import { Button } from '@/components/ui/Button';
 
@@ -80,7 +81,6 @@ export default function FeaturedSlotScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const { text: FG, muted: MUTED } = theme;
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const { isSignedIn } = useAuth();
   const params = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
@@ -180,7 +180,7 @@ export default function FeaturedSlotScreen() {
     } catch (e: any) {
       if (promptUpgradeOnPlanGate(e, router)) return;
       const msg = String(e?.message ?? '');
-      Alert.alert('Featured', msg.includes('already_booked') || msg.includes('409')
+      Alert.alert('Could not start checkout', msg.includes('already_booked') || msg.includes('409')
         ? 'You already have a Featured slot booked or in review.'
         : "Couldn't start checkout. Try again.");
     } finally {
@@ -213,18 +213,20 @@ export default function FeaturedSlotScreen() {
 
   return (
     <View style={s.screen}>
-      <ScreenHeader title="Featured" onBack={goBack} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 140 }}>
+      <ScreenHeader title="Featured on Discover" onBack={goBack} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}>
         {loading ? (
           <View style={s.center}><ActivityIndicator color={FG} /></View>
-        ) : !availability ? null : (
+        ) : !availability ? (
+          <ErrorState message="Couldn't load Featured availability." onRetry={canCallApi ? () => { void load(); } : undefined} />
+        ) : (
           <>
             {open ? (
               <View style={s.card}>
                 <SlotState s={s} slot={open} />
                 <Text style={s.meta}>{formatDay(open.startsAt)} – {formatDay(open.endsAt)} · {open.durationDays} days · {formatCents(open.priceCents)}</Text>
                 {(open.displayState === 'in_review' || open.displayState === 'scheduled' || open.displayState === 'awaiting_payment') && (
-                  <TouchableOpacity style={s.linkBtn} onPress={() => cancel(open)} disabled={cancellingId === open.id} accessibilityRole="button">
+                  <TouchableOpacity style={s.linkBtn} onPress={() => cancel(open)} disabled={cancellingId === open.id} accessibilityRole="button" accessibilityLabel="Cancel Featured slot" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     {cancellingId === open.id ? <ActivityIndicator size="small" color={MUTED} /> : <Text style={s.linkBtnText}>Cancel</Text>}
                   </TouchableOpacity>
                 )}
@@ -240,7 +242,7 @@ export default function FeaturedSlotScreen() {
                       style={[s.option, on && s.optionOn]}
                       onPress={() => setSelected(o.durationDays)}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: on }}
+                      accessibilityState={{ checked: on }}
                       testID={`featured-option-${o.durationDays}`}
                     >
                       <View style={{ flex: 1 }}>
@@ -368,7 +370,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.xs },
   rowLabel: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
   rowValue: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-  note: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: SP.md },
+  note: { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, marginTop: SP.md },
   card: { paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   badge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: FG },
   badgeText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },

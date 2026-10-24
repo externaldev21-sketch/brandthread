@@ -14,8 +14,9 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform, useWind
 import { CachedImage as Image } from '@/components/CachedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useApi } from '@/lib/api';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -52,9 +53,9 @@ interface PreviewDrop {
 }
 
 export default function SellerDropPreview() {
+  const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId: string }>();
@@ -68,6 +69,9 @@ export default function SellerDropPreview() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [reloadKey, setReloadKey] = useState(0);
+
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retry = useCallback(() => { setLoading(true); setLoadAttempt(n => n + 1); }, []);
 
   useEffect(() => {
     let active = true;
@@ -85,7 +89,11 @@ export default function SellerDropPreview() {
     return () => clearInterval(interval);
   }, []);
 
-  const countdown = drop ? computeCountdownParts(drop.releaseAt, now) : null;
+  const countdown = drop?.releaseAt ? computeCountdownParts(drop.releaseAt, now) : null;
+  // computeCountdownParts reports "live" for any past (or missing) launch
+  // time, so a closed/fulfilled drop or an undated draft needs its own line
+  // instead of a misleading LIVE NOW.
+  const isEnded = drop?.status === 'closed' || drop?.status === 'fulfilled';
   const products = drop?.products ?? [];
   const heroUri = drop?.heroVideoUrl || drop?.heroImageUrl || products.flatMap(p => p.images ?? []).find(Boolean);
 
@@ -145,11 +153,15 @@ export default function SellerDropPreview() {
 
           <View style={styles.copy}>
             <Text style={styles.name}>{drop.name}</Text>
-            {countdown?.isLive ? (
+            {isEnded ? (
+              <Text style={styles.countdownText}>Drop closed</Text>
+            ) : !countdown ? (
+              <Text style={styles.countdownText}>No launch date set</Text>
+            ) : countdown.isLive ? (
               <Text style={styles.live}>LIVE NOW</Text>
             ) : (
               <Text style={styles.countdownText}>
-                {countdown ? `${countdown.days}d ${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s` : '—'}
+                {`${countdown.days}d ${countdown.hours}h ${countdown.minutes}m ${countdown.seconds}s`}
               </Text>
             )}
             {!!drop.earlyAccessMinutes && (
