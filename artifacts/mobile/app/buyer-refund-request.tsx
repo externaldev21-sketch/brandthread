@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Platform } from 'react-native';
+  ActivityIndicator, Platform } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +23,8 @@ import {
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
+import { priorRefundedCents, remainingRefundableCents } from '@/lib/refundRemaining';
+import { showAlert } from '@/lib/actionSheet';
 import {
   CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
@@ -75,7 +77,7 @@ export default function BuyerRefundRequestScreen() {
 
   async function pickEvidence() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission required', 'Please allow access to your photo library.'); return; }
+    if (!perm.granted) { showAlert('Allow photo access', 'Turn on photo access in Settings to add photos.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       // POST /api/returns/evidence takes JPEG, PNG or WebP photos only.
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -110,13 +112,16 @@ export default function BuyerRefundRequestScreen() {
     return () => { active = false; };
   }, [orderId, reloadKey]);
 
-  const totalCents = order?.payment.totalCents ?? 0;
+  // What's left after earlier (partial) refunds, never the full total again.
+  const totalCents = order ? remainingRefundableCents(order) : 0;
+  const alreadyRefundedCents = order ? priorRefundedCents(order) : 0;
+  const fullyRefunded = !!order && alreadyRefundedCents > 0 && totalCents === 0;
 
   async function handleSubmit() {
-    if (!order || route === 'closed') return;
+    if (!order || route === 'closed' || fullyRefunded || submitting) return;
     if (route === 'return') {
-      if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
-      if (!description.trim()) { Alert.alert('Add Details', 'Please describe why you are requesting a refund.'); return; }
+      if (!reason) { showAlert('Choose a reason', 'Pick why you’re asking for a refund.'); return; }
+      if (!description.trim()) { showAlert('Add details', 'Describe why you’re asking for a refund.'); return; }
     }
     haptics.light();
     setSubmitting(true);
@@ -135,7 +140,7 @@ export default function BuyerRefundRequestScreen() {
       setSubmitted(true);
     } catch (error) {
       haptics.error();
-      Alert.alert(
+      showAlert(
         route === 'cancel' ? "Couldn't cancel the order" : "Couldn't send your request",
         refundErrorMessage(error, 'Check your connection and try again.'),
       );
@@ -157,7 +162,7 @@ export default function BuyerRefundRequestScreen() {
   if (!order) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request refund" />
         {loadError ? (
           <EmptyState
             icon="wifi-off"
@@ -180,7 +185,7 @@ export default function BuyerRefundRequestScreen() {
   if (submitted && cancelResult) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request Refund" />
+        <ScreenHeader title="Request refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
           <View style={s.successIcon}><Icon name="check" size={32} color={theme.onAccent} /></View>
           <Text style={s.successTitle}>Order cancelled</Text>
@@ -189,7 +194,7 @@ export default function BuyerRefundRequestScreen() {
               ? 'A full refund was issued to your original payment method. It can take 5–10 business days to show on your statement.'
               : 'Nothing was charged for this order.'}
           </Text>
-          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+          <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} style={s.doneBtn} />
         </View>
       </View>
     );
@@ -201,7 +206,7 @@ export default function BuyerRefundRequestScreen() {
         <ScreenHeader title="Request refund" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
           <View style={s.successIcon}><Icon name="check" size={32} color={MEDIA.foreground} /></View>
-          <Text style={s.successTitle}>Refund Request Submitted</Text>
+          <Text style={s.successTitle}>Refund request submitted</Text>
           <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
           <Text style={s.successNote}>We'll notify you when there's an update on your order.</Text>
           <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} style={s.doneBtn} />
@@ -235,13 +240,15 @@ export default function BuyerRefundRequestScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Max refund */}
-        <View style={s.maxCard}>
-          <Text style={s.maxLabel}>{route === 'cancel' ? 'Refund' : 'Maximum possible refund'}</Text>
-          <Text style={s.maxAmount}>{formatCents(totalCents)}</Text>
+        <View style={s.maxCard} testID="refund-max-card">
+          <Text style={s.maxLabel}>{fullyRefunded ? 'Refunded' : route === 'cancel' ? 'Refund' : 'Maximum possible refund'}</Text>
+          <Text style={s.maxAmount}>{formatCents(fullyRefunded ? alreadyRefundedCents : totalCents)}</Text>
           <Text style={s.maxNote}>
-            {route === 'cancel'
-              ? "This order hasn't shipped yet, so it will be cancelled and refunded in full to your original payment method."
-              : 'Actual refund amount is subject to seller and payment provider review. Refunds are not guaranteed until confirmed.'}
+            {fullyRefunded
+              ? 'This order has already been refunded in full, so there’s nothing left to refund.'
+              : `${alreadyRefundedCents > 0 ? `${formatCents(alreadyRefundedCents)} was already refunded on this order. ` : ''}${route === 'cancel'
+                ? "This order hasn't shipped yet, so it will be cancelled and refunded in full to your original payment method."
+                : 'Actual refund amount is subject to seller and payment provider review. Refunds are not guaranteed until confirmed.'}`}
           </Text>
         </View>
 
@@ -262,7 +269,7 @@ export default function BuyerRefundRequestScreen() {
           </View>
         )}
 
-        {route === 'closed' && order && (
+        {route === 'closed' && order && !fullyRefunded && (
           <Text style={s.disclaimer}>
             {order.status === 'disputed'
               ? 'A chargeback is open on this order, so the refund is handled through your card issuer.'
@@ -270,7 +277,7 @@ export default function BuyerRefundRequestScreen() {
           </Text>
         )}
 
-        {route === 'return' && (<>
+        {route === 'return' && !fullyRefunded && (<>
         {/* Reason */}
         <View style={s.card}>
           <Text style={s.sectionTitle}>Refund reason</Text>
@@ -330,7 +337,6 @@ export default function BuyerRefundRequestScreen() {
                     </View>
                   ) : null}
                   <TouchableOpacity
-                    accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: `${MEDIA.background}99`, borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     disabled={photo.state === 'uploading'}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
@@ -352,14 +358,16 @@ export default function BuyerRefundRequestScreen() {
         </>)}
       </ScrollView>
 
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <PrimaryButton
-          label={route === 'cancel' ? 'Cancel order and refund' : 'Submit Refund Request'}
-          onPress={handleSubmit}
-          loading={submitting}
-          disabled={submitting || route === 'closed'}
-        />
-      </View>
+      {fullyRefunded ? null : (
+        <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
+          <PrimaryButton
+            label={route === 'cancel' ? 'Cancel order and refund' : 'Submit refund request'}
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={submitting || route === 'closed'}
+          />
+        </View>
+      )}
     </View>
   );
 }

@@ -43,7 +43,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { createReturnRequest } from '@/services/cartService';
 import { RETURN_REASON_OPTIONS, BuyerReturnReason } from '@/services/cartTypes';
-import { getBuyerOrder } from '@/services/orderService';
+import { getBuyerOrder, mapApiBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -53,6 +53,10 @@ import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableSc
 import { Button } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import { activeReturnFor, isReturnEligible, resolutionForRefundMethod, returnSubmitError, type RefundMethodKey } from '@/lib/returns';
+import { openReturnWindow } from '@/lib/returnWindow';
+import { classifyOrderLoadError, isInvalidOrderId, ORDER_LOAD_FALLBACK } from '@/lib/orderLoadError';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { PhotoViewer } from '@/components/media/PhotoViewer';
 
 const MAX_PHOTOS = 5;
 const MAX_NOTES = 1000;
@@ -131,6 +135,8 @@ export default function BuyerReturnRequestScreen() {
   const api = useApi();
 
   const [phase, setPhase] = useState<Phase>('loading');
+  const [loadErrorMessage, setLoadErrorMessage] = useState(ORDER_LOAD_FALLBACK);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [existingReturnId, setExistingReturnId] = useState<string | null>(null);
   const [createdReturnId, setCreatedReturnId] = useState<string | null>(null);
@@ -150,22 +156,40 @@ export default function BuyerReturnRequestScreen() {
     // actually failed.
     if (isMissingParam(orderId)) { setPhase('notfound'); return; }
     setPhase('loading');
+    setLoadErrorMessage(ORDER_LOAD_FALLBACK);
     try {
       const [loaded, existing, options] = await Promise.all([
         getBuyerOrder(orderId),
         api.returns.listBuyer().then(rows => activeReturnFor(Array.isArray(rows) ? rows : [], orderId)).catch(() => null),
         api.returns.refundOptions().catch(() => null),
       ]);
-      // getBuyerOrder swallows request failures and returns undefined, so an
-      // empty result here can still be a network failure — keep the retryable
-      // error state for it.
       if (options && Array.isArray(options.methods) && options.methods.includes('original')) setRefundMethods(options.methods);
-      if (!loaded) { setPhase('error'); return; }
-      setOrder(loaded);
+      let resolved = loaded;
+      if (!resolved) {
+        // getBuyerOrder swallows request failures and returns undefined, so
+        // ask the API once more to tell a bad link (no such order, 404) from
+        // a request that actually failed (network → retryable error).
+        const preview = isBuyerDevPreview() || isSellerDevPreview();
+        if (isInvalidOrderId(orderId, preview)) { setPhase('notfound'); return; }
+        if (preview) { setPhase('not_found'); return; }
+        try {
+          const row = await api.buyer.orders.get(orderId);
+          if (row?.id) resolved = mapApiBuyerOrder(row);
+        } catch (err) {
+          const failure = classifyOrderLoadError(err);
+          if (failure.kind === 'error') { setLoadErrorMessage(failure.message); setPhase('error'); }
+          else setPhase('not_found');
+          return;
+        }
+        if (!resolved) { setPhase('not_found'); return; }
+      }
+      setOrder(resolved);
       if (existing?.id) { setExistingReturnId(existing.id); setPhase('existing'); return; }
-      setPhase(isReturnEligible(loaded.status) ? 'form' : 'ineligible');
-    } catch {
-      setPhase('error');
+      setPhase(isReturnEligible(resolved.status) ? 'form' : 'ineligible');
+    } catch (err) {
+      const failure = classifyOrderLoadError(err);
+      if (failure.kind === 'error') { setLoadErrorMessage(failure.message); setPhase('error'); }
+      else setPhase('not_found');
     }
   }, [api, orderId]);
 
@@ -255,7 +279,7 @@ export default function BuyerReturnRequestScreen() {
     return (
       <UnavailableScreen
         title="Request a return"
-        heading="Order not found"
+        heading="This return link isn’t valid"
         message="Open a return request from one of your orders."
         icon="package"
         fallback="/(buyer)/orders"
@@ -270,7 +294,7 @@ export default function BuyerReturnRequestScreen() {
         <EmptyState
           icon="wifi-off"
           title="Couldn’t load this order"
-          description="Check your connection and try again."
+          description={loadErrorMessage}
           action={{ label: 'Try again', onPress: () => { void load(); } }}
         />
       </BrandthreadScreen>
@@ -283,8 +307,8 @@ export default function BuyerReturnRequestScreen() {
         {header}
         <EmptyState
           icon="package"
-          title="Order not found"
-          description="This order may have been removed or the link is incomplete."
+          title="We couldn’t find that order"
+          description="It may have been removed, or it belongs to another account."
           action={{ label: 'Go back', onPress: () => goBackOr(router) }}
         />
       </BrandthreadScreen>
@@ -350,7 +374,8 @@ export default function BuyerReturnRequestScreen() {
 
   const items = order?.lineItems ?? [];
   const itemsTotal = items.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0);
-  const returnDeadline = order?.createdAt ? new Date(new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : '';
+  // From delivery when known (else the order date); hidden once it has passed.
+  const returnWindow = openReturnWindow(order);
 
   return (
     <BrandthreadScreen noSafeTop noSafeBottom>
@@ -415,7 +440,16 @@ export default function BuyerReturnRequestScreen() {
           <View style={s.photoGrid}>
             {evidencePhotos.map((uri, idx) => (
               <View key={`${uri}-${idx}`} style={s.photoCell}>
-                <Image cachePolicy="memory-disk" source={{ uri }} style={s.evidenceThumb} accessibilityLabel={`Photo ${idx + 1}`} />
+                <TouchableOpacity
+                  onPress={() => setViewerIndex(idx)}
+                  activeOpacity={0.85}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Photo ${idx + 1}`}
+                  accessibilityHint="Opens the photo full size"
+                  testID={`return-photo-${idx}`}
+                >
+                  <Image cachePolicy="memory-disk" source={{ uri }} style={s.evidenceThumb} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
                   style={s.evidenceRemove}
@@ -436,6 +470,12 @@ export default function BuyerReturnRequestScreen() {
           </View>
           {photoNotice ? <Text style={s.photoNotice}>{photoNotice}</Text> : null}
         </Section>
+        <PhotoViewer
+          visible={viewerIndex !== null}
+          images={evidencePhotos}
+          initialIndex={viewerIndex ?? 0}
+          onClose={() => setViewerIndex(null)}
+        />
 
         <Section title="How do you want your refund?" subtitle={`Up to ${formatCents(itemsTotal)} for these items. The seller confirms the amount.`}>
           {refundMethods.map((method, idx) => (
@@ -453,10 +493,10 @@ export default function BuyerReturnRequestScreen() {
               testID={`refund-method-${method}`}
             />
           ))}
-          {returnDeadline ? (
-            <View style={[s.summaryRow, { marginTop: SP.sm }]}>
+          {returnWindow ? (
+            <View style={[s.summaryRow, { marginTop: SP.sm }]} testID="return-window">
               <Icon name="calendar" size={ICON.sm} color={theme.muted} />
-              <Text style={[s.summarySub, { flex: 1, marginTop: 0 }]}>30-day return window · request by {fmtDate(returnDeadline)}</Text>
+              <Text style={[s.summarySub, { flex: 1, marginTop: 0 }]}>30-day return window · request by {fmtDate(returnWindow.deadline)}</Text>
             </View>
           ) : null}
         </Section>

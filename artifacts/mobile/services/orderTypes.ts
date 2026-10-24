@@ -590,6 +590,8 @@ export interface BuyerOrderView {
   delivery?: BuyerDelivery;
   /** When the buyer's self-cancel closes (seller-set window, item 129); absent on older responses. */
   buyerCancelDeadline?: string | null;
+  /** Already refunded on this order (orders.refunded_cents, GET /api/buyer/orders/:id); absent on older responses. */
+  refundedCents?: number;
   createdAt: string;
 }
 

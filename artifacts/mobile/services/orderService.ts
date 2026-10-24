@@ -713,6 +713,8 @@ export interface BuyerOrderApiRow {
   threadCashAppliedCents?: number | null;
   cancellationNotes?: string | null;
   isCustomerVisible?: boolean | null;
+  /** orders.refunded_cents (part of the delivery columns every buyer order projection selects). */
+  refundedCents?: number | null;
 }
 
 /**
@@ -769,6 +771,7 @@ export function mapApiBuyerOrder(raw: BuyerOrderApiRow | Record<string, unknown>
     hasReturnRequest: false,
     cancellationReason: o.cancellationReason ?? null,
     delivery,
+    ...(typeof o.refundedCents === 'number' && Number.isSafeInteger(o.refundedCents) ? { refundedCents: o.refundedCents } : {}),
     createdAt:          o.createdAt ?? now(),
   };
 }
