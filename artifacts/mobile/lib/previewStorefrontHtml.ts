@@ -65,7 +65,7 @@ export function buildPreviewStorefrontHtml(): string {
     return `<article class="product-card">
       <div class="product-image">${image}</div>
       <div class="product-meta"><span>${escapeHtml(p.name)}</span><span>${formatUsd(p.pricing.priceCents)}</span></div>
-      <button type="button" class="add-to-cart-btn" ${inStock ? '' : 'disabled'}>${inStock ? 'Add to cart' : 'Sold out'}</button>
+      <button type="button" class="add-to-cart-btn" ${inStock ? '' : 'disabled'}>${inStock ? 'Add to bag' : 'Sold out'}</button>
     </article>`;
   }).join('');
 

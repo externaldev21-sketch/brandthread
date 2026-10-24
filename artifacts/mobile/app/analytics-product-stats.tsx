@@ -33,12 +33,12 @@ export default function AnalyticsProductStatsScreen() {
   return (
     <InsightFrame title="Product stats" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={reload} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
-        <EmptyState icon="shopping-bag" title="No product activity" description="Views, add-to-carts and purchases for this period show here." />
+        <EmptyState icon="shopping-bag" title="No product activity" description="Views, add-to-bags and purchases for this period show here." />
       ) : (
         <>
           <KpiGrid range={range} items={[
             { key: 'views', label: 'Product views', value: formatCompactCount(t!.views), changePct: data.deltas.viewsPct, featured: true },
-            { key: 'carts', label: 'Added to cart', value: formatCompactCount(t!.addToCarts), changePct: data.deltas.addToCartsPct },
+            { key: 'carts', label: 'Added to bag', value: formatCompactCount(t!.addToCarts), changePct: data.deltas.addToCartsPct },
             { key: 'buys', label: 'Purchases', value: formatCompactCount(t!.purchases), changePct: data.deltas.purchasesPct },
             { key: 'rev', label: 'Product revenue', value: formatCentsCompact(t!.revenueCents), changePct: data.deltas.revenuePct },
           ]} />
@@ -52,7 +52,7 @@ export default function AnalyticsProductStatsScreen() {
           <Card padded>
             {[
               { label: 'Viewed a product', value: t!.views, rate: null as string | null },
-              { label: 'Added to cart', value: t!.addToCarts, rate: pct(t!.viewToCartPct) },
+              { label: 'Added to bag', value: t!.addToCarts, rate: pct(t!.viewToCartPct) },
               { label: 'Purchased', value: t!.purchases, rate: pct(t!.cartToPurchasePct) },
             ].map((step, i) => (
               <View key={step.label} style={{ marginTop: i ? SP.md : 0 }}>
@@ -76,7 +76,7 @@ export default function AnalyticsProductStatsScreen() {
                   thumbnailUrl={p.imageUrl}
                   icon="shopping-bag"
                   title={p.name}
-                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
+                  subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} bags · ${p.purchases} sold`}
                   value={formatCents(p.revenueCents)}
                   valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}

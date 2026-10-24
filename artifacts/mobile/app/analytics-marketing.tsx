@@ -179,7 +179,7 @@ export default function AnalyticsMarketingScreen() {
             <RevenueBar label="Referrals"  valueCents={data.referralRevenue.value}   totalCents={totalMarketing} color={colors.info} />
             <View style={s.recoveredRow}>
               <Feather name="refresh-cw" size={13} color={colors.success} />
-              <Text style={s.recoveredText}>Abandoned cart recovered:</Text>
+              <Text style={s.recoveredText}>Abandoned bag recovered:</Text>
               <Text style={[s.recoveredAmount, { color: colors.success }]}>{data.abandonedCheckoutRecovered.formatted}</Text>
             </View>
           </Card>

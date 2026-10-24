@@ -1667,7 +1667,7 @@ export default function SellerConversationScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="seller-conversation-buyer-context-btn"
               accessibilityRole="button"
-              accessibilityLabel={`${displayName} — orders and cart`}
+              accessibilityLabel={`${displayName} — orders and bag`}
             >
               <Feather name="clipboard" size={ICON.lg} color={MUTED} />
             </PressableScale>
@@ -2296,7 +2296,7 @@ export default function SellerConversationScreen() {
             <View style={s.buyerContextCartNote}>
               <Feather name="shopping-cart" size={16} color={SUBTLE} />
               <Text style={s.buyerContextCartNoteText}>
-                Cart contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's cart before checkout.
+                Bag contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's bag before checkout.
               </Text>
             </View>
           </ScrollView>

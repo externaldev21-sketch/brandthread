@@ -160,7 +160,7 @@ function CartItemRow({
       icon: 'trash-2',
       color: '#FFFFFF',
       iconColor: '#000000',
-      accessibilityLabel: `Remove ${item.productName} from cart`,
+      accessibilityLabel: `Remove ${item.productName} from bag`,
       onPress: onRemove,
     },
   ], [item.productName, onRemove, onSaveForLater, theme.text]);
@@ -288,7 +288,7 @@ function CartItemRow({
             disabled={isRowBusy}
             noMinHeight
             rippleEnabled={false}
-            accessibilityLabel={`Remove ${item.productName} from cart`}
+            accessibilityLabel={`Remove ${item.productName} from bag`}
             accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
             testID={`cart-remove-${item.id}`}
           >
@@ -551,12 +551,12 @@ function SavedItemRow({ item, onMove, onRemove }: {
         )}
         <View style={si.actions}>
           <Button
-            label="Move to cart"
+            label="Move to bag"
             size="small"
             variant="secondary"
             onPress={onMove}
             disabled={!item.isAvailable}
-            accessibilityHint={`Moves ${item.productName} to cart`}
+            accessibilityHint={`Moves ${item.productName} to bag`}
           />
           <Button
             label="Remove"
@@ -873,7 +873,7 @@ export default function CartScreen() {
     if (groups.length !== 1) {
       Alert.alert(
         'One store at a time',
-        'Rewards can be used when your cart has items from one seller. Check out each seller separately to use points.',
+        'Rewards can be used when your bag has items from one seller. Check out each seller separately to use points.',
       );
       return;
     }
@@ -934,7 +934,7 @@ export default function CartScreen() {
         const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
-          Alert.alert('Review your cart', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
+          Alert.alert('Review your bag', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
           setBusy(false);
           return;
         }
@@ -962,7 +962,7 @@ export default function CartScreen() {
               const sellerLabel = group.sellerName || 'One of the sellers';
               Alert.alert(
                 'Payments unavailable',
-                `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
+                `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your bag.'}`,
                 [{ text: 'OK' }],
               );
               setBusy(false);
@@ -1019,7 +1019,7 @@ export default function CartScreen() {
           this is a screen reached from the feed's cart icon or Shop the
           Post, never its own tab (see BUYER_TAB_BAR_HIDDEN_ROUTES). */}
       <Header
-        title={`Cart${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
+        title={`Bag${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
         showBack
         // Over the page's pure black (no second, lighter band).
         transparent
@@ -1028,7 +1028,7 @@ export default function CartScreen() {
             onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
-            accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
+            accessibilityLabel={editMode ? 'Done editing bag' : 'Edit bag'}
             // Header's compact row already contributes SP.sm (8pt) of its own
             // paddingHorizontal; this adds the remaining 8pt so Edit's right
             // inset totals 16pt — the same as the back chevron's left inset.
@@ -1047,7 +1047,7 @@ export default function CartScreen() {
           <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
             <ThreadIllustration motif="hanger" size={52} color={theme.muted} strokeWidth={4.5} />
           </View>
-          <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
+          <Text style={[s.emptyTitle, { color: theme.text }]}>Your bag is empty</Text>
           <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>
           <Button
             label="Continue shopping"
@@ -1059,7 +1059,7 @@ export default function CartScreen() {
         </View>
       ) : !hasItems && !hasSaved && loadError ? (
         <ErrorState
-          message="Couldn’t load your cart. Check your connection and try again."
+          message="Couldn’t load your bag. Check your connection and try again."
           onRetry={() => { setLoading(true); void load(); }}
           style={{ flex: 1, justifyContent: 'center' }}
         />
@@ -1079,7 +1079,7 @@ export default function CartScreen() {
                 onPress={handleRemoveSelected}
                 loading={removingSelected}
                 disabled={selectedItems.length === 0}
-                accessibilityHint="Removes the selected items from your cart"
+                accessibilityHint="Removes the selected items from your bag"
               />
             </View>
           )}

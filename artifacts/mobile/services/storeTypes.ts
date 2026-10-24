@@ -555,7 +555,7 @@ export const STORE_FEATURES: { value: StoreFeature; label: string; icon: string 
   { value: 'product_recommendations', label: 'Product Recommendations', icon: 'shuffle' },
   { value: 'recently_viewed', label: 'Recently Viewed', icon: 'eye' },
   { value: 'quick_add', label: 'Quick Add', icon: 'plus-circle' },
-  { value: 'sticky_add_to_cart', label: 'Sticky Add to Cart', icon: 'shopping-bag' },
+  { value: 'sticky_add_to_cart', label: 'Sticky Add to Bag', icon: 'shopping-bag' },
   { value: 'pre_order_display', label: 'Pre-order Display', icon: 'calendar' },
   { value: 'low_stock_notice', label: 'Low-stock Notice', icon: 'alert-triangle' },
   { value: 'announcement_bar', label: 'Announcement Bar', icon: 'bell' },

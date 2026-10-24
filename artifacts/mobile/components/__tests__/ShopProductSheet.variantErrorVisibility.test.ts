@@ -39,12 +39,12 @@ describe('ShopProductSheet — a missing-variant error is always visible, not ju
       sheetSource.indexOf('async function handleAddToCart()'),
       sheetSource.indexOf('// Buy now'),
     );
-    expect(addToCartHandler).toContain("rejectMissingVariant('Please select all options before adding to cart.')");
+    expect(addToCartHandler).toContain("rejectMissingVariant('Please select all options before adding to bag.')");
     expect(addToCartHandler).toContain("rejectMissingVariant('Please select a valid combination.')");
     expect(addToCartHandler).toContain("rejectMissingVariant('This combination is out of stock.')");
     // The old direct calls must be gone from this handler — every guard here
     // goes through the scroll-and-mirror path.
-    expect(addToCartHandler).not.toMatch(/setVariantError\('Please select all options before adding to cart\.'\)/);
+    expect(addToCartHandler).not.toMatch(/setVariantError\('Please select all options before adding to bag\.'\)/);
 
     const buyNowHandler = sheetSource.slice(
       sheetSource.indexOf('async function handleBuyNow()'),

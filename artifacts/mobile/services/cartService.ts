@@ -301,7 +301,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     const newQty = existing.quantity + quantity;
     const cap = variant.inventoryQuantity > 0 ? variant.inventoryQuantity : 99;
     if (newQty > cap) {
-      return { success: false, message: `You already have ${existing.quantity} in your cart. Can't add more.`, cart };
+      return { success: false, message: `You already have ${existing.quantity} in your bag. Can't add more.`, cart };
     }
     cart.items[existingIdx] = { ...existing, quantity: newQty };
   } else {
@@ -374,7 +374,7 @@ export async function replaceCartItemVariant(
   const k = keys();
   const cart = await loadCart(k);
   const index = cart.items.findIndex(item => item.id === itemId);
-  if (index < 0) return { success: false, message: 'That cart item is no longer available.', cart };
+  if (index < 0) return { success: false, message: 'That bag item is no longer available.', cart };
   if (!product.isActive || !variant.isAvailable) {
     return { success: false, message: 'The selected variant is no longer available.', cart };
   }
@@ -388,7 +388,7 @@ export async function replaceCartItemVariant(
     const duplicate = cart.items[duplicateIndex];
     const mergedQuantity = duplicate.quantity + quantity;
     if (!product.isPreOrder && mergedQuantity > variant.inventoryQuantity) {
-      return { success: false, message: `You already have ${duplicate.quantity} of this variant in your cart.`, cart };
+      return { success: false, message: `You already have ${duplicate.quantity} of this variant in your bag.`, cart };
     }
     cart.items[duplicateIndex] = { ...duplicate, quantity: mergedQuantity, maxQuantity: variant.inventoryQuantity || 99 };
     cart.items.splice(index, 1);
@@ -775,7 +775,7 @@ export async function applyDiscount(
   if (!sellerId) {
     // No seller context to validate a code against — fail closed rather than
     // accepting an unvalidated code.
-    return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
+    return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your bag before applying a discount code.' };
   }
   const items = Array.isArray(group?.items)
     ? group.items.map((item: CartItem) => ({ productId: item.productId, priceCents: item.priceCents, quantity: item.quantity }))
@@ -820,7 +820,7 @@ export async function applyDiscount(
                 errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
                 errCode === 'ALREADY_USED_BY_CUSTOMER' ? "You've already used this code." :
                 errCode === 'MIN_ORDER_NOT_MET' ? (errMessage || 'Minimum order not met for this code.') :
-                errCode === 'NO_ELIGIBLE_ITEMS' ? 'No items in your cart qualify for this code.' :
+                errCode === 'NO_ELIGIBLE_ITEMS' ? 'No items in your bag qualify for this code.' :
                 errCode === 'INACTIVE' ? 'This code is paused.' :
                 errCode === 'FIRST_ORDER_ONLY' ? 'This code is only valid on your first order with this shop.' :
                 errCode === 'CUSTOMER_LIMIT_REACHED' ? "You've reached the limit for this code." :

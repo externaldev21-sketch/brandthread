@@ -51,7 +51,7 @@ describe('QuantityStepper onRemoveAtMin (cart line: − becomes trash at qty 1)'
     const [dec] = buttons(tree);
     expect(dec.props.disabled).toBe(false);
     expect(icons(tree)[0]).toBe('trash-2');
-    expect(dec.props.accessibilityLabel).toBe('Remove Hoodie from cart');
+    expect(dec.props.accessibilityLabel).toBe('Remove Hoodie from bag');
     act(() => dec.props.onPress());
     expect(onRemove).toHaveBeenCalledTimes(1);
     expect(onChange).not.toHaveBeenCalled();

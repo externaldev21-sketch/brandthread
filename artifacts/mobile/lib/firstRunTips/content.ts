@@ -62,8 +62,8 @@ export const BUYER_DISCOVER_GESTURE: { gesture: GestureKind; title: string; body
 };
 
 export const BUYER_PRODUCT_DETAIL_SPOTLIGHT = {
-  title: 'Add to cart or buy now',
-  body: 'Buy now skips your cart and goes straight to checkout.',
+  title: 'Add to bag or buy now',
+  body: 'Buy now skips your bag and goes straight to checkout.',
 };
 
 export const BUYER_CHECKOUT_STEPS: FirstRunTipStep[] = [

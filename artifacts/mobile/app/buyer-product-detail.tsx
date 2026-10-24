@@ -867,7 +867,7 @@ export default function BuyerProductDetailScreen() {
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
       addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
-      Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+      Alert.alert('Cannot Add to Bag', result.message ?? 'Please try again.');
     }
   }
 
@@ -1017,8 +1017,8 @@ export default function BuyerProductDetailScreen() {
             <IconButton
               name="shopping-bag"
               onPress={() => router.push('/(buyer)/cart' as never)}
-              accessibilityLabel={cartCount > 0 ? `Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open cart'}
-              accessibilityHint="View items in your cart"
+              accessibilityLabel={cartCount > 0 ? `Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open bag'}
+              accessibilityHint="View items in your bag"
               variant="plain"
               color="#FFFFFF"
               style={s.mediaChromeBtn}
@@ -1093,7 +1093,7 @@ export default function BuyerProductDetailScreen() {
                <View style={s.paymentWarningCopy}>
                  <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
                  <Text style={s.paymentWarningText}>
-                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your cart.
+                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your bag.
                  </Text>
                </View>
              </View>
@@ -1435,18 +1435,18 @@ export default function BuyerProductDetailScreen() {
             icon="check"
             variant="secondary"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="In your bag. View cart"
+            accessibilityLabel="In your bag. View bag"
             style={s.buyNowBtn}
             testID="product-view-cart"
           />
         ) : (
           <Button
-            label="Add to cart"
+            label="Add to bag"
             variant="secondary"
             onPress={handleAddToCart}
             loading={addingToCart}
             disabled={addingToCart || launching || (allSelected && !inStock)}
-            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
+            accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
             style={s.buyNowBtn}
             testID="product-add-to-cart"
           />

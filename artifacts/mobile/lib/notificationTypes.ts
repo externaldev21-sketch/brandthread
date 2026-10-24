@@ -16,7 +16,7 @@ export const BUYER_NOTIFICATION_TYPES: NotificationTypeRow[] = [
   { key: 'friend_activity', label: 'Social',                description: 'Follows, likes, and comments' },
   { key: 'new_drops',       label: 'Drops and live',        description: 'Drops and live from brands' },
   { key: 'price_alerts',    label: 'Price and stock',       description: 'Price drops and restocks' },
-  { key: 'cart_reminders',  label: 'Cart reminders',        description: 'Items left in your cart' },
+  { key: 'cart_reminders',  label: 'Bag reminders',         description: 'Items left in your bag' },
 ];
 
 export const SELLER_NOTIFICATION_TYPES: NotificationTypeRow[] = [

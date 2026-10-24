@@ -19,7 +19,7 @@ import { saveExportFile } from '@/lib/saveExportFile';
 
 const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
   { key: 'orders', label: 'Orders', detail: 'One row per order with totals, refunds and location' },
-  { key: 'products', label: 'Products', detail: 'Views, add-to-carts, purchases and revenue per product' },
+  { key: 'products', label: 'Products', detail: 'Views, add-to-bags, purchases and revenue per product' },
   { key: 'analytics', label: 'Analytics', detail: 'Visits, orders, revenue and followers per day' },
   { key: 'content', label: 'Threads and videos', detail: 'Views, engagement and sales per post' },
   { key: 'audience', label: 'Audience', detail: 'Followers, new vs returning, locations, devices' },

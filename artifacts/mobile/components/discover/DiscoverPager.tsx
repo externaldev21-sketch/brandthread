@@ -334,7 +334,7 @@ export function DiscoverPager() {
               <IconButton
                 name="shopping-cart"
                 variant="glass"
-                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
                 onPress={openCart}
                 badge={cartCount}
                 style={styles.glassBtn}
@@ -576,7 +576,7 @@ function DiscoverCard({
         <View style={{ flex: 1 }}>
           <PressableScale
             style={[styles.secondaryBtn, { borderColor: '#FFFFFF55' }]}
-            accessibilityLabel="Add to cart"
+            accessibilityLabel="Add to bag"
             onPress={() => {
               hapticPrimaryAction();
               priceRef.current?.measureInWindow((x, y) => onAddToCart(x, y));
@@ -584,7 +584,7 @@ function DiscoverCard({
           >
             <View ref={priceRef} collapsable={false} style={styles.actionBtnInner}>
               <Feather name="shopping-cart" size={16} color="#FFFFFF" />
-              <Text style={styles.secondaryBtnText}>Add to Cart</Text>
+              <Text style={styles.secondaryBtnText}>Add to Bag</Text>
             </View>
           </PressableScale>
         </View>

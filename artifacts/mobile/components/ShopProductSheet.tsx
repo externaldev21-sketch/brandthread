@@ -782,7 +782,7 @@ export function ShopProductSheet({
   async function handleAddToCart() {
     if (!product) return;
     if (!allOptionsSelected) {
-      rejectMissingVariant('Please select all options before adding to cart.');
+      rejectMissingVariant('Please select all options before adding to bag.');
       return;
     }
     if (!variant) {
@@ -810,7 +810,7 @@ export function ShopProductSheet({
       const newCount = getSuccessfulCartCount(result);
       if (newCount == null) {
         setPhase('ready');
-        setVariantError(result.message ?? 'Could not add to cart.');
+        setVariantError(result.message ?? 'Could not add to bag.');
         return;
       }
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1286,14 +1286,14 @@ export function ShopProductSheet({
                 activeOpacity={0.85}
                 style={[ss.addBtn, (isBusy || (phase !== 'added' && !sizeSelected)) && { opacity: 0.6 }]}
                 accessibilityRole="button"
-                accessibilityLabel={phase === 'added' ? 'View cart' : 'Add to cart'}
+                accessibilityLabel={phase === 'added' ? 'View bag' : 'Add to bag'}
               >
                 {phase === 'adding' ? (
                   <ActivityIndicator color={theme.text} size="small" />
                 ) : (
                   <>
                     <Feather name="shopping-cart" size={17} color={theme.text} />
-                    <Text style={ss.addBtnText}>{phase === 'added' ? 'View cart' : 'Add to cart'}</Text>
+                    <Text style={ss.addBtnText}>{phase === 'added' ? 'View bag' : 'Add to bag'}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1404,10 +1404,10 @@ export function ShopProductSheet({
             onPress={() => { setShowAddedConfirmation(false); handleViewCart(); }}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel="Added to cart. View cart"
+            accessibilityLabel="Added to bag. View bag"
           >
             <Feather name="check" size={15} color={theme.onAccent} />
-            <Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to cart</Text>
+            <Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to bag</Text>
             <Text style={[ss.addedToastDivider, { color: theme.onAccent }]}>·</Text>
             <Text style={[ss.addedToastView, { color: theme.onAccent }]}>View</Text>
           </TouchableOpacity>
@@ -1632,7 +1632,7 @@ function ProductListRow({
         activeOpacity={0.8}
         style={[ss.listRowCartBtn, added && ss.listRowCartBtnAdded, soldOut && ss.listRowCartBtnDisabled]}
         accessibilityRole="button"
-        accessibilityLabel={added ? `${tag.productName} added to cart` : `Add ${tag.productName} to cart`}
+        accessibilityLabel={added ? `${tag.productName} added to bag` : `Add ${tag.productName} to bag`}
       >
         {adding ? (
           <ActivityIndicator size="small" color={theme.text} />

@@ -413,7 +413,7 @@ export default function BuyerCheckoutScreen() {
         // Out of stock / price changed / unavailable — shown inline, not as an alert.
         showError({
           title: 'Some items in your order changed',
-          message: result.issues.map(i => `• ${i.message}`).join('\n') || 'Review your cart and try again.',
+          message: result.issues.map(i => `• ${i.message}`).join('\n') || 'Review your bag and try again.',
         });
         return false;
       }

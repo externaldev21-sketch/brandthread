@@ -202,10 +202,10 @@ export default function LoyaltyScreen() {
           >
              {redeeming
                ? <ActivityIndicator color={theme.onAccent} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }]}>Use points in Cart</Text>
+               : <Text style={[s.redeemBtnText, { color: theme.onAccent }]}>Use points in Bag</Text>
             }
           </TouchableOpacity>
-          <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>
+          <Text style={s.redeemDisabledNote}>Choose your points in Bag when you’re ready to check out.</Text>
           {balance < 100 && (
             <Text style={s.redeemDisabledNote}>You need at least 100 points to redeem.</Text>
           )}

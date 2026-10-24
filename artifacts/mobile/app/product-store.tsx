@@ -491,7 +491,7 @@ export default function ProductStoreScreen() {
         {/* 7. CTA buttons (in scroll) */}
         <View style={s.ctaRow}>
           <PrimaryButton
-            label="Add to cart"
+            label="Add to bag"
             onPress={handleAddToCart}
             icon="shopping-bag"
             style={s.ctaPrimary}
@@ -592,7 +592,7 @@ export default function ProductStoreScreen() {
             style={s.stickyBtnGrad}
           >
             <Feather name="shopping-bag" size={ICON.sm} color={theme.onAccent} />
-            <Text style={[s.stickyBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add to cart</Text>
+            <Text style={[s.stickyBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add to bag</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

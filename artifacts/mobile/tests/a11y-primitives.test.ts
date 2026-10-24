@@ -7,7 +7,7 @@ import {
 describe('iconAccessibilityLabel', () => {
   it.each([
     ['arrow-left', 'Back'], ['x', 'Close'], ['heart', 'Like'], ['send', 'Send'], ['more-horizontal', 'More options'],
-    ['search', 'Search'], ['plus', 'Add'], ['share', 'Share'], ['share-2', 'Share'], ['shopping-bag', 'Cart'],
+    ['search', 'Search'], ['plus', 'Add'], ['share', 'Share'], ['share-2', 'Share'], ['shopping-bag', 'Bag'], ['shopping-cart', 'Bag'],
   ])('maps %s to %s', (icon, label) => {
     expect(iconAccessibilityLabel(icon)).toBe(label);
   });

@@ -62,7 +62,7 @@ export function QuantityStepper({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={removeMode ? `Remove${itemLabel ? ` ${itemLabel}` : ''} from cart` : 'Decrease quantity'}
+        accessibilityLabel={removeMode ? `Remove${itemLabel ? ` ${itemLabel}` : ''} from bag` : 'Decrease quantity'}
         disabled={!canDecrement}
         onPress={decrement}
         style={[styles.btn, sm && styles.btnSm, !canDecrement && styles.disabled]}

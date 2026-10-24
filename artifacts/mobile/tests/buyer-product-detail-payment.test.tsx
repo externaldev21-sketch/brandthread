@@ -411,7 +411,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
        borderColor: '#F9731644',
     });
     expect(textContent(warning)).toContain('Payments unavailable');
-    expect(textContent(warning)).toContain('You can still add this item to your cart.');
+    expect(textContent(warning)).toContain('You can still add this item to your bag.');
 
     const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Payments unavailable' });
     expect(buyNow.props.disabled).toBe(true);
@@ -420,7 +420,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     // The add-to-cart control is an icon-only IconButton (was previously a
     // TouchableOpacity with a visually-hidden "Add to Cart" text node) —
     // both expose the same action via accessibilityLabel.
-    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to cart' });
+    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to bag' });
     expect(addToCart.props.disabled).toBe(false);
 
     await act(async () => {
@@ -442,7 +442,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
       await flushPromises();
     });
 
-    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to cart' });
+    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to bag' });
     expect(addToCart.props.disabled).toBe(false);
 
     await act(async () => {

@@ -173,7 +173,7 @@ export default function BuyerSaved() {
       const product = await getBuyerProduct(item.targetId);
       const variant = product?.variants.find(v => v.isAvailable);
       if (!product || !variant) {
-        Alert.alert('Unavailable', 'This item is no longer available to add to cart.');
+        Alert.alert('Unavailable', 'This item is no longer available to add to bag.');
         return;
       }
       const result = await addToCart({ product, variant, quantity: 1 });
@@ -181,7 +181,7 @@ export default function BuyerSaved() {
         hapticSuccessAction();
         setActionsFor(null);
       } else {
-        Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+        Alert.alert('Cannot Add to Bag', result.message ?? 'Please try again.');
       }
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -385,7 +385,7 @@ export default function BuyerSaved() {
         <View style={styles.actionsContent}>
           <Text style={styles.actionsTitle} numberOfLines={1}>{actionsFor?.title}</Text>
           <ListRow icon="zap" title="Buy Now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
-          <ListRow icon="shopping-cart" title="Add to Cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
+          <ListRow icon="shopping-cart" title="Add to Bag" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
           <ListRow
             icon="folder"
             title="Move to collection"
