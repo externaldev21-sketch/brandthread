@@ -32,6 +32,8 @@ import { FONT, FS } from '@/lib/theme';
 
 export const COMPOSER_PILL_MIN_HEIGHT = 40;
 export const COMPOSER_SEND_SIZE = 32;
+/** Touch target for the send/stop button — Apple HIG minimum 44pt. */
+export const COMPOSER_SEND_HIT_SIZE = 44;
 const LINE_HEIGHT = 20;
 const MAX_LINES = 5;
 const INPUT_V_PAD = 10; // (40 - 20) / 2 → single line is exactly 40px
@@ -172,13 +174,14 @@ export default function Composer({
             <Pressable
               onPress={busy ? onStop : onSend}
               disabled={!showAction || (!busy && !sendable)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={busy ? 'Stop' : 'Send'}
-              style={[styles.send, { backgroundColor: theme.accent }]}
+              style={styles.sendHit}
               testID={`${testID}-send`}
             >
-              <Feather name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />
+              <View style={[styles.send, { backgroundColor: theme.accent }]}>
+                <Feather name={busy ? 'square' : 'arrow-up'} size={busy ? 14 : 18} color={theme.onAccent} />
+              </View>
             </Pressable>
           </Animated.View>
         </View>
@@ -219,6 +222,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,
+  },
+  // The Pressable itself is the >=44pt touch target (react-native-web
+  // ignores hitSlop, which left web with only the drawn circle to hit);
+  // negative margins cancel the extra size so layout and the drawn 32pt
+  // circle stay exactly where they were.
+  sendHit: {
+    width: COMPOSER_SEND_HIT_SIZE,
+    height: COMPOSER_SEND_HIT_SIZE,
+    margin: -(COMPOSER_SEND_HIT_SIZE - COMPOSER_SEND_SIZE) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   send: {
     width: COMPOSER_SEND_SIZE,

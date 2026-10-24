@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, Pressable, Animated, Easing,
-  Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
+  Dimensions, PanResponder, StyleSheet, Modal, FlatList,
   Linking, Platform, Share,
 } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
@@ -55,6 +55,7 @@ import {
 import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { showAlert } from '@/lib/actionSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -296,7 +297,7 @@ export default function BuyerStoryViewer() {
     } catch {
       setLikedSet(prev => { const n = new Set(prev); wasLiked ? n.add(sid) : n.delete(sid); return n; });
       setLikesCounts(prev => ({ ...prev, [sid]: Math.max(0, (prev[sid] ?? 0) + (wasLiked ? 1 : -1)) }));
-      Alert.alert('Could not update like', 'Try again.');
+      showAlert('Could not update like', 'Try again.');
     }
   };
 
@@ -364,7 +365,7 @@ export default function BuyerStoryViewer() {
       if (!override) setInputText('');
       hapticSuccessAction();
     } catch {
-      Alert.alert('Couldn’t send reply', 'Try again.');
+      showAlert('Couldn’t send reply', 'Try again.');
     } finally {
       setSendingReply(false);
     }
@@ -524,7 +525,7 @@ export default function BuyerStoryViewer() {
       } catch (err) {
         const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
         if (body?.stickerState) return body.stickerState;
-        Alert.alert('Could not send your answer', body?.error ?? 'Try again.');
+        showAlert('Could not send your answer', body?.error ?? 'Try again.');
         throw err;
       }
     },
@@ -562,7 +563,7 @@ export default function BuyerStoryViewer() {
       setResponsesOpen(false);
       router.push(`/buyer-conversation?id=${encodeURIComponent(dm.conversationId)}` as never);
     } catch {
-      Alert.alert('Could not open the conversation', 'Try again.');
+      showAlert('Could not open the conversation', 'Try again.');
     }
   };
 
@@ -783,7 +784,7 @@ export default function BuyerStoryViewer() {
             style={({ pressed }) => [styles.productTag, { opacity: pressed ? 0.8 : 1 }]}
             onPress={() => {
               hapticLight();
-              Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
+              showAlert(currentSlide.productTagName ?? 'Product', undefined, [
                 {
                   text: 'Shop',
                   onPress: () => router.push(
@@ -809,7 +810,7 @@ export default function BuyerStoryViewer() {
             onPress={() => {
               setIsPaused(true);
               const author = { userId: currentStory.authorId, name: currentStory.authorName };
-              Alert.alert(currentStory.authorName, undefined, [
+              showAlert(currentStory.authorName, undefined, [
                 ...(slidePeople.length > 0 ? [{
                   text: 'Tagged people',
                   onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
@@ -925,7 +926,7 @@ export default function BuyerStoryViewer() {
               onPress={() => {
                 hapticLight();
                 setIsPaused(true);
-                Alert.alert('Your story', undefined, [
+                showAlert('Your story', undefined, [
                   ...(slidePeople.length > 0 ? [{
                     text: 'Tagged people',
                     onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
@@ -936,7 +937,7 @@ export default function BuyerStoryViewer() {
                       try {
                         const MediaLibrary = getMediaLibrary();
                         if (!MediaLibrary) {
-                          Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+                          showAlert('Unavailable', mediaLibraryUnavailableMessage());
                           return;
                         }
                         const perm = await MediaLibrary.requestPermissionsAsync();
@@ -944,7 +945,7 @@ export default function BuyerStoryViewer() {
                         await MediaLibrary.createAssetAsync(currentSlide.imageUri);
                         hapticSuccessAction();
                       } catch {
-                        Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
+                        showAlert('Couldn’t save', 'Check your photo library permission and try again.');
                       } finally {
                         setIsPaused(false);
                       }
@@ -958,7 +959,7 @@ export default function BuyerStoryViewer() {
                         await api.social.deleteStory(currentStory.id);
                         goBackOr(router);
                       } catch {
-                        Alert.alert('Couldn’t delete', 'Try again.');
+                        showAlert('Couldn’t delete', 'Try again.');
                         setIsPaused(false);
                       }
                     },

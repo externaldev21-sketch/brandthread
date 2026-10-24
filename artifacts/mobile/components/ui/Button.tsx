@@ -28,6 +28,7 @@ import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { getDisabledFilledButtonColors } from '@/lib/disabledButton';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -108,12 +109,16 @@ export function Button({
     onPress(event);
   };
 
+  // Disabled filled buttons get a visible silver-wash surface + hairline
+  // border (lib/disabledButton.ts) — palette.elevated is black on the
+  // default theme, which left a disabled primary as bare grey text.
+  const disabledFilled = getDisabledFilledButtonColors(theme);
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
     switch (variant) {
-      case 'primary': return { bg: isDisabled ? palette.elevated : theme.accent, fg: isDisabled ? palette.mutedForeground : theme.onAccent };
+      case 'primary': return isDisabled ? disabledFilled : { bg: theme.accent, fg: theme.onAccent };
       case 'secondary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : palette.foreground, border: isDisabled ? palette.border : palette.foreground };
       case 'tertiary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : theme.accentLight };
-      case 'destructive': return { bg: isDisabled ? palette.elevated : RED, fg: isDisabled ? palette.mutedForeground : palette.background };
+      case 'destructive': return isDisabled ? disabledFilled : { bg: RED, fg: palette.background };
     }
   })();
 
@@ -145,6 +150,7 @@ export function Button({
           { height, borderRadius: radius.md, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
+          isFilled && isDisabled && { borderWidth: StyleSheet.hairlineWidth, borderColor: variantStyle.border },
           isFilled && !isDisabled && styles.raisedShadow,
           fullWidth && styles.fullWidth,
           isDisabled && !isFilled && { opacity: 0.5 },

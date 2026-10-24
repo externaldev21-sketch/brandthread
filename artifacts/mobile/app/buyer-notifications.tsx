@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
-  View, Text, FlatList, ScrollView,
-  Alert, StyleSheet,
+  View, Text, FlatList, ScrollView, StyleSheet,
 } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Feather } from '@expo/vector-icons';
@@ -30,6 +29,7 @@ import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
+import { showAlert } from '@/lib/actionSheet';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -366,7 +366,7 @@ export default function BuyerNotifications() {
   };
 
   const handleClearRead = () => {
-    Alert.alert('Clear read notifications', 'This will remove all read notifications.', [
+    showAlert('Clear read notifications', 'This will remove all read notifications.', [
       {
         text: 'Clear',
         style: 'destructive',

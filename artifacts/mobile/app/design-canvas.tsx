@@ -22,8 +22,7 @@ import React, {
   useRef, useState, useCallback, useEffect, useMemo,
 } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable,
-  Alert, ScrollView, TextInput, Modal, Dimensions, Share,
+  View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable, ScrollView, TextInput, Modal, Dimensions, Share,
   Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
   LayoutAnimation, UIManager, Linking,
 } from 'react-native';
@@ -141,6 +140,7 @@ import { getColorPickerState, saveColorPickerState } from '@/services/designServ
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
 import { radius } from '@/constants/radii';
+import { showAlert } from '@/lib/actionSheet';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -617,7 +617,7 @@ export default function DesignCanvasScreen() {
         ? await getProject(projectId)
         : await createProject('canvas', 'Untitled Artwork', {});
       if (!proj) {
-        Alert.alert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
+        showAlert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
         return;
       }
       setProject(proj);
@@ -1668,7 +1668,7 @@ export default function DesignCanvasScreen() {
   }
 
   function handleDeleteLayer(id: string) {
-    Alert.alert('Delete Layer', 'This cannot be undone.', [
+    showAlert('Delete Layer', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {
         mutateLayer(prev => prev.filter(l => l.id !== id));
@@ -1695,7 +1695,7 @@ export default function DesignCanvasScreen() {
 
   function handleMergeLayers() {
     const drawingLayers = layers.filter(l => l.type === 'drawing');
-    if (drawingLayers.length < 2) { Alert.alert('Merge', 'Need at least 2 drawing layers.'); return; }
+    if (drawingLayers.length < 2) { showAlert('Merge', 'Need at least 2 drawing layers.'); return; }
     const allPaths = drawingLayers.flatMap(l => (l.data as DesignDrawingLayer).paths);
     const maxOrder = drawingLayers.reduce((m, l) => Math.max(m, l.order), 0);
     const merged: DesignLayer = {
@@ -1788,7 +1788,7 @@ export default function DesignCanvasScreen() {
     const below = findLayerBelow(top);
     if (!below) return;
     if (top.type !== 'drawing' || below.type !== 'drawing') {
-      Alert.alert('Merge down', 'Only two drawing layers can be merged right now.');
+      showAlert('Merge down', 'Only two drawing layers can be merged right now.');
       return;
     }
     const topPaths = (top.data as DesignDrawingLayer).paths;
@@ -1892,7 +1892,7 @@ export default function DesignCanvasScreen() {
       setActiveTopTool('transform'); // see handleAddText's comment — same gap, same fix
       closeSheet();
     } catch {
-      Alert.alert('Error', 'Could not access photo library.');
+      showAlert('Error', 'Could not access photo library.');
     }
   }
 
@@ -1902,7 +1902,7 @@ export default function DesignCanvasScreen() {
     const newH = Number(resizeH.trim());
     if (!Number.isSafeInteger(newW) || !Number.isSafeInteger(newH) ||
         newW < 8 || newH < 8 || newW > 16384 || newH > 16384) {
-      Alert.alert(
+      showAlert(
         'Invalid size',
         'Width and height must be whole pixels between 8 and 16384. The canvas will not be silently downscaled.',
       );
@@ -1938,7 +1938,7 @@ export default function DesignCanvasScreen() {
     setProject(p => p ? { ...p, canvas: { ...p.canvas, width: newW, height: newH } } : p);
     markDirty();
     closeSheet();
-    Alert.alert('Canvas resized', `${newW} × ${newH} px — layer positions scaled proportionally.`);
+    showAlert('Canvas resized', `${newW} × ${newH} px — layer positions scaled proportionally.`);
   }
 
   function handleSetCrop() {
@@ -1956,7 +1956,7 @@ export default function DesignCanvasScreen() {
     };
     setCropRect(newCrop);
     markDirty();
-    Alert.alert(
+    showAlert(
       'Crop guides set',
       `${newCrop.w}×${newCrop.h}px crop will be applied to PNG export and shown as red guides on canvas.`,
     );
@@ -1966,7 +1966,7 @@ export default function DesignCanvasScreen() {
   function handleClearCrop() {
     setCropRect(null);
     markDirty();
-    Alert.alert('Crop cleared', 'Export will use the full canvas dimensions.');
+    showAlert('Crop cleared', 'Export will use the full canvas dimensions.');
   }
 
   // ─── Flip transforms ──────────────────────────────────────────────────────
@@ -2101,7 +2101,7 @@ export default function DesignCanvasScreen() {
   // ─── Cut / Copy / Paste for selected layers ───────────────────────────────
   function handleCut() {
     const selId = selectedLayerId;
-    if (!selId) { Alert.alert('Nothing selected', 'Select a layer first.'); return; }
+    if (!selId) { showAlert('Nothing selected', 'Select a layer first.'); return; }
     const layer = layers.find(l => l.id === selId);
     if (!layer) return;
     setClipboard([layer]);
@@ -2112,7 +2112,7 @@ export default function DesignCanvasScreen() {
 
   function handleCopyLayer() {
     const selId = selectedLayerId;
-    if (!selId) { Alert.alert('Nothing selected', 'Select a layer first.'); return; }
+    if (!selId) { showAlert('Nothing selected', 'Select a layer first.'); return; }
     const layer = layers.find(l => l.id === selId);
     if (!layer) return;
     setClipboard([{ ...layer }]);
@@ -2123,13 +2123,13 @@ export default function DesignCanvasScreen() {
     // Snapshot all current layers as clipboard (does NOT mutate original)
     const snap = JSON.parse(JSON.stringify(layers)) as DesignLayer[];
     setClipboard(snap);
-    Alert.alert('Canvas copied', 'Paste to create a copy of the current composition.');
+    showAlert('Canvas copied', 'Paste to create a copy of the current composition.');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   function handlePaste() {
     if (!clipboard || clipboard.length === 0) {
-      Alert.alert('Nothing to paste', 'Copy or cut a layer first.');
+      showAlert('Nothing to paste', 'Copy or cut a layer first.');
       return;
     }
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
@@ -2156,7 +2156,7 @@ export default function DesignCanvasScreen() {
         multiple: false,
       });
     } catch {
-      Alert.alert('Picker error', 'Could not open the document picker. Try again.');
+      showAlert('Picker error', 'Could not open the document picker. Try again.');
       return;
     }
 
@@ -2169,7 +2169,7 @@ export default function DesignCanvasScreen() {
     // ── Step 1: Strict MIME + extension pair check ───────────────────────────
     const pairResult = validateMimeExtPair(mime || null, asset.name);
     if (!pairResult.ok) {
-      Alert.alert('Unsupported file', pairResult.reason);
+      showAlert('Unsupported file', pairResult.reason);
       return;
     }
 
@@ -2182,14 +2182,14 @@ export default function DesignCanvasScreen() {
         // Step 2: Actual byte-length gate — guards against missing/false metadata.
         const sizeResult = validateJsonByteLength(raw);
         if (!sizeResult.ok) {
-          Alert.alert('File too large', sizeResult.reason);
+          showAlert('File too large', sizeResult.reason);
           return;
         }
 
         // Step 3: Strict JSON + schema validation — no unsafe casts.
         const jsonResult = validateBtJson(raw);
         if (!jsonResult.ok) {
-          Alert.alert('Cannot import', jsonResult.reason);
+          showAlert('Cannot import', jsonResult.reason);
           return;
         }
 
@@ -2204,12 +2204,12 @@ export default function DesignCanvasScreen() {
         mutateLayer(prev => [...prev, ...incoming]);
         markDirty();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
+        showAlert(
           'Imported',
           `${incoming.length} layer${incoming.length === 1 ? '' : 's'} added from "${asset.name}".`,
         );
       } catch (e) {
-        Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
+        showAlert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
       }
       return;
     }
@@ -2223,7 +2223,7 @@ export default function DesignCanvasScreen() {
       const bytes     = new Uint8Array(buf, 0, Math.min(buf.byteLength, 16));
       const magicResult = validateMagicBytes(bytes, mime);
       if (!magicResult.ok) {
-        Alert.alert('Rejected', magicResult.reason);
+        showAlert('Rejected', magicResult.reason);
         return;
       }
 
@@ -2257,7 +2257,7 @@ export default function DesignCanvasScreen() {
       markDirty();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
-      Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
+      showAlert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
     }
   }
 
@@ -2274,7 +2274,7 @@ export default function DesignCanvasScreen() {
       setReferenceVisible(true);
       markDirty();
     } catch {
-      Alert.alert('Error', 'Could not load reference image.');
+      showAlert('Error', 'Could not load reference image.');
     }
   }
 
@@ -2311,10 +2311,10 @@ export default function DesignCanvasScreen() {
       // Flush latest gen first — duplicateProject reads from the persisted project.
       await coordinatedSave();
       const copy = await duplicateProject(project.id);
-      Alert.alert('Saved', `"${copy.name}" saved to your gallery.`);
+      showAlert('Saved', `"${copy.name}" saved to your gallery.`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      Alert.alert('Error', 'Could not save a copy.');
+      showAlert('Error', 'Could not save a copy.');
     }
   }
 
@@ -2352,7 +2352,7 @@ export default function DesignCanvasScreen() {
         };
         triggerWebDownload(asset.uri, `${slug}_product.png`);
         void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        Alert.alert(
+        showAlert(
           'Design downloaded',
           `Your full-resolution PNG (${desc.width}×${desc.height}) has been downloaded. ` +
           'Upload it as the product photo in your Seller dashboard.',
@@ -2370,14 +2370,14 @@ export default function DesignCanvasScreen() {
       };
       const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
       if (mediaSaveResult !== 'saved') {
-        Alert.alert(
+        showAlert(
           mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
           mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
         );
         return;
       }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      Alert.alert(
+      showAlert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
         'Open "Add Product" in the Seller tab and select it as your product photo.',
@@ -2386,7 +2386,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.");
+      showAlert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2411,7 +2411,7 @@ export default function DesignCanvasScreen() {
         };
         triggerWebDownload(asset.uri, `${slug}_post.png`);
         void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        Alert.alert(
+        showAlert(
           'Design downloaded',
           `Full-resolution PNG (${desc.width}×${desc.height}) downloaded. ` +
           'Attach it when composing your Thread post.',
@@ -2429,14 +2429,14 @@ export default function DesignCanvasScreen() {
       };
       const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
       if (mediaSaveResult !== 'saved') {
-        Alert.alert(
+        showAlert(
           mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
           mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
         );
         return;
       }
       void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      Alert.alert(
+      showAlert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
         'Open the Thread composer and select it to create a post.',
@@ -2445,7 +2445,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.");
+      showAlert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2471,7 +2471,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       setSaveStatus('unsaved');
-      Alert.alert(
+      showAlert(
         'Could not save',
         'Your latest edits are still on this screen. Try saving again before leaving.',
       );
@@ -2494,7 +2494,7 @@ export default function DesignCanvasScreen() {
       goBackOr(router);
     } catch {
       setSaveStatus('unsaved');
-      Alert.alert(
+      showAlert(
         'Save failed',
         'Your latest edits have not been saved. Try again before leaving the canvas.',
       );
@@ -2682,7 +2682,7 @@ export default function DesignCanvasScreen() {
         if (sharingAvailable) {
           await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Export ${projectName}`, UTI: uti });
         } else {
-          Alert.alert(
+          showAlert(
             mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
             mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow media-library access in Settings to save the export.',
           );
@@ -2695,7 +2695,7 @@ export default function DesignCanvasScreen() {
         await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Share ${projectName}`, UTI: uti });
       } else {
         const suffix = desc.hasCrop ? ' (cropped)' : '';
-        Alert.alert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
+        showAlert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
       }
 
       await syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
@@ -2703,7 +2703,7 @@ export default function DesignCanvasScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error('[design-canvas] export failed', err);
-      Alert.alert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
+      showAlert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -2755,13 +2755,13 @@ export default function DesignCanvasScreen() {
       };
 
       const available = await Sharing.isAvailableAsync();
-      if (!available) { Alert.alert('Sharing unavailable', 'System share sheet is not available.'); return; }
+      if (!available) { showAlert('Sharing unavailable', 'System share sheet is not available.'); return; }
       await Sharing.shareAsync(asset.uri, { mimeType: 'image/png', dialogTitle: `Share ${projectName}`, UTI: 'public.png' });
       await syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
     } catch (err: unknown) {
       console.error('[design-canvas] share failed', err);
-      Alert.alert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
+      showAlert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -4171,7 +4171,7 @@ export default function DesignCanvasScreen() {
           closeSheet();
           try {
             const perm = await ImagePicker.requestCameraPermissionsAsync();
-            if (!perm.granted) { Alert.alert('Permission required', 'Camera access is needed.'); return; }
+            if (!perm.granted) { showAlert('Permission required', 'Camera access is needed.'); return; }
             const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
             if (result.canceled || !result.assets?.[0]) return;
             const uri = await makeDurableUri(result.assets[0].uri);
@@ -4193,7 +4193,7 @@ export default function DesignCanvasScreen() {
             mutateLayer(prev => [...prev, newLayer]);
             setSelectedLayerId(newLayer.id);
             setActiveTopTool('transform');
-          } catch { Alert.alert('Error', 'Could not take photo.'); }
+          } catch { showAlert('Error', 'Could not take photo.'); }
         }}
         onInsertFile={() => { closeSheet(); setTimeout(() => handleInsertFile(), 100); }}
         onAddText={() => { closeSheet(); openSheet('text'); }}

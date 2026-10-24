@@ -40,6 +40,7 @@ import {
   isSubscriptionPaymentRecoveryRequired,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
+import { friendlyError } from '@/lib/friendlyError';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 // Note: there is no real usage-metrics API in this codebase yet, so the Usage
@@ -201,7 +202,7 @@ export default function SubscriptionScreen() {
         Alert.alert('Only the store owner can do this');
         return;
       }
-      Alert.alert('Checkout error', e?.message ?? 'Could not start checkout. Please try again.');
+      Alert.alert('Checkout error', friendlyError(e, 'Could not start checkout. Please try again.'));
     }
   }
 
@@ -226,7 +227,7 @@ export default function SubscriptionScreen() {
         Alert.alert('Only the store owner can do this');
         return;
       }
-      Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
+      Alert.alert('Portal error', friendlyError(e, 'Could not open billing portal. Please try again.'));
     }
   }
 

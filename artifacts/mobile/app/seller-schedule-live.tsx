@@ -23,6 +23,7 @@ import {
   cancelScheduledLive, combineSchedule, createScheduledLive, fetchMyScheduledLives,
   scheduleDayOptions, scheduleTimeOptions, type ScheduledLive,
 } from '@/lib/live/liveCommerce';
+import { friendlyError } from '@/lib/friendlyError';
 
 export default function SellerScheduleLiveScreen() {
   const { theme } = useAppTheme();
@@ -79,7 +80,7 @@ export default function SellerScheduleLiveScreen() {
       setTitle(''); setDescription(''); setTimeKey(null); setPicked([]); setShowProducts(false);
       await loadMine();
     } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Could not schedule the live. Try again.');
+      setError(friendlyError(e, 'Could not schedule the live. Try again.'));
     } finally {
       setSaving(false);
     }

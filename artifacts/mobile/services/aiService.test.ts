@@ -12,9 +12,19 @@
  *  8. Abort cleanup (AbortError does not corrupt session)
  *  9. Persistence (session survives across loadSession calls)
  * 10. Account switching (different userId gets isolated session)
+ * 11. AI credit gate codes (daily cap / 402) and XHR status 0 classification
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// ─── react-native mock ────────────────────────────────────────────────────────
+// The real package's Flow-typed index can't be parsed by Vitest's ESM loader;
+// the service only touches it transitively (dev-preview / platform checks).
+
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+  Alert: { alert: vi.fn() },
+}));
 
 // ─── AsyncStorage mock ────────────────────────────────────────────────────────
 
@@ -42,6 +52,13 @@ vi.mock('./aiAuditLog', () => ({
   addAuditEntry: () => Promise.resolve(),
 }));
 
+// ─── aiCreditsError spy (real behaviour, observable routing) ──────────────────
+
+vi.mock('../lib/aiCreditsError', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/aiCreditsError')>();
+  return { ...actual, routeAiCreditsRefusal: vi.fn(actual.routeAiCreditsRefusal) };
+});
+
 // ─── fetch mock (controlled per test) ────────────────────────────────────────
 
 let _fetchImpl: ((...args: unknown[]) => Promise<Response>) | null = null;
@@ -60,7 +77,7 @@ function mockFetchOk(body: unknown): void {
   } as unknown as Response);
 }
 
-function mockFetchError(status: number, body: { error?: string } = {}): void {
+function mockFetchError(status: number, body: Record<string, unknown> = {}): void {
   _fetchImpl = () => Promise.resolve({
     ok: false,
     status,
@@ -428,5 +445,106 @@ describe('10. Account switching', () => {
     _resetSessionForTest();
     const sJoined = await loadSession({ screen: 'general' }, 'userX', 'joined');
     expect(sJoined.messages).toHaveLength(0);
+  });
+});
+
+// ─── XHR mock for the streaming path ─────────────────────────────────────────
+
+type FakeXhrOutcome = { status: number; responseText?: string };
+let _xhrOutcome: FakeXhrOutcome | null = null;
+let _lastXhr: FakeXHR | null = null;
+
+class FakeXHR {
+  readyState = 0;
+  status = 0;
+  responseText = '';
+  onreadystatechange: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  open() {}
+  setRequestHeader() {}
+  send() {
+    _lastXhr = this;
+    const outcome = _xhrOutcome;
+    if (!outcome) return; // stays pending until aborted
+    queueMicrotask(() => this.finish(outcome.status, outcome.responseText ?? ''));
+  }
+  abort() {
+    this.finish(0, '');
+  }
+  finish(status: number, responseText: string) {
+    if (this.readyState === 4) return;
+    this.status = status;
+    this.responseText = responseText;
+    this.readyState = 4;
+    this.onreadystatechange?.();
+  }
+}
+
+describe('11. AI credit gate codes and network classification', () => {
+  beforeEach(() => {
+    _xhrOutcome = null;
+    _lastXhr = null;
+    vi.stubGlobal('XMLHttpRequest', FakeXHR);
+  });
+
+  it('a 429 user_daily_cap carries its code and the daily-limit copy, not the rate-limit copy', async () => {
+    const { loadSession, sendMessage, AIServiceError, AI_DAILY_CAP_MESSAGE } = await getService();
+    mockFetchError(429, { error: { code: 'user_daily_cap', message: 'cap' } });
+    const s0 = await loadSession({ screen: 'general' });
+
+    const err = await sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }).catch((e) => e);
+    expect(err).toBeInstanceOf(AIServiceError);
+    expect(err).toMatchObject({ code: 'user_daily_cap', status: 429, message: AI_DAILY_CAP_MESSAGE });
+    expect(err.message).not.toMatch(/rate limit|minute/i);
+  });
+
+  it('a plain 429 without a credits code stays the rate-limit error', async () => {
+    const { loadSession, sendMessage } = await getService();
+    mockFetchError(429, { error: 'slow down' });
+    const s0 = await loadSession({ screen: 'general' });
+
+    await expect(sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }))
+      .rejects.toMatchObject({ code: 'rate_limited', message: expect.stringMatching(/rate limit/i) });
+  });
+
+  it('routes a 402 insufficient_credits through the AI credits surface', async () => {
+    const { loadSession, sendMessage } = await getService();
+    const { routeAiCreditsRefusal } = await import('../lib/aiCreditsError');
+    const body = { code: 'insufficient_credits' };
+    mockFetchError(402, body);
+    const s0 = await loadSession({ screen: 'general' });
+
+    await expect(sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }))
+      .rejects.toMatchObject({ code: 'insufficient_credits', status: 402 });
+    expect(routeAiCreditsRefusal).toHaveBeenCalledWith(402, JSON.stringify(body));
+  });
+
+  it('streaming: a 429 user_daily_cap carries its code', async () => {
+    const { loadSession, sendMessageStream, AI_DAILY_CAP_MESSAGE } = await getService();
+    _xhrOutcome = { status: 429, responseText: JSON.stringify({ code: 'user_daily_cap' }) };
+    const s0 = await loadSession({ screen: 'general' });
+
+    await expect(sendMessageStream({ userText: 'Hi', session: s0, authToken: 'tok' }, () => {}))
+      .rejects.toMatchObject({ code: 'user_daily_cap', message: AI_DAILY_CAP_MESSAGE });
+  });
+
+  it('streaming: XHR status 0 without an abort is a network error, not AbortError', async () => {
+    const { loadSession, sendMessageStream, AI_NETWORK_MESSAGE } = await getService();
+    _xhrOutcome = { status: 0 };
+    const s0 = await loadSession({ screen: 'general' });
+
+    const err = await sendMessageStream({ userText: 'Hi', session: s0, authToken: 'tok' }, () => {}).catch((e) => e);
+    expect(err.name).not.toBe('AbortError');
+    expect(err).toMatchObject({ code: 'network', message: AI_NETWORK_MESSAGE });
+  });
+
+  it('streaming: cancelGeneration still rejects with AbortError', async () => {
+    const { loadSession, sendMessageStream, cancelGeneration } = await getService();
+    const s0 = await loadSession({ screen: 'general' });
+
+    const pending = sendMessageStream({ userText: 'Hi', session: s0, authToken: 'tok' }, () => {});
+    await vi.waitFor(() => expect(_lastXhr).not.toBeNull());
+    cancelGeneration();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   });
 });

@@ -28,7 +28,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   SectionList,
@@ -114,6 +113,7 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 import { radius } from '@/constants/radii';
+import { showAlert } from '@/lib/actionSheet';
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
@@ -725,7 +725,7 @@ export default function ActivityCenterScreen() {
     },
     onFailed: (failed) => {
       restoreRows(failed);
-      Alert.alert('Could not delete', 'Check your connection and try again.');
+      showAlert('Could not delete', 'Check your connection and try again.');
     },
   }), [restoreRows]);
   // Leaving Activity sends a waiting delete now rather than dropping it.
@@ -1038,7 +1038,7 @@ export default function ActivityCenterScreen() {
       if (next) hapticSuccessAction();
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -1098,7 +1098,7 @@ export default function ActivityCenterScreen() {
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
       showToast('Blocked');
     } catch {
-      Alert.alert('Could not block', 'Please try again in a moment.');
+      showAlert('Could not block', 'Please try again in a moment.');
     }
   }, [showToast]);
 
@@ -1138,7 +1138,7 @@ export default function ActivityCenterScreen() {
       setRemoveFollowerTarget(null);
       showToast('Removed');
     } catch {
-      Alert.alert('Could not remove follower', 'Please try again in a moment.');
+      showAlert('Could not remove follower', 'Please try again in a moment.');
     } finally {
       setRemovingFollower(false);
     }
@@ -1157,7 +1157,7 @@ export default function ActivityCenterScreen() {
     } catch {
       setItems(previous);
       setDotIds(previousDots);
-      Alert.alert('Could not mark all as read', 'Check your connection and try again.');
+      showAlert('Could not mark all as read', 'Check your connection and try again.');
     }
   }, []);
 
@@ -1174,7 +1174,7 @@ export default function ActivityCenterScreen() {
         delete next[person.userId];
         return next;
       });
-      Alert.alert('Could not follow', 'Please try again in a moment.');
+      showAlert('Could not follow', 'Please try again in a moment.');
     }
   }, []);
 

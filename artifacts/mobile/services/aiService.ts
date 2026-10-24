@@ -27,6 +27,7 @@ import {
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
 import { getPreviewAiReply } from '../lib/previewAiBrain';
+import { AI_CREDITS_ALERT_COPY, routeAiCreditsRefusal, type AiCreditsErrorKind } from '../lib/aiCreditsError';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,49 @@ export async function clearSession(
   await AsyncStorage.removeItem(key);
 }
 
+// ─── Errors ───────────────────────────────────────────────────────────────────
+
+export type AIServiceErrorCode = AiCreditsErrorKind | 'auth' | 'rate_limited' | 'unavailable' | 'network' | 'http';
+
+/** A failed AI request, carrying the server's error code so the UI can pick copy. */
+export class AIServiceError extends Error {
+  constructor(message: string, public readonly code: AIServiceErrorCode, public readonly status?: number) {
+    super(message);
+    this.name = 'AIServiceError';
+  }
+}
+
+export const AI_DAILY_CAP_MESSAGE = 'Daily limit reached - resets tomorrow';
+export const AI_NO_CREDITS_MESSAGE = "You're out of AI credits — add more to keep going.";
+export const AI_NETWORK_MESSAGE = "Couldn't reach Brandthread AI.";
+
+/**
+ * Maps a non-2xx AI response to an AIServiceError. The AI credit gate's
+ * refusals keep their code (a 429 `user_daily_cap` is a daily cap, not the
+ * per-minute rate limit), and a 402 is routed to the AI credits screen.
+ */
+function aiHttpError(status: number, body: string): AIServiceError {
+  const creditsKind = routeAiCreditsRefusal(status, body);
+  if (creditsKind === 'insufficient_credits') return new AIServiceError(AI_NO_CREDITS_MESSAGE, creditsKind, status);
+  if (creditsKind === 'user_daily_cap') return new AIServiceError(AI_DAILY_CAP_MESSAGE, creditsKind, status);
+  if (creditsKind === 'global_daily_cap') return new AIServiceError(AI_CREDITS_ALERT_COPY.global_daily_cap.message, creditsKind, status);
+  if (status === 401 || status === 403) {
+    return new AIServiceError('Authentication error. Please sign in again.', 'auth', status);
+  }
+  if (status === 429) {
+    return new AIServiceError('Rate limit reached — please wait a moment and try again.', 'rate_limited', status);
+  }
+  if (status >= 500) {
+    return new AIServiceError('AI service is temporarily unavailable. Please try again shortly.', 'unavailable', status);
+  }
+  let serverMessage: string | undefined;
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown };
+    if (typeof parsed?.error === 'string') serverMessage = parsed.error;
+  } catch { /* non-JSON body */ }
+  return new AIServiceError(serverMessage ?? `AI request failed (${status}).`, 'http', status);
+}
+
 // ─── API call ─────────────────────────────────────────────────────────────────
 
 /**
@@ -225,17 +269,8 @@ async function callAI(
   });
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Authentication error. Please sign in again.');
-    }
-    if (res.status === 429) {
-      throw new Error('Rate limit reached — please wait a moment and try again.');
-    }
-    if (res.status === 503 || res.status === 502) {
-      throw new Error('AI service is temporarily unavailable. Please try again shortly.');
-    }
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `AI request failed (${res.status}).`);
+    const body = await res.text().catch(() => '');
+    throw aiHttpError(res.status, body);
   }
 
   return res.json() as Promise<AIChatResponse>;
@@ -271,8 +306,14 @@ function callAIStream(
     let buffer = '';
     let fullContent = '';
     let settled = false;
+    // XHR reports both a cancelled request and a network failure as status
+    // 0, so remember whether *we* aborted to tell the two apart.
+    let aborted = false;
 
-    const onAbort = () => xhr.abort();
+    const onAbort = () => {
+      aborted = true;
+      xhr.abort();
+    };
     signal.addEventListener('abort', onAbort);
     const cleanup = () => signal.removeEventListener('abort', onAbort);
 
@@ -315,16 +356,12 @@ function callAIStream(
       if (xhr.readyState === 4 && !settled) {
         settled = true;
         cleanup();
-        if (xhr.status === 401 || xhr.status === 403) {
-          reject(new Error('Authentication error. Please sign in again.'));
-        } else if (xhr.status === 429) {
-          reject(new Error('Rate limit reached — please wait a moment and try again.'));
-        } else if (xhr.status === 0) {
-          reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
-        } else if (xhr.status >= 500 || xhr.status === 502 || xhr.status === 503) {
-          reject(new Error('AI service is temporarily unavailable. Please try again shortly.'));
+        if (xhr.status === 0) {
+          reject(aborted || signal.aborted
+            ? Object.assign(new Error('Request aborted'), { name: 'AbortError' })
+            : new AIServiceError(AI_NETWORK_MESSAGE, 'network', 0));
         } else if (xhr.status !== 200) {
-          reject(new Error(`AI request failed (${xhr.status}).`));
+          reject(aiHttpError(xhr.status, xhr.responseText ?? ''));
         } else {
           // Stream ended without an explicit "done" event — use what we have.
           resolve({ content: fullContent });
@@ -335,7 +372,9 @@ function callAIStream(
       if (settled) return;
       settled = true;
       cleanup();
-      reject(new Error("Couldn't reach Brandthread AI."));
+      reject(aborted || signal.aborted
+        ? Object.assign(new Error('Request aborted'), { name: 'AbortError' })
+        : new AIServiceError(AI_NETWORK_MESSAGE, 'network', 0));
     };
 
     xhr.open('POST', `${apiBase}/api/v1/ai/chat/stream`);

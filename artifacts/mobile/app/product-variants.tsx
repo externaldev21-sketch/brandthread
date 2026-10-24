@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Pressable,
+  View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import {
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { showAlert } from '@/lib/actionSheet';
 
 interface Axis { name: string; values: string[] }
 interface Variant {
@@ -138,9 +139,9 @@ export default function ProductVariantsScreen() {
     if (!clean) return;
     const key = clean.toLowerCase() === 'color' ? 'colour' : clean.toLowerCase();
     if (axes.some((a) => (a.name.toLowerCase() === 'color' ? 'colour' : a.name.toLowerCase()) === key)) {
-      Alert.alert('Already added', `${clean} is already an option.`); return;
+      showAlert('Already added', `${clean} is already an option.`); return;
     }
-    if (axes.length >= 5) { Alert.alert('Limit reached', 'A product can have up to 5 options.'); return; }
+    if (axes.length >= 5) { showAlert('Limit reached', 'A product can have up to 5 options.'); return; }
     setAxes((prev) => [...prev, { name: clean.slice(0, 40), values: [] }]);
     setAddingAxis(false); setNewAxisName('');
   }
@@ -148,20 +149,20 @@ export default function ProductVariantsScreen() {
   async function generate() {
     if (!productId) return;
     const usable = axes.filter((a) => a.values.length > 0);
-    if (usable.length === 0) { Alert.alert('Add option values', 'Add at least one value to an option first.'); return; }
+    if (usable.length === 0) { showAlert('Add option values', 'Add at least one value to an option first.'); return; }
     const price = variants.length === 0 ? toCents(genPrice) : (toCents(genPrice) ?? undefined);
-    if (price === null) { Alert.alert('Price needed', 'Enter the price each new variant starts with.'); return; }
+    if (price === null) { showAlert('Price needed', 'Enter the price each new variant starts with.'); return; }
     const stock = toInt(genStock);
-    if (stock === null) { Alert.alert('Stock', 'Enter a whole number for starting stock.'); return; }
+    if (stock === null) { showAlert('Stock', 'Enter a whole number for starting stock.'); return; }
     setBusy('generate');
     try {
       await api.productVariants.putAxes(productId, usable);
       const result = await api.productVariants.generate(productId, { ...(price !== undefined ? { priceCents: price } : {}), stock });
       applyState(result);
       setEdits({});
-      if (result.created === 0) Alert.alert('Up to date', 'Every combination already exists.');
+      if (result.created === 0) showAlert('Up to date', 'Every combination already exists.');
     } catch (err) {
-      Alert.alert("Couldn't generate variants", errText(err, 'Try again.'));
+      showAlert("Couldn't generate variants", errText(err, 'Try again.'));
     } finally {
       setBusy(null);
     }
@@ -178,9 +179,9 @@ export default function ProductVariantsScreen() {
       const e = edits[id]; const current = variants.find((v) => v.id === id);
       if (!current) continue;
       const u: (typeof updates)[number] = { variantId: id };
-      if (e.price !== undefined) { const c = toCents(e.price); if (c === null) { Alert.alert('Price', 'Enter a price above 0.'); return; } if (c !== current.priceCents) u.priceCents = c; }
-      if (e.stock !== undefined) { const n = toInt(e.stock); if (n === null) { Alert.alert('Stock', 'Stock must be a whole number.'); return; } if (n !== current.stock) u.stock = n; }
-      if (e.low !== undefined) { const n = toInt(e.low); if (n === null) { Alert.alert('Low-stock level', 'Use a whole number.'); return; } if (n !== current.lowStockThreshold) u.lowStockThreshold = n; }
+      if (e.price !== undefined) { const c = toCents(e.price); if (c === null) { showAlert('Price', 'Enter a price above 0.'); return; } if (c !== current.priceCents) u.priceCents = c; }
+      if (e.stock !== undefined) { const n = toInt(e.stock); if (n === null) { showAlert('Stock', 'Stock must be a whole number.'); return; } if (n !== current.stock) u.stock = n; }
+      if (e.low !== undefined) { const n = toInt(e.low); if (n === null) { showAlert('Low-stock level', 'Use a whole number.'); return; } if (n !== current.lowStockThreshold) u.lowStockThreshold = n; }
       if (e.sku !== undefined && e.sku.trim() !== current.sku) u.sku = e.sku.trim();
       if (Object.keys(u).length > 1) updates.push(u);
     }
@@ -190,7 +191,7 @@ export default function ProductVariantsScreen() {
       applyState(await api.productVariants.bulkUpdate(productId, updates));
       setEdits({});
     } catch (err) {
-      Alert.alert("Couldn't save variants", errText(err, 'Nothing was changed. Try again.'));
+      showAlert("Couldn't save variants", errText(err, 'Nothing was changed. Try again.'));
     } finally {
       setBusy(null);
     }
@@ -201,8 +202,8 @@ export default function ProductVariantsScreen() {
     const low = lowDefaultText.trim() === '' ? null : toInt(lowDefaultText);
     const edition = editionText.trim() === '' ? null : toInt(editionText);
     const counter = counterText.trim() === '' ? null : toInt(counterText);
-    if (lowDefaultText.trim() !== '' && low === null) { Alert.alert('Low-stock default', 'Use a whole number.'); return; }
-    if (rules.limitedQuantityEnabled && (edition === null || edition < 1)) { Alert.alert('Edition size', 'Enter how many units the edition has.'); return; }
+    if (lowDefaultText.trim() !== '' && low === null) { showAlert('Low-stock default', 'Use a whole number.'); return; }
+    if (rules.limitedQuantityEnabled && (edition === null || edition < 1)) { showAlert('Edition size', 'Enter how many units the edition has.'); return; }
     setBusy('rules');
     try {
       const saved = await api.productVariants.putStockRules(productId, {
@@ -214,9 +215,9 @@ export default function ProductVariantsScreen() {
       setApplyLow(false);
       // A switch to hide/archive can change the product's status right away; refresh silently.
       api.productVariants.get(productId).then((d: any) => { setVariants(d.variants ?? []); }).catch(() => undefined);
-      Alert.alert('Saved', 'Stock rules updated.');
+      showAlert('Saved', 'Stock rules updated.');
     } catch (err) {
-      Alert.alert("Couldn't save stock rules", errText(err, 'Try again.'));
+      showAlert("Couldn't save stock rules", errText(err, 'Try again.'));
     } finally {
       setBusy(null);
     }

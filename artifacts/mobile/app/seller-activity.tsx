@@ -11,7 +11,7 @@
  * the unread dot on the bell clears; rows keep their own dot for this visit.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 
@@ -59,6 +59,7 @@ import {
   markPreviewActivityDismissed,
 } from '@/lib/previewActivity';
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
+import { showAlert } from '@/lib/actionSheet';
 
 export default function SellerActivityScreen() {
   const { theme } = useAppTheme();
@@ -126,7 +127,7 @@ export default function SellerActivityScreen() {
     },
     onFailed: (failed) => {
       restoreRows(failed);
-      Alert.alert('Could not delete', 'Check your connection and try again.');
+      showAlert('Could not delete', 'Check your connection and try again.');
     },
   }), [restoreRows]);
   const deferredDeleteRef = useRef(deferredDelete);
@@ -297,7 +298,7 @@ export default function SellerActivityScreen() {
       if (next) hapticSuccessAction();
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -351,7 +352,7 @@ export default function SellerActivityScreen() {
               setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
               showToast('Blocked');
             })
-            .catch(() => Alert.alert('Could not block', 'Please try again in a moment.'));
+            .catch(() => showAlert('Could not block', 'Please try again in a moment.'));
         },
       });
     }

@@ -17,6 +17,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { LiveCohostCandidate, LiveCohostPerson } from '@/lib/live/moderationTypes';
+import { friendlyError } from '@/lib/friendlyError';
 
 const DEMO_CANDIDATES: LiveCohostCandidate[] = [
   { userId: 'demo-1', username: 'atelier.nord', displayName: 'Atelier Nord', avatarUrl: null, followed: true },
@@ -77,7 +78,7 @@ export default function LiveCohostScreen() {
       await api.liveCohost.invite(streamId, seller.userId);
     } catch (e: any) {
       setInvited((prev) => { const n = new Set(prev); n.delete(seller.userId); return n; });
-      Alert.alert('Couldn’t invite', e?.message ?? 'Try again.');
+      Alert.alert('Couldn’t invite', friendlyError(e, 'Try again.'));
     }
   }
 
