@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
 
   followRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, marginTop: SP.lg },
   followTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
-  followSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  followSubtitle: { fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 2 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: SP.lg },
   item: { width: '23%', alignItems: 'center' },

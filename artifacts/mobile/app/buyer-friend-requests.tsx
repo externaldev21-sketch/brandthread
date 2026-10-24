@@ -384,9 +384,10 @@ export default function BuyerFriendRequestsScreen() {
         refreshControl={pull.refreshControl}
         contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge + SPACING.xxl }}
       >
+        {/* A failed load shows the retry row instead of the tab's empty state, which would contradict it. */}
         {loadFailed && !loading && incoming.length === 0 && sent.length === 0 && suggestions.length === 0 ? (
           <View style={{ padding: SPACING.md }}><RetryRow label="Couldn't load people" onRetry={() => { void loadData(); }} /></View>
-        ) : null}
+        ) : (<>
         {CONTACT_SYNC_ENABLED && (
           <PressableScale
             testID="find-from-contacts"
@@ -403,6 +404,7 @@ export default function BuyerFriendRequestsScreen() {
         {tab === 'incoming'  && renderIncoming()}
         {tab === 'sent'      && renderSent()}
         {tab === 'suggested' && renderSuggested()}
+        </>)}
       </ScrollView>
     </View>
   );

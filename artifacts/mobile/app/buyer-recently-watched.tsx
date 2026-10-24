@@ -176,7 +176,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   details: { flex: 1, gap: 4 },
   caption: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
   author: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm },
-  time: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs },
+  time: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta },
   footer: { paddingVertical: SP.lg },
   retry: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
 });
