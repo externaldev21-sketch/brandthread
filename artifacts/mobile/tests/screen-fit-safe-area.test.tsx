@@ -338,7 +338,6 @@ describe('no file introduces a too-low web top-inset floor (the useHeaderTopInse
  */
 const ALLOWED_RAW_TOP_INSET_USES: Record<string, string> = {
   'app/buyer-checkout.tsx': 'out of scope — a separate effort owns the checkout flow',
-  'app/camera-capture.tsx': 'full-bleed native camera chrome; its one header row already floors via Math.max(insets.top, 54)',
   'app/live.tsx': "TabPageHeader's own documented 67pt web fallback for the LIVE tab header, not a stack-screen header",
   'components/security/AppLockGate.tsx': 'native-only past its own early return — the file never renders on web, so insets.top is always the real device value',
   'app/onboarding.tsx': "the decorative ThreadWeave background animation's position, not a header",

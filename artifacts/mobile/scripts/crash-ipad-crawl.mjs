@@ -32,11 +32,11 @@ const BUYER = [
   '/buyer-saved', '/buyer-archive', '/buyer-notifications', '/buyer-settings', '/buyer-addresses',
   '/buyer-payment-methods', '/buyer-problem-report', '/buyer-report', '/buyer-blocked', '/delete-account',
   '/help', '/privacy', '/terms', '/thread-explainer', '/plans', '/buyer-live', '/buyer-story-viewer',
-  '/buyer-story-create', '/call-screen', '/share-profile', '/buyer-qr-code',
+  '/buyer-story-create', '/call-screen', '/buyer-qr-code',
 ];
 const SELLER = [
   '/(tabs)', '/(tabs)/studio', '/(tabs)/products', '/(tabs)/orders', '/(tabs)/analytics', '/(tabs)/marketing',
-  '/(tabs)/profile', '/seller-settings', '/manufacturer-hub', '/create-post', '/camera-capture', '/design',
+  '/(tabs)/profile', '/seller-settings', '/manufacturer-hub', '/create-post', '/design',
   '/design-canvas', '/ai-studio', '/store-builder', '/store-preview', '/product-editor', '/add-product',
   '/inventory', '/finance', '/payouts', '/seller-inbox', '/seller-go-live', '/seller-live',
   '/seller-verification', '/subscription', '/billing', '/share-store', '/post-analytics', '/app-theme',

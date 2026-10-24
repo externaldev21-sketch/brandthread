@@ -4103,7 +4103,7 @@ function FeedScreenContent({
                   router.push('/(buyer)/cart' as never);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
               >
                 <Icon name="shopping-cart" size={22} color={ON_DARK} />
                 {cartCount > 0 && (
@@ -4160,7 +4160,7 @@ function FeedScreenContent({
                     router.push('/(buyer)/cart' as never);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                  accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
                   hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                   testID="buyer-home-cart-icon"
                 >
@@ -4271,7 +4271,7 @@ function FeedScreenContent({
                 router.push('/(buyer)/cart' as never);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+              accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
             >
               <Icon name="shopping-cart" size={20} color={ON_DARK} />
               {cartCount > 0 && (

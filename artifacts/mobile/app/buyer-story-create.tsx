@@ -508,7 +508,7 @@ export default function StoryComposer() {
   const api = useApi();
   // The real signed-in role (seller preview counts as seller — RoleContext
   // handles that), NOT an `accountType` route param: every seller entry
-  // point (camera-capture.tsx, create-post.tsx) pushes this route with no
+  // point (create-post.tsx) pushes this route with no
   // such param, so a seller landed here always saw POST/STORY only — LIVE
   // never showed no matter the account, and a seller's story/post got
   // attributed as `authorAccountType: 'buyer'`. Used for every seller-only

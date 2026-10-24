@@ -364,7 +364,7 @@ describe('DiscoverPager — cart badge', () => {
     });
 
     const r = await render(<DiscoverPager />);
-    const cartBtn = r.root.findByProps({ accessibilityLabel: 'Open cart, 5 items' });
+    const cartBtn = r.root.findByProps({ accessibilityLabel: 'Open bag, 5 items' });
     expect(cartBtn).toBeTruthy();
     r.unmount();
   });
@@ -382,7 +382,7 @@ describe('DiscoverPager — add to cart', () => {
     addToCartMock.mockResolvedValue({ success: true, cart: { items: [{ quantity: 1 }] } });
 
     const r = await render(<DiscoverPager />);
-    const addBtn = r.root.findByProps({ accessibilityLabel: 'Add to cart' });
+    const addBtn = r.root.findByProps({ accessibilityLabel: 'Add to bag' });
     await act(async () => {
       addBtn.props.onPress();
       await Promise.resolve();

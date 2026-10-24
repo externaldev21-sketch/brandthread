@@ -288,6 +288,6 @@ export const SCREEN_PROMPTS: Partial<Record<AIScreenContext['screen'], string[]>
   content:          ['Give me five hooks for this product', 'Write a premium caption', 'Create a 7-day content plan', 'Which product should I post next?'],
   inventory:        ['What should I restock?', 'Predict stockout risks', 'Identify dead stock', 'Compare my warehouse locations'],
   manufacturer_hub: ['Which quote is best value?', 'Draft a counteroffer', 'Summarize production status', 'What should I ask before accepting?'],
-  marketing:        ['Generate an email campaign', 'Recommend the best segment to target', 'Create an abandoned-cart sequence', 'Write five subject lines'],
+  marketing:        ['Generate an email campaign', 'Recommend the best segment to target', 'Create an abandoned-bag sequence', 'Write five subject lines'],
   customers:        ['Who are my VIP customers?', 'Identify at-risk customers', 'Suggest a win-back campaign', 'Summarize customer behavior'],
 };

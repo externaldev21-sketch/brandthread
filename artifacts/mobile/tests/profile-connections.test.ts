@@ -22,9 +22,16 @@ describe('buyer protection shown wherever a buyer commits money', () => {
     const preorderLines = buyerProtectionLines({ preorder: true });
     expect(preorderLines).toHaveLength(2);
     for (const text of preorderLines) expect(text).not.toContain('[');
-    // Heading reuses the existing buyer-settings purchase protection label.
-    expect(read('app/buyer-settings-detail.tsx')).toContain(`label: '${BUYER_PROTECTION_TITLE}'`);
-    expect(read('app/buyer-settings-detail.tsx')).toContain(`value: '${BUYER_PROTECTION_STATUS}'`);
+    // The heading is the purchase protection label, rendered by the shared note.
+    expect(BUYER_PROTECTION_TITLE).toBe('Purchase protection');
+    expect(BUYER_PROTECTION_STATUS).toBe('Brandthread protected');
+    const note = read('components/BuyerProtectionNote.tsx');
+    expect(note).toContain('{BUYER_PROTECTION_TITLE} · {BUYER_PROTECTION_STATUS}');
+    expect(note).toContain('>{BUYER_PROTECTION_TITLE}</Text>');
+    expect(note).toContain('>{BUYER_PROTECTION_STATUS}</Text>');
+    // The unlinked buyer-settings "payments" section that also showed this
+    // label (next to fake "1 saved" / "On" values) was removed.
+    expect(read('app/buyer-settings-detail.tsx')).not.toContain(BUYER_PROTECTION_TITLE);
   });
 
   it('renders the same note on product detail, checkout, and order detail', () => {

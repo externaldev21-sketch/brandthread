@@ -73,6 +73,8 @@ interface NavItem {
 const STORE_ITEMS: NavItem[] = [
   { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: 'accent', route: '/store-builder' },
   { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: 'secondary', route: '/store-collections' },
+  { icon: 'package', label: 'Bundles',      desc: 'Sell products together at a set price', accent: 'accent', route: '/product-bundles' },
+  { icon: 'calendar', label: 'Drops',       desc: 'Schedule limited product launches', accent: 'warning', route: '/seller-drops' },
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: 'accentLight', route: '/store-domain' },
   { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'muted', route: '/discounts' },
   { icon: 'percent', label: 'Sales',         desc: 'Automatic sale prices',        accent: 'muted', route: '/sales' },

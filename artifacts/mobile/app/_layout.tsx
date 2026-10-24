@@ -352,7 +352,6 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // ── Genuine full-screen creation / camera / checkout flows ──
   // Registered as a full-screen modal presentation below — real camera UI
   // with its own shutter/mode controls anchored to the bottom of the screen.
-  'camera-capture',
   'create-post',
   // Full-page form with its own bottom "Publish"/"Uploading photos…" CTA.
   'add-product',
@@ -446,7 +445,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // slide-off/on animation). The four below are buyer routes a seller can
   // still land on (buyer-facing preview, a seller opening a buyer link,
   // etc.) — real camera/live UI with its own bottom controls, same category
-  // as camera-capture/seller-go-live above; this is the actual fresh-install
+  // as create-post/seller-go-live above; this is the actual fresh-install
   // bug a seller hit: 'buyer-story-create' was missing, so the floating
   // seller tab bar rendered on top of the story camera's shutter row.
   'buyer-story-create',
@@ -1662,7 +1661,6 @@ const AppStack = React.memo(function AppStack() {
           <Stack.Screen name="navigation-isolation-probe" options={{ headerShown: false, animation: 'none', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         ) : null}
         {/* Feature screens */}
-        <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1797,7 +1795,7 @@ const AppStack = React.memo(function AppStack() {
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="seller-activity"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-activity" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="activity-people"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="profile-music-picker"    options={{ headerShown: false, animation: 'ios_from_right' }} />

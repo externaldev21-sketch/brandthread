@@ -54,7 +54,7 @@ const THREAD_FEATURES = [
   {
     icon: 'shopping-bag' as const,
     title: 'Shop from a post',
-    body: "Products are tagged directly in posts. Tap a product to see details, add to cart, and check out — all without leaving the Thread.",
+    body: "Products are tagged directly in posts. Tap a product to see details, add to bag, and check out — all without leaving the Thread.",
   },
   {
     icon: 'message-circle' as const,

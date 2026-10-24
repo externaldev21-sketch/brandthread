@@ -1527,7 +1527,7 @@ export default function BuyerProductDetailScreen() {
       bumpCart();
       setBagPlusOne(prev => ({ trigger: prev.trigger + 1, quantity: qty }));
     } else {
-      Alert.alert("Couldn't add to cart", result.message ?? 'Try again.');
+      Alert.alert("Couldn't add to bag", result.message ?? 'Try again.');
     }
   }
 
@@ -1736,7 +1736,7 @@ export default function BuyerProductDetailScreen() {
                <View style={s.paymentWarningCopy}>
                  <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
                  <Text style={s.paymentWarningText}>
-                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your cart.
+                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your bag.
                  </Text>
                </View>
              </View>

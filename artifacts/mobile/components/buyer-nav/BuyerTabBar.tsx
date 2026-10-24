@@ -96,7 +96,7 @@ const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);
 // ─── Full-screen creation/story/video/live routes ──────────────────────────
 // `BUYER_TAB_BAR_HIDDEN_ROUTES` above only covers routes registered INSIDE
 // this Tabs navigator (`state.routes`) — it can't see a root-Stack sibling
-// like buyer-story-create or camera-capture, which `detachInactiveScreens={
+// like buyer-story-create or create-post, which `detachInactiveScreens={
 // false}` (app/(buyer)/_layout.tsx) keeps this whole Tabs navigator (and
 // this bar) mounted underneath, just visually covered by. That covering
 // screen is opaque (`contentStyle: OPAQUE_SCREEN_CONTENT`, app/_layout.tsx),
@@ -112,7 +112,6 @@ const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);
 // Regression guard: tests/tab-bar-full-screen-slide.test.ts asserts every
 // buyer-reachable creation/story/video/live route below is covered.
 const BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
-  'camera-capture',
   'create-post',
   'buyer-story-create',
   'buyer-story-viewer',

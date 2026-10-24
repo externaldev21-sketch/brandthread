@@ -28,13 +28,14 @@ import {
 import {
   BrandthreadCard, SecondaryButton, EmptyState, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getVersions, duplicateProject, createProject, updateProject, restoreVersion } from '@/services/designService';
+import { createVersion, getVersions, restoreVersion, duplicateVersion } from '@/services/designService';
 import { ORANGE } from '@/lib/theme';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const ACTION_HIT = { top: 13, bottom: 13, left: 8, right: 8 };
+const THUMB_SIZE = 56;
 
 function formatDate(iso: string): string {
   try {
@@ -49,7 +50,7 @@ function formatDate(iso: string): string {
 
 export default function DesignVersionsScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const styles = createStyles(theme);
   const router = useRouter();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -57,17 +58,20 @@ export default function DesignVersionsScreen() {
   const [versions, setVersions]   = useState<DesignVersion[]>([]);
   const [loading, setLoading]     = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<DesignVersion | null>(null);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
-  useEffect(() => {
+  const loadVersions = useCallback(async () => {
     if (!projectId) { setLoading(false); return; }
     getVersions(projectId)
       .then(v => setVersions([...v].sort((a, b) => b.createdAt.localeCompare(a.createdAt))))
       .catch(() => setVersions([]))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  useEffect(() => { void loadVersions(); }, [loadVersions]);
 
   const handlePreview = useCallback((version: DesignVersion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -85,6 +89,7 @@ export default function DesignVersionsScreen() {
           onPress: async () => {
             setRestoring(version.id);
             try {
+              await createVersion(version.projectId, 'Before restore', true);
               const restored = await restoreVersion(version.id);
               Alert.alert('Version restored', 'Your project now matches this version.');
               router.replace(`/design-canvas?id=${restored.id}` as never);
@@ -97,26 +102,26 @@ export default function DesignVersionsScreen() {
         },
       ]
     );
-  }, [router]);
+  }, [router, loadVersions]);
 
   const handleDuplicate = useCallback(async (version: DesignVersion) => {
+    if (duplicating) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    let newProject: Awaited<ReturnType<typeof duplicateProject>> | null = null;
+    setDuplicating(version.id);
     try {
-      const snap = version.snapshot;
-      const created = await createProject(snap.type, `${snap.name} (${version.label})`, snap.canvas, snap.garmentType, snap.garmentColor);
-      newProject = await updateProject(created.id, { layers: snap.layers });
-    } catch { /* handled below */ }
-    if (newProject) {
+      const newProject = await duplicateVersion(version.id);
       router.push(`/design-canvas?id=${newProject.id}` as never);
-    } else {
-      Alert.alert('Error', 'Failed to duplicate project.');
+    } catch {
+      Alert.alert('Could not duplicate', 'No new project was created. Please try again.');
+    } finally {
+      setDuplicating(null);
     }
-  }, [router]);
+  }, [router, duplicating]);
 
   const renderItem = ({ item }: { item: DesignVersion }) => (
     <BrandthreadCard style={styles.versionCard}>
       <View style={styles.versionTop}>
+        <DesignLayerCompositor project={item.snapshot} displaySize={THUMB_SIZE} />
         <View style={styles.versionInfo}>
           {item.autoSaved && (
             <StatusBadge label="Auto-saved" variant="info" small />
@@ -124,7 +129,7 @@ export default function DesignVersionsScreen() {
           <Text style={styles.versionLabel}>{item.label}</Text>
           <Text style={styles.versionDate}>{formatDate(item.createdAt)}</Text>
         </View>
-        {restoring === item.id && (
+        {(restoring === item.id || duplicating === item.id) && (
           <ActivityIndicator color={PURPLE} size="small" />
         )}
       </View>
@@ -262,7 +267,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyState: { marginTop: 60 },
 
   versionCard: { marginBottom: SP.sm },
-  versionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },
+  versionTop: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   versionInfo: { flex: 1, gap: 4 },
   versionLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   versionDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
