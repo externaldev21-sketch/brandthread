@@ -584,7 +584,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44 },
   switchLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   inlineError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: SP.sm },
-  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.xs + 1, color: theme.text, lineHeight: 18 },
+  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 18 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },

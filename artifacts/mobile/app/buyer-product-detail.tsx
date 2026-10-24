@@ -1864,6 +1864,7 @@ export default function BuyerProductDetailScreen() {
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Size guide"
+              hitSlop={{ top: 12, bottom: 12, left: 4, right: 12 }}
               testID="product-size-guide-link"
             >
               <AppIcon name="maximize" size={13} color={PURPLE_LIGHT} />
@@ -2195,6 +2196,7 @@ export default function BuyerProductDetailScreen() {
             Button's own style is on its inner view, where flex collapses). */}
         <View style={s.halfBtn}>
         {addedToCart ? (
+          <View style={s.buyNowBtn}>
           <Button
             label="View in bag"
             variant="primary"
@@ -2203,7 +2205,9 @@ export default function BuyerProductDetailScreen() {
             fullWidth
             testID="product-view-cart"
           />
+          </View>
         ) : (
+          <View style={s.buyNowBtn}>
           <Button
             label="Add to bag"
             variant="primary"
@@ -2214,6 +2218,7 @@ export default function BuyerProductDetailScreen() {
             fullWidth
             testID="product-add-to-cart"
           />
+          </View>
         )}
         </View>
 
@@ -2221,7 +2226,8 @@ export default function BuyerProductDetailScreen() {
         {dropsAt ? <Text style={s.vacationText}>{dropName ? `${dropName} · ` : ''}Drops {dropsOnLabel(dropsAt)}</Text> : productDraw.draw ? null : sellerPreview ? (<Button label="Not for sale yet" onPress={() => {}} disabled fullWidth testID="product-seller-preview-buy" />) : product.isPreOrder ? (
 
           <Button
-            label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
+            label={reserved ? 'Reserved' : 'Reserve (no charge)'}
+            icon={reserved ? 'check' : undefined}
             onPress={handleReserve}
             variant="secondary"
             size="small"
@@ -2231,6 +2237,7 @@ export default function BuyerProductDetailScreen() {
             fullWidth
           />
         ) : (
+          <View style={s.buyNowBtn}>
           <Button
             label={
               paymentUnavailable ? 'Payments unavailable'
@@ -2245,6 +2252,7 @@ export default function BuyerProductDetailScreen() {
             fullWidth
             testID="product-buy-now"
           />
+          </View>
         )}
         </View>
       </View>
@@ -2762,6 +2770,8 @@ function RelatedProducts({ productId, excludeSellerId, sellerId = excludeSellerI
             key={p.id}
             style={{ width: 140 }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`${p.name}, ${formatCents(lowestPriceCents)}`}
             onPress={() => {
               if (usesThreadPull) {
                 push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
@@ -3005,7 +3015,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 const makeWaitlistStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight, BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, minHeight: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   joined: { borderColor: SUCCESS + '44', backgroundColor: 'transparent' },
   text:   { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
   });
@@ -3013,7 +3023,7 @@ const makeWaitlistStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
 // Size chart toggle styles
 const sz = StyleSheet.create({
-  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm },
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm, minHeight: 44 },
   label:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
 });
 

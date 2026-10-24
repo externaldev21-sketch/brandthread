@@ -196,7 +196,7 @@ export function OrderSuccessSheet({
         )}
 
         <Animated.View style={[s.buttons, stagger[4]]}>
-          <Button label="Track Order" variant="primary" fullWidth onPress={() => onTrackOrder(order.orderId)} />
+          <Button label="Track order" variant="primary" fullWidth onPress={() => onTrackOrder(order.orderId)} />
           <Button label="Continue" variant="secondary" fullWidth onPress={onContinue} />
         </Animated.View>
       </View>

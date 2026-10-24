@@ -6,6 +6,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -49,7 +50,7 @@ function CardBrand({ brand }: { brand: string }) {
   const upper = brand.charAt(0).toUpperCase() + brand.slice(1);
   return (
     <View style={[cb.wrap, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-      <Text style={[cb.text, { color: theme.accent }]}>{upper}</Text>
+      <Text style={[cb.text, { color: theme.accent }]} numberOfLines={1}>{upper}</Text>
     </View>
   );
 }
@@ -68,6 +69,7 @@ export default function BuyerPaymentMethodsScreen() {
   const [loading, setLoading] = useState(true);
   // A failed fetch is an error, never "No saved payment methods".
   const [loadError, setLoadError] = useState(false);
+  const loadFailed = loadError;
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
@@ -80,6 +82,7 @@ export default function BuyerPaymentMethodsScreen() {
       setLoading(false);
       return;
     }
+    setLoadError(false);
     try {
       const data = await api.reviews.paymentMethods() as any;
       if (!data || !Array.isArray(data.paymentMethods)) throw new Error('Unexpected payment methods response');
@@ -152,7 +155,11 @@ export default function BuyerPaymentMethodsScreen() {
             Payment methods saved from your Brandthread purchases.
           </Text>
 
-          {paymentMethods.length === 0 ? (
+          {loadFailed ? (
+            <View style={{ marginBottom: SPACING.xl }}>
+              <RetryRow label="Couldn't load your saved cards" onRetry={() => void load()} />
+            </View>
+          ) : paymentMethods.length === 0 ? (
             <EmptyState
               icon="credit-card"
               title="No saved payment methods"
@@ -184,7 +191,7 @@ export default function BuyerPaymentMethodsScreen() {
                           label="Make default"
                           onPress={() => setDefault(pm)}
                           variant="tertiary"
-                          size="small"
+                          size="compact"
                           loading={settingDefault === pm.id}
                           disabled={settingDefault !== null}
                           style={s.setDefaultBtn}
@@ -232,7 +239,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   defaultBadge: { backgroundColor: `${theme.success}26`, borderRadius: RADII.pill, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: theme.success },
   pmMeta: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginTop: 2 },
-  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 6, minWidth: 0, paddingHorizontal: 0, height: 24 },
+  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 2, minWidth: 0, paddingHorizontal: 0 },
   securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
   securityNoteText: { flex: 1, ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18 },
 });

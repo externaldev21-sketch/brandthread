@@ -501,7 +501,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, fontVariant: ['tabular-nums'] },
 
-  fieldError: { fontSize: FS.xs + 1, fontFamily: FONT.medium, color: theme.text, marginTop: -SP.sm, marginBottom: SP.md },
+  fieldError: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.text, marginTop: -SP.sm, marginBottom: SP.md },
 
   textarea: {
     minHeight: 110, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md,
@@ -522,17 +522,17 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: theme.cardElevated,
   },
   addPhotoText: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.text },
-  photoNotice: { fontFamily: FONT.regular, fontSize: FS.xs + 1, color: theme.muted, marginTop: SP.sm, lineHeight: 18 },
+  photoNotice: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.sm, lineHeight: 18 },
 
   summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
   summaryTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  summarySub: { fontSize: FS.xs + 1, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
+  summarySub: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
 
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
 
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: theme.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, gap: SP.sm },
   submitError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
-  submitErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.xs + 1, color: theme.text, lineHeight: 18 },
+  submitErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 18 },
 
   successWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
   successIcon: {

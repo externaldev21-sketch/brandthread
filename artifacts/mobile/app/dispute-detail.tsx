@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +27,10 @@ import { EmptyState } from '@/components/layout/EmptyState';
 type EvidenceType = DisputeEvidence['type'];
 
 const EVIDENCE_TYPES: { key: EvidenceType; label: string; icon: string }[] = [
-  { key: 'tracking',         label: 'Tracking Proof',    icon: 'package' },
-  { key: 'photo',            label: 'Product Photos',    icon: 'image' },
+  { key: 'tracking',         label: 'Tracking proof',    icon: 'package' },
+  { key: 'photo',            label: 'Product photos',    icon: 'image' },
   { key: 'policy',           label: 'Policy',            icon: 'file-text' },
-  { key: 'written_response', label: 'Written Response',  icon: 'edit-3' },
+  { key: 'written_response', label: 'Written response',  icon: 'edit-3' },
   { key: 'other',            label: 'Other',             icon: 'more-horizontal' },
 ];
 
@@ -93,6 +93,7 @@ export default function DisputeDetailScreen() {
   const api = useApi();
   const { userId: authUserId } = useAuth();
   const isSignedOutPreview = isSellerDevPreview() && !authUserId;
+  const headerTopInset = useHeaderTopInset();
 
   // order shape compatible with render code
   const [order, setOrder] = useState<any | null>(null);
@@ -225,6 +226,8 @@ export default function DisputeDetailScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (loading || !dispute || !order) {
+    // Keeps the header (and its back button) in every state; these used to
+    // be a bare centred line with no way out on web.
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <ScreenHeader title="Dispute" onBack={() => goBackOr(router, '/(tabs)/orders')} />
@@ -364,7 +367,7 @@ export default function DisputeDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: headerTopInset }}>
       {/* 1. HEADER */}
       <BrandthreadHeader
         title="Dispute"
@@ -392,7 +395,6 @@ export default function DisputeDetailScreen() {
             <Icon name="alert-octagon" size={ICON.md} color={RED} />
             <Text style={styles.alertType}>{disputeTypeLabel(dispute.type)}</Text>
           </View>
-          <Text style={styles.alertClaim}>Customer claim: {dispute.customerClaim.slice(0, 120)}{dispute.customerClaim.length > 120 ? '…' : ''}</Text>
           <View style={styles.alertAmountRow}>
             <Text style={styles.alertAmountLabel}>Disputed amount</Text>
              <Text style={styles.alertAmount}>{formatCents(dispute.amountCents)}</Text>
@@ -421,7 +423,7 @@ export default function DisputeDetailScreen() {
 
         {/* 3. CUSTOMER CLAIM */}
         <View>
-          <Text style={styles.sectionHeader}>Customer Claim</Text>
+          <Text style={styles.sectionHeader}>Customer claim</Text>
           <View style={[styles.claimBlock, { backgroundColor: CARD_ELEVATED }]}>
             <Text style={styles.claimText}>{dispute.customerClaim}</Text>
           </View>
@@ -429,7 +431,7 @@ export default function DisputeDetailScreen() {
 
         {/* 4. ORDER CONTEXT */}
         <BrandthreadCard style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Context</Text>
+          <Text style={styles.sectionTitle}>Order details</Text>
           <View style={styles.contextRow}>
             <Text style={styles.ctxLabel}>Order</Text>
             <Text style={styles.ctxValue}>{order.orderNumber}</Text>
@@ -442,12 +444,14 @@ export default function DisputeDetailScreen() {
             <Text style={styles.ctxLabel}>Total</Text>
              <Text style={styles.ctxValue}>{formatCents(order.payment.totalCents)}</Text>
           </View>
-          <View style={styles.contextRow}>
-            <Text style={styles.ctxLabel}>Products</Text>
-            <Text style={[styles.ctxValue, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
-               {order.lineItems.map((li: { productName: string }) => li.productName).join(', ')}
-            </Text>
-          </View>
+          {order.lineItems.length > 0 && (
+            <View style={styles.contextRow}>
+              <Text style={styles.ctxLabel}>Products</Text>
+              <Text style={[styles.ctxValue, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+                {order.lineItems.map((li: { productName: string }) => li.productName).join(', ')}
+              </Text>
+            </View>
+          )}
           {firstShipment?.trackingNumber && (
             <View style={styles.contextRow}>
               <Text style={styles.ctxLabel}>Tracking</Text>
@@ -487,7 +491,7 @@ export default function DisputeDetailScreen() {
           {/* Add evidence form */}
           {!isFinal && (
             <BrandthreadCard elevated style={styles.section}>
-              <Text style={styles.sectionTitle}>Add Evidence</Text>
+              <Text style={styles.sectionTitle}>Add evidence</Text>
 
               {/* Type chips */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -497,6 +501,9 @@ export default function DisputeDetailScreen() {
                       key={et.key}
                       style={[styles.chip, evidenceType === et.key && styles.chipActive]}
                       onPress={() => setEvidenceType(et.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: evidenceType === et.key }}
+                      accessibilityLabel={et.label}
                     >
                       <Icon
                         name={et.icon as any}
@@ -520,7 +527,7 @@ export default function DisputeDetailScreen() {
               />
 
               <PrimaryButton
-                label="Submit Evidence"
+                label="Submit evidence"
                 onPress={handleSubmitEvidence}
                 loading={submittingEvidence}
                 disabled={submittingEvidence || !evidenceDesc.trim()}
@@ -537,7 +544,7 @@ export default function DisputeDetailScreen() {
           {!isFinal && (
             <View style={styles.actionsGap}>
               <SecondaryButton
-                label={conceding ? 'Accepting…' : 'Accept Dispute (Concede)'}
+                label={conceding ? 'Accepting…' : 'Accept dispute and refund'}
                 onPress={handleConcede}
                 disabled={conceding}
                 accent={RED}
@@ -548,7 +555,7 @@ export default function DisputeDetailScreen() {
           {(status === 'evidence_needed' || status === 'evidence_submitted') && !evidenceSubmittedAt && (dispute.evidence.filter(e => !e.description.startsWith('[INTERNAL NOTE]')).length > 0 || evidenceFiles.length > 0) && (
             <View style={{ marginTop: SP.sm }}>
               <PrimaryButton
-                label="Submit All Evidence"
+                label="Submit all evidence"
                 onPress={handleSubmitAll}
                 loading={submittingAll}
                 icon="send"
@@ -589,7 +596,7 @@ export default function DisputeDetailScreen() {
 
         {/* 7. INTERNAL NOTES */}
         <View>
-          <Text style={styles.sectionHeader}>Internal Notes</Text>
+          <Text style={styles.sectionHeader}>Internal notes</Text>
 
           {dispute.internalNotes.length === 0 && (
             <Text style={styles.noNotes}>No internal notes yet.</Text>
@@ -611,7 +618,7 @@ export default function DisputeDetailScreen() {
               multiline
             />
             <SecondaryButton
-              label="Add Note"
+              label="Add note"
               onPress={handleAddNote}
               disabled={addingNote || !internalNote.trim()}
               icon="plus"

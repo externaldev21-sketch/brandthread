@@ -169,8 +169,12 @@ export default function BuyerAddressesScreen() {
   };
 
   const handleSave = async () => {
-    if (!label || !recipientName || !street || !city || !state || !postalCode || !country) {
-      Alert.alert('Missing fields', 'Please fill out all required fields.');
+    const missing = [
+      [label, 'label'], [recipientName, 'recipient name'], [street, 'street address'],
+      [city, 'city'], [state, 'state'], [postalCode, 'ZIP / postal code'], [country, 'country'],
+    ].filter(([value]) => !value.trim()).map(([, name]) => name);
+    if (missing.length > 0) {
+      Alert.alert('Missing fields', `Please add: ${missing.join(', ')}.`);
       return;
     }
 
@@ -235,6 +239,11 @@ export default function BuyerAddressesScreen() {
   };
 
   const showForm = isCreating || editingId;
+  // The first address, and the current default, must stay default (the
+  // checkbox used to lock on after any tap, with no way to undo it).
+  const defaultLocked = isCreating
+    ? addresses.length === 0
+    : !!addresses.find(a => a.id === editingId)?.isDefault;
 
   if (loading) {
     return (
@@ -304,12 +313,12 @@ export default function BuyerAddressesScreen() {
 
               <TouchableOpacity
                 style={styles.defaultToggle}
-                onPress={() => setIsDefault(true)}
-                disabled={isDefault}
+                onPress={() => setIsDefault(v => !v)}
+                disabled={defaultLocked}
                 activeOpacity={0.7}
                 accessibilityRole="checkbox"
                 accessibilityLabel="Set as default address"
-                accessibilityState={{ checked: isDefault, disabled: isDefault }}
+                accessibilityState={{ checked: isDefault, disabled: defaultLocked }}
               >
                 <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
                   {isDefault && <Icon name="check" size={14} color={theme.onAccent} />}
@@ -317,7 +326,7 @@ export default function BuyerAddressesScreen() {
                 <Text style={styles.defaultToggleText}>Set as default address</Text>
               </TouchableOpacity>
 
-              <Button label="Save Address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
+              <Button label="Save address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
             </View>
           ) : (
             <>

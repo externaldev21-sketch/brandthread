@@ -407,7 +407,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
       <View style={{ marginTop: SP.sm }}>
         {firstItem && (
           <Text style={styles.itemText} numberOfLines={1}>
-            {firstItem.productName} ({firstItem.variant}) × {firstItem.quantity}
+            {firstItem.productName}{firstItem.variant ? ` (${firstItem.variant})` : ''} × {firstItem.quantity}
           </Text>
         )}
         {extraCount > 0 && (
@@ -864,7 +864,7 @@ export default function BuyerOrdersScreen() {
             ) : loadError ? (
               <EmptyState
                 icon="alert-triangle"
-                title="Couldn't load your orders."
+                title="Couldn't load your orders"
                 description="Pull to refresh, or tap try again."
                 action={{
                   label: 'Try again',
@@ -877,10 +877,10 @@ export default function BuyerOrdersScreen() {
               <EmptyState
                 icon="shopping-bag"
                 illustration="tee"
-                title="Your first find is still out there."
+                title="Your first find is still out there"
                 description="When something catches your eye, every update from checkout to doorstep will live here."
                 action={{
-                  label: 'Discover Products',
+                  label: 'Discover products',
                   icon: 'compass',
                   onPress: () => router.navigate('/(buyer)/discover' as never),
                 }}
@@ -953,7 +953,7 @@ function cardStyles(theme: AppThemePreset) {
       color: theme.text,
     },
     orderMeta: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.regular,
       color: theme.muted,
       marginTop: 1,
@@ -997,7 +997,7 @@ function cardStyles(theme: AppThemePreset) {
       color: theme.text,
     },
     moreText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.regular,
       color: theme.muted,
       marginTop: 2,
@@ -1041,7 +1041,7 @@ function cardStyles(theme: AppThemePreset) {
       letterSpacing: 0.2,
     },
     cancellationReason: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.medium,
       color: theme.muted,
     },
@@ -1069,7 +1069,7 @@ function cardStyles(theme: AppThemePreset) {
       marginTop: SP.xs,
     },
     trackingText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.medium,
       color: theme.secondary,
     },
@@ -1084,6 +1084,7 @@ function cardStyles(theme: AppThemePreset) {
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 10,
+      minHeight: 44,
       borderRadius: RADIUS.sm,
       backgroundColor: theme.cardElevated,
       borderWidth: 1,
@@ -1101,7 +1102,7 @@ function cardStyles(theme: AppThemePreset) {
       borderColor: theme.border,
     },
     actionBtnText: {
-      fontSize: FS.xs,
+      fontSize: FS.meta,
       fontFamily: FONT.semibold,
       color: theme.text,
     },

@@ -92,6 +92,7 @@ export default function BuyerRefundRequestScreen() {
     }
   }
 
+  const [reloadTick, setReloadTick] = useState(0);
   useEffect(() => {
     if (isMissingParam(orderId)) { setLoading(false); return; }
     let active = true;
@@ -202,9 +203,26 @@ export default function BuyerRefundRequestScreen() {
           <View style={s.successIcon}><Icon name="check" size={32} color={MEDIA.foreground} /></View>
           <Text style={s.successTitle}>Refund Request Submitted</Text>
           <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
-          <Text style={s.successNote}>Refund updates will appear here.</Text>
-          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+          <Text style={s.successNote}>We'll notify you when there's an update on your order.</Text>
+          <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} style={s.doneBtn} />
         </View>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Request a refund" />
+        <EmptyState
+          icon="package"
+          title="Couldn’t load this order"
+          description="Check your connection and try again."
+          action={orderId
+            ? { label: 'Try again', onPress: () => setReloadTick(n => n + 1) }
+            : { label: 'Go back', onPress: () => goBackOr(router) }}
+          secondaryAction={orderId ? { label: 'Go back', onPress: () => goBackOr(router) } : undefined}
+        />
       </View>
     );
   }
@@ -230,7 +248,7 @@ export default function BuyerRefundRequestScreen() {
         {/* Order */}
         {order && (
           <View style={s.card}>
-            <Text style={s.sectionTitle}>Order Items</Text>
+            <Text style={s.sectionTitle}>Order items</Text>
             {order.lineItems.map((item, idx) => (
               <View key={idx} style={[s.itemRow, idx > 0 && s.itemBorder]}>
                 <Icon name="package" size={14} color={MUTED} />
@@ -255,7 +273,7 @@ export default function BuyerRefundRequestScreen() {
         {route === 'return' && (<>
         {/* Reason */}
         <View style={s.card}>
-          <Text style={s.sectionTitle}>Refund Reason</Text>
+          <Text style={s.sectionTitle}>Refund reason</Text>
           {REFUND_REASONS.map(r => (
             <TouchableOpacity key={r} style={s.optionRow} onPress={() => { haptics.selection(); setReason(r); }} activeOpacity={0.7}>
               <View style={[s.radio, reason === r && s.radioSelected]}>
@@ -278,6 +296,7 @@ export default function BuyerRefundRequestScreen() {
             multiline
             numberOfLines={5}
             textAlignVertical="top"
+            accessibilityLabel="Refund details"
           />
         </View>
 
@@ -286,6 +305,8 @@ export default function BuyerRefundRequestScreen() {
           style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
           onPress={pickEvidence}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Add photo evidence, ${evidencePhotos.length} of 5 added`}
         >
           <Icon name="camera" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>
@@ -313,6 +334,9 @@ export default function BuyerRefundRequestScreen() {
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: `${MEDIA.background}99`, borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
                     disabled={photo.state === 'uploading'}
                     onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove photo ${idx + 1}`}
                   >
                     <Icon name="x" size={10} color={MEDIA.foreground} />
                   </TouchableOpacity>
@@ -323,7 +347,7 @@ export default function BuyerRefundRequestScreen() {
         )}
 
         <Text style={s.disclaimer}>
-          Submitting a refund request does not guarantee approval. Do not claim a refund is approved until the seller or payment provider confirms it.
+          Submitting a request doesn’t guarantee a refund. We’ll let you know once the seller or payment provider confirms it.
         </Text>
         </>)}
       </ScrollView>

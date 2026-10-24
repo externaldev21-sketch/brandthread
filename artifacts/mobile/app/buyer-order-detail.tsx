@@ -724,7 +724,8 @@ export default function BuyerOrderDetailScreen() {
   }, [userId]);
 
   useFocusEffect(useCallback(() => {
-    if (!id) return;
+    // No id (a bad deep link): show "not found" instead of spinning forever.
+    if (!id) { setLoading(false); return; }
     let cancelled = false;
     const accountGeneration = accountGenerationRef.current;
     consecutiveFailuresRef.current = 0;
@@ -913,7 +914,7 @@ export default function BuyerOrderDetailScreen() {
     if (!order) return;
     // Gate: only allow reviews on real API orders to prevent demo/local data contamination
     if (!isRealOrderId(order.id)) {
-      Alert.alert('Not Available', 'Reviews can only be submitted for completed purchases.');
+      Alert.alert('Reviews unavailable', 'Reviews can only be submitted for completed purchases.');
       return;
     }
     setSubmittingReview(true);
@@ -975,11 +976,11 @@ export default function BuyerOrderDetailScreen() {
         const msg = result.refunded
           ? `Your order has been cancelled and a full refund has been issued. ${refundExpectedLabel(new Date())} on your statement.`
           : 'Your order has been cancelled.';
-        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
+        Alert.alert('Order cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router, '/(buyer)/orders') }]);
       }
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Cannot Cancel', "This order can't be cancelled now. Message the seller for help.");
+      Alert.alert("Couldn't cancel this order", "This order can't be cancelled now. Message the seller for help.");
     } finally {
       setCancelling(false);
     }
@@ -1106,7 +1107,7 @@ export default function BuyerOrderDetailScreen() {
               <View style={styles.trackingInfoRow}>
                 <Icon name="truck" size={ICON.xs} color={theme.muted} />
                 <Text style={[styles.trackingInfoText, { color: theme.text }]}>
-                  Shipped via {order.trackingCarrier}
+                  {order.trackingCarrier ? `Shipped via ${order.trackingCarrier}` : 'Shipped'}
                 </Text>
                 <View style={[styles.trackingChip, { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border }]}>
                   <Text style={[styles.trackingChipText, { color: theme.muted }]} numberOfLines={1}>{order.trackingNumber}</Text>
@@ -1143,7 +1144,7 @@ export default function BuyerOrderDetailScreen() {
           </View>
         ) : (
         <View style={{ marginBottom: SP.md }}>
-          <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order Progress</Text>
+          <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order progress</Text>
           <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
             {/* Item 107: "where is it" headline + static route map (Shop
                 app tracking pattern) over the timeline. */}
@@ -1264,7 +1265,7 @@ export default function BuyerOrderDetailScreen() {
         </SectionCard>
 
         {/* ── 3. Shipping address ──────────────────────────────────────────── */}
-        <SectionCard title="Shipping Address">
+        <SectionCard title="Shipping address">
           <Text style={styles.addressLine}>{order.shippingAddress.name}</Text>
           <Text style={styles.addressLine}>{order.shippingAddress.line1}</Text>
           {order.shippingAddress.line2 ? <Text style={styles.addressLine}>{order.shippingAddress.line2}</Text> : null}
@@ -1281,7 +1282,7 @@ export default function BuyerOrderDetailScreen() {
         ) : null}
 
         {/* ── 4. Payment / totals receipt ──────────────────────────────────── */}
-        <SectionCard title="Payment Summary">
+        <SectionCard title="Payment summary">
           <Row label="Subtotal" value={formatCents(order.payment.subtotalCents)} />
           <Row label="Shipping" value={formatCents(order.payment.shippingTotalCents)} />
           {/* Tax is hidden rather than shown as "$0.00" when it isn't known/charged —
@@ -1357,7 +1358,7 @@ export default function BuyerOrderDetailScreen() {
         {/* Pre-order info */}
         {!order.delivery && order.isPreOrder && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <Text style={[sc.title, { paddingHorizontal: 0, marginBottom: SP.sm }]}>Pre-order Status</Text>
+            <Text style={[sc.title, { color: theme.muted }]}>Pre-order status</Text>
             <GradientCard colors={[theme.secondaryDim, `${theme.secondary}0A`]} style={{ borderColor: `${theme.secondary}59` }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
                 <Icon name="clock" size={ICON.sm} color={CYAN} />
@@ -1379,7 +1380,7 @@ export default function BuyerOrderDetailScreen() {
           {canBuyerCancel(order.status, order.createdAt, Date.now(), order.buyerCancelDeadline) && (
             <>
             <SecondaryButton
-              label={cancelling ? 'Cancelling…' : 'Cancel Order'}
+              label={cancelling ? 'Cancelling…' : 'Cancel order'}
               icon="x-circle"
               onPress={() => { haptics.warning(); setShowCancelModal(true); }}
               accent={theme.error}
@@ -1390,7 +1391,7 @@ export default function BuyerOrderDetailScreen() {
           )}
           {returnRequest || isReturnEligible(order.status) ? (
             <SecondaryButton
-              label={returnRequest ? 'View Return' : 'Request Return'}
+              label={returnRequest ? 'View return' : 'Request return'}
               icon="refresh-ccw"
               onPress={() => { handleRequestReturn(); }}
             />
@@ -1405,19 +1406,13 @@ export default function BuyerOrderDetailScreen() {
               }}
             />
           ) : null}
-          <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
-          <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
+          <SecondaryButton label="Report a problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
+          <SecondaryButton label="Report seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
           {order.status === 'delivered' && (
             <SecondaryButton label={reorderBusyId === order.id ? 'Adding…' : 'Reorder'} icon="repeat" onPress={handleBuyAgain} disabled={reorderBusyId === order.id} />
           )}
         </View>
 
-        {/* Disclaimer */}
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <Text style={styles.disclaimer}>
-            This order view shows your purchase details only. Internal seller information is not visible here.
-          </Text>
-        </View>
       </ResponsiveContainer>
       </ScrollView>
 
@@ -1442,15 +1437,15 @@ export default function BuyerOrderDetailScreen() {
           >
             <Icon name="star" size={ICON.sm} color={theme.warning} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.reviewCTATitle}>Leave a Review</Text>
+              <Text style={styles.reviewCTATitle}>Leave a review</Text>
               <Text style={styles.reviewCTASub}>Share your experience with {order.sellerName}</Text>
             </View>
             <Icon name="chevron-right" size={ICON.sm} color={theme.muted} />
           </TouchableOpacity>
         )}
 
-        <SecondaryButton label="Help Center" icon="help-circle" onPress={() => router.push('/help' as never)} small />
-        <PrimaryButton label="Contact Seller" icon="message-circle" onPress={handleContactSeller} />
+        <SecondaryButton label="Help center" icon="help-circle" onPress={() => router.push('/help' as never)} small />
+        <PrimaryButton label="Contact seller" icon="message-circle" onPress={handleContactSeller} />
       </View>
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}
@@ -1468,13 +1463,15 @@ export default function BuyerOrderDetailScreen() {
                 Your payment will be fully refunded. {refundExpectedLabel(new Date())} on your statement.
               </Text>
               <View style={{ flexDirection: 'row', gap: SP.sm }}>
-                <SecondaryButton label="Keep Order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
+                <SecondaryButton label="Keep order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
                 <TouchableOpacity
                   style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: `${theme.error}24`, borderWidth: 1, borderColor: `${theme.error}60`, alignItems: 'center', justifyContent: 'center' }}
                   onPress={handleCancelOrder}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Yes, cancel this order"
                 >
-                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, Cancel</Text>
+                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1577,9 +1574,6 @@ const makeStyles = (theme: AppThemePreset) => {
     // Pre-order
     preOrderTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
     preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-
-    // Disclaimer
-    disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 18 },
 
     // Bottom action bar
     actionBar: { borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background, paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm },
