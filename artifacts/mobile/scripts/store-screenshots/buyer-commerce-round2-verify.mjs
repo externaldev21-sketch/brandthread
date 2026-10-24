@@ -63,6 +63,16 @@ const text = (page, re) => page.evaluate((src) => {
   return [...document.querySelectorAll('div,span')].filter(el => el.children.length === 0 && rx.test(el.textContent ?? '')).map(el => el.textContent.trim()).slice(0, 12);
 }, re.source);
 
+const LIVE = [/\/public\/checkout-config$/, { live: true, mode: 'test', applePay: false, googlePay: false, reason: null }];
+// The cart's quote for a complete address: $12 shipping per seller + tax.
+const QUOTE = [/\/checkout\/payment-intent\/quote$/, () => ({
+  amountCents: 52_844,
+  paymentMethodTypes: ['card'],
+  groups: [
+    { sellerId: 'user_brand_northline', subtotalCents: 31_800, shippingCents: 1_200, discountCents: 0, taxCents: 2_624, totalCents: 35_624 },
+    { sellerId: 'user_brand_field', subtotalCents: 16_500, shippingCents: 1_200, discountCents: 0, taxCents: 1_420, totalCents: 19_120 },
+  ],
+})];
 const ORDER_ID = '3f2b8c1e-9d4a-4b7e-8f21-0c6d5e4a3b21';
 try {
   await screen('pdp-touch', '/buyer-product-detail?productId=prod_nl_hoodie_ember', {
@@ -92,6 +102,7 @@ try {
   });
   await screen('checkout', '/buyer-checkout?source=cart', {
     direct: true,
+    routes: [LIVE, QUOTE],
     prepare: async (page) => { await page.mouse.move(195, 400); for (let i = 0; i < 4; i++) await page.mouse.wheel(0, 500); },
     log: async (page) => ({ delivery: await text(page, /after it ships|Ships in/), tax: await page.getByTestId('checkout-tax-line').innerText().catch(() => null) }),
   });
@@ -109,7 +120,7 @@ try {
     prepare: async (page) => { await page.getByText(/Add (an |new )?address/i).first().click().catch(() => {}); await page.waitForTimeout(1200); },
   });
   await screen('payment-methods', '/buyer-payment-methods', {
-    routes: [[/\/buyer\/payment-methods\/?$/, { paymentMethods: [{ id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2028, isDefault: true }] }]],
+    routes: [LIVE, [/\/buyer\/payment-methods\/?$/, { paymentMethods: [{ id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2028, isDefault: true }] }]],
     log: async (page) => ({ addCard: await text(page, /Add card|Adding a card/) }),
   });
   await screen('disputes', '/disputes', {
