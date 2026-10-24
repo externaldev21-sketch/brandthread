@@ -3554,13 +3554,18 @@ export default function DesignCanvasScreen() {
       )}
 
       {/* ── CANVAS AREA ── */}
-      <View
-        style={styles.canvasOuter}
-        onLayout={e => {
-          const { width, height } = e.nativeEvent.layout;
-          setStageSize(prev => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
-        }}
-      >
+      <View style={styles.canvasOuter}>
+        {/* Stage size sensor: a full-bleed, non-interactive child measures the
+            stage. onLayout on canvasOuter itself never fired on web, which
+            left the aspect-fit artboard at 0×0. */}
+        <View
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          onLayout={e => {
+            const { width, height } = e.nativeEvent.layout;
+            setStageSize(prev => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+          }}
+        />
 
         {/* Left sidebar: Procreate's own vertically-centred handles — size on
             top, opacity below, undo/redo beneath both — inset from the edge
@@ -3665,6 +3670,7 @@ export default function DesignCanvasScreen() {
             },
             canvasFit.scale <= 0 && styles.canvasUnmeasured,
           ]}
+          testID="canvas-artboard"
           onTouchStart={handleCanvasTouchStart}
           onTouchMove={handleCanvasTouchMove}
           onTouchEnd={cancelQuickMenuLongPress}
