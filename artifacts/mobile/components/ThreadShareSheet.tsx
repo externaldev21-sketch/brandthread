@@ -551,6 +551,7 @@ function AccountThreadShareSheet({
             <Text style={styles.progressText}>{savingProgress}% Saving…</Text>
             <Pressable
               onPress={() => abortRef.current?.abort()}
+              hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel="Cancel saving video"
               testID="thread-share-save-cancel"
@@ -649,8 +650,8 @@ const makeStyles = (theme: { background: string; card: string; border: string; t
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
   progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: theme.background, paddingTop: 8 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 7 },
-  progressText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.xs },
-  cancelText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.xs },
+  progressText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.meta },
+  cancelText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.meta },
   progressTrack: { height: 3, backgroundColor: theme.border },
   progressFill: { height: 3 },
 });

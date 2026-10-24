@@ -241,7 +241,7 @@ export default function ActivityPeopleScreen() {
     <View style={styles.container}>
       <ScreenHeader title={title} />
       {showSearch && (
-        <SearchBar value={query} onChange={setQuery} placeholder="Search" style={styles.search} />
+        <SearchBar value={query} onChange={setQuery} placeholder="Search people" style={styles.search} />
       )}
 
       {status === 'loading' ? (

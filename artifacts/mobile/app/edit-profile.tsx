@@ -49,6 +49,7 @@ import { getPreviewAccount } from '@/lib/previewAccount';
 
 import { useLiveUsernameCheck } from '@/hooks/useLiveUsernameCheck';
 import { Avatar } from '@/components/ui/Avatar';
+import { FS, SP } from '@/lib/theme';
 
 import { getInitials } from '@/lib/format';
 
@@ -454,7 +455,7 @@ export default function EditProfileScreen() {
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
     } catch {
-      Alert.alert('Error', 'Could not save profile. Please try again.');
+      Alert.alert('Could not save', 'Could not save profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -477,7 +478,7 @@ export default function EditProfileScreen() {
         title="Edit profile"
         onBack={handleBackPress}
         rightElement={
-          <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Save profile">
             {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
               <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { color: TEXT_DISABLED }]}>Save</Text>
             )}
@@ -655,7 +656,8 @@ export default function EditProfileScreen() {
             <Text style={styles.rowLabel}>Bio</Text>
             <View style={{ flex: 1 }}>
               <TextInput
-                style={[styles.rowInput, { height: 74, textAlignVertical: 'top' }]}
+                accessibilityLabel="Bio"
+                style={[styles.rowInput, { flex: 0, height: 74, textAlignVertical: 'top' }]}
                 value={fields.bio}
                 onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
                 placeholder="Write a short description about your brand"
@@ -760,6 +762,7 @@ function FieldRow({
       <View style={styles.row}>
         <Text style={styles.rowLabel}>{label}</Text>
         <TextInput
+          accessibilityLabel={label}
           style={[styles.rowInput, error && { color: theme.error }]}
           value={value}
           onChangeText={onChange}
@@ -791,7 +794,7 @@ function ImageUploadRow({
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   return (
     <View style={[styles.card, { marginBottom: 8 }]}>
-      <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading}>
+      <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading} accessibilityRole="button" accessibilityLabel={`Change ${label.toLowerCase()}`} accessibilityHint={hint}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.rowLabel, { width: undefined, color: theme.text, fontFamily: FONT.medium }]}>{label}</Text>
           <Text style={styles.rowHint}>{uploading ? `Uploading… ${progress}%` : hint}</Text>
@@ -830,7 +833,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   // Storefront header preview
   previewCard: {
-    marginHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: theme.border,
+    marginHorizontal: SP.md, borderRadius: 16, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.card, overflow: 'hidden', paddingBottom: 14,
   },
   previewBannerWrap: { width: '100%', height: 88 },
@@ -867,7 +870,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   editPhotoLink: { fontSize: 13, fontFamily: FONT.medium, color: theme.accentLight },
 
   card: {
-    backgroundColor: theme.card, marginHorizontal: 14, borderRadius: 12,
+    backgroundColor: theme.card, marginHorizontal: SP.md, borderRadius: 12,
     borderWidth: 1, borderColor: theme.border, overflow: 'hidden',
   },
 

@@ -62,6 +62,7 @@ import { blockUser, seeLessNotificationType, setSellerFollowing } from '@/servic
 import { getVisiblePreviewActivity, isPreviewActivityEnabled, isPreviewActivityId, markPreviewActivityDismissed } from '@/lib/previewActivity';
 
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 

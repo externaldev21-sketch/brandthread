@@ -564,6 +564,8 @@ export default function BuyerEditProfileScreen() {
               onPress={handleSave}
               disabled={!isDirty || saving || avatarUploading}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Save profile"
             >
               {saving ? (
                 <ActivityIndicator size="small" color={theme.accent} />
@@ -620,6 +622,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Name</Text>
                 <TextInput
+                  accessibilityLabel="Name"
                   style={[styles.rowInput, { color: theme.text }]}
                   value={fields.name}
                   onChangeText={v => set('name', v)}
@@ -639,6 +642,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Username</Text>
                 <TextInput
+                  accessibilityLabel="Username"
                   style={[
                     styles.rowInput,
                     { color: theme.text },
@@ -684,6 +688,7 @@ export default function BuyerEditProfileScreen() {
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Bio</Text>
               <View style={{ flex: 1 }}>
                 <TextInput
+                  accessibilityLabel="Bio"
                   style={[styles.rowInput, { color: theme.text, textAlignVertical: 'top', minHeight: 60 }]}
                   value={fields.bio}
                   onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
@@ -703,6 +708,7 @@ export default function BuyerEditProfileScreen() {
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Link</Text>
                 <TextInput
+                  accessibilityLabel="Link"
                   style={[styles.rowInput, { color: theme.text }, errors.link && { color: theme.error }]}
                   value={fields.link}
                   onChangeText={v => set('link', v)}
@@ -764,6 +770,7 @@ export default function BuyerEditProfileScreen() {
                 <Text style={[styles.rowHint, { color: theme.muted }]}>Add this label if your content often uses AI.</Text>
               </View>
               <HapticSwitch
+                accessibilityLabel="AI creator"
                 value={extra.aiCreator}
                 onValueChange={v => setExtra(prev => ({ ...prev, aiCreator: v }))}
               />
@@ -777,6 +784,7 @@ export default function BuyerEditProfileScreen() {
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Show badge</Text>
               <HapticSwitch
+                accessibilityLabel="Show style badge"
                 value={badge.enabled}
                 onValueChange={v => setBadge(b => ({ ...b, enabled: v }))}
               />
@@ -797,6 +805,7 @@ export default function BuyerEditProfileScreen() {
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Label</Text>
               <TextInput
+                accessibilityLabel="Badge label"
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.label}
                 onChangeText={v => setBadge(b => ({ ...b, label: v }))}

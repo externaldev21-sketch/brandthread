@@ -1,0 +1,345 @@
+# Social screens — audit (3/10)
+
+Audited by reading every screen's code and rendering it in the web harness (`scripts/store-screenshots` build, 393×852, fresh account and `&demo=1`). Items marked [FIXED] are fixed in this PR; the rest are listed with the reason they were left.
+
+**Seller Own Profile** (`artifacts/mobile/app/(tabs)/profile.tsx`)
+- [FIXED] Edit-brand sheet (long-press Edit) used a fixed `paddingBottom: 26` (styles `sheet`, ~line 908), so Cancel/Save sat on the home indicator on notched iPhones — the `SheetRise` now gets `paddingBottom: Math.max(26, insets.bottom + SP.md)` via `useSafeAreaInsets()`.
+- [FIXED] Edit-brand sheet backdrop TouchableOpacity (~line 788) and the icon-only close "x" button (~line 801) had accessibilityLabel but no accessibilityRole — added `accessibilityRole="button"` to both.
+- [FIXED] Bio character counter `characterCount` used a literal `fontSize: 11` (meta text below the 12pt floor) — now `FS.meta`.
+- [FIXED] Drafts folder tile count `draftsTileCount` used `FS.xs` (11) for meta text — now `FS.meta`.
+- [FIXED] ShareProfileSheet got `avatarUrl={profile?.profileImageUrl}` while the header shows `avatarPosterUrl || profileImageUrl`, so a seller with a moving avatar saw a different/blank avatar on the share card — now uses the same expression as the header.
+- [FIXED] Products (Shop) and Tagged tab load failures showed "Couldn't load these videos." (shared `ProfileGridPlaceholder`, components/profile/ProfileGridStates.tsx:73) — wrong noun for products/tagged; now "Couldn't load this tab."
+- [FIXED] Products tab "Your live listings" sublabel on the Shop pill (`pillSub`, components/profile/ProfileControls.tsx:663) was 11pt meta text — now `FS.meta` (lineHeight 16).
+- [FIXED] Products tab tile product name (`name`, components/profile/ProfileProductTile.tsx:98) was 11pt — now `FS.meta`.
+- `--demo` renders exactly the same as a fresh account (0/0/0 stats, "No posts yet", "No products yet", "No tagged posts") — the own seller profile has no demo-gated data path; adding one is feature work (unfixed).
+- "Share profile" is offered twice: the top-bar share icon and the first row of the "..." ProfileMenuSheet (menu has only Share + View as visitor) — product decision on menu contents (unfixed).
+
+**Buyer Own Profile** (`artifacts/mobile/app/(buyer)/profile.tsx`)
+- [FIXED] "Edit profile", "Share profile" and the discover-people square button were invisible as buttons on the default Monochrome theme: both `backgroundColor` and `borderColor` were `theme.cardElevated` (= #000 = page background), so they rendered as bare floating text (verified in render, lines ~897/909/920) — border now `theme.border` (silver hairline, same as other outlined buttons); fill unchanged.
+- [FIXED] Top bar had two overflow-style icons with confusing names: "..." = "Profile options" and the hamburger = "More options" (line ~837); the hamburger opens the page titled "Menu" (buyer-settings-menu), so its label is now "Menu".
+- [FIXED] Saved tab grid: cells are sized as `(columnWidth - SP.md*2) / columns` but the column wrapper had no horizontal padding, so the tiles sat flush against the left edge with ~32pt dead space on the right — added a `savedRow` (`paddingHorizontal: SP.md`) column-wrapper style for the Saved tab only.
+- [FIXED] Saved tile subtitle (`savedSubtitle`), Drafts tile count (`draftsCount`) and order-row meta "#123 · 2 items" (`orderCardMeta`) used `FS.xs` (11) for meta text — now `FS.meta`.
+- [FIXED] Story highlights row labels ("New" / highlight names, components/profile/ProfileStoriesRow.tsx:106) were 11pt meta text — now `FS.meta`, lineHeight 16.
+- [FIXED] Profile-video manage/coachmark sheet backdrop Pressable (components/profile/ProfileCover.tsx:183) had a label but no role — added `accessibilityRole="button"`.
+- Liked tab is always empty ("No liked posts yet") even for buyers who have liked posts — `rows` returns `[]` for Liked because there is no backing data source (unfixed: needs an API/feature).
+- Saved tab: tapping any saved cell ignores the item (`handleSavedTap` takes no argument) and opens the generic /buyer-saved list; and the empty state's CTA "View saved" sends a buyer who was just told nothing is saved to another saved list — needs a product decision on per-type destinations/CTA (unfixed).
+- `--demo` renders the same as a fresh account (0 stats, no posts/saved/orders; only the avatar/bio identity is populated), so the populated grid/last-row clearance can't be shown in preview; code check: both screens pad the list by tab-bar inset + 24 (`computeEmptyArea`), and the empty-state CTAs clear the tab bar once scrolled (verified in render) (unfixed: demo data is feature work).
+- Action row uses literals off the token scale (`gap: 6`, `borderRadius: 8`, `paddingTop: 16`, `actionSquare` width 36) — documented as deliberate Instagram proportions in comments; left (unfixed, design decision).
+
+**Edit profile — seller** (`artifacts/mobile/app/edit-profile.tsx`)
+- [FIXED] Bio field clipped to ~2 lines: the multiline TextInput inherited `flex: 1` from `rowInput` inside an auto-height column, so `flexBasis: 0` overrode `height: 74`. It rendered 38px tall and hid "basics." from the demo bio (edit-profile.tsx:618). Added `flex: 0` so the 74px height applies.
+- [FIXED] Row labels wrapped onto two lines ("Brand / name", "Contact / email") because `rowLabel` was fixed at `width: 100`. Changed it to 120 (styles.rowLabel).
+- [FIXED] "Banner / cover" title wrapped to two lines: the `width: undefined` override in ImageUploadRow does not unset the 100px `rowLabel` width on web. Changed it to `width: 'auto'` (ImageUploadRow).
+- [FIXED] The profile-link row truncated the URL ("brandthread.app/u/north…") because an empty `<Text style={styles.rowLabel} />` reserved a 100px spacer (edit-profile.tsx:601). Removed the spacer and right-aligned the URL to match the inputs.
+- [FIXED] The avatar and logo pickers were icon-only TouchableOpacity controls with no label or role. The harness flagged an unlabeled 84x84 pressable (edit-profile.tsx:520, 541). Added `accessibilityRole="button"` with "Change avatar" / "Change logo".
+- [FIXED] The banner upload row (ImageUploadRow TouchableOpacity) had no role or label. Added a button role, the label "Change banner / cover" and the hint text as `accessibilityHint`.
+- [FIXED] The header Save control had no `accessibilityRole`. Added a button role and the label "Save profile".
+- [FIXED] None of the text inputs had an accessibility label; FieldRow and the Bio input relied on placeholders only. Added `accessibilityLabel={label}` and "Bio".
+- [FIXED] The upload "Retry" link was 11px text with a 6px hitSlop (well under 44pt) and no role (RetryLink). Changed it to FS.meta, a 12px hitSlop, a button role and the label "Retry upload".
+- [FIXED] Off-token font sizes: previewMeta 12.5, editPhotoLink 12.5, charCounter 11, inlineError 11.5 and inlineErrorNoIndent 11 were below or between tokens. Changed them to FS.meta / FS.sm, and imageOverlayText to FS.xs (badge overlay).
+- [FIXED] Off-gutter spacing: cards, the preview card and the quick-link list used `marginHorizontal: 14` instead of the 16 gutter. Changed them to SP.md, and moved section labels from 18 to 20 so they keep their inset.
+- [FIXED] The save-failure alert used the generic title "Error". Changed it to "Could not save".
+- With `bt_preview=seller` (with or without `demo=1`) the screen only shows "Couldn't load your profile / Retry", because the preview seed is gated on `__DEV__` and api.seller.getProfile 401s (unfixed). Adding demo-mode seeding would add new demo data plumbing.
+- The save-failure `Alert.alert` is a no-op on react-native-web, so a failed save shows nothing on web (unfixed). It needs an inline error or toast pattern, which is a design decision.
+- `app/general-settings.tsx:55,71` pushes `/edit-profile`, and `/edit-profile` opened in the buyer role renders this seller editor (storefront, payouts and so on) rather than the buyer editor (unfixed). That is outside my files and the routing intent is unclear.
+
+**Edit profile — buyer** (`artifacts/mobile/app/(buyer)/edit-profile.tsx`, reached at `/(buyer)/edit-profile`)
+- [FIXED] The "AI creator" and "Show badge" switches had no accessible name; the harness flagged two unlabeled `role=switch` controls (lines 692, 705). Added `accessibilityLabel` "AI creator" / "Show style badge".
+- [FIXED] The avatar TouchableOpacity was icon-only with no label or role (line 517). Added a button role and the label "Change profile photo or video". The text link under it also got a button role.
+- [FIXED] The Gender row had no role or label, and the GenderPicker option rows had no role or selected state. Added a button role and the label "Gender, <value|not set>". Added a role, label and `accessibilityState.selected` to each option.
+- [FIXED] The avatar upload "Retry" had no hitSlop (12.5px text, far below 44pt) and no role. Added a 12px hitSlop, a button role and the label "Retry upload".
+- [FIXED] The Save header control had no role or label. Added a button role and "Save profile".
+- [FIXED] The Name, Username, Bio, Link, Badge emoji and Badge label TextInputs had no accessibility labels. Added them.
+- [FIXED] Off-token font sizes: sectionHint 12.5, chevronLabel 13.5, coverHint 12.5, errorText and retryLink 12.5, inlineError and usernameHint 11.5, and charCounter 11. Changed them to FS.meta / FS.sm.
+- [FIXED] Cards used `marginHorizontal: 14` instead of the 16 gutter. Changed it to SP.md.
+- With `demo=1` the screen still opens with blank Name and Username fields and a "?" avatar: it loads only from local AsyncStorage (loadBuyerProfile/getMyProfile), never from the account (unfixed). Data plumbing is outside this screen's scope.
+- Choosing the "Custom" gender option just stores the literal "Custom", with no way to enter a custom value, so it is a dead end (unfixed). It needs a text-entry design.
+- A load failure is swallowed (`.catch(() => {})`) and the form shows as empty instead of an error or retry state (unfixed). Low risk, since every source is local storage.
+
+**Share profile screen** (`artifacts/mobile/app/share-profile.tsx`)
+- [FIXED] Title Case copy did not match the app's sentence case and used an exclamation mark. Changed the header "Share Profile" → "Share profile", "Copy Link" → "Copy link", "Link Copied!" → "Link copied", the button "Share Profile" → "Share profile", "Set Username" → "Set username" and the share dialogTitle.
+- [FIXED] In the seller role the floating SellerGlobalTabBar stays mounted over this route (seen in the render), but scroll padding was only `insets.bottom + 48`, so on short phones the hint and Share button end up under the bar. paddingBottom now uses `Math.max(insets.bottom + SP.xxl, useTabBarClearance(2))`.
+- [FIXED] The hint text "Anyone with this link…" used FS.xs (11), which is reserved for badges. Changed it to FS.meta.
+- [FIXED] The QR wrapper declared `borderRadius: RADIUS.md` without `overflow: 'hidden'`, so the white QR square kept sharp corners. Added `overflow: 'hidden'`.
+- The route is orphaned: every in-app "Share profile" entry opens ShareProfileSheet, and nothing navigates to `/share-profile` (unfixed). Removing or redirecting the route is a product decision.
+- When auto-copy fires, a "Link copied" status banner and a green "Link copied" button appear at the same time, which is redundant feedback (unfixed). This is a design choice.
+
+**Share profile sheet + QR scanner + share cards** (`artifacts/mobile/components/ShareProfileSheet.tsx`, `components/ShareProfileQrScanner.tsx`, `components/share-cards/*`; opened from the buyer and seller profile "Share profile" buttons)
+- [FIXED] The signed-in "no username" state was a dead end: it said "Set a username to get a shareable QR code." with no action (ShareProfileSheet.tsx:333). Added a "Set username" link that closes the sheet and pushes `/edit-profile` (seller) or `/(buyer)/edit-profile`, using the existing `router`.
+- [FIXED] The loading state showed a static, non-animated Feather "loader" glyph that looked frozen. Replaced it with `ActivityIndicator`.
+- [FIXED] Tile labels ("Share profile", "Copy link", "Download"), the profile URL and the share hint used FS.xs (11) for non-badge text. Changed them to FS.meta. The COLOR/EMOJI/SELFIE chip labels stay at xs.
+- [FIXED] Scanner: the viewfinder corner brackets and the "Point your camera at a Brandthread QR code" pill rendered over the "Camera unavailable" state, contradicting it (see share-scanner.png). Both now render only when the camera is live.
+- [FIXED] Scanner: "Allow Camera" was a silent no-op once permission was permanently denied, because `requestPermission` does nothing when `canAskAgain` is false. It now opens `Linking.openSettings()` in that case. The button also got a hitSlop, since it was about 34px tall.
+- [FIXED] Scanner: the Back and Close header icons were 40x40 with no hitSlop. Added a 2px hitSlop to reach 44.
+- [FIXED] Share cards: the tagline ("Find me on Brandthread" / "Shop … on Brandthread") used FS.xs. Changed it to FS.meta in BuyerShareCard and SellerShareCard.
+- The seller tab profile (`app/(tabs)/profile.tsx:876`) does not pass `profileUsername`, so the sheet always falls back to api.auth.me. In the seller demo it renders "Couldn't load profile" (unfixed). The call site is not in my files.
+- Picking SELFIE without an avatar silently shows the COLOR gradient, so the tab appears to do nothing (unfixed). A fallback design is needed.
+- The scanner has two header buttons (Back and Close) that both call `onClose`, which is redundant (unfixed). It is the deliberate Mobbin layout.
+- The scanner's "Allow Camera" button text is Title Case (unfixed). The string is pinned by tests/share-profile-qr-scanner.test.tsx.
+- The signed-out state "Sign in to share your profile" has no sign-in action (unfixed). The auth route choice is a product decision.
+- `components/share-cards/*` (BuyerShareCard, SellerShareCard, ShareCardFrame) are dead code: nothing imports them. The sheet also ignores its `buyerExtra`/`sellerExtra` props and declares an unused `stateDetail` style (unfixed). Deleting them is a cleanup decision for the owner.
+
+**Thread share sheet** (`artifacts/mobile/components/ThreadShareSheet.tsx`, opened from the feed "Share post" button)
+- [FIXED] Busy spinners were invisible: ActivityIndicator used `theme.onAccent` (#000 in Monochrome) on a `theme.surface` (#000) circle (line 382). Changed it to `theme.text`.
+- [FIXED] "More friends" opened `Linking.openURL(ExpoLinking.createURL('/(buyer)/friends'))`. On web that opens a new browser tab, and on native it round-trips through the URL scheme. Changed it to `router.push('/(buyer)/friends')`.
+- [FIXED] The Close (X) button was 34x34 with no hitSlop and no `accessibilityRole`. Added `hitSlop={5}` and a button role.
+- [FIXED] The save-progress "Cancel" text was an 11px-tall tap target with no hitSlop. Added a hitSlop.
+- [FIXED] Action labels and the progress/cancel text used FS.xs (11). Changed them to FS.meta, with label lineHeight 15 so two-line labels still fit `minHeight: 30`.
+- With no accepted friends, the first row shows only a lone "More friends" tile (unfixed). The label is pinned by components/__tests__/ThreadShareSheet.structure.test.ts.
+
+**Other-user Profile (buyer as seen by a visitor)** (`artifacts/mobile/app/buyer-other-profile.tsx`)
+- When the profile fails to load (`api.social.profile` errors, or the id is unknown/`u_…`), the screen still draws the full shell as "?" / "Unknown" / "@unknown" with 0 / 0 counts. Its "..." sheet still offers Mute / Restrict / Report / Block, and the only error is a Retry in the grid area (shots: bop-demo.png, bop-menu.png). (unfixed — the screen's designed error is the in-grid Retry; replacing the shell with a full-screen error is a layout change and would break scripts/profile-owner-visitor-screenshots.mjs. Suggest hiding the "..." menu while `loadFailed`.)
+- [FIXED] Mute and Restrict gave no confirmation and could fail silently. `handleMute`/`handleRestrict` (~line 316) only fired a haptic, had no try/catch (a storage failure would be an unhandled rejection) and stored the raw route `handle`/`initials` params, which are '@unknown' / '?' when the user arrives from an activity row without them. Fix: wrapped both in try/catch with an Alert on failure. They now show a "Muted {name}" / "Restricted {name}" snackbar and store `displayHandle`/`displayInitials` resolved from the API.
+- [FIXED] The Thread Cash chip opened the send sheet without a recipient (~line 391). `ThreadCashAttachButton` got neither `recipientName` nor `recipientHandle`, so the sheet's subtitle fell back to "To them". Fix: it now passes `recipientName={displayName}` and `recipientHandle={profile?.username}`.
+- [FIXED] The blocked / visitor-preview banner used off-token values (~line 683). Its body and "Unblock"/"Exit" text were FS.xs (11, which is reserved for badges), `gap: 10` and `padding: 12` were literals, and the body text had no fontFamily. Fix: FS.meta, `gap: SP.sm`, `padding: SPACING.sm`, and FONT.regular.
+- [FIXED] The More-sheet row `gap: 14` was a literal (moreRowStyles ~line 664). Changed to SPACING.sm.
+- The More sheet doesn't match the seller profile's "..." sheet (unfixed). It is a hand-rolled Modal with dividers and no border or close affordance, while seller-profile.tsx uses the shared `ProfileMenuSheet`. The labels differ too: "Block" here, "Block {name}" there. Switching component is a layout change, not a mechanical fix.
+- Mute and Restrict are one-way (unfixed). The sheet always shows "Mute"/"Restrict", even for a user who is already muted or restricted, in which case tapping does nothing. There is no Unmute/Unrestrict. Fixing it needs new state loaded from `getMutedUsers`/`getRestrictedUsers`, which is a feature addition.
+- [FIXED] Grid load failures (Tagged tab, profile refresh, Products) read "Couldn't load these videos." because the shared `ProfileGridPlaceholder` (components/profile/ProfileGridStates.tsx) ignores `title` on error. The shared copy now reads "Couldn't load this tab." (fixed in the own-profile pass). Passing the screen's own `title` through is still open.
+
+**Public Profile Route** (`artifacts/mobile/app/u/[username].tsx`)
+- [FIXED] The signed-out landing hid its call to action from screen readers. Its `ScrollView` had `accessible` (~line 149), which on iOS makes the whole scroll content one accessibility element, so VoiceOver could not reach "Join Brandthread" or "Sign in". Removed the prop.
+- [FIXED] The loading state hid the back button from screen readers (~line 365). The root View had `accessible` + `accessibilityLabel="Loading profile"`, which grouped the whole screen, ScreenHeader back button included, into one non-interactive element. Removed both. The visible "Loading profile…" text still announces the state.
+- [FIXED] The error state didn't match the not-found state (~line 414). Its wifi-off icon sat bare, while not-found puts its icon in the 80px `iconBox` circle. Wrapped it in `iconBox`.
+- [FIXED] Off-token values. The fine print "Brandthread · Fashion & Commerce" was FS.xs (11, a meta line, not a badge), now FS.meta. The Home and Retry buttons used `paddingVertical: 14`, now SPACING.sm. `verifiedInline` used `gap: 3`, now SP.xs.
+- The signed-out landing can't be rendered in the harness (unfixed, not a code defect). Clerk is always stubbed as signed in, so /u/northlinestudio redirects to /seller-profile. The landing was reviewed in code only. /u/nobodyhere renders "Profile not found" correctly (shots/other-profiles/u-404.png).
+- Unused `header`/`backBtn` styles remain in makeStyles (unfixed). This is dead code with no visible effect.
+
+**Brand / Seller Profile (visitor view)** (`artifacts/mobile/app/seller-profile.tsx`)
+- [FIXED] Signed-out visitors could never reach the sign-in prompt from Follow (~line 627). The Follow button was `disabled` when `!userId`, but `handleFollow` already calls `requireSignIn()`, which routes guests to /sign-in and back. For guests the button was a dead, greyed control. Removed `|| !userId` from `disabled`.
+- [FIXED] A missing profile showed as a connection error. An unknown seller id, or a 404 from `/api/public/sellers/:id`, showed "Couldn't load this profile / Check your connection and try again / Retry", and Retry could never succeed (render: shots/other-profiles/seller-ember-demo.png). Fix: added `profileNotFound`, set when there is no route id or `err.status === 404` (never on the own-profile load). It shows "Profile not found / This profile doesn't exist or is no longer available." with a "Go back" action instead. Network failures keep Retry.
+- [FIXED] The rating chip read "1 reviews" when there was exactly one review (~line 644). It now uses the singular.
+- [FIXED] The visitor's empty Posts tab said "No videos yet" / "{brand} hasn't posted any videos yet." The tab is "Posts" (grid icon) and holds photo and carousel posts too. For visitors it now says "No posts yet" / "{brand} hasn't posted yet."; the owner copy is unchanged.
+- [FIXED] Tapping the backdrop of the owner's long-press post-actions sheet did nothing. The backdrop was a `PressableScale` with a style object (~line 761), and PressableScale only forwards `style` to its inner Animated.View, so the outer Pressable had no hit area; buyer-other-profile.tsx documents and fixed the same bug. Replaced it with a plain `Pressable` and added `accessibilityRole="button"`.
+- [FIXED] Off-token values. The vacation banner body text was FS.xs (11), now FS.meta. `vacationTitle` used `marginBottom: 3`, now SP.xs. SheetRow used `gap: 14` and `sheetHandle` used `marginTop: 12`, both now SPACING.sm.
+- The visitor "..." menu has Share profile / Gift cards / Report / Block but no Mute (unfixed). The buyer profile offers Mute and Restrict. Whether a brand can be muted is a product decision.
+- Post tiles show a shopping-bag badge and a photo badge in the top corners plus "▷ 1,200" (shots/other-profiles/seller-demo-bottom.png) (unfixed; shared component, owned by own-profile group). The play-icon view count also appears on photo posts. This comes from `ProfileVideoTile` in components/profile/ProfileVideoGrid.tsx.
+- [FIXED] Grid load failures (Tagged tab, profile refresh, Products) read "Couldn't load these videos." because the shared `ProfileGridPlaceholder` (components/profile/ProfileGridStates.tsx) ignores `title` on error. The shared copy now reads "Couldn't load this tab." (fixed in the own-profile pass). Passing the screen's own `title` through is still open.
+
+**Followers / Following** (`artifacts/mobile/app/connections.tsx`)
+- [FIXED] The Followers/Following tabs collapsed to their text width and ran together as "2 followers4 following", jammed against x=0, with no half-width split (rendered). The cause is that `PressableScale` puts `style` on its inner Animated.View, so `tabStyles.tab`'s `flex: 1` never reached the outer Pressable (connections.tsx `TabButton`, ~l.453). Wrapped each tab in `<View style={tabStyles.tabWrap}>` (`flex: 1`).
+- [FIXED] On every row the Follow/Following/Remove pill sat right after the name, part way across the row, instead of at the right edge (rendered on both lists). Same PressableScale cause: `styles.rowTap` `flex: 1` was ignored (~l.290). Wrapped the row's PressableScale in `<View style={styles.rowTapWrap}>` (`flex: 1, minWidth: 0`).
+- [FIXED] The search bar and the "Sort by" row had no 16pt gutter. "Sort by" was at x=0, the chevron touched the right screen edge, and the focused search pill ran edge to edge (rendered; `headerExtras` had no horizontal padding, ~l.528). Added `marginHorizontal: SP.md` to `search` and `paddingHorizontal: SP.md` to `sortRow`.
+- [FIXED] The Follow/Following/Remove pills rendered 44pt tall instead of the 32pt `pillStyles.pill.height`, because PressableScale adds a 44 minHeight. Added `noMinHeight` to `FollowPill` and `RemovePill`. PressableScale's auto hitSlop still pads the tap target to 44.
+- [FIXED] Meta text and pill labels were at FS.xs (11), below the 12pt floor: `username`, `mutualTag` ("Follows you"), `sortLabel`, `sortValue` and `pillStyles.text`. Changed all to `FS.meta`.
+- [FIXED] The row separator was inset 72 while the text column starts at 68 (16 gutter + 44 avatar + 8 gap), so the hairlines were visibly misaligned. Changed it to `SP.md + 44 + SP.sm`.
+- [FIXED] The unfollow confirm sheet showed only "Unfollow / Cancel" and never said which account (rendered; `showActionSheet(undefined, …)`, ~l.244). Added the title `Unfollow {name}?`.
+- Changing the sort quietly ignores a failed request (`handleSelectSort` `.catch(() => {})`, ~l.187). The header then shows the new sort label while the list stays in the old order (unfixed: choosing between an error toast and reverting is a UX decision).
+- On another account's Followers list, tapping "Following" unfollows at once with no confirm (~l.334), unlike the confirmed flow on the Following list (unfixed: behaviour change).
+- In demo mode, "Priya Nandan · Follows you" appears on Following, but she is missing from the 2-row Followers list (unfixed: demo seed in scripts/store-screenshots/demo-data.mjs, not owned).
+- The search bar's clear "x" sits top-aligned rather than vertically centred in the pill (rendered; unfixed: `SearchBar` in components/BrandthreadUI.tsx, not owned).
+
+**Activity people list** (`artifacts/mobile/app/activity-people.tsx`)
+- [FIXED] The search field's placeholder and accessibility label were just "Search" (~l.242), which is ambiguous for screen readers. Changed to "Search people".
+- Tapping "Following" on a row unfollows at once with no confirm (`handleToggleFollow`, ~l.188), inconsistent with the confirmed unfollow on connections.tsx (unfixed: behaviour change).
+- Following a private account shows "Following" even when the server only records a request. `handleToggleFollow` ignores a `requested` status from `setSellerFollowing` (unfixed: needs a "Requested" pill state in the shared PersonRow, not owned).
+- The loading skeleton uses off-token spacing `SP.xs + 2` (6) for row padding and gaps (~l.320 and l.324) (unfixed: cosmetic, and changing it alters the skeleton height to match PersonRow).
+
+**Follow requests / Connections** (`artifacts/mobile/app/buyer-friend-requests.tsx`)
+- [FIXED] On the Sent, Suggested and Incoming rows, the trailing actions ("Following" pill and "Unfollow") floated mid-row instead of sitting at the right edge (rendered on Sent). `PressableScaleRow`'s `flex: 1` was on PressableScale's inner view (~l.415). Wrapped it in an outer `<View style={rowStyles.outer}>` (`flex: 1, minWidth: 0`).
+- [FIXED] Seller handles showed without the @ ("fieldoffice", "emberandash") next to buyer handles that have it (rendered on Sent). Added an `atHandle()` display helper and applied it to all four handle lines.
+- [FIXED] A mutual follow (Priya Nandan, `followsMe: true`) appeared on Sent as "You follow them", i.e. listed as not following back (rendered). The Sent filter now also excludes rows whose own `followsMe` flag is true (~l.98).
+- [FIXED] The Suggested tab flashed "No suggestions yet" while data was still loading, because there was no `loading` branch, unlike Incoming and Sent (~l.323). Added `if (loading) return <ListSkeleton rows={4} />`.
+- [FIXED] Error alerts were titled with a bare "Error" ("Could not follow back.", "Could not unfollow.", "Could not confirm the request.") at ~l.126, l.141 and l.159. Rewrote them as "Couldn’t follow back" / "Couldn’t unfollow" / "Couldn’t confirm request" / "Couldn’t delete request" with the body "Try again in a moment."
+- Incoming, Sent and Suggested avatars use per-user identity colours (teal, orange, purple) instead of the monochrome `Avatar` that the Follow-requests rows already use (unfixed: swapping removes the file's only `#FFFFFF` hit, which makes its entry in tests/no-hardcoded-theme-color-lint.test.ts's allowlist stale, and that test fails. The lead should do the swap together with removing the allowlist entry).
+- "Dismiss" on an Incoming row only filters local state, so the row comes back on the next focus or refresh (`useFocusEffect` reloads) (unfixed: needs a persisted dismiss).
+- "Unfollow" on Sent unfollows at once with no confirm (unfixed: behaviour change).
+- The screen title is "Connections" while the entry point is follow requests, and it duplicates the title of /connections (unfixed: naming decision).
+
+**Blocked & muted** (`artifacts/mobile/app/buyer-blocked.tsx`)
+- [FIXED] Lead's report confirmed. The Blocked/Muted SegmentedControl rendered edge to edge (x=0 to 393, rendered) while the cards below sit in a 16pt gutter (FlatList `paddingHorizontal: SPACING.md`). Passed `style={s.tabs}` (`marginHorizontal: SPACING.md`) through SegmentedControl's existing `style` prop.
+- [FIXED] The empty state showed a redundant "0 BLOCKED ACCOUNTS" / "0 MUTED ACCOUNTS" section label directly above "You haven’t blocked anyone" / "No muted accounts" (rendered). The label now renders only when the count is greater than 0.
+- [FIXED] The Muted list had no pull-to-refresh while the Blocked list did. Added the same `ThemedRefreshControl` to the muted FlatList.
+- `unmute()` has no try/catch (~l.80). A failed `unmuteUser` becomes an unhandled rejection with no feedback (unfixed: needs an error UX choice).
+- `explainerText` uses an ad-hoc `lineHeight: 19` over `TYPE_SCALE.callout` (~l.214) (unfixed: cosmetic, and the token's own line height changes the card height).
+
+**Shared components** (`artifacts/mobile/components/social/RemoveFollowerSheet.tsx`, `artifacts/mobile/components/social/FollowButton.tsx`)
+- [FIXED] RemoveFollowerSheet: the dividers used a hardcoded `rgba(128,128,128,0.2)` instead of the theme. Changed to `theme.border`. The backdrop Pressable now has `accessibilityRole="button"` alongside its "Close" label.
+- [FIXED] FollowButton: the label "Follow Back" was title case, while every other pill in the app says "Follow back". Changed to sentence case (no tests reference it).
+- [FIXED] FollowButton: the compact variant is 32pt tall with no hitSlop, below 44. Added `hitSlop={{ top: 6, bottom: 6 }}` for the compact size.
+- [FIXED] FollowButton: the compact label was FS.xs (11). Changed to `FS.meta`.
+- [FIXED] FollowButton: there was no `accessibilityState` while busy or disabled. Added `{ disabled, busy }`.
+
+**Story Composer — Camera step** (`artifacts/mobile/app/buyer-story-create.tsx`)
+- [FIXED] Layout/grid mode makes the shutter go blank: in grid mode the shutter draws a `#000` grid glyph and no white inner disc, so it was black on black (render 04-grid-active) (buyer-story-create.tsx:1324). Changed the glyph color to `ON_DARK`.
+- [FIXED] Grid progress dots sat inside `controlsRow` between the shutter and the flip button. That pushed the shutter off-center and spread the row apart (render 04-grid-active) (was :1326-1332). Moved the dots block out of the row so it sits below it, centered above the "Cell N of M" hint (:1342).
+- [FIXED] The "Story settings" gear only showed an info Alert, which is a no-op on web, so it went nowhere (:1159). It now opens `/buyer-privacy-settings`, the same screen the in-file "Manage settings" archive notice already uses (:1162).
+- [FIXED] The "Grant access" permission button had no `accessibilityRole` (:1131). Added `button`.
+- [FIXED] Grid-layout options were 36x36 and the STORY/POST mode items were 32pt tall, with no hitSlop (render SMALL list). Added `hitSlop` to both (:1227, :1256).
+- [FIXED] Meta text was at the 11pt badge floor: the camera hint "Tap for photo · Hold for video", the rail labels and "Change grid" (styles `hint`, `railLabel`, `changeGridText`). Moved to `FS.meta` (12).
+- The "Change grid" pill is placed at a hardcoded `topInset + 90 + 190`. With the rail expanded or in the no-camera fallback, it overlaps the rail chevron and the camera-off icon (render 04-grid-active) (:1234). (unfixed) Repositioning it is a layout decision.
+- Expanding the rail ("Create/Boomerang/Layout/Hands-free" labels) widens the column, so the icons shift right and no longer line up under the X button (render 02-rail-expanded) (:2313). (unfixed) Needs a fixed rail width or a label-placement decision.
+
+**Story Composer — Create (text-only) step** (`artifacts/mobile/app/buyer-story-create.tsx`)
+- [FIXED] Text-color "circles" in the create toolbar rendered as 28x44 pills because `PressableScale` forces a 44pt min-height (render 06-create-typed) (:1563). Added `noMinHeight`. `PressableScale` still auto-pads the tap area to 44.
+- [FIXED] The canvas wrapper was `<Pressable onPress={() => {}}>`, a dead tap. Tapping empty canvas after the keyboard closed did nothing (:1526). It now focuses the text input through a new `createInputRef`.
+- [FIXED] Share sheet row subtitles "Sharing options" and "Add people" promised actions the radio rows don't have (render 07-share-sheet) (:1404, :1422). Reworded to describe the audience: "Everyone who can see your stories" and "Only people on your Close Friends list".
+- [FIXED] Share-sheet subtitles were 11pt meta text (`shareRowSubtitle`). Moved to `FS.meta`.
+
+**Story Composer — Edit step, text tool, sticker tray, share** (`artifacts/mobile/app/buyer-story-create.tsx`)
+- [FIXED] The "More tools" (…) button in the editor's top bar was a dead end: an Alert saying "Additional tools are coming soon." (was :1677-1684). Removed the button. NOTE for lead: `tests/no-coming-soon-lint.test.ts:80` allowlists `app/buyer-story-create.tsx`, and that was the file's only banned phrase. Its "stale" test will now flag the entry, so delete that allowlist line.
+- [FIXED] Each new sticker (Location, Time, Link, Thread Cash, Mention-less overlays, text) landed at exactly the same point, so stickers stacked illegibly: "Link" printed over "Add location" (render 14/17) (:845-850). New overlays are now offset 44pt down per existing overlay, cycling every 5.
+- [FIXED] The text-animation sheet subtitle had dev wording: "Plays back when story-viewer animation support ships — selection is saved now." (render 20-anim-sheet) (:2000). Changed to "Animations don’t play back in stories yet. Your choice is saved with this text."
+- [FIXED] Text-tool X and "Done" were bare 22x24 and 38x24 targets (:1842, :1845). Added 10pt `hitSlop`.
+- [FIXED] Draw bar targets were small with no hitSlop: color dots 22x22, brush sizes 24x24, undo 28x28 (render 22-draw) (:1696-1706). Added `hitSlop` to each.
+- [FIXED] The Close Friends chip on the edit bar was 26pt tall with no hitSlop (:1811). Added a vertical `hitSlop`.
+- [FIXED] Text-color sheet swatches rendered as 28x44 pills, the same `PressableScale` min-height issue (render 21-color-sheet) (:1980). Added `noMinHeight`.
+- [FIXED] The send button's posting state showed a static Feather "loader" glyph that never spins (:1827). Replaced it with `ActivityIndicator`.
+- [FIXED] Caption input had no accessibilityLabel (:1801). Added "Caption".
+- [FIXED] Shop-link modal: the Cancel and Add touchables had no `accessibilityRole`, and the URL input had no label (:2195-2215). Added roles, a small vertical `hitSlop` and `accessibilityLabel="Shop link URL"`.
+- [FIXED] Tagged-people sheet "Remove" button (~30pt tall) and reshare "Story unavailable" "Close" text button had no hitSlop (:2173, :1757). Added `hitSlop`.
+- [FIXED] Off-token or below-floor type: `myAvatarText` 10 became `FS.xs`, and `textToolChipGlyph` 13 became `FS.sm`. Meta labels at 11 moved to `FS.meta`: `myStoryLabel`, `closeFriendsLabel`, `mentionControlsLabel`, `mentionOpacityValue`, `sheetSubtitle`, `hsbLabel`, `stickerTileLabel`.
+- The Location sticker (tray tile and text-tool shortcut) places a literal "Add location" pill with no way to pick or edit a place, so that placeholder text gets published (:2053, :1950). (unfixed) Needs a location picker.
+- The Link sticker places `linkUrl: 'https://'` / "Link" with no URL entry, which makes it a dead sticker (:2057). (unfixed) Needs a link composer, for example reusing the shop-link modal, which is a product decision.
+- The Product picker swallows fetch errors and shows "No products to tag yet." with no retry (:919-926, :2112). (unfixed) Needs a new error state in this sheet.
+- The PostingToast percent label is `fontSize: 9`, below the 11pt floor (:301). (unfixed) "100" at 11pt no longer fits inside the 22pt ring, so the ring would need resizing.
+- While the text tool is open, its Mention/Location accessory row draws over the edit bar's "Your story / Close Friends / send" row, which shows through the 0.72 backdrop (render 18-text-tool). (unfixed) Layering/design change.
+
+**Story Composer — "Also share to" sheet** (`artifacts/mobile/app/buyer-story-create.tsx`)
+- [FIXED] The header row was double-indented: `textToolTop` adds 16pt on top of the sheet's 16pt padding, so "Also share to" sat at x=32 while the search field sat at x=16 (render 08-after-share) (:1437). Zeroed the row's horizontal padding there.
+- [FIXED] A search with no matches showed a blank list (:1485-1491). Added a "No people found." hint using the existing `alsoShareHint` style.
+- [FIXED] A failed `searchProfiles` rejection was unhandled and left stale results (:1078). Added `.catch` that clears the results.
+- [FIXED] The search input had no accessibilityLabel, and the Send buttons were ~30pt tall (:1451, :1474). Added the label "Search people" and a vertical `hitSlop`.
+
+**Sticker composers (Poll / Question / Countdown)** (`artifacts/mobile/components/social/StoryStickerComposer.tsx`)
+- [FIXED] CountdownPicker treated a failed `api.drops.list()` as "No upcoming drops", which is a misleading empty state with no retry (:138-149). Added a `failed` state showing "Couldn’t load your drops." with a "Try again" button that re-runs the fetch.
+- [FIXED] The Countdown empty state "No upcoming drops. Schedule a drop…" was a dead end (render 16-countdown). Added a "Schedule a drop" secondary button that closes the sheet and opens the existing `/seller-drop-create`.
+- [FIXED] The poll "Remove option" X is 40x40 with no hitSlop (:84-89). Added `hitSlop={4}`.
+- [FIXED] Spacing used raw literals 16/8/12/24 in the sheet, input, optionRow, addRow, empty and dropRow styles, plus `insets.bottom + 16`. Swapped them to `SP.md/SP.sm/SP.lg` and `SPACING.sm`.
+
+**Mention picker / suggestions bar** (`artifacts/mobile/components/MentionPickerSheet.tsx`)
+- [FIXED] The error state said "Couldn’t load people. Try again." but had no retry control (render 12-mention-picker, both fresh and demo) (:104-105). Added a `retry()` to `useMentionSearch` (an attempt counter in the effect deps) and a "Try again" button (`testID="mention-picker-retry"`).
+- [FIXED] When the search failed, MentionSuggestionsBar (the "@…" strip in the text tool) told the user "No people found." (:153). It now shows "Couldn’t load people." when the search failed.
+- [FIXED] Avatar initials used the literal `fontSize: 11` (:189). Swapped to `FS.xs`.
+
+**Mention sticker / reshare card** (`artifacts/mobile/components/StoryMentionSticker.tsx`)
+- [FIXED] The reshare credit pill ("@handle", which opens the original story) is a 41x14 target with `hitSlop={8}`, ~30pt effective (render 24-reshare, SMALL list) (:53). Raised the vertical hitSlop to 15 to reach about 44pt.
+- `base` sticker padding and radius are raw literals (12/6/8) not on the SP/RADIUS scale (:67). (unfixed) Changing them alters the sticker's size, and it's shared with the viewer, so it needs a design call.
+
+**Notes tray + Notes composer** (`artifacts/mobile/app/(buyer)/inbox.tsx` — notes portions only)
+- [FIXED] The note-compose sheet sat in a plain `View` with `autoFocus` and no keyboard avoidance. On iOS the keyboard covers the input and the "Share note" button (:1847). Wrapped the sheet backdrop in the app's existing `KeyboardAvoidingView` from `@/components/KeyboardProviderCompat` (`padding` on iOS), and added the import.
+- [FIXED] The composer placeholder "Your thoughts go here..." used three periods while every other composer uses "…" (:1874). Changed to "Your thoughts go here…".
+- [FIXED] The note bubble text used the literal `fontSize: 11` (:2010). Swapped to `FS.xs`. It's a chip, so the badge floor applies.
+- There's no way to remove or clear your own note: the compose sheet only replaces it, and `socialService` has no delete endpoint (:684-702). (unfixed) Needs a new API.
+- Friends' note bubbles are clamped to one line at 84pt (`numberOfLines={1}`), so a short note like "at the thrift store" truncates (:1630). (unfixed) Wrapping to two lines changes the fixed 34pt slot every avatar aligns to, which is a layout decision.
+
+**Story Viewer** (`artifacts/mobile/app/buyer-story-viewer.tsx`)
+- [FIXED] Own story bottom bar read "Seen by 0" in demo, and tapping it opened an empty "0 viewers" sheet. The seeded viewers fallback was gated on `!myUserId`, but the preview has a user id. So the prefetch (buyer-story-viewer.tsx:275-276) and `openViewersModal` (:574-577) replaced the list with `[]` on the failed fetch. It was also the wrong gate, because a fresh (non-demo) preview with no user id got fake viewers. Both paths now fall back to `PREVIEW_STORY_VIEWERS` only when `isPreviewDemoMode()`, and use `[]` otherwise.
+- [FIXED] When a real story has 0 viewers, the bar showed the awkward copy "Seen by 0" (:905). It now reads "No viewers yet", and the accessibilityLabel matches.
+- [FIXED] Choosing "Report story" from the "..." menu (:831) left `isPaused=true`. After the user came back from the report screen, the story stayed frozen and never advanced again. The menu now unpauses before pushing the report route.
+- [FIXED] Dismissing either action sheet without a button (Android back or tapping outside) left playback paused for good. Both `Alert.alert` menus (others' "Story options" and own "More options") now pass `{ cancelable: true, onDismiss: () => setIsPaused(false) }`.
+- [FIXED] "Delete story" in the own-story "..." menu deleted the story right away with no confirmation (:954). It now asks first with "Delete this story?" and Cancel / Delete (destructive), and unpauses on cancel.
+- [FIXED] "Mute <name>" had no error handling (:819). A failed `muteUser` caused an unhandled rejection and left the story paused with no feedback. It is now wrapped in try/catch, shows a "Couldn’t mute / Try again." alert and unpauses.
+- [FIXED] "Save to device" was offered on text slides, which have no imageUri. It always failed with the misleading "Check your photo library permission" alert (:943). The option now only shows for photo/video slides that have an imageUri.
+- [FIXED] The "Notify me" countdown sticker failed silently when `api.publicDrops.subscribe` threw (:531), and the button just reset. It now shows "Couldn’t turn on drop alerts / Try again." and rethrows, so the sticker keeps its retry state.
+- [FIXED] The author name and time had no truncation or shrink (:776-778). A long name pushed the product tag, "..." and close buttons off-screen. The container is now `flexShrink: 1` and both texts are `numberOfLines={1}`.
+- [FIXED] The product tag chip label had no line limit (:800). A long product name grew the chip without bound in the header row. The label is now `numberOfLines={1}` + `flexShrink`, and the chip has `flexShrink: 1, maxWidth: 160`.
+- [FIXED] The full-height tap zones were unlabeled pressables: the harness reported "0,0 86x639" and "86,0 307x639" as unlabeled. They now carry accessibilityLabel "Previous" / "Next", matching story-mention-viewer.tsx.
+- [FIXED] Rows in the viewers sheet ignored `avatarUrl` and always showed a letter, while the "Seen by" stack used the photo. Rows now render the avatar image (the circle got `overflow: hidden`). Name and handle are now `numberOfLines={1}`.
+- [FIXED] Meta text below the floor. Viewer-row handle and time used FS.xs (11) and are now FS.meta (12). The seen-by avatar initials used the literal `fontSize: 10` and are now FS.xs.
+- On web, every `Alert.alert` menu does nothing: others' "...", own "More options", the product-tag "Shop" sheet and the delete confirm. react-native-web's Alert is a no-op, and the "..." menus also leave the story paused (verified by render: tapping "Story options" shows nothing). (unfixed) The fix needs an app-wide web action-sheet fallback (lib/actionSheet.ts), outside this file.
+- Highlights play as separate stories, so the progress bar shows one segment per item instead of one per highlight item (06b-highlight.png: a single segment for a 3-item highlight). (unfixed) This needs a nav/progress model change and is a design decision.
+- Demo author question sticker says "7 responses", but the Responses sheet lists 2 answers. The seed in lib/previewStickers.ts has `count: 7` and only 2 `PREVIEW_STICKER_ANSWERS`. (unfixed) The file is not owned.
+- Replying from the Responses sheet in the demo sticker story just closes the sheet, which is a dead tap (`replyToAnswer`, :559). (unfixed) It only happens on the demo path, and no preview DM route exists for these seeded users.
+- `authorName` uses the literal `fontSize: 14`, which is off-token with no matching FS step (13/15). (unfixed) Changing it alters the header type size, which is a design call.
+- The viewers sheet shows "No viewers yet" when the fetch failed, with no retry. (unfixed) Telling a failure apart needs new state and UI.
+
+**Story Gesture Guide / Responses sheet / Stickers / Tray (viewer sub-components)** (`artifacts/mobile/components/social/*`)
+- [FIXED] StoryGestureGuide: the "Tap to keep watching" meta line used FS.xs (11) and is now FS.meta. The copy is unchanged because tests and scripts match it.
+- [FIXED] StoryStickers: a long poll option label had no truncation and ran under the right-aligned check + percentage once results were revealed. The label is now `numberOfLines={1}`, with a maxWidth when revealed.
+- [FIXED] StoryStickers: the product sticker name/sub and the countdown name had no line limits, so a long product or drop name grew the card without bound. They are now `numberOfLines` 2/1/2.
+- [FIXED] StoryStickers: the question "Send answer" button was 32x32 with no hitSlop, so the target was under 44. `hitSlop={6}` was added.
+- [FIXED] StoryQuestionResponsesSheet: the "Reply" button was 36pt tall with no hitSlop, so the target was under 44. `hitSlop={4}` was added. The responder name is now `numberOfLines={1}`, and the literal `+ 16` bottom padding is now `SP.md`.
+- [FIXED] StoryTray: name labels under the rings used FS.xs (11) and are now FS.meta, with marginTop 4 replaced by SP.xs. The ring accessibilityLabel spoke initials ("AN's story"). An optional `name` prop was added, and the tray now passes `authorName`.
+- StoryTray (`components/social/StoryTray.tsx`) isn't imported anywhere, so it is dead code. The inbox builds its own tray. (unfixed) Deleting or wiring it is a product decision.
+- The Responses sheet shows "No responses yet." when loading the answers failed: the viewer sets `{questions: []}` on error. There is no retry. (unfixed) This needs an error prop and new UI.
+
+**Story Mentions List** (`artifacts/mobile/app/story-mentions.tsx`)
+- A network error shows the "No story mentions" empty state with no retry. `useStoryMentions` swallows the error and exposes no error flag. (unfixed) hooks/useStoryMentions.ts is not owned.
+- [FIXED] (rail on Activity, `components/StoryMentionsRail.tsx`) The ring count badge used the literal `fontSize: 10` below the 11 floor and is now FS.xs. The "See all" text link was about 32pt tall with `hitSlop={8}`, so the target was under 44. hitSlop is now 12.
+
+**Story Mention Viewer** (`artifacts/mobile/app/story-mention-viewer.tsx`)
+- [FIXED] The only way to report a story was an invisible long-press on the header text (:484). That Pressable had no label, hint or accessibility action, so screen-reader users could not reach it at all. It now has an accessibilityLabel ("<name> mentioned you"), the hint "Long press to report this story", and a `longpress` accessibility action ("Report story") wired to the same `openReportSheet`.
+- There is no visible "..." / options button, so Report is only reachable by an undiscoverable long-press. The regular viewer has a "Story options" button. (unfixed) Adding a header button is a layout and design change.
+- Mention stickers on the slide aren't tappable here (`pointerEvents="none"`, :104), unlike buyer-story-viewer, which opens the "View profile" popover through ViewerMentionStickers. (unfixed) This is feature parity work, not a mechanical fix.
+- "Story unavailable" (:392) is also shown when the user simply has no mentions left, and its copy and icon differ from the main viewer's "This story's no longer available." with camera-off. (unfixed) This is minor copy consistency. It is left alone because a design pass may want different wording per case.
+- `name` uses the literal `fontSize: 14`, which is off-token (same as the main viewer). (unfixed) No exact token exists, so this is a design call.
+
+**StoryMentionViewerParts (mention popover / tagged sheet / reshare card)** (`artifacts/mobile/components/StoryMentionViewerParts.tsx`)
+- Clean. All pressables are labelled, the close X has hitSlop 12, the "View profile" button is 44pt, and handle/name rows are `numberOfLines={1}`.
+
+**Highlight Stories (Select stories)** (`artifacts/mobile/app/buyer-highlight-stories.tsx`)
+- [FIXED] In the error state, the "Done" sticky CTA rendered in the middle of the screen, right under "Try again" (16-hl-stories-fresh.png). EmptyState doesn't flex, so the CTA wasn't pushed to the bottom. The error state is now wrapped in a `flex: 1` view.
+- [FIXED] "Done" was enabled while the grid was loading or had failed to load. Tapping it ran a no-op save and popped, as if the highlight had been updated. The CTA is now `disabled={loading || failed}`.
+- [FIXED] The error title used a straight apostrophe ("Couldn't") while the rest of the screen family uses ’. It now reads "Couldn’t load your stories". The date chip padding literal `8` is now `SPACING.xs`.
+- Opening the screen without a `highlightId` outside the demo throws 'missing highlight', and the user sees "Couldn't load your stories / Check your connection", which is misleading. (unfixed) Only the Highlights manager links here and it always passes the id; a dedicated state would be new UI.
+
+**Comments Sheet** (`artifacts/mobile/app/buyer-post-comments.tsx`)
+- [FIXED] Blocking someone from the long-press menu left all of their comments on screen. In the demo render, "Toby Nguyen is blocked" appeared but his comment was still in the list. For preview posts `load()` just re-reads `previewCommentsCache`, so the comments never went away (handleBlock ~line 836). Added a local `setCommentsSynced(prev => prev.filter(c => c.author.userId !== comment.author.userId))` after a successful block. A real post still refetches as before.
+- [FIXED] Guest muted-word read failure blanked the whole thread. If `readGuestMutedWords()` rejected, `guestMutedPhrases` became `null`, and `visibleRows` returns `[]` for `null`. Guests then saw "Start the conversation" on a post that has comments (~line 541). The failure path now sets `[]`, which means no muted words, so all comments show.
+- [FIXED] Opening the sheet without a `postId` showed "Start the conversation" with a live composer. Sending then called `api.comments.create('')` and showed a generic error (load ~line 724, composerLocked ~line 1083). It now sets `fetchError` to 'This post is no longer available.' (Retry stays wired to `load`, which an existing test pins). `composerLocked` now includes `!postId`, and the locked text reads "Comments aren't available on this post."
+- [FIXED] The header showed "0 comments" above the fetch-error InlineError, which is wrong because the count is unknown (~line 1145). The title is now "Comments" whenever `fetchError` is set.
+- [FIXED] Reply was a dead tap when the composer was locked. When comments were disabled or the viewer was signed out, Reply (row and long-press menu) still set `replyingTo`, which opened a "Replying to X" banner over a composer that cannot send (handleReply ~line 816). handleReply now returns early when locked. A signed-out viewer is sent to `/sign-in`, the same target as the locked composer's "Sign in" link.
+- [FIXED] Misleading copy: the send-failure banner said "Could not post comment. Tap to retry.", but tapping the banner only dismisses it (~line 978). It now says "Could not post comment. Try again." (the draft is kept, so Send retries).
+- [FIXED] The "Replying to X" cancel (x) button sat at the top-right corner of a banner stretched to 44pt by PressableScale's forced minHeight. The render showed the x misaligned with the vertically centred label and the banner about twice its needed height. Added `noMinHeight`, and raised hitSlop 6 to 15 so the target stays 44pt (14 + 2*15).
+- [FIXED] Hit targets under 44pt: the composer's Emoji and Mention (@) tools are 26x26 with no hitSlop. Added hitSlop 9 on each side, giving 44pt. The quick-reaction emoji buttons are about 24pt wide; added left/right hitSlop of 10.
+- [FIXED] Missing a11y: the actions-sheet scrim Pressable had `accessibilityLabel="Dismiss"` but no role. Added `accessibilityRole="button"`. The send-error and held-notice banners dismiss on tap but say nothing about it; added `accessibilityHint="Dismiss"`.
+- [FIXED] Meta text below the 12pt floor (it used FS.xs = 11, which is for badges only). Changed to FS.meta: "Replying to X" reply context, "View older comments", the muted-words note, "View N replies / Hide replies", toast text, send-error and held banners, the "Replying to" banner label, and the like count under the heart (`actionLabel`, literal 11).
+- [FIXED] Off-token literals swapped for tokens: `pinnedText` / `creatorLikedText` / `reviewPillText` 11 to FS.xs (badges); `creatorBadge` 13 to FS.sm; Avatar initials `10` (for avatars of 34pt or less) to FS.xs, which was below the floor.
+- `emptyState` / `emptyTitle` / `emptyText` styles (~lines 1420-1422) are dead code; the screen uses `EmptyState` from BrandthreadUI (unfixed). This is cleanup only, with no user impact.
+- `commentTime` / `replyLabel` / `commentText` / `authorName` use literal 12/12/15/13 instead of FS tokens (unfixed). tests/comments-sheet-fixes.test.ts pins those exact source strings.
+- tests/comments-sheet-fixes.test.ts already fails on the original HEAD source (unfixed, not caused by this audit). It expects `Ionicons ... 'heart-outline'` and `authorName ... color: '#8a8a8a'`, but the file uses FontAwesome/Feather hearts and `MUTED`. Lead should update the test.
+- Author avatar and name in a comment row can't be tapped to open the profile, while @mentions in the same rows can (unfixed). Adding it would be new navigation and a feature decision.
+- The header count includes replies and counts comments a guest's muted words hide locally, so "12 comments" can exceed what's visible (unfixed). Changing the count's meaning is a product decision.
+- Toast is placed at a fixed `bottom: 150`. With the reply banner and mention strip showing it overlaps the list rows above the composer (seen in the render) (unfixed). Repositioning is a layout change.
+- Destructive confirm button text is hard-coded `#1A0A0A` on `theme.error` (unfixed). Theme colour choice; needs design input.
+- Mention suggestion chip shows "mayac" without "@" (render) (unfixed). It comes from components/MentionPickerSheet.tsx, which this group doesn't own.
+
+**Quote Post** (`artifacts/mobile/app/quote-post.tsx`, `artifacts/mobile/components/social/QuotedPostCard.tsx`)
+- [FIXED] A broken or unreachable thumbnail URL rendered an empty grey square (render with an unreachable thumb). QuotedPostCard used a bare `<Image>` with no `onError`. Added `thumbFailed` state; on error it shows the existing image/video icon placeholder.
+- [FIXED] With no `postId`, the card showed a fake "Brandthread" author (the `quotedAuthorName` fallback) with no caption, and the Post button stayed disabled with no explanation (render `/quote-post`). The screen now passes `{ unavailable: true }` when there is no postId, so the card's existing "This post is unavailable" state shows.
+- [FIXED] The unavailable state's `accessibilityLabel` was on a plain View without `accessible`, so iOS VoiceOver ignored it. Added `accessible`.
+- [FIXED] The character counter "0/2200" used FS.xs (11), below the meta floor. Changed to FS.meta.
+- [FIXED] Off-token spacing literals in quote-post.tsx (16/8/24/12 in content and footer, the input's paddingHorizontal 16, and the footer's safe-area minimum 12) and QuotedPostCard (gap 12, padding 16/12, unavailable padding 16, text gap 4) now use the matching `SPACING` tokens. Values are unchanged.
+- The disabled Post button renders as bare grey "Post" text with no visible button shape in dark mode, because Button's disabled primary uses `palette.elevated` (render) (unfixed). This lives in components/ui/Button.tsx, which this group doesn't own.
+- In preview/demo, tapping Post just navigates back with no confirmation or haptic (unfixed). There's no existing toast or route to wire it to without adding a feature.
+- If `author` is missing but `postId` is present, the card labels the original "Brandthread" (unfixed). The fallback is shared with the post viewer; changing it needs a decision.
+- Input `paddingVertical: 14` and `lineHeight: 22` have no exact token (unfixed).
+
+**Repost / Quote entry points** (report-only; owned by the feed team)
+- RightActionRail's Repost (components/buyer-feed/RightActionRail.tsx:274-285) is a straight toggle with no "Quote" choice. The only route to /quote-post is the "Quote" item in components/ThreadShareSheet.tsx:318-324. That item shows only when `isUUID(postId)`, so in demo/preview there is no way to reach the quote composer from the UI.
+
+**Activity** (`artifacts/mobile/app/activity-center.tsx`, buyer tab wrapper `artifacts/mobile/app/(buyer)/activity.tsx`)
+- [FIXED] Last row stays under the floating tab bar at the end of the list. With 23 rows in the feed and the list scrolled to the bottom, the final row ("Person17 Name liked your post") sat behind the tab bar capsule (shots/activity/buyer-full-02-bottom.png). The cause was `contentContainerStyle` paddingBottom = `screenPadding.bottom + SP.xl`, which comes from `useScreenPadding({ withTabBarInset: false })` and is only the safe-area inset (activity-center.tsx:1334). Now `Math.max(screenPadding.bottom + SP.xl, useTabBarClearance(role === 'seller' ? 2 : 1))`. Mid-list rows still scroll under the glass, and the end of the list now clears the bar for both the buyer bar and the seller bar.
+- [FIXED] "..." menu (swipe "More options" or long-press) → "Block" blocked the person on a single tap with no confirmation (activity-center.tsx:1119, `handleBlockFromMenu` ran directly). It now opens a `Block {name}?` sheet with the shared `BLOCK_EXPLAINER` copy (lib/safety.ts) and Block/Cancel buttons, through the existing `showActionSheet`, which also works on web. Other Block entry points in the app already work this way (buyer-conversation, buyer-post-comments).
+- Back arrow shows on the buyer **tab** version of Activity (`/activity`, where the tab bar's bell slot is selected). Other buyer tab roots (Orders, Friends, Following) pass `showBack={false}`. (unfixed) The same default export is also a pushed stack screen for sellers, and buyers can reach it by pushing from a bell. Hiding the arrow only on the tab instance means changing the wrapper's re-export pattern, and that is a navigation design call.
+- The auth error state ("Sign in again to see your activity.") offers only "Try again", which repeats the same failing call. There is no sign-in action (activity-center.tsx:1288-1294; the same applies to seller-activity.tsx:417-423). (unfixed) The correct sign-in route and flow for a signed-in user whose session expired is a product decision. I reproduced it in the seller preview (shots/activity/seller-ac-demo2.png).
+- On web, the last filter chip ("Thread Cash") scrolls flush against the right screen edge: the trailing 16pt `chipScrollContent` padding is not honored by the horizontal ScrollView on react-native-web (shots/activity/buyer-empty-chip-thread_cash.png). (unfixed) This is web-only; native honors contentContainer padding, and adding a spacer would double the gap on native.
+- `Alert.alert('Could not delete' / 'Could not follow' / 'Could not block' / 'Could not mark all as read')` failure messages are silent no-ops on web, so failures there give no feedback (activity-center.tsx:728, 1041, 1101, 1160). (unfixed) This is a codebase-wide pattern for error alerts. Swapping them is a cross-screen decision, not a local fix.
+- Repost rows get no type badge on the avatar, while like, comment and follow rows do: `ActivityTypeBadge` only maps follows/likes/comments (activity-center.tsx:211-215). (unfixed) Choosing a new badge icon is a design decision.
+- Suggested-for-you "Follow" text uses a literal `fontSize: 14` (activity-center.tsx:1638), which is not an FS token. (unfixed) It deliberately matches the shared FollowPill's own literal 14 (components/search/PersonRow.tsx:171), so changing only this one would make the two pills disagree.
+- Actor avatars without a photo render on saturated per-user colours (purple, pink, blue — `row.actorColor`, seen on /activity-center?demo=1), outside the black/white/silver palette (unfixed). The colours come from the activity data/preview seed, so recolouring is a palette decision across every avatar fallback.
+
+**Notifications** (`artifacts/mobile/app/buyer-notifications.tsx`)
+- [FIXED] The header "Clear read notifications" (trash) button did nothing on web. It called `Alert.alert`, which is a silent no-op on react-native-web; tapping it showed no sheet (verified: no confirm text appeared). It now uses the existing `showActionSheet` with the same title, message and buttons. That is unchanged `Alert.alert` on native and a real themed sheet on web. The unused `Alert` import was removed.
+- [FIXED] Tapping a social notification opened the Inbox. For example, "Marcus Webb started following you" navigated to `/inbox` (verified live). `notifNavigation` sent every type not in its switch (new_follower, post_like, post_comment, repost, mention, story_mention…) to `router.navigate('/(buyer)/inbox')` (buyer-notifications.tsx:218-220). The default branch now uses the existing `activityHref(notif, 'buyer')` from lib/activity.ts, the same routing the Activity rows use: profile for a follower, post viewer for a like, comment thread for a comment. It falls back to Inbox only when there is no target.
+- [FIXED] A row tap waited for `markNotificationRead` before navigating. That function refetches the whole notifications list, so every tap was delayed by a network round trip, and an offline or failed refetch threw before `notifNavigation` ran, so the tap did nothing (buyer-notifications.tsx:325-327). The row is now marked read locally, navigation happens immediately, and the server mark-read runs afterwards with its error caught.
+- [FIXED] Unread rows' 2pt accent left border pushed their avatar and text 2pt right of read rows, so the columns didn't line up (PS avatar at x=18pt vs MW at x=16pt in shots/activity/bn-demo.png). Read rows now reserve the same 2pt left border in `theme.background`.
+- [FIXED] Rows with an empty `body` (all follower and like rows) still rendered an empty body `<Text>`, which takes up a blank line on native. Their accessibilityLabel also ended in a dangling `". "`. The body Text is now rendered only when there is a body, and the label omits it when empty.
+- [FIXED] Off-token icon sizes: the filter-row edge chevrons used a literal `size={14}`. They now use `ICON.xs` (same value).
+- The swipe "Read" action and category icons use off-palette accents: swipe Read is `theme.success` (green), and products/marketing icons are `theme.warning`, seller_updates is `theme.success` (buyer-notifications.tsx:113-126, 415). (unfixed) Recoloring is a palette/design decision.
+- On web, the right-edge filter fade does not fade. The chevron draws straight over the "Products" chip text ("Produc>t") (shots/activity/bn-demo.png). (unfixed) Changing the gradient/edge treatment is visual design.
+- Long-press sheet actions (Mark read/unread, Mute, Delete) and swipe toggle-read `await` service calls without try/catch: a failure is an unhandled rejection and the user gets no feedback (buyer-notifications.tsx:337-366, 383-393). (unfixed) Proper rollback plus an error surface needs per-action design.
+- Section headers are ALL CAPS ("TODAY", "THIS WEEK"), while Activity uses sentence case ("Today", "Last 7 days"), and the header between sections is a dashed ThreadDivider. (unfixed) This is a deliberate style of this classic list, and changing it is a design choice.
+
+**Seller Activity** (`artifacts/mobile/app/seller-activity.tsx`)
+- [FIXED] "..." menu → "Block" blocked immediately with no confirmation (seller-activity.tsx:343-356). It now shows the same `Block {name}?` + `BLOCK_EXPLAINER` confirm sheet via `showActionSheet` before calling `blockUser`.
+- The auth error state offers only "Try again" with no sign-in path (seller-activity.tsx:417-423). (unfixed) Same reason as on Activity: the sign-in flow is a product decision.
+- The "All" empty-state copy reads "Likes and followers show up here." even though the screen also collects comments, mentions and reposts (it comes from `sellerChipEmpty('all')` in lib/sellerActivity.ts). (unfixed) The string lives in lib/sellerActivity.ts, which is outside my owned files.
+- `Alert.alert('Could not delete' / 'Could not follow' / 'Could not block')` failure messages are silent on web (seller-activity.tsx:129, 300, 354). (unfixed) Same codebase-wide pattern as on Activity.
+
+**Notification Banner** (`artifacts/mobile/components/notifications/NotificationBanner.tsx`)
+- [FIXED] The close "x" was an icon-only TouchableOpacity with no accessibilityLabel or role. It now has `accessibilityRole="button"` and `accessibilityLabel="Dismiss notification"`.
+- [FIXED] The banner's main tap target had no accessibilityRole or label. It now has `accessibilityRole="button"`, a label of title plus body, and a hint.
+- [FIXED] The close button was nested inside the banner's own TouchableOpacity, which is a button inside a button: invalid on web and ambiguous for screen readers. The row is now a plain View holding an "open" TouchableOpacity (`openArea`: flex 1, row) and the close button as a sibling. The visual layout is the same.
+- [FIXED] Body text used `FS.xs` (11), which is below the 12pt floor for non-badge text. It now uses `FS.meta` (12).

@@ -39,6 +39,7 @@ import { getSellerFollowState, setSellerFollowing, setPostPinned, pinErrorMessag
 import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { SPACING } from '@/constants/spacing';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents';
 import { copyProfileLink } from '@/lib/copyProfileLink';
@@ -210,6 +211,8 @@ export default function SellerProfileScreen() {
   const sellsGiftCards = useStoreGiftCards(seller?.sellerId);
   const [profileLoading, setProfileLoading] = useState(!cachedSellerView);
   const [profileError, setProfileError] = useState(false);
+  // A 404 / missing id is "not found", not a connection problem (no Retry).
+  const [profileNotFound, setProfileNotFound] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -292,6 +295,7 @@ export default function SellerProfileScreen() {
     (async () => {
       if (reloadTick === 0 && !hasSellerRef.current) setProfileLoading(true);
       setProfileError(false);
+      setProfileNotFound(false);
       try {
         let view: SellerView;
         if (loadOwnProfile) {
@@ -728,12 +732,21 @@ export default function SellerProfileScreen() {
         <View style={styles.errorBar}>
           <ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         </View>
-        <EmptyState
-          icon="alert-triangle"
-          title="Couldn't load this profile"
-          description="Check your connection and try again."
-          action={{ label: 'Retry', onPress: () => { setProfileLoading(true); setProfileError(false); setReloadTick((tick) => tick + 1); } }}
-        />
+        {profileNotFound ? (
+          <EmptyState
+            icon="user-x"
+            title="Profile not found"
+            description="This profile doesn't exist or is no longer available."
+            action={{ label: 'Go back', onPress: goBack }}
+          />
+        ) : (
+          <EmptyState
+            icon="alert-triangle"
+            title="Couldn't load this profile"
+            description="Check your connection and try again."
+            action={{ label: 'Retry', onPress: () => { setProfileLoading(true); setProfileError(false); setReloadTick((tick) => tick + 1); } }}
+          />
+        )}
       </View>
     );
   }
@@ -985,10 +998,10 @@ export default function SellerProfileScreen() {
             layout={layout}
             quiet
             icon={(tabEmpty?.icon ?? videosEmpty.icon) as never}
-            title={tabEmpty?.title ?? videosEmpty.title}
+            title={tabEmpty?.title ?? (isOwner ? videosEmpty.title : 'No posts yet')}
             description={tabEmpty
               ? tabEmpty.message
-              : isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted any videos yet.`}
+              : isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted yet.`}
             action={(tabEmpty ?? videosEmpty).cta ? { label: (tabEmpty ?? videosEmpty).cta!.label, onPress: () => router.push((tabEmpty ?? videosEmpty).cta!.route as never) } : undefined}
             testID={`seller-profile-${activeTab.toLowerCase()}-empty`}
           />
@@ -1067,8 +1080,8 @@ function makeStyles(theme: AppThemePreset) {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,
     },
-    vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+    vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: SP.xs },
+    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 18 },
     errorRoot: { flex: 1, backgroundColor: theme.background },
     errorBar: { paddingHorizontal: SP.md, alignItems: 'flex-start' },
   });

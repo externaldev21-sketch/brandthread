@@ -114,7 +114,15 @@ export default function NotificationBanner() {
           },
         ]}
       >
-        <TouchableOpacity activeOpacity={0.85} onPress={handlePress} style={styles.content}>
+        <View style={styles.content}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handlePress}
+            style={styles.openArea}
+            accessibilityRole="button"
+            accessibilityLabel={payload.body ? `${payload.title}. ${payload.body}` : payload.title}
+            accessibilityHint="Opens this notification"
+          >
           <View style={styles.iconWrap}>
             <Icon name={icon} size={18} color={theme.accent} />
           </View>
@@ -124,10 +132,11 @@ export default function NotificationBanner() {
               <Text style={[styles.body, { color: theme.muted }]} numberOfLines={2}>{payload.body}</Text>
             )}
           </View>
+          </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss notification" hitSlop={12} onPress={hide} style={styles.closeButton}>
             <Icon name="x" size={16} color={theme.muted} />
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -156,6 +165,12 @@ const styles = StyleSheet.create({
     paddingVertical: SP.sm,
     paddingHorizontal: SP.sm,
   },
+  openArea: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   iconWrap: {
     width: 36,
     height: 36,
@@ -173,7 +188,7 @@ const styles = StyleSheet.create({
   },
   body: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     marginTop: 2,
   },
   closeButton: {

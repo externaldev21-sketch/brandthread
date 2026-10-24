@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
@@ -148,6 +149,7 @@ export default function ProfileScreen() {
   const { theme } = useAppTheme();
   const router  = useRouter();
   const api = useApi();
+  const insets = useSafeAreaInsets();
   const hasUnreadActivity = useSellerActivityUnread();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
   const layout = useProfileLayout({ tileAspect: TILE_ASPECT_3_4 });
@@ -881,7 +883,7 @@ export default function ProfileScreen() {
       <ShareProfileSheet
         visible={shareSheetVisible}
         onClose={() => setShareSheetVisible(false)}
-        avatarUrl={profile?.profileImageUrl ?? null}
+        avatarUrl={profile?.avatarPosterUrl || profile?.profileImageUrl || null}
         sellerExtra={{
           rating: null,
           products: sellerPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.thumbnailUri ?? p.mediaUris?.[0] })),
@@ -910,7 +912,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   draftsTileTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-  draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED },
 
   // Profile editor sheet
   inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },

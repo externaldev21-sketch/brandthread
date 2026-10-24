@@ -544,6 +544,9 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>(true, false);
   const router = useRouter();
   const { role } = useRole();
+  // Once scrolled to the very end, the last row (and "Suggested for you")
+  // must clear the floating tab bar instead of resting under it — the small
+  // `screenPadding.bottom` above alone left the final row behind the bar.
   const api = useApi();
   const { user } = useUser();
   // Inline "Trending brands" under the activity (replaces "Find people to follow").
@@ -1068,7 +1071,17 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       buttons.push({ text: 'Remove follower', style: 'destructive', onPress: () => setRemoveFollowerTarget(row) });
     }
     if (actor?.id) {
-      buttons.push({ text: 'Block', style: 'destructive', onPress: () => { void handleBlockFromMenu(row); } });
+      // Blocking is drastic (hides both people from each other everywhere),
+      // so it gets the same "Block name?" confirm every other Block entry
+      // point in the app shows, not a one-tap action.
+      buttons.push({
+        text: 'Block',
+        style: 'destructive',
+        onPress: () => showActionSheet(`Block ${actor.name}?`, BLOCK_EXPLAINER, [
+          { text: 'Block', style: 'destructive', onPress: () => { void handleBlockFromMenu(row); } },
+          { text: 'Cancel', style: 'cancel' },
+        ]),
+      });
     }
     buttons.push({ text: 'Cancel', style: 'cancel' });
     showActionSheet(undefined, undefined, buttons);

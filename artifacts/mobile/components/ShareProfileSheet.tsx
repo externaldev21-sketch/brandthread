@@ -225,6 +225,11 @@ export function ShareProfileSheet({
     setScreen('share');
   }, []);
 
+  const handleSetUsername = useCallback(() => {
+    onClose();
+    router.push((identity?.accountType === 'seller' ? '/edit-profile' : '/(buyer)/edit-profile') as never);
+  }, [identity?.accountType, onClose, router]);
+
   const handleShareProfile = useCallback(() => {
     if (!canonicalUrl || busy) return;
     void runAction('share', async () => {
@@ -366,6 +371,9 @@ export function ShareProfileSheet({
               <View style={[styles.card, styles.stateCard]}>
                 <Icon name="at-sign" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Set a username to get a shareable QR code.</Text>
+                <PressableScale onPress={handleSetUsername} accessibilityRole="button" accessibilityLabel="Set username">
+                  <Text style={styles.retryText}>Set username</Text>
+                </PressableScale>
               </View>
             ) : (
               <>
@@ -657,8 +665,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
-  profileLink: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', marginTop: SP.xs },
-  shareHint: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', paddingHorizontal: SP.lg, marginTop: SP.sm },
+  profileLink: { fontFamily: FONT.regular, fontSize: FS.meta, textAlign: 'center', marginTop: SP.xs },
+  shareHint: { fontFamily: FONT.regular, fontSize: FS.meta, textAlign: 'center', paddingHorizontal: SP.lg, marginTop: SP.sm },
   tilesRow: {
     flexDirection: 'row',
     width: '100%',
@@ -678,7 +686,7 @@ const styles = StyleSheet.create({
   },
   tileLabel: {
     fontFamily: FONT.medium,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: '#FFFFFF',
   },
   toastWrap: {

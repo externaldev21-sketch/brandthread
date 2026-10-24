@@ -14,10 +14,12 @@ import { Platform } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { Button } from '@/components/ui';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useApi } from '@/lib/api';
+import { useRouter } from 'expo-router';
+import { SPACING } from '@/constants/spacing';
 
 const POLL_QUESTION_MAX = 80;
 const POLL_OPTION_MAX = 30;
@@ -31,7 +33,7 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
       <ModalSafeArea>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[s.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + 16 }]}>
+          <View style={[s.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.md }]}>
             <View style={[s.handle, { backgroundColor: theme.border }]} />
             <Text style={[s.title, { color: theme.text }]}>{title}</Text>
             {children}
@@ -83,6 +85,7 @@ export function PollComposer({ visible, onClose, onAdd }: {
           {options.length > 2 ? (
             <Pressable
               onPress={() => setOptions((prev) => prev.filter((_, k) => k !== i))}
+              hitSlop={4}
               style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove option ${i + 1}`}
             >
               <Icon name="x" size={18} color={theme.muted} />
@@ -121,11 +124,15 @@ export function CountdownPicker({ visible, onClose, onPick }: {
 }) {
   const { theme } = useAppTheme();
   const api = useApi();
+  const router = useRouter();
   const [drops, setDrops] = useState<UpcomingDrop[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!visible) return undefined;
     let alive = true;
     setDrops(null);
+    setFailed(false);
     (async () => {
       try {
         const rows = (await api.drops.list()) as Array<{ id: string; name: string; status: string; releaseAt: string | null }>;
@@ -136,15 +143,20 @@ export function CountdownPicker({ visible, onClose, onPick }: {
           .map((d) => ({ id: d.id, name: d.name, releaseAt: d.releaseAt! }));
         if (alive) setDrops(upcoming);
       } catch {
-        if (alive) setDrops([]);
+        if (alive) { setDrops([]); setFailed(true); }
       }
     })();
     return () => { alive = false; };
-  }, [visible, api]);
+  }, [visible, api, attempt]);
   return (
     <Sheet visible={visible} title="Countdown" onClose={onClose}>
       {drops === null ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
+      ) : failed ? (
+        <>
+          <Text style={[s.empty, { color: theme.muted }]}>Couldn’t load your drops.</Text>
+          <Button label="Try again" variant="secondary" onPress={() => setAttempt((n) => n + 1)} fullWidth />
+        </>
       ) : drops.length === 0 ? (
         <Text style={[s.empty, { color: theme.muted }]}>No upcoming drops. Schedule one with a drop time to count down to it.</Text>
       ) : (
@@ -174,17 +186,17 @@ export function CountdownPicker({ visible, onClose, onPick }: {
 }
 
 const s = StyleSheet.create({
-  sheet: { borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  sheet: { borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SPACING.sm },
   handle: { width: 36, height: 4, borderRadius: RADII.pill, alignSelf: 'center', opacity: 0.6, marginBottom: 4 },
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
-  input: { height: 48, borderWidth: 1, borderRadius: RADII.input, paddingHorizontal: 16, fontFamily: FONT.regular, fontSize: FS.base },
-  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  input: { height: 48, borderWidth: 1, borderRadius: RADII.input, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  addRow: { height: 44, borderWidth: 1, borderRadius: RADII.input, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
+  addRow: { height: 44, borderWidth: 1, borderRadius: RADII.input, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.md },
   addText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   center: { height: 96, alignItems: 'center', justifyContent: 'center' },
-  empty: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, paddingVertical: 24, textAlign: 'center' },
-  dropRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  empty: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, paddingVertical: SP.lg, textAlign: 'center' },
+  dropRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   dropName: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 20 },
   dropWhen: { fontFamily: FONT.regular, fontSize: FS.sm },
 });

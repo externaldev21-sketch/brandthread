@@ -12,7 +12,7 @@
  * clear "camera unavailable" state instead of a blank screen.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -83,7 +83,13 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
           </Text>
           {Platform.OS !== 'web' && (
             <Pressable
-              onPress={requestPermission}
+              // Once the OS stops prompting (permanently denied), asking again
+              // is a silent no-op — send the person to Settings instead.
+              onPress={() => {
+                if (permission && !permission.canAskAgain) void Linking.openSettings();
+                else void requestPermission();
+              }}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               style={styles.permissionBtn}
               accessibilityRole="button"
               accessibilityLabel="Allow camera access"
@@ -94,20 +100,23 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
         </View>
       )}
 
-      {/* ── Viewfinder corner brackets ── */}
-      <View pointerEvents="none" style={styles.frameWrap}>
-        <View style={styles.frame}>
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+      {/* ── Viewfinder corner brackets (only over a live camera) ── */}
+      {cameraReady && (
+        <View pointerEvents="none" style={styles.frameWrap}>
+          <View style={styles.frame}>
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={[styles.headerRow, { top: topInset + SP.sm }]}>
         <Pressable
           onPress={onClose}
           style={styles.headerIcon}
+          hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
           testID="qr-scanner-back"
@@ -117,6 +126,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
         <Pressable
           onPress={onClose}
           style={styles.headerIcon}
+          hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
           accessibilityRole="button"
           accessibilityLabel="Close scanner"
         >
@@ -124,7 +134,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
         </Pressable>
       </View>
 
-      <Text style={styles.hint}>Point your camera at a Brandthread QR code</Text>
+      {cameraReady && <Text style={styles.hint}>Point your camera at a Brandthread QR code</Text>}
     </View>
   );
 }

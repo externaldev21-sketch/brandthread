@@ -92,11 +92,12 @@ export default function BuyerFriendRequestsScreen() {
       );
 
       // Sent = people I follow but who don't follow me back
-      // Cross-reference: followersSet = set of user IDs who follow me
+      // Cross-reference: followersSet = set of user IDs who follow me (plus
+      // the following row's own followsMe flag, so a mutual never lands here)
       const followersSet = new Set(followers.map(f => f.userId));
       setSent(
         following
-          .filter(f => !followersSet.has(f.userId))
+          .filter(f => !followersSet.has(f.userId) && !f.followsMe)
           .map(f => ({
             userId:   f.userId,
             name:     f.name,
@@ -125,7 +126,7 @@ export default function BuyerFriendRequestsScreen() {
       setIncoming(prev => prev.filter(r => r.userId !== row.userId));
       void requestContextualPushPermission(userId, api);
     } catch {
-      Alert.alert('Error', 'Could not follow back.');
+      Alert.alert('Couldn’t follow back', 'Try again in a moment.');
     } finally {
       setActionId(null);
     }
@@ -140,7 +141,7 @@ export default function BuyerFriendRequestsScreen() {
       setRequests(prev => prev.filter(r => r.userId !== row.userId));
       if (action === 'approve') void loadData();
     } catch {
-      Alert.alert('Error', action === 'approve' ? 'Could not confirm the request.' : 'Could not delete the request.');
+      Alert.alert(action === 'approve' ? 'Couldn’t confirm request' : 'Couldn’t delete request', 'Try again in a moment.');
     } finally {
       setActionId(null);
     }
@@ -159,7 +160,7 @@ export default function BuyerFriendRequestsScreen() {
       await api.social.unfollow(row.userId);
       setSent(prev => prev.filter(r => r.userId !== row.userId));
     } catch {
-      Alert.alert('Error', 'Could not unfollow.');
+      Alert.alert('Couldn’t unfollow', 'Try again in a moment.');
     } finally {
       setActionId(null);
     }
@@ -294,7 +295,7 @@ export default function BuyerFriendRequestsScreen() {
               </View>
               <View style={s.rowCenter}>
                 <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
-                <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
+                <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{atHandle(row.handle)}</Text>
                 <Text style={[TYPE_SCALE.caption, s.rowMutual]}>You follow them</Text>
               </View>
             </PressableScaleRow>
@@ -319,6 +320,7 @@ export default function BuyerFriendRequestsScreen() {
   // ── Render suggested ───────────────────────────────────────────────────────
 
   function renderSuggested() {
+    if (loading) return <ListSkeleton rows={4} />;
     if (suggestions.length === 0) {
       return (
         <EmptyState
@@ -346,7 +348,7 @@ export default function BuyerFriendRequestsScreen() {
                 </View>
                 <View style={s.rowCenter}>
                   <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{sug.name}</Text>
-                  <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{sug.handle}</Text>
+                  <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{atHandle(sug.handle)}</Text>
                   {sug.reason ? <Text style={[TYPE_SCALE.caption, s.rowMutual]} numberOfLines={1}>{sug.reason}</Text> : null}
                 </View>
               </PressableScaleRow>
@@ -404,6 +406,12 @@ export default function BuyerFriendRequestsScreen() {
       </ScrollView>
     </View>
   );
+}
+
+// Seller handles come back bare ("fieldoffice"); buyer handles carry the @.
+function atHandle(handle?: string | null): string {
+  if (!handle) return '';
+  return handle.startsWith('@') ? handle : `@${handle}`;
 }
 
 // A row's tap area (open profile) built on the shared press-scale feel, kept

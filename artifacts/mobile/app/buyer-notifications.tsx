@@ -28,6 +28,7 @@ import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { Chip, MenuSheet } from '@/components/ui';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 
 import { TYPE_SCALE } from '@/constants/typography';
 
@@ -249,9 +250,15 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
         router.navigate('/(buyer)/friends' as any);
       }
       break;
-    default:
-      router.navigate('/(buyer)/inbox' as any);
+    default: {
+      // Social rows (new follower, likes, comments, reposts, mentions…) open
+      // the same destination their Activity row does — the person's profile,
+      // the post, the comment — instead of dropping everything on the inbox.
+      const href = activityHref(notif, 'buyer');
+      if (href) router.push(href as any);
+      else router.navigate('/(buyer)/inbox' as any);
       break;
+    }
   }
 }
 
@@ -374,6 +381,7 @@ export default function BuyerNotifications() {
     if (!isBuyerDevPreview()) void markNotificationRead(notif.id).catch(() => {});
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);
+    await markNotificationRead(notif.id).catch(() => {});
   };
 
   const handleLongPress = (notif: Notification) => {
@@ -438,7 +446,9 @@ export default function BuyerNotifications() {
   };
 
   const handleClearRead = () => {
-    Alert.alert('Clear read notifications', 'This will remove all read notifications.', [
+    // showActionSheet, not Alert.alert: Alert.alert is a silent no-op on web,
+    // which left this header button doing nothing there.
+    showActionSheet('Clear read notifications', 'This will remove all read notifications.', [
       {
         text: 'Clear read',
         style: 'destructive',
@@ -533,7 +543,7 @@ export default function BuyerNotifications() {
           onPress={() => handleTap(notif)}
           onLongPress={() => handleLongPress(notif)}
           accessibilityRole="button"
-          accessibilityLabel={`${notif.isRead ? '' : 'Unread. '}${notif.title}. ${notif.body}`}
+          accessibilityLabel={`${notif.isRead ? '' : 'Unread. '}${notif.title}${notif.body ? `. ${notif.body}` : ''}`}
           accessibilityHint="Double tap to open. Long press for more options."
         >
           {/* Left Icon */}
@@ -558,7 +568,9 @@ export default function BuyerNotifications() {
             >
               {notif.title}
             </Text>
-            <Text style={[styles.notifBody, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
+            {notif.body ? (
+              <Text style={[styles.notifBody, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
+            ) : null}
             <View style={styles.notifMeta}>
               <Text style={[styles.notifTime, { color: theme.subtle }]}>{timeAgo(notif.createdAt)}</Text>
               {notif.cta ? (

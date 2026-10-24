@@ -1093,7 +1093,7 @@ export default function ProfileScreen() {
         renderItem={renderRow as any}
         keyExtractor={keyForRow as any}
         numColumns={numColumns}
-        columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
+        columnWrapperStyle={numColumns > 1 ? (activeTab === 'Saved' ? [styles.gridRow, styles.savedRow] : styles.gridRow) : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={activeTab === 'Closet' && !loading ? (
           <ClosetEmpty title={emptyTitle} action={emptyAction} minHeight={emptyArea.minHeight} />
@@ -1216,6 +1216,8 @@ function makeStyles(theme: AppThemePreset) {
     root: { flex: 1, backgroundColor: theme.background },
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
+    // Saved cells are sized from the column minus a 16pt gutter each side.
+    savedRow: { paddingHorizontal: SP.md },
 
     // Bio → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
@@ -1244,7 +1246,7 @@ const topBarStyles = StyleSheet.create({
 const cellStyles = StyleSheet.create({
   savedTile: { aspectRatio: 1, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
   savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.xs },
-  savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs },
+  savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.meta },
   draftsTile: { borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   draftsTitle: { fontFamily: FONT.semibold, fontSize: FS.sm },
   draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
@@ -1257,5 +1259,5 @@ const cellStyles = StyleSheet.create({
   orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   orderCardBody: { flex: 1, gap: 2 },
   orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
+  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.meta, marginBottom: 2 },
 });

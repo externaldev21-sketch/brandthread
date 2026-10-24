@@ -36,6 +36,7 @@ function useMentionSearch(query: string, active: boolean, enabled: boolean) {
   const [people, setPeople] = useState<MentionPerson[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const seq = useRef(0);
   useEffect(() => {
     if (!active || !enabled) { setPeople([]); setLoading(false); setFailed(false); return; }
@@ -48,8 +49,8 @@ function useMentionSearch(query: string, active: boolean, enabled: boolean) {
         .finally(() => { if (seq.current === mine) setLoading(false); });
     }, query ? 200 : 0);
     return () => clearTimeout(t);
-  }, [query, active, enabled, api]);
-  return { people, loading, failed };
+  }, [query, active, enabled, api, attempt]);
+  return { people, loading, failed, retry: () => setAttempt((n) => n + 1) };
 }
 
 function PersonAvatar({ person, size }: { person: MentionPerson; size: number }) {
@@ -73,7 +74,7 @@ export function MentionPickerSheet({
 }) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const { people, loading, failed } = useMentionSearch(query, visible, enabled);
+  const { people, loading, failed, retry } = useMentionSearch(query, visible, enabled);
 
   useEffect(() => { if (!visible) setQuery(''); }, [visible]);
 
@@ -106,7 +107,12 @@ export function MentionPickerSheet({
             ) : loading && !people.length ? (
               <ActivityIndicator style={{ marginTop: SP.lg }} color={ON_DARK} />
             ) : failed ? (
-              <Text style={styles.empty}>Couldn’t load people. Try again.</Text>
+              <View style={styles.errorWrap}>
+                <Text style={styles.empty}>Couldn’t load people.</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={retry} accessibilityRole="button" accessibilityLabel="Try again" testID="mention-picker-retry">
+                  <Text style={styles.retryText}>Try again</Text>
+                </TouchableOpacity>
+              </View>
             ) : !people.length ? (
               <Text style={styles.empty}>{query.trim() ? 'No people found.' : 'Search for someone to tag.'}</Text>
             ) : people.map((p) => (
@@ -151,12 +157,13 @@ export function MentionSuggestionsBar({
     ? demoPeople.filter((p) => !q || (p.username ?? p.handle ?? '').toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
     : search.people;
   const loading = search.loading;
+  const failed = !demoPeople && search.failed;
   const enabledForCopy = demoPeople ? true : enabled;
   if (!active) return null;
   return (
     <View style={styles.bar} testID="mention-suggestions">
       {!people.length ? (
-        <Text style={styles.barEmpty}>{!enabledForCopy ? 'Sign in to tag people.' : loading ? 'Searching…' : 'No people found.'}</Text>
+        <Text style={styles.barEmpty}>{!enabledForCopy ? 'Sign in to tag people.' : loading ? 'Searching…' : failed ? 'Couldn’t load people.' : 'No people found.'}</Text>
       ) : (
         <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.barContent}>
           {people.map((p) => (
@@ -192,8 +199,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, minHeight: 56 },
   rowTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
   rowSub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
-  initials: { color: ON_DARK, fontSize: 11, fontFamily: FONT.bold },
+  initials: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.bold },
   empty: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
+  errorWrap: { alignItems: 'center' },
+  retryBtn: { minHeight: 44, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', alignItems: 'center', justifyContent: 'center' },
+  retryText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
 
   bar: { minHeight: 48, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
   barContent: { paddingHorizontal: SP.sm, gap: SP.sm, alignItems: 'center' },

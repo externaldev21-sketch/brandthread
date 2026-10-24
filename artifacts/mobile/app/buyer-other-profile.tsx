@@ -1,5 +1,6 @@
 import { restrictUser } from '@/services/socialService';
 import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
+import { SPACING } from '@/constants/spacing';
 /**
  * A buyer's profile as seen by a VISITOR — the same ProfileShell as every
  * other profile. Visitors get only: avatar, name, @username, followers /
@@ -450,6 +451,8 @@ export default function BuyerOtherProfileScreen() {
       {isMutual && threadCashSendEnabled ? (
         <ThreadCashAttachButton
           recipientId={canonicalUserId}
+          recipientName={displayName}
+          recipientHandle={profile?.username ?? undefined}
           onSent={() => {}}
           renderTrigger={(open) => (
             <PressableScale
@@ -733,8 +736,8 @@ function makeStyles(theme: AppThemePreset) {
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
     followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     blockedBanner: {
-      flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.sm,
-      padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm,
+      padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
     },
     blockedBannerText: { flex: 1, color: theme.muted, fontSize: FS.xs, lineHeight: 18 },
     blockedBannerAction: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },

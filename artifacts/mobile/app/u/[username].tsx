@@ -47,6 +47,7 @@ import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { radius } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -357,7 +358,7 @@ function makeStyles(theme: AppThemePreset) {
   homeBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
-    paddingVertical: 14,
+    paddingVertical: SPACING.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
@@ -370,7 +371,7 @@ function makeStyles(theme: AppThemePreset) {
   retryBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
-    paddingVertical: 14,
+    paddingVertical: SPACING.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.text,
@@ -467,7 +468,7 @@ function makeStyles(theme: AppThemePreset) {
   verifiedInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: SP.xs,
   },
   verifiedText: {
     fontFamily: FONT.medium,
@@ -560,7 +561,7 @@ function makeStyles(theme: AppThemePreset) {
   // Fine print
   finePrint: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: theme.subtle,
     marginTop: SP.xl,
     textAlign: 'center',

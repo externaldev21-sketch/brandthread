@@ -264,7 +264,7 @@ function Avatar({ uri, initials, size = 38, ring = true, backgroundColor, recycl
       width: size, height: size, borderRadius: size / 2, backgroundColor: backgroundColor ?? theme.cardElevated,
       alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size > 34 ? FS.xs : 10 }}>{initials}</Text>
+      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.xs }}>{initials}</Text>
     </View>
   );
 }
@@ -720,7 +720,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     let active = true;
     void readGuestMutedWords().then(
       (words) => { if (active) setGuestMutedPhrases(words.map((word) => word.phrase)); },
-      () => { if (active) setGuestMutedPhrases(null); },
+      () => { if (active) setGuestMutedPhrases([]); },
     );
     return () => { active = false; };
   }, [user?.id]);
@@ -906,7 +906,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   }, [isPreviewPost, postId]);
 
   const load = useCallback(async () => {
-    if (!postId) { setLoading(false); return; }
+    if (!postId) { setFetchError('This post is no longer available.'); setLoading(false); return; }
     if (!UUID_RE.test(postId)) {
       // Preview/demo content has no backing server post, but it still gets
       // a real comments experience: 8-15 seeded comments (persisted for the
@@ -1188,7 +1188,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
       setSendError(
         code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED' || code === 'COMMENTS_LIMITED'
           ? apiErrorMessage(error, 'This comment can’t be posted.')
-          : 'Could not post comment. Tap to retry.',
+          : 'Could not post comment. Try again.',
       );
       haptic('error');
     } finally {
@@ -1334,7 +1334,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     </>
   ), [loading, fetchError, load]);
 
-  const composerLocked = meta.commentsDisabled || !meta.canComment;
+  const composerLocked = !postId || meta.commentsDisabled || !meta.canComment;
 
   // Opened directly with no post (deep link / typed route): there is no
   // media to sit above the sheet and no thread to load, so present a full
@@ -1375,7 +1375,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
               </PressableScale>
             ) : <View style={s.headerSide} />}
             <Text style={s.headerTitle}>
-              {loading ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
+              {loading || fetchError ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
             </Text>
             <PressableScale
               style={s.headerSide}
@@ -1470,7 +1470,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
 
           {composerLocked ? (
             <View style={s.lockedComposer}>
-              {isPreviewPost ? (
+              {isPreviewPost || !postId ? (
                 <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
@@ -1505,6 +1505,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={`Add ${emoji}`}
+                    hitSlop={{ left: 10, right: 10 }}
                     rippleEnabled={false}
                   >
                     <AppleEmoji emoji={emoji} size={24} />
@@ -1728,9 +1729,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   listFooter: { alignItems: 'center', gap: SP.xs, paddingTop: SP.xs },
   loadMore: { paddingVertical: SP.sm, paddingHorizontal: SP.md, minHeight: 36, justifyContent: 'center' },
-  loadMoreText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
+  loadMoreText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.meta },
   mutedNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SP.xs },
-  mutedNoteText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs },
+  mutedNoteText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.meta },
 
   // Comment rows
   // 8pt top + 8pt bottom = 16pt between consecutive comments (TikTok
@@ -1749,8 +1750,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   commentBody: { flex: 1, minWidth: 0 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
   authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED, flexShrink: 1 },
-  creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
-  replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
+  creatorBadge: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  replyContext: { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
   commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
@@ -1761,11 +1762,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.pill,
     borderWidth: 1, borderColor: theme.warning + '55', backgroundColor: theme.warning + '14',
   },
-  reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: 11 },
+  reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: FS.xs },
   pinnedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
-  pinnedText: { fontFamily: FONT.semibold, fontSize: 11, color: MUTED },
+  pinnedText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
   creatorLikedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
-  creatorLikedText: { fontFamily: FONT.semibold, fontSize: 11 },
+  creatorLikedText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   commentContentPress: { alignItems: 'flex-start' },
   // Time and Reply are both plain, unpadded, same-size/same-lineHeight
   // children of one centered row — no minHeight tap-target box around
@@ -1789,7 +1790,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     width: 28, marginTop: 23, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2,
   },
   commentLikeIconWrap: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontFamily: FONT.regular, fontSize: 11, color: MUTED, textAlign: 'center' },
+  actionLabel: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED, textAlign: 'center' },
   // 8pt below the meta row above it, per TikTok's own spacing. `noMinHeight`
   // on this row's Pressable (see ViewRepliesButton) keeps this tight instead
   // of the ~60pt gap PressableScale's forced 44pt box used to create here.
@@ -1798,14 +1799,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingLeft: SP.md + 48, marginTop: 8, paddingVertical: 4, minHeight: 20,
   },
   viewRepliesLine: { width: 20, height: 1, backgroundColor: '#3a3a3a' },
-  viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
+  viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.meta, color: MUTED },
 
   toast: {
     position: 'absolute', alignSelf: 'center', bottom: 150,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 8,
   },
-  toastText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.xs },
+  toastText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.meta },
 
   // Input — 8pt vertical padding plus the safe area (applied via insets at
   // the call site), never a fixed larger pad.
@@ -1818,19 +1819,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: theme.error + '1A', borderRadius: RADIUS.sm,
     paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.xs,
   },
-  sendErrorText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: theme.error, lineHeight: 16 },
+  sendErrorText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.meta, color: theme.error, lineHeight: 16 },
   heldBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: theme.warning + '14', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning + '40',
     paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.xs,
   },
-  heldBannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: FG, lineHeight: 16 },
+  heldBannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.meta, color: FG, lineHeight: 16 },
   replyingBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: theme.accentDim, borderRadius: RADIUS.sm,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginBottom: SP.xs,
   },
-  replyingLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, flex: 1 },
+  replyingLabel: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED, flex: 1 },
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
   emptyLine: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', padding: SP.md },

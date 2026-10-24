@@ -203,6 +203,7 @@ export default function BlockedAndMutedScreen() {
           keyExtractor={(item) => item.id}
           ListHeaderComponent={header}
           contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xxl }}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
           renderItem={({ item }) => (
             <ListRow
               avatar={{ name: item.mutedUserName }}
@@ -235,6 +236,7 @@ export default function BlockedAndMutedScreen() {
 
 const makeStyles = (theme: AppThemePreset, palette: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
+  tabs: { marginHorizontal: SPACING.md },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   explainer: {
     flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start',

@@ -53,7 +53,7 @@ export function ReshareCard({
           <Pressable
             onPress={onCreditPress}
             disabled={!onCreditPress}
-            hitSlop={8}
+            hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
             style={styles.creditPill}
             accessibilityRole={onCreditPress ? 'button' : 'text'}
             accessibilityLabel={onCreditPress ? `Open ${withAt(handle)}'s story` : `From ${withAt(handle)}`}
