@@ -344,6 +344,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/search/SegmentedTabs.tsx',
   'components/search/VideoTile.tsx',
   'components/settings/SettingsKit.tsx',
+  'components/share-cards/ShareCardFrame.tsx',
   'components/social/CreateButton.tsx',
   'components/social/PostGrid.tsx',
   'components/social/StoryGestureGuide.tsx',
