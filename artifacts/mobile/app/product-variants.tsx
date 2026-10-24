@@ -46,7 +46,8 @@ const BEHAVIORS: Array<{ value: Rules['soldOutBehavior']; title: string; body: s
 
 function errText(err: unknown, fallback: string): string {
   const message = (err as { message?: string } | null)?.message;
-  return message && message.length < 160 ? message : fallback;
+  // Raw transport errors ("API 403: …") aren't seller-facing copy.
+  return message && message.length < 160 && !/^API \d{3}\b/.test(message) ? message : fallback;
 }
 const toCents = (text: string): number | null => {
   const n = Number(text.replace(/[^0-9.]/g, ''));
@@ -502,7 +503,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   addBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   addRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
   input: { fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground, backgroundColor: c.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingHorizontal: SP.md, paddingVertical: 10 },
-  fieldLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: c.mutedForeground, marginBottom: 4 },
+  fieldLabel: { fontFamily: FONT.medium, fontSize: FS.meta, color: c.mutedForeground, marginBottom: 4 },
   addOption: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, paddingVertical: 12, paddingHorizontal: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' },
   addOptionText: { fontFamily: FONT.medium, fontSize: FS.base, color: c.foreground },
   sortRow: { flexDirection: 'row', gap: SP.xs, marginHorizontal: SP.md, marginBottom: SP.sm },

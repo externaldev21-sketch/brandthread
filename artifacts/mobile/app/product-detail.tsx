@@ -27,6 +27,8 @@ import { Product, ProductVariant, ProductStatus } from '@/services/productTypes'
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -63,6 +65,8 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
+  // Seller bar floats over every seller screen.
+  const tabBarInset = useTabBarMetrics(2).occupiedHeight;
   const headerTopInset = useHeaderTopInset();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
@@ -206,7 +210,8 @@ export default function ProductDetailScreen() {
           <PressableScale
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert('Product Options', '', [
+              // showActionSheet: native Alert on iOS/Android, themed sheet on web (where Alert.alert is a no-op).
+              showActionSheet('Product options', undefined, [
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
                     archiveProduct(product.id).then(p => {
@@ -227,7 +232,7 @@ export default function ProductDetailScreen() {
                 { text: 'Duplicate', onPress: () => {
                   duplicateProduct(product.id).then(copy => {
                     if (copy) {
-                      Alert.alert('Product duplicated', `${copy.name} was added as a draft.`, [
+                      showActionSheet('Product duplicated', `${copy.name} was added as a draft.`, [
                         { text: 'View copy', onPress: () => router.replace(('/product-detail?id=' + copy.id) as never) },
                         { text: 'OK' },
                       ]);
@@ -285,7 +290,7 @@ export default function ProductDetailScreen() {
       <ScrollView
         style={s.tabContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: tabBarInset + 56 + SP.lg }}
       >
         {activeTab === 'overview'   && <OverviewTab   product={product} pricing={pricing} coverImage={coverImage} />}
         {activeTab === 'variants'   && <VariantsTab   product={product} setProduct={setProduct} id={id!} />}
@@ -1406,7 +1411,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
                   borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: foreground, letterSpacing: -0.2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  headerBtn:    { minHeight: COMP.minTouchTarget, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
+  headerBtn:    { minHeight: COMP.minTouchTarget, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
                   borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.accent },
   editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
   iconBtnSmall: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,

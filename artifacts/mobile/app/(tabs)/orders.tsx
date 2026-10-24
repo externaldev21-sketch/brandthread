@@ -1016,7 +1016,7 @@ export default function OrdersScreen() {
   const handleMoreMenu = useCallback(() => {
     showActionSheet('Orders', 'Choose an action', [
       { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
+      { text: 'Bulk actions', onPress: () => showActionSheet('Bulk actions', 'Long-press orders to select.', [{ text: 'OK' }]) },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1436,12 +1436,12 @@ const createStyles = (theme: any) => {
     color: FG,
   },
   orderItems: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: MUTED,
   },
   orderCancelled: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: RED,
   },
@@ -1458,7 +1458,7 @@ const createStyles = (theme: any) => {
     letterSpacing: -0.1,
   },
   orderTime: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: SUBTLE,
   },
@@ -1515,7 +1515,7 @@ const createStyles = (theme: any) => {
     borderColor: STRONG + '44',
   },
   trackingText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: STRONG,
   },
@@ -1548,12 +1548,12 @@ const createStyles = (theme: any) => {
   },
   pausedBannerText: {
     flex: 1,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: FG,
   },
   pausedBannerAction: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.semibold,
     color: MUTED,
   },
@@ -1572,7 +1572,7 @@ const createStyles = (theme: any) => {
   },
   errorBannerText: {
     flex: 1,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: RED,
     lineHeight: 16,
@@ -1589,7 +1589,7 @@ const createStyles = (theme: any) => {
     paddingVertical: SP.xs,
   },
   errorRetryText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.semibold,
     color: STRONG,
   },
@@ -1630,7 +1630,7 @@ const createStyles = (theme: any) => {
     borderColor: BORDER,
   },
   bulkBtnText: {
-     fontSize: FS.xs,
+     fontSize: FS.meta,
     fontFamily: FONT.semibold,
   },
 

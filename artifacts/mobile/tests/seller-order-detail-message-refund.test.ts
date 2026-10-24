@@ -34,7 +34,7 @@ describe('order detail: Message Buyer action', () => {
   });
 
   it('is wired into the always-visible Actions row, disabled while opening or with no buyer account', () => {
-    expect(source).toContain("label={messagingBuyer ? 'Opening…' : 'Message Buyer'}");
+    expect(source).toContain("label={messagingBuyer ? 'Opening…' : 'Message buyer'}");
     expect(source).toContain('disabled={messagingBuyer || !order.customer.buyerUserId}');
   });
 

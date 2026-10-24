@@ -9,7 +9,6 @@ import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
@@ -26,6 +25,7 @@ import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RET
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
 import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
@@ -461,7 +461,6 @@ export default function OrderDetailScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const queryClient = useQueryClient();
 
@@ -820,7 +819,13 @@ export default function OrderDetailScreen() {
 
   if (!order) {
     return (
-      <View style={[s.root, { paddingTop: headerTopInset }]}>
+      <View style={s.root}>
+        <ScreenHeader
+          title="Order"
+          divider={false}
+          variant="push"
+          onBack={() => goBackOr(router, '/(tabs)/orders')}
+        />
         {updatesPaused && (
           <PressableScale
             style={s.pausedBanner}
@@ -841,7 +846,7 @@ export default function OrderDetailScreen() {
           description={orderLoadFailed ? 'Check your connection and try again.' : 'This order may have been deleted or the ID is invalid.'}
           action={orderLoadFailed
             ? { label: 'Retry', onPress: retryUpdates, icon: 'refresh-cw' }
-            : { label: 'Go Back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
+            : { label: 'Go back', onPress: () => goBackOr(router, '/(tabs)/orders'), icon: 'arrow-left' }}
         />
       </View>
     );
@@ -930,7 +935,7 @@ export default function OrderDetailScreen() {
       <Modal visible={showCancelModal} transparent animationType="fade" onRequestClose={() => setShowCancelModal(false)}>
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Cancel Order</Text>
+            <Text style={s.modalTitle}>Cancel order</Text>
             <Text style={s.modalSubtitle}>Select a reason</Text>
             <View style={s.chipRow}>
               {CANCELLATION_REASONS.map(r => (
@@ -964,9 +969,9 @@ export default function OrderDetailScreen() {
               </View>
             </BrandthreadCard>
             <View style={s.modalActions}>
-              <SecondaryButton label="Go Back" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
+              <SecondaryButton label="Go back" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
               <PrimaryButton
-                label="Confirm Cancel"
+                label="Confirm cancel"
                 onPress={handleCancelOrder}
                 loading={cancelling}
                 colors={[RED, RED]}
@@ -1138,7 +1143,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         <SectionHeader title="Actions" />
         <View style={s.actionCol}>
           <SecondaryButton
-            label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
+            label={messagingBuyer ? 'Opening…' : 'Message buyer'}
             onPress={onMessageBuyer}
             icon="message-circle"
             disabled={messagingBuyer || !order.customer.buyerUserId}
@@ -1151,25 +1156,28 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
             />
           )}
         </View>
+        {!order.customer.buyerUserId ? (
+          <Text style={s.readOnlyNote}>Guest checkout — this buyer has no Brandthread account to message.</Text>
+        ) : null}
         {order.autoRefundedAt ? (
           <Text style={s.readOnlyNote}>Auto-refunded orders are read-only. Mark shipped and Add tracking are turned off.</Text>
         ) : null}
         {!order.autoRefundedAt && order.status === 'new' && (
           <View style={s.actionCol}>
-            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" />
-            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
+            <PrimaryButton label="Mark processing" onPress={onMarkProcessing} icon="play" />
+            <SecondaryButton label="Cancel order" onPress={onCancelPress} icon="x" accent={RED} />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'processing' && (
           <View style={s.actionCol}>
-            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" />
-            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
+            <PrimaryButton label="Mark ready to ship" onPress={onMarkReadyToShip} icon="package" />
+            <SecondaryButton label="Fulfill order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
-            <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
-            <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
+            <PrimaryButton label="Fulfill order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" />
+            <SecondaryButton label="Add tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" />
             {addingTracking && (
               <BrandthreadCard style={s.inlineForm}>
                 <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
@@ -1177,13 +1185,13 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
                 <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
               </BrandthreadCard>
             )}
-            <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" />
+            <SecondaryButton label="Mark shipped" onPress={onMarkShipped} icon="send" />
           </View>
         )}
         {!order.autoRefundedAt && order.status === 'shipped' && (
           <View style={s.actionCol}>
             {order.shipments[0]?.trackingNumber && (
-              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" />
+              <SecondaryButton label="View tracking" onPress={() => showActionSheet('Tracking', order.shipments[0].trackingNumber ?? '', [{ text: 'OK' }])} icon="map-pin" />
             )}
             <Text style={s.readOnlyNote}>{DELIVERY_CONFIRMED_BY_NOTE}</Text>
           </View>
@@ -1199,7 +1207,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
           </BrandthreadCard>
         )}
         {!order.autoRefundedAt && (order.status === 'processing' || order.status === 'ready_to_ship') && (
-          <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
+          <SecondaryButton label="Cancel order" onPress={onCancelPress} icon="x" accent={RED} />
         )}
       </View>
 
@@ -1565,7 +1573,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             testID="estimated-delivery-input"
           />
           <PrimaryButton
-            label="Save Tracking Update"
+            label="Save tracking update"
             icon="check"
             small
             loading={updatingTracking}
@@ -1601,7 +1609,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 <Text style={s.manufacturerName}>{group.manufacturerName ?? 'Manufacturer'}</Text>
                 <Text style={s.manufacturerStatus}>Status: {group.status.replace(/_/g, ' ')}</Text>
                 <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer</Text>
-                <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} disabled={readOnly} />
+                <SecondaryButton label="Add tracking from manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} disabled={readOnly} />
               </BrandthreadCard>
             ) : (
               <BrandthreadCard style={s.sellerFulfillCard}>
@@ -1625,8 +1633,8 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 )}
 
                 {!readOnly && <View style={s.actionCol}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small />
-                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small />
+                  <SecondaryButton label="Buy label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small />
+                  <SecondaryButton label="Add tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small />
                 </View>}
               </BrandthreadCard>
             )}
@@ -1642,7 +1650,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small />
                 </View>
                 {form.tracking.trim().length > 0 && (
-                  <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
+                  <SecondaryButton label="Mark shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
                 )}
               </BrandthreadCard>
             )}
@@ -1733,7 +1741,7 @@ function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
           placeholderTextColor={SUBTLE}
           multiline
         />
-        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
+        <PrimaryButton label="Add note" onPress={onAddNote} loading={addingNote} icon="plus" small />
       </View>
     </View>
   );
@@ -1858,10 +1866,10 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
             <View style={s.disputeActions}>
               {/* "Accept Dispute" is hidden here until it calls a real disputes API —
                   see dispute-detail.tsx, which owns evidence and concede actions. */}
-              <SecondaryButton label="Review Dispute" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
+              <SecondaryButton label="Review dispute" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
             </View>
             {d.status === 'evidence_needed' && (
-              <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
+              <PrimaryButton label="Submit evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
             )}
           </GradientCard>
         );
@@ -1962,7 +1970,7 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
           placeholderTextColor={SUBTLE}
           multiline
         />
-        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
+        <PrimaryButton label="Add note" onPress={onAddNote} loading={addingNote} icon="plus" small />
       </View>
     </View>
   );
@@ -2011,7 +2019,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   badgeRow:         { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   heroDate:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },
   heroMeta:         { flexDirection: 'row', gap: SP.xs, marginTop: SP.xs, flexWrap: 'wrap' },
-  heroMetaText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  heroMetaText:     { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
   riskBadge:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center', backgroundColor: RED_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.sm, alignSelf: 'flex-start' },
   riskBadgeText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: RED },
   preOrderBadge:    { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.xs, alignSelf: 'flex-start' },
@@ -2021,7 +2029,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   actionSection:    { gap: SP.sm },
   heroCustomer:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.xs },
   actionCol:        { gap: SP.sm },
-  readOnlyNote:     { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
+  readOnlyNote:     { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   deliveredText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
 
@@ -2039,10 +2047,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   lineItemCard:     { marginBottom: SP.xs },
   lineItemRow:      { flexDirection: 'row', alignItems: 'center' },
   lineItemName:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  lineItemVariant:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  lineItemSku:      { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  lineItemVariant:  { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
+  lineItemSku:      { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
   lineItemRight:    { alignItems: 'flex-end' },
-  lineItemQty:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  lineItemQty:      { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
   lineItemTotal:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
 
   // Customer
@@ -2066,22 +2074,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Payment
   divider:          { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-  payoutNote:       { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: -2, marginBottom: SP.xs, lineHeight: 16 },
+  payoutNote:       { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: -2, marginBottom: SP.xs, lineHeight: 16 },
   heldFundsNotice:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.md },
   heldFundsNoticeText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   heldFundsGrid:    { flexDirection: 'row', gap: SP.md, marginBottom: SP.md },
   heldFundStat:     { flex: 1, alignItems: 'center' },
-  heldFundLabel:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  heldFundLabel:    { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
   heldFundValue:    { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   milestoneTitle:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   milestoneRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
   milestoneLabel:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  milestoneDate:    { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  expectedRelease:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
+  milestoneDate:    { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
+  expectedRelease:  { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
   refundCard:       { gap: SP.xs, marginBottom: SP.xs },
   refundHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
   refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto' },
-  refundDate:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  refundDate:       { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
 
   // Fulfillment
   trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },
@@ -2093,20 +2101,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   trackingStatusOptionText: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   trackingStatusOptionTextSelected: { color: FG },
-  estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
+  estimatedDeliveryLabel: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   manufacturerCard: { gap: SP.sm },
   manufacturerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   manufacturerStatus:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  manufacturerNotice:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  manufacturerNotice:{ fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
   sellerFulfillCard:{ gap: SP.sm },
   checklistRow:     { flexDirection: 'row', gap: SP.md },
   checkItem:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
   checkItemDone:    {},
   checkLabel:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   fromAddrRow:      { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
-  fromAddrText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  fromAddrText:     { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
   inlineForm:       { gap: SP.sm, borderColor: BORDER_ACTIVE },
   inlineFormTitle:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   inlineInput:      { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
@@ -2114,10 +2122,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   shipmentCard:     { gap: SP.xs, marginBottom: SP.xs },
   shipmentHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   shipmentCarrier:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  trackingNum:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  latestEvent:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  trackingNum:      { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
+  latestEvent:      { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
   viewTrackingBtn:  { flexDirection: 'row', gap: SP.xs, alignItems: 'center', marginTop: SP.xs },
-  viewTrackingText: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN },
+  viewTrackingText: { fontSize: FS.meta, fontFamily: FONT.medium, color: CYAN },
 
   // Timeline
   timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
@@ -2125,7 +2133,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   timelineBody:     { flex: 1 },
   timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
-  timelineTime:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  timelineTime:     { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
   timelineTag:      { flexDirection: 'row', gap: 3, alignItems: 'center' },
   timelineTagText:  { fontSize: FS.xs, fontFamily: FONT.medium },
 
@@ -2136,8 +2144,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   noteCard:         { gap: SP.sm, marginBottom: SP.xs },
   noteHeader:       { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   noteContent:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  noteMeta:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  pinToggle:        { fontSize: FS.xs, fontFamily: FONT.medium },
+  noteMeta:         { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
+  pinToggle:        { fontSize: FS.meta, fontFamily: FONT.medium },
   noteTypeRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
   noteTypeText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
@@ -2145,15 +2153,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Returns
   returnCard:       { gap: SP.sm, marginBottom: SP.sm },
   returnHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
-  returnResolution: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN, textTransform: 'capitalize' },
+  returnResolution: { fontSize: FS.meta, fontFamily: FONT.medium, color: CYAN, textTransform: 'capitalize' },
   returnCustomer:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   returnExplanation:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
   returnItemRow:    { flexDirection: 'row', gap: SP.xs, alignItems: 'center', paddingVertical: 2 },
   returnItemText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
-  returnItemReason: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
+  returnItemReason: { fontSize: FS.meta, fontFamily: FONT.regular, color: ORANGE },
   returnActions:    { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs },
   denyForm:         { gap: SP.sm, marginTop: SP.xs },
-  denyLabel:        { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  denyLabel:        { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   denyInput:        { minHeight: 72, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, color: FG, padding: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, textAlignVertical: 'top' },
 
   // Disputes
@@ -2164,7 +2172,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   disputeClaim:     { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   disputeDeadlineRow:{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
   disputeDeadline:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  disputeEvCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  disputeEvCount:   { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
   disputeActions:   { flexDirection: 'row', gap: SP.sm },
 
   // Modal
@@ -2181,8 +2189,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
   pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
-  pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
+  pausedBannerText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.medium, color: FG },
+  pausedBannerAction: { fontSize: FS.meta, fontFamily: FONT.semibold, color: ORANGE },
   cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
@@ -2190,7 +2198,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   trackingDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
-  trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  trackingEvLoc:    { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
+  trackingEvTime:   { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
   });
 };

@@ -839,7 +839,7 @@ function makeStyles(theme: AppThemePreset) {
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,
     },
     vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 18 },
     errorRoot: { flex: 1, backgroundColor: theme.background },
     errorBar: { paddingHorizontal: SP.md, alignItems: 'flex-start' },
     sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: modal scrim

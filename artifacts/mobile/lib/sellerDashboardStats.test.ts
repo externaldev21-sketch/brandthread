@@ -126,6 +126,11 @@ describe('mergeTopProductImages', () => {
 });
 
 describe('normalizeRecentOrder', () => {
+  it("reads the orders list's server-side itemCount", () => {
+    expect(normalizeRecentOrder({ id: 'ord_1', itemCount: 3, totalCents: 100, status: 'pending', orderNumber: 'BT-00001' }).itemCount).toBe(3);
+    expect(normalizeRecentOrder({ id: 'ord_2', items: [{}, {}], totalCents: 100, status: 'pending' }).itemCount).toBe(2);
+  });
+
   it('falls back through known field name variants without inventing data', () => {
     const order = { id: 'order_123456', total_cents: 4599, status: 'processing', lineItems: [{}, {}] };
     expect(normalizeRecentOrder(order)).toEqual({

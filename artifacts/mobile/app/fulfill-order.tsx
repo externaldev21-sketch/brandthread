@@ -24,6 +24,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionH
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
+import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from '@/lib/previewSellerOrders';
 import { formatCents } from '@/lib/money';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import {
@@ -127,7 +128,10 @@ export default function FulfillOrderScreen() {
     setLoading(true);
     try {
       const [raw, presetList] = await Promise.all([
-        api.orders.get(orderId),
+        // Preview demo orders (demo=1) live only on this device — same
+        // lookup order-detail uses, so "Ship" from the Orders list can open
+        // packing instead of a load error.
+        isGeneratedSellerOrderId(orderId) ? Promise.resolve(getGeneratedSellerOrder(orderId) ?? null) : api.orders.get(orderId),
         getPackagePresets().catch(() => []),
       ]);
       const adapted = raw ? adaptApiOrder(raw) : null;
@@ -417,9 +421,10 @@ export default function FulfillOrderScreen() {
   if (!order) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Fulfill Order" divider={false} />
-        <View style={s.centered}>
+        <ScreenHeader title="Fulfill order" divider={false} />
+        <View style={[s.centered, s.errorState]}>
           <Text style={s.errorText}>Couldn't load this order.</Text>
+          {orderId ? <SecondaryButton label="Try again" icon="refresh-cw" onPress={load} small /> : null}
         </View>
       </View>
     );
@@ -464,7 +469,7 @@ export default function FulfillOrderScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Fulfill Order" divider={false} />
+      <ScreenHeader title="Fulfill order" divider={false} />
 
       {/* Stepper */}
       <View style={s.stepperRow}>
@@ -492,9 +497,16 @@ export default function FulfillOrderScreen() {
       >
         {step === 1 && (
           <>
-            <SectionHeader title={`Order #${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
+            <SectionHeader title={`Order ${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
             {order.lineItems.map(li => (
-              <TouchableOpacity key={li.id} onPress={() => toggleItem(li.id)} activeOpacity={0.8}>
+              <TouchableOpacity
+                key={li.id}
+                onPress={() => toggleItem(li.id)}
+                activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: !!checked[li.id] }}
+                accessibilityLabel={`Packed ${li.productName}${li.variant ? `, ${li.variant}` : ''}, quantity ${li.quantity}`}
+              >
                 <BrandthreadCard style={s.itemCard}>
                   {li.imageUri ? (
                     <Image source={{ uri: li.imageUri }} style={s.itemThumb} />
@@ -744,6 +756,7 @@ const createStyles = (theme: { background: string; card: string; border: string;
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     centeredInline: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.lg },
     errorText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
+    errorState: { gap: SP.md },
     content: { flex: 1 },
     mutedText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
     linkText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ACCENT },
@@ -758,12 +771,12 @@ const createStyles = (theme: { background: string; card: string; border: string;
     itemThumb: { width: 48, height: 48, borderRadius: RADIUS.sm },
     itemThumbPlaceholder: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
     itemName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-    itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+    itemVariant: { fontSize: FS.meta, fontFamily: FONT.regular, color: MUTED },
 
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     presetChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, gap: 2 },
     presetChipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-    presetChipSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+    presetChipSub: { fontSize: FS.meta, fontFamily: FONT.regular, color: SUBTLE },
     carrierChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
 
     fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },

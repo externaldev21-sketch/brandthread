@@ -7,13 +7,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useApi } from '@/lib/api';
 import { adaptApiOrder } from '@/app/order-detail';
 import { getShippingRates, purchaseShippingLabel } from '@/services/orderService';
@@ -27,7 +27,8 @@ export default function FulfillBatchScreen() {
   const s = useMemo(() => createStyles(theme), [theme]);
   const { orderIds } = useLocalSearchParams<{ orderIds: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  // Seller bar floats over every seller screen; keep Done reachable above it.
+  const tabBarInset = useTabBarMetrics(2).occupiedHeight;
   const api = useApi();
 
   const ids = useMemo(() => (orderIds ?? '').split(',').map(id => id.trim()).filter(Boolean), [orderIds]);
@@ -36,6 +37,7 @@ export default function FulfillBatchScreen() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<'labels' | 'ship' | null>(null);
   const [results, setResults] = useState<RowResult[]>([]);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +58,7 @@ export default function FulfillBatchScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [api, ids]);
+  }, [api, ids, reloadTick]);
 
   async function handlePrintLabels() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -115,8 +117,8 @@ export default function FulfillBatchScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={`Fulfill ${ids.length} Order${ids.length === 1 ? '' : 's'}`} />
-      <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: insets.bottom + SP.xxl }}>
+      <ScreenHeader title={`Fulfill ${ids.length} order${ids.length === 1 ? '' : 's'}`} />
+      <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: tabBarInset + SP.xl }}>
         {loading ? (
           <View style={s.centered}>
             <ActivityIndicator color={ACCENT} size="large" />
@@ -124,9 +126,19 @@ export default function FulfillBatchScreen() {
         ) : (
           <>
             <SectionHeader title="Selected orders" />
+            {orders.length < ids.length && (
+              <View style={s.loadError}>
+                <Text style={s.mutedText}>
+                  {orders.length === 0
+                    ? "Couldn't load these orders."
+                    : `Couldn't load ${ids.length - orders.length} of ${ids.length} orders.`}
+                </Text>
+                <SecondaryButton label="Try again" icon="refresh-cw" onPress={() => setReloadTick(t => t + 1)} small />
+              </View>
+            )}
             {orders.map(o => (
               <BrandthreadCard key={o.id} style={s.orderRow}>
-                <Text style={s.orderNumber}>#{o.orderNumber}</Text>
+                <Text style={s.orderNumber}>{o.orderNumber}</Text>
                 <Text style={s.mutedText}>{o.customer.name}</Text>
               </BrandthreadCard>
             ))}
@@ -143,11 +155,11 @@ export default function FulfillBatchScreen() {
                   <BrandthreadCard key={r.orderId} style={s.resultRow}>
                     <Feather name={r.ok ? 'check-circle' : 'alert-circle'} size={ICON.md} color={r.ok ? SUCCESS : ERROR} />
                     <View style={{ flex: 1 }}>
-                      <Text style={s.orderNumber}>#{r.orderNumber}</Text>
+                      <Text style={s.orderNumber}>{r.orderNumber}</Text>
                       <Text style={s.mutedText}>{r.message}</Text>
                     </View>
                     {r.labelUrl && (
-                      <TouchableOpacity onPress={() => Linking.openURL(r.labelUrl!)} accessibilityRole="button" accessibilityLabel={`Open label for order ${r.orderNumber}`}>
+                      <TouchableOpacity onPress={() => Linking.openURL(r.labelUrl!)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Open label for order ${r.orderNumber}`}>
                         <Feather name="external-link" size={ICON.md} color={ACCENT} />
                       </TouchableOpacity>
                     )}
@@ -173,6 +185,7 @@ const createStyles = (theme: { text: string; muted: string }) => {
     orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     orderNumber: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
     actionRow: { flexDirection: 'row', gap: SP.sm },
+    loadError: { gap: SP.sm, alignItems: 'flex-start' },
     resultRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   });
 };

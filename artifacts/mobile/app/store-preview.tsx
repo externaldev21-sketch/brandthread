@@ -162,19 +162,23 @@ export default function StorePreview() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height - insets.top - insets.bottom - 52;
+  // Root is padded by useHeaderTopInset(), not insets.top — subtract the same
+  // value so the frame fills down to the bottom edge with no dead band.
+  const headerTopInset = useHeaderTopInset();
+  const screenHeight = Dimensions.get('window').height - headerTopInset - insets.bottom - 52;
   const containerWidth = device === 'desktop' ? DESKTOP_WIDTH : screenWidth;
   const scale = device === 'desktop' ? screenWidth / DESKTOP_WIDTH : 1;
   const desktopInjectedJS = "var m=document.querySelector('meta[name=viewport]'); if(m){m.setAttribute('content','width=" + DESKTOP_WIDTH + "');} true;";
 
   return (
-    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
+    <View style={[styles.root, { paddingTop: headerTopInset }]}>
       <View style={styles.bar}>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"
+          accessibilityRole="button"
         >
           <Feather name="x" size={ICON.md} color={theme.text} />
         </TouchableOpacity>
@@ -223,7 +227,7 @@ export default function StorePreview() {
         <View style={styles.center}>
           <Feather name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
-          <TouchableOpacity onPress={load} style={styles.retryBtn}>
+          <TouchableOpacity onPress={load} style={styles.retryBtn} accessibilityRole="button" accessibilityLabel="Try loading the store preview again">
             <Text style={styles.retryText}>Try again</Text>
           </TouchableOpacity>
         </View>

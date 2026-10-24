@@ -60,7 +60,8 @@ export function SellerDashboardRecentOrders({
             key={order.id}
             icon="shopping-bag"
             title={order.buyerName}
-            subtitle={`${order.orderNumber} · ${order.itemCount} ${order.itemCount === 1 ? 'item' : 'items'}`}
+            // Non-breaking spaces keep "2 items" together when the narrow title column wraps.
+            subtitle={`${order.orderNumber} ·\u00A0${order.itemCount}\u00A0${order.itemCount === 1 ? 'item' : 'items'}`}
             value={formatCents(order.totalCents)}
             rightElement={<StatusBadge label={orderStatusLabel(order.status)} variant={orderStatusVariant(order.status)} small />}
             onPress={() => onOpenOrder(order.id)}

@@ -285,7 +285,9 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   listRight: {
-    maxWidth: '38%',
+    // Wide enough for an amount + status badge + chevron; the title column
+    // (flex: 1, minWidth: 0) wraps instead of the amount clipping to "$…".
+    maxWidth: '60%',
     flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -294,7 +296,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   listValue: {
-    flexShrink: 1,
+    flexShrink: 0,
     fontSize: 15,
     fontFamily: FONT.semibold,
     color: FG,

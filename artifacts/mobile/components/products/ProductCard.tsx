@@ -225,10 +225,15 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // Same dark scrim as the "…" button so the status chip stays legible on
+  // bright product photos.
   chipTopLeft: {
     position: 'absolute',
     top: SP.xs,
     left: SP.xs,
+    borderRadius: RADIUS.pill,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   chipBottomLeft: {
     position: 'absolute',
@@ -273,7 +278,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   meta: {
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
   },
   priceRow: {
     flexDirection: 'row',
@@ -297,7 +302,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   stock: {
     fontFamily: FONT.medium,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     marginTop: 1,
   },
   swipeActions: {

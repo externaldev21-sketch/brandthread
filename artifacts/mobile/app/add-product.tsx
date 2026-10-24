@@ -109,6 +109,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
       <View style={s.stepperControl}>
         <TouchableOpacity
           style={s.stepperBtn}
+          hitSlop={8}
           disabled={value <= min}
           onPress={() => { hapticToggle(); onChange(Math.max(min, value - 1)); }}
           accessibilityLabel={`Decrease ${label}`}
@@ -127,6 +128,7 @@ function Stepper({ label, value, onChange, min = 0 }: {
         />
         <TouchableOpacity
           style={s.stepperBtn}
+          hitSlop={8}
           onPress={() => { hapticToggle(); onChange(value + 1); }}
           accessibilityLabel={`Increase ${label}`}
         >
@@ -1654,6 +1656,10 @@ export default function AddProductScreen() {
                         return next;
                       })}
                       style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
+                      hitSlop={12}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={`Select ${v.title || 'variant'}`}
                     >
                       {selected && <Feather name="check" size={11} color={theme.onAccent} />}
                     </TouchableOpacity>
@@ -1688,7 +1694,7 @@ export default function AddProductScreen() {
                     keyboardType="numeric"
                     returnKeyType="done"
                   />
-                  <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Remove ${v.title || 'variant'}`}>
                     <Feather name="trash-2" size={14} color={RED} />
                   </TouchableOpacity>
                 </View>
@@ -2444,7 +2450,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   stepperInput: {
-    minWidth: 32, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
+    // Fixed width: on web a TextInput's intrinsic size is ~20ch, which
+    // pushed the +/− buttons apart and squeezed the row label.
+    width: 56, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
     paddingVertical: 0,
   },
 
@@ -2485,7 +2493,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   variantFields: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   variantInput: {
-    flex: 1, height: 40, backgroundColor: SURFACE,
+    // minWidth 0 lets the SKU/Price/Stock inputs shrink to the card instead
+    // of overflowing it (web TextInputs default to ~20ch wide).
+    flex: 1, minWidth: 0, height: 40, backgroundColor: SURFACE,
     borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
