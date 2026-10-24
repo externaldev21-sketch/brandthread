@@ -148,10 +148,14 @@ export interface ComposeDiscoverFeedOptions {
   isSignedIn: boolean;
   filter: 'forYou' | 'fits';
   limit?: number;
+  /** Throw when every source it tried failed and nothing (not even preview
+   *  backfill) filled the grid, so the caller can show an error + retry
+   *  instead of the "Nothing to show yet" empty state. */
+  throwWhenUnreachable?: boolean;
 }
 
 /** One page of the For You / Fits grid, real data first, preview-backfilled on cold start. */
-export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30 }: ComposeDiscoverFeedOptions): Promise<DiscoverPost[]> {
+export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30, throwWhenUnreachable = false }: ComposeDiscoverFeedOptions): Promise<DiscoverPost[]> {
   const [blocked, muted] = await Promise.all([
     getBlockedUsers().catch(() => []),
     getMutedUsers().catch(() => []),
@@ -162,22 +166,28 @@ export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30
   ]);
 
   let posts: DiscoverPost[] = [];
+  let sourcesTried = 0;
+  let sourcesFailed = 0;
 
   if (filter !== 'fits') {
+    sourcesTried += 1;
     try {
       const { trending } = await api.publicTrending.get(limit);
       posts.push(...(Array.isArray(trending) ? trending : []).map(mapTrendingToPost).filter((p: DiscoverPost | null): p is DiscoverPost => !!p));
     } catch {
       // Keep going — friend posts (and preview backfill) can still fill the grid.
+      sourcesFailed += 1;
     }
   }
 
   if (isSignedIn) {
+    sourcesTried += 1;
     try {
       const rows = await api.social.friendActivity(20, 0);
       posts.push(...(Array.isArray(rows) ? rows : []).map(mapFriendPostToPost).filter((p: DiscoverPost | null): p is DiscoverPost => !!p));
     } catch {
       // No friends yet, or offline — fine, the rest of the mix still shows.
+      sourcesFailed += 1;
     }
   }
 
@@ -187,6 +197,10 @@ export async function composeDiscoverPosts({ api, isSignedIn, filter, limit = 30
     const seeded = getPreviewDiscoverPosts(filter);
     const existingIds = new Set(posts.map((p) => p.id));
     posts.push(...seeded.filter((p) => !existingIds.has(p.id)));
+  }
+
+  if (throwWhenUnreachable && sourcesTried > 0 && sourcesFailed === sourcesTried && posts.length === 0) {
+    throw new Error('Discover posts unavailable');
   }
 
   if (filter === 'fits') posts = posts.filter((p) => p.authorAccountType === 'buyer');
@@ -287,15 +301,20 @@ export async function composeDiscoverDrops({ api }: { api: any }): Promise<Disco
   let drops: DiscoverDrop[] = [];
   try {
     const rows = await api.publicDrops.list('upcoming');
+    // /api/public/drops returns `heroImageUrl` + a `seller` {brandName,
+    // displayName} join; the flat fields are accepted too. A row still
+    // missing its brand or image is dropped rather than rendered with a
+    // placeholder ("Brand", blank thumbnail).
     drops = (Array.isArray(rows) ? rows : []).map((r: any) => ({
       id: r.id,
       name: r.name ?? r.title ?? 'Drop',
-      brandName: r.brandName ?? r.sellerDisplayName ?? 'Brand',
-      imageUri: r.imageUri ?? (r.images ?? [])[0],
+      brandName: r.brandName ?? r.sellerDisplayName ?? r.seller?.brandName ?? r.seller?.displayName ?? '',
+      imageUri: r.imageUri ?? r.heroImageUrl ?? (r.images ?? [])[0],
       releaseAt: r.releaseAt ?? null,
       live: !!r.live,
-    }));
-  } catch {
+    })).filter((d: DiscoverDrop) => !!d.brandName?.trim() && !!d.imageUri);
+  } catch (error) {
+    if (!isPreviewCatalogEnabled()) throw error;
     // Preview backfill below.
   }
   if (drops.length === 0 && isPreviewCatalogEnabled()) drops = getPreviewDrops();

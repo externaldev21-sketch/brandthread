@@ -16,6 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ThemedRefreshControl } from '@/components/ui';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
@@ -62,6 +63,12 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
   /** Rendered after the last row (and the load-more skeleton). */
   ListFooterExtra?: React.ReactElement | null;
+  /** Pull-to-refresh; omitted = no refresh control. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  /** The posts load failed: the empty state becomes an error with retry. */
+  error?: boolean;
+  onRetry?: () => void;
 }>(function DiscoverGrid({
   posts,
   loading,
@@ -83,6 +90,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   contentContainerStyle,
   ListHeaderComponent,
   ListFooterExtra,
+  refreshing = false,
+  onRefresh,
+  error = false,
+  onRetry,
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -137,14 +148,22 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
       ListHeaderComponent={ListHeaderComponent}
-      ListEmptyComponent={!loading ? (
+      refreshControl={onRefresh ? <ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
+      ListEmptyComponent={!loading ? (error ? (
+        <EmptyState
+          icon="wifi-off"
+          title="Couldn't load posts"
+          description="Check your connection and try again."
+          action={onRetry ? { label: 'Try again', onPress: onRetry } : undefined}
+        />
+      ) : (
         <EmptyState
           icon="activity"
           illustration="trending"
           title="Nothing to show yet"
           description="Posts from buyers and brands will show up here as the community grows."
         />
-      ) : null}
+      )) : null}
       renderItem={({ item: row }) => {
         if (loading) {
           return (

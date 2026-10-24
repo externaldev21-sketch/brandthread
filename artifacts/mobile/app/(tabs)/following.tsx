@@ -1,8 +1,11 @@
 /**
  * Brandthread — Following / Drops
- * Shows brands the buyer follows, with their latest drops and real countdown timers.
- * Loads real active drops from /api/public/drops.
- * Never shows mock/invented brands — shows real empty state when there are no drops.
+ * Shows active drops from the sellers the viewer follows, with real countdown
+ * timers. Loads real active drops from /api/public/drops and filters them to
+ * followed owners (/api/social/following — both keyed by Clerk id). A viewer
+ * who follows nobody (or whose follow list can't be read) sees every public
+ * drop under "Latest drops" instead.
+ * Never shows mock/invented brands — shows real empty/error states.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -25,11 +28,13 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { pickAvatarColor } from '@/lib/avatarColors';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DropItem {
   id: string;
+  ownerId?: string;
   name: string;
   type: 'pre-order' | 'pre-made';
   status: string;
@@ -197,12 +202,25 @@ export default function FollowingScreen() {
 
   const [drops, setDrops] = useState<DropItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  // 'followed' = the viewer follows at least one account, so only those
+  // owners' drops show; 'latest' = follows nobody (or the follow list
+  // couldn't be read), so every public drop shows under "Latest drops".
+  const [mode, setMode] = useState<'followed' | 'latest'>('latest');
 
   const loadDrops = useCallback(() => {
     setLoading(true);
-    api.publicDrops.list()
-      .then((raw: any) => {
-        const list: any[] = Array.isArray(raw) ? raw : raw?.drops ?? [];
+    setFailed(false);
+    Promise.all([
+      api.publicDrops.list(),
+      Promise.resolve().then(() => api.social.following()).catch(() => null),
+    ])
+      .then(([raw, following]: [any, Array<{ userId: string }> | null]) => {
+        const all: any[] = Array.isArray(raw) ? raw : raw?.drops ?? [];
+        const followedIds = new Set((Array.isArray(following) ? following : []).map((f) => f.userId));
+        const followedMode = followedIds.size > 0;
+        setMode(followedMode ? 'followed' : 'latest');
+        const list = followedMode ? all.filter((d) => followedIds.has(d.ownerId)) : all;
         const mapped: DropItem[] = list.map((d: any) => {
           const sellerName = d.seller?.brandName ?? d.seller?.displayName ?? 'Seller';
           const sellerInitials = sellerName.slice(0, 2).toUpperCase();
@@ -226,7 +244,7 @@ export default function FollowingScreen() {
         });
         setDrops(mapped);
       })
-      .catch(() => {})
+      .catch(() => { setDrops([]); setFailed(true); })
       .finally(() => setLoading(false));
   }, [api]);
 
@@ -252,7 +270,12 @@ export default function FollowingScreen() {
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page.
           No subtitle, matching Discover; the status line moved into the body. */}
       <Header title="Following" largeTitle showBack={false} />
-      <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
+      {mode === 'latest' && !loading && !failed ? (
+        <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]} accessibilityRole="header">Latest drops</Text>
+      ) : null}
+      {failed ? null : (
+        <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
+      )}
 
       {/* Brand avatars row — only shown when real drops exist */}
       {avatarBrands.length > 0 && (
@@ -294,6 +317,16 @@ export default function FollowingScreen() {
           <DropCardSkeleton />
           <DropCardSkeleton />
         </View>
+      ) : failed ? (
+        <ErrorState message="Couldn't load drops." onRetry={loadDrops} style={{ flex: 1 }} />
+      ) : drops.length === 0 && mode === 'latest' ? (
+        <View style={s.centeredWrap}>
+          <Feather name="zap" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
+          <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
+          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
+            New drops will appear here when sellers launch them.
+          </Text>
+        </View>
       ) : drops.length === 0 ? (
         <View style={s.centeredWrap}>
           <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
@@ -330,6 +363,7 @@ const s = StyleSheet.create({
   container: { flex: 1 },
 
   statusLine: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  sectionTitle: { paddingHorizontal: SPACING.md, paddingBottom: 2 },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

@@ -128,11 +128,13 @@ export default function DiscoverScreen() {
   const [forYouPosts, setForYouPosts] = useState<DiscoverPost[]>([]);
   const [forYouLoading, setForYouLoading] = useState(true);
   const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
+  const [forYouError, setForYouError] = useState(false);
   const forYouLimit = useRef(30);
 
   const [fitsPosts, setFitsPosts] = useState<DiscoverPost[]>([]);
   const [fitsLoading, setFitsLoading] = useState(true);
   const [fitsLoadingMore, setFitsLoadingMore] = useState(false);
+  const [fitsError, setFitsError] = useState(false);
   const fitsLimit = useRef(30);
 
   const [brands, setBrands] = useState<BrandCardData[]>([]);
@@ -151,6 +153,7 @@ export default function DiscoverScreen() {
   const [drops, setDrops] = useState<DiscoverDrop[]>([]);
   const [dropsLoading, setDropsLoading] = useState(true);
   const [dropsFetched, setDropsFetched] = useState(false);
+  const [dropsError, setDropsError] = useState(false);
 
   const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
@@ -196,8 +199,12 @@ export default function DiscoverScreen() {
   const fetchForYou = useCallback(async (append = false) => {
     if (append) setForYouLoadingMore(true); else setForYouLoading(true);
     try {
-      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'forYou', limit: forYouLimit.current });
+      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'forYou', limit: forYouLimit.current, throwWhenUnreachable: true });
       setForYouPosts(rows);
+      setForYouError(false);
+    } catch {
+      // A failed page keeps what is already on screen; only an empty grid shows the error.
+      setForYouError(true);
     } finally {
       if (append) setForYouLoadingMore(false); else setForYouLoading(false);
     }
@@ -206,8 +213,11 @@ export default function DiscoverScreen() {
   const fetchFits = useCallback(async (append = false) => {
     if (append) setFitsLoadingMore(true); else setFitsLoading(true);
     try {
-      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'fits', limit: fitsLimit.current });
+      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'fits', limit: fitsLimit.current, throwWhenUnreachable: true });
       setFitsPosts(rows);
+      setFitsError(false);
+    } catch {
+      setFitsError(true);
     } finally {
       if (append) setFitsLoadingMore(false); else setFitsLoading(false);
     }
@@ -227,6 +237,9 @@ export default function DiscoverScreen() {
     setDropsLoading(true);
     try {
       setDrops(await composeDiscoverDrops({ api }));
+      setDropsError(false);
+    } catch {
+      setDropsError(true);
     } finally {
       setDropsLoading(false);
       setDropsFetched(true);
@@ -330,6 +343,10 @@ export default function DiscoverScreen() {
           }}
           onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
           onTileLongPress={setSafetyMenuPost}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          error={forYouError && forYouPosts.length === 0}
+          onRetry={() => { void fetchForYou(); }}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
           ListFooterExtra={<RecentlyViewedRow style={{ paddingHorizontal: SP.md, marginTop: SP.lg }} />}
@@ -351,6 +368,10 @@ export default function DiscoverScreen() {
           }}
           onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
           onTileLongPress={setSafetyMenuPost}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          error={fitsError && fitsPosts.length === 0}
+          onRetry={() => { void fetchFits(); }}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header as never}
         />
@@ -417,7 +438,16 @@ export default function DiscoverScreen() {
             </ResponsiveContainer>
           ) : (
             <View style={{ paddingHorizontal: SP.md }}>
-              <EmptyState icon="zap" title="No drops yet" description="Upcoming drops from sellers will show up here." />
+              {dropsError ? (
+                <EmptyState
+                  icon="wifi-off"
+                  title="Couldn't load drops"
+                  description="Check your connection and try again."
+                  action={{ label: 'Try again', onPress: () => { void fetchDrops(); } }}
+                />
+              ) : (
+                <EmptyState icon="zap" title="No drops yet" description="Upcoming drops from sellers will show up here." />
+              )}
             </View>
           )}
         />

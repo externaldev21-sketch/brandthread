@@ -49,6 +49,15 @@ type ScreenState =
   | { kind: 'error' }
   | { kind: 'ready'; data: PublicCollectionDto };
 
+/** Where a saved item opens: product → PDP, post → the post player. Any
+ *  other type (store, nested collection, future kinds) has no target here. */
+function itemHref(item: PublicCollectionItem): string | null {
+  if (!item.targetId) return null;
+  if (item.type === 'product') return `/product-detail?id=${encodeURIComponent(item.targetId)}`;
+  if (item.type === 'post') return `/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}`;
+  return null;
+}
+
 async function fetchPublicCollection(collectionId: string): Promise<PublicCollectionDto> {
   const apiBase =
     process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -159,7 +168,9 @@ export default function PublicCollectionScreen() {
             scrollEnabled={false}
             columnWrapperStyle={{ gap: GAP }}
             contentContainerStyle={{ gap: GAP, marginTop: SP.lg }}
-            renderItem={({ item }) => (
+            renderItem={({ item }) => {
+              const href = itemHref(item);
+              const tile = (
               <View style={styles.tile}>
                 {item.image ? (
                   <Image source={{ uri: item.image }} style={styles.tileImage} />
@@ -171,7 +182,20 @@ export default function PublicCollectionScreen() {
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
                 {item.priceCents != null ? <Text style={styles.tilePrice}>{formatCents(item.priceCents)}</Text> : null}
               </View>
-            )}
+              );
+              // Unknown types stay a plain, non-interactive tile (no button role).
+              if (!href) return tile;
+              return (
+                <TouchableOpacity
+                  onPress={() => router.push(href as never)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.type === 'product' ? `Open ${item.title}` : `Open post ${item.title}`}
+                >
+                  {tile}
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
 

@@ -52,7 +52,6 @@ function rel(full: string): string {
 const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/(buyer)/activity.tsx',
   'app/(buyer)/cart.tsx',
-  'app/(buyer)/discover-feed.tsx',
   'app/(buyer)/discover.tsx',
   'app/(buyer)/feed.tsx',
   'app/(buyer)/following.tsx',

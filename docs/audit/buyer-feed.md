@@ -24,11 +24,15 @@ screen lists at most 3 items.
   feed" with a Retry button. This uses the existing `creatorRetry` style, so it
   looks like the creator player's own error state. The forced-500 render was
   checked before and after.
-- **open**: The bundled `FASHION_PREVIEW_POSTS` are added whenever `__DEV__`
-  is true (`feed.tsx` ~2456 and ~2600), not only under `&demo=1`. Dev builds
-  therefore show seeded videos to a "fresh" account. This is left open because
-  the gate is shared with the seller feed and the first-frame poster in
-  `app/+html.tsx`, so changing it is more than a one-line change.
+- **fixed (round 2)**: The bundled `FASHION_PREVIEW_POSTS` and their
+  first-frame poster were added whenever `__DEV__` was true. Both are now
+  gated on `isPreviewDemoMode()` (`?bt_preview=…&demo=1`), latched at mount so
+  in-app navigation, which drops the query, doesn't remove them mid-session.
+  A fresh account in a dev build now sees the real feed, empty or not. The
+  seller feed never received these posts, so it is unchanged. `app/+html.tsx`
+  only holds a preload hint and is documented as dead under
+  `web.output: "single"`. Verified in render: fresh preview shows only real API
+  posts, and `&demo=1` still leads with the seeded posts.
 
 ## 2. Buyer feed alias: `app/(buyer)/feed.tsx`
 
@@ -46,12 +50,14 @@ screen lists at most 3 items.
 - **fixed**: The brand avatar chips were unlabelled buttons; VoiceOver only
   read the initials. They now have `accessibilityRole="button"` and an
   "Open drop from {brand}" label.
-- **open**: A failed `/api/public/drops` load is swallowed (`.catch(() => {})`)
-  and shows as "No drops yet". It needs an error state with a retry.
-- **open**: The screen says it shows drops from sellers you follow, and the
-  empty copy says "Follow sellers to see their latest drops here". It actually
-  loads all public drops, with no follow filter. Either the data or the copy
-  needs to change, and that is a product decision.
+- **fixed (round 2)**: A failed `/api/public/drops` load now shows an error
+  with Retry instead of "No drops yet". Verified: Retry re-fetches.
+- **fixed (round 2, data fix)**: Drops are now filtered to followed owners
+  (`/api/social/following` user ids against each drop's `ownerId`; both are
+  Clerk ids). A viewer who follows nobody, or whose follow list can't be read,
+  sees every public drop under "Latest drops", with a neutral empty state. The
+  follow-prompt empty copy now appears only in the followed state. Verified in
+  render: latest, followed, followed-but-empty and error.
 
 ## 5. Discover with filter tabs (For You / Fits / Brands / People / Drops): `app/(buyer)/discover.tsx`
 
@@ -63,24 +69,26 @@ screen lists at most 3 items.
   container, so the header (title, search bar and filter chips) dropped about
   16pt whenever Drops was selected. The spacer now sits below the header.
   Verified in render: the title and chips no longer move between filters.
-- **open**: The For You and Fits grids have no pull-to-refresh
-  (`DiscoverGrid` takes no refresh props), while Brands, People and Drops do.
-  `composeDiscoverPosts` also swallows network errors, so a failed load shows
-  "Nothing to show yet" instead of an error. Fixing this means adding props to
-  `components/discover/DiscoverGrid.tsx`, which is outside these routes.
-  - Related: Drops rows show the placeholder subtitle "Brand" and blank
-    thumbnails when the API omits `brandName` or an image
-    (`lib/discoverFeed.ts:293`, `'Brand'` fallback). This shows up in the demo
-    render.
+- **fixed (round 2)**: For You and Fits now have pull-to-refresh (new
+  `refreshing`/`onRefresh` props on `DiscoverGrid`). A load where every source
+  failed (`composeDiscoverPosts({ throwWhenUnreachable })`) shows "Couldn't
+  load posts" with Try again instead of "Nothing to show yet". The Drops filter
+  got the same treatment.
+- **fixed (round 2)**: Drops rows showed "Brand" with blank thumbnails because
+  `composeDiscoverDrops` read `brandName`/`imageUri`, but `/api/public/drops`
+  sends `seller.{brandName,displayName}` and `heroImageUrl`. It now maps the
+  real fields and hides any row still missing a brand or an image. Verified:
+  of three stubbed drops, only the complete one renders.
 
 ## 6. Discover full-screen pager: `app/(buyer)/discover-feed.tsx`
 
-- **open**: This route is orphaned. Its header comment says Discover pushes
-  `/(buyer)/discover-feed` from a "For You" full-screen entry point, but
-  nothing in `app/`, `components/` or `lib/` navigates there. I checked for
-  string routes, `useThreadPull().push`, swipe handlers and the safety `…`
-  menu. It is also not registered in `(buyer)/_layout.tsx`. Either wire up the
-  entry point or delete the route.
+- **fixed (round 2)**: The owner approved deleting this orphaned route,
+  which nothing navigated to. Its entry is also removed from the ScreenHeader
+  migration allowlist, as that file's own rule requires.
+  `components/discover/DiscoverPager.tsx` (and its test) is now unused but was
+  left in place, because only the route's deletion was approved. A stale
+  `'(buyer)/discover-feed'` entry in `components/layout/ScreenChrome.tsx` is
+  harmless and was left for the same reason.
 
 ## 7. Search with results tabs (For you / Accounts / Products / Tags / Brands): `app/buyer-search.tsx`
 
@@ -90,13 +98,12 @@ screen lists at most 3 items.
   preview gate at all. That includes production. They now appear only under
   `&demo=1` (`isPreviewDemoMode`). The fictional `PREVIEW_ACCOUNTS` were
   gated on preview only and are now also limited to `demo=1`.
-- **open**: A post tile in results is labelled "Play video by X", but tapping
-  it opens the author's profile (`/buyer-other-profile?userId=…&postId=…`),
-  and that screen ignores `postId`. The tapped post never opens. The right
-  target is the creator player (`profileVideosHref({ source: 'creator', id,
-  startPostId, exactPost: true })`, as in `buyer-recently-watched.tsx`). That
-  needs confirmation that a search result's `authorId` is the id the creator
-  player expects, so it is left open.
+- **fixed (round 2)**: Tapping a post tile opens the creator player on that
+  video (`profileVideosHref({ source: 'creator', id: authorId, startPostId,
+  exactPost: true })`). Mapping confirmed in the server code: a video result's
+  `authorId` is `posts.userId`, the id `/api/public/users/:id/videos` loads,
+  and the exact-post check compares against `/api/posts/:id`'s `userId`.
+  Verified: the tap lands on `/profile-videos?source=creator&id=…&startPostId=…&exactPost=1`.
 
 ## 8. Recent searches: `app/buyer-search-history.tsx`
 
@@ -138,9 +145,12 @@ screen lists at most 3 items.
   render). The "By …" prefix is now dropped when there is no owner name. Also
   added: `accessibilityRole="button"` on both CTAs, and spacing above "Nothing
   saved here yet."
-- **open**: The item tiles are not tappable (plain `View`s with no long-press
-  either). A visitor can't open a saved product from a shared collection.
-  Routing depends on `item.type`, so this is left open.
+- **fixed (round 2)**: Tiles are now tappable by `item.type`: product opens
+  the PDP (`/product-detail?id=`, the share-link target) and post opens the
+  post player (`/buyer-post-viewer?postId=`). The payload has no post author,
+  so the creator player can't be used here. Store, collection and unknown
+  types stay plain tiles with no button role. Verified: two buttons for three
+  tiles, and the product tile opens the PDP.
 
 ## 15. Public profile: `app/u/[username].tsx`
 
@@ -163,10 +173,18 @@ screen lists at most 3 items.
 - **fixed**: Save worked in one direction only. Tapping a saved bookmark did
   nothing (a dead tap). It now toggles, using the existing
   `removeSavedItem`, and the label and state follow it.
-- **open**: Liking someone else's post isn't persisted. `likePost` only flips
-  posts in the viewer's own local list, so the heart and count reset when the
-  viewer reopens. A second open item: there are two share buttons, the
-  header's send icon and `share-2` in the action bar.
+- **fixed (round 2)**: Likes on server posts persist through the real like
+  API (`api.posts.interact(id, { type: 'like', value: 'add' | 'remove' })`,
+  idempotent), with an optimistic update, the server's count applied on
+  success, and a rollback on failure. On-device posts (non-UUID ids) keep the
+  local store. Verified: a stubbed success shows the server count, and a
+  forced 500 rolls back to the original.
+  - Remaining limitation (backend): `GET /api/posts/:id` doesn't say whether
+    the viewer already liked the post, so a post liked elsewhere opens with an
+    empty heart. Tapping it re-adds the like idempotently and the count stays
+    correct.
+- **fixed (round 2)**: Removed the duplicate share. The header's send icon is
+  gone and the action-bar `share-2` stays (TikTok convention).
 
 ---
 

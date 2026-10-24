@@ -165,6 +165,8 @@ async function loadPublicPost(api: ReturnType<typeof useApi>, id: string): Promi
   } catch { return null; }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -244,10 +246,26 @@ export default function BuyerPostViewer() {
 
   const handleLike = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const prevLiked = liked;
+    const prevCount = likeCount;
     const newLiked = !liked;
+    // Optimistic; server posts persist through the real like API (idempotent
+    // add/remove, returns the fresh count) and roll back on failure. Local-only
+    // posts (non-UUID ids: on-device drafts, preview seeds) keep the local store.
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
-    if (params.postId) await likePost(params.postId);
+    const id = params.postId;
+    if (!id) return;
+    if (!UUID_RE.test(id)) { await likePost(id); return; }
+    try {
+      const res = await api.posts.interact(id, { type: 'like', value: newLiked ? 'add' : 'remove' });
+      if (typeof res?.count === 'number') setLikeCount(res.count);
+      // Keep the on-device copy of my own posts in step (no-op for others').
+      void likePost(id).catch(() => {});
+    } catch {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+    }
   };
 
   const handleShare = async () => {
@@ -314,7 +332,6 @@ export default function BuyerPostViewer() {
       <ScreenHeader
         title={authorName}
         onBack={() => goBackOr(router)}
-        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
       />
       {tileExpandOverlay}
 
