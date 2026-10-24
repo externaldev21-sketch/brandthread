@@ -106,7 +106,8 @@ export default function SellerScheduleLiveScreen() {
   }
 
   async function cancel(id: string) {
-    try { await cancelScheduledLive(id); } catch { /* row stays */ }
+    setError('');
+    try { await cancelScheduledLive(id); } catch { setError('Could not cancel that live. Try again.'); }
     await loadMine();
   }
 
@@ -198,6 +199,7 @@ export default function SellerScheduleLiveScreen() {
                   style={[styles.pickRow, { borderColor: theme.border }]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
+                  accessibilityLabel={p.name}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowText, { color: theme.text }]}>{p.name}</Text>
@@ -264,7 +266,7 @@ const styles = StyleSheet.create({
   dayCard: { borderWidth: crispPx(1.5), borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, minWidth: 84 },
   dayLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
   daySub: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  note: { fontFamily: FONT.regular, fontSize: FS.xs },
+  note: { fontFamily: FONT.regular, fontSize: FS.meta },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 12 },
   rowText: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.sm },
   scheduledCard: { borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, gap: 4 },

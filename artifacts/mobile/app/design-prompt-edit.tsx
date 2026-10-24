@@ -1,3 +1,4 @@
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 /**
  * Brandthread Design Studio — Edit with Prompt
  * Route: /design-prompt-edit  (Studio tab → "Edit with Prompt")
@@ -155,6 +156,27 @@ export default function DesignPromptEditScreen() {
     }
   }
 
+  async function handleSaveResult() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    const saved = await saveImageToCameraRoll(uri, 'prompt-edit');
+    if (saved.ok) Alert.alert('Saved', 'Saved to Photos.');
+    else if (saved.reason === 'permission') Alert.alert('Permission required', 'Allow photo library access to save this image.');
+    else if (saved.reason === 'unavailable') Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+    else Alert.alert('Save failed', 'Could not save this image. Please try again.');
+  }
+
+  async function handleSaveToBrandAssets() {
+    const uri = result?.imageUris[0];
+    if (!uri) return;
+    try {
+      await createBrandAsset({ name: prompt.trim().slice(0, 40) || 'Prompt edit', type: 'graphic', uri, tags: ['ai-generated', 'prompt-edit'] });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
+    }
+  }
+
   return (
     <BrandthreadScreen>
       <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
@@ -205,6 +227,8 @@ export default function DesignPromptEditScreen() {
                 onPress={() => setPrompt(ex)}
                 style={[s.chip, prompt === ex && s.chipActive]}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Use example: ${ex}`}
               >
                 <Text style={[s.chipText, prompt === ex && s.chipTextActive]}>{ex}</Text>
               </TouchableOpacity>

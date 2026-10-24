@@ -558,7 +558,9 @@ export default function CreateAdScreen() {
 
     const order = Array.from({ length: localPaths.length }, (_, i) => i);
     [order[from], order[to]] = [order[to], order[from]];
-    try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch { /* revert not needed */ }
+    try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch {
+      Alert.alert('Could not save order', 'Your photo order was not saved. Try moving it again.');
+    }
   }
 
   // ── Launch: validate everything, save, then pay ──────────────────────────
@@ -695,7 +697,7 @@ export default function CreateAdScreen() {
         <Text style={[styles.stageSub, { color: colors.mutedForeground }]}>Verifying your payment…</Text>
         {!nativeRail && (
           <Text style={[styles.stageSub, { fontSize: FS.xs, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.xl }]}>
-            Never activates on redirect alone — confirming with Stripe now.
+            Confirming your payment with Stripe.
           </Text>
         )}
       </View>
@@ -719,8 +721,8 @@ export default function CreateAdScreen() {
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.subtle, fontSize: FS.xs }]}>
             Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
           </Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)}>
-            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Back to Design Studio</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Done">
+            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Done</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -738,7 +740,7 @@ export default function CreateAdScreen() {
           <Icon name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
           <Text style={[styles.stageHeading, { color: colors.foreground }]}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>{initError}</Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }} accessibilityRole="button" accessibilityLabel="Go back">
             <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Go back</Text>
           </TouchableOpacity>
         </View>
@@ -834,6 +836,8 @@ export default function CreateAdScreen() {
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
                   style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: colors.elevated, borderColor: colors.border }]}
                   onPress={() => pickMedia('photos')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add more photos"
                   testID="add-more-photos-btn"
                 >
                   <Icon name="plus" size={20} color={colors.mutedForeground} />

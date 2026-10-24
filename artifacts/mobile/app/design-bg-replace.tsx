@@ -146,7 +146,7 @@ export default function DesignBgReplaceScreen({
       });
       setResultUri(res.resultUri);
     } catch {
-      Alert.alert('Error', 'Generation failed. Please try again.');
+      Alert.alert('Generation failed', 'Could not replace the background. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -259,10 +259,10 @@ export default function DesignBgReplaceScreen({
       {embedded && (
         <View style={s.modeWrap}>
           <View style={s.modeRow}>
-            <TouchableOpacity style={s.modeButton} onPress={onSelectRemove} activeOpacity={0.8}>
+            <TouchableOpacity style={s.modeButton} onPress={onSelectRemove} activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: false }}>
               <Text style={s.modeText}>Remove</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.modeButton, s.modeButtonActive]} activeOpacity={0.8}>
+            <TouchableOpacity style={[s.modeButton, s.modeButtonActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: true }}>
               <Text style={[s.modeText, s.modeTextActive]}>Replace</Text>
             </TouchableOpacity>
           </View>
@@ -273,7 +273,7 @@ export default function DesignBgReplaceScreen({
         {/* Source Image */}
         <SectionHeader title="Source image" style={s.sectionHdr} />
         <View style={s.ph}>
-          <TouchableOpacity onPress={pickSourceImage} activeOpacity={0.85}>
+          <TouchableOpacity onPress={pickSourceImage} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={imageUri ? 'Change source image' : 'Upload source image'}>
             {imageUri ? (
               <View style={s.sourcePreview}>
                 <Image source={{ uri: imageUri }} style={s.sourceImage} resizeMode="cover" />
@@ -341,7 +341,7 @@ export default function DesignBgReplaceScreen({
           <View style={s.ph}>
             <View style={s.gradientGrid}>
               {GRADIENT_PRESETS.map((gp, idx) => (
-                <TouchableOpacity key={gp.label} onPress={() => setSelectedGradient(idx)} style={[s.gradCard, selectedGradient === idx && s.gradCardSelected]} activeOpacity={0.8}>
+                <TouchableOpacity key={gp.label} onPress={() => setSelectedGradient(idx)} style={[s.gradCard, selectedGradient === idx && s.gradCardSelected]} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`${gp.label} gradient`} accessibilityState={{ selected: selectedGradient === idx }}>
                   <LinearGradient colors={[gp.from, gp.to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.gradSwatch} />
                   <Text style={s.gradLabel}>{gp.label}</Text>
                   {selectedGradient === idx && (
@@ -382,7 +382,7 @@ export default function DesignBgReplaceScreen({
           <View style={s.ph}>
             <View style={s.sceneGrid}>
               {AI_SCENES.map((scene) => (
-                <TouchableOpacity key={scene} onPress={() => setSelectedScene(scene)} style={[s.scenePill, selectedScene === scene && s.scenePillActive]} activeOpacity={0.8}>
+                <TouchableOpacity key={scene} onPress={() => setSelectedScene(scene)} style={[s.scenePill, selectedScene === scene && s.scenePillActive]} activeOpacity={0.8} accessibilityRole="button" accessibilityState={{ selected: selectedScene === scene }}>
                   <Text style={[s.scenePillText, selectedScene === scene && s.scenePillTextActive]}>{scene}</Text>
                 </TouchableOpacity>
               ))}
@@ -449,7 +449,7 @@ export default function DesignBgReplaceScreen({
               keyExtractor={p => p.id}
               contentContainerStyle={{ padding: SP.md }}
               renderItem={({ item }) => (
-                <TouchableOpacity style={s.productRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
+                <TouchableOpacity style={s.productRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={`Add to ${item.name}`}>
                   {item.media?.[0]?.uri ? (
                     <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                   ) : (
@@ -541,6 +541,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productThumb:       { width: 52, height: 52, borderRadius: RADIUS.sm },
   productThumbEmpty:  { backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
   productName:        { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 4 },
-  productStatus:      { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  productStatus:      { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textTransform: 'capitalize' },
   });
 };

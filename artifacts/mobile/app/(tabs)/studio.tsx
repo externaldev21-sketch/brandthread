@@ -9,6 +9,7 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -90,7 +91,7 @@ const STANDARD_STUDIO_TOOLS: StudioTool[] = [
   {
     id: 'create-content',
     title: 'Create Content',
-    desc: 'Film and edit Seller posts and videos.',
+    desc: 'Film and edit posts and videos.',
     icon: 'video',
     accent: '',
     accentDim: '',
@@ -131,11 +132,11 @@ const STUDIO_TOOLS: StudioTool[] = [
 const THEME_ACCENT_TOOLS = new Set<string>(['ai-design', 'create-content', ...EXTRA_AI_TOOL_IDS]);
 
 const TEMPLATES = [
-  { label: 'T-Shirt',      colors: ['#0EA5E9', '#1D4ED8'] as [string,string] },
-  { label: 'Hoodie',       colors: ['#0EA5E9', '#6366F1'] as [string,string] },
-  { label: 'Product Card', colors: ['#0F766E', '#3B82F6'] as [string,string] },
-  { label: 'Story Reel',   colors: ['#5B5CFF', '#5B5CFF'] as [string,string] },
-  { label: 'Lookbook',     colors: ['#F97316', '#F59E0B'] as [string,string] },
+  { label: 'T-Shirt' },
+  { label: 'Hoodie' },
+  { label: 'Product Card' },
+  { label: 'Story Reel' },
+  { label: 'Lookbook' },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -187,7 +188,10 @@ export default function StudioScreen() {
         setProjects(p.filter(x => x.status !== 'archived'));
         setProjectsError(null);
       })
-      .catch(() => setProjects([]))
+      .catch(() => {
+        setProjects([]);
+        setProjectsError("Couldn't load your projects.");
+      })
       .finally(() => setLoadingProjects(false));
   }, [userId]);
 
@@ -240,6 +244,8 @@ export default function StudioScreen() {
             style={s.myProjectsBtn}
             onPress={() => router.push('/design' as never)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            hitSlop={{ top: 8, bottom: 8 }}
           >
             <Icon name="folder" size={14} color={theme.accentLight} />
             <Text style={s.myProjectsBtnText}>My Projects</Text>
@@ -272,6 +278,9 @@ export default function StudioScreen() {
                 key={tool.id}
                 activeOpacity={0.85}
                 onPress={() => handleToolPress(tool)}
+                accessibilityRole="button"
+                accessibilityLabel={isLocked ? `${tool.title}, requires Growth plan` : tool.title}
+                accessibilityHint={tool.desc}
                 style={[s.toolCard, { width: toolCardWidth, borderColor: toolAccent + '33' }]}
               >
                 {/* Icon row */}
@@ -302,7 +311,7 @@ export default function StudioScreen() {
         {/* ── RECENT PROJECTS ── */}
         <View style={[s.sectionHeader, s.sectionHeaderTop]}>
           <Text style={s.sectionTitle}>Recent projects</Text>
-          <TouchableOpacity onPress={() => router.push('/design' as never)} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => router.push('/design' as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="View all projects" hitSlop={14}>
             <Text style={s.sectionAction}>View all →</Text>
           </TouchableOpacity>
         </View>
@@ -311,6 +320,18 @@ export default function StudioScreen() {
           <View style={s.loadingRow}>
             <ActivityIndicator size="small" color={theme.accent} />
           </View>
+        ) : projectsError ? (
+          <TouchableOpacity
+            style={s.projEmptyRow}
+            activeOpacity={0.8}
+            onPress={loadProjects}
+            accessibilityRole="button"
+            accessibilityLabel={`${projectsError} Tap to retry`}
+          >
+            <Feather name="alert-circle" size={20} color={theme.muted} style={{ marginRight: SP.sm }} />
+            <Text style={s.projEmptyText}>{projectsError} Tap to retry.</Text>
+            <Feather name="rotate-cw" size={14} color={theme.muted} />
+          </TouchableOpacity>
         ) : projects.length > 0 ? (
           projects.slice(0, 4).map((proj) => {
             const variant: 'purple'|'success'|'info'|'warning'|'neutral' =
@@ -324,6 +345,8 @@ export default function StudioScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push(`/design-canvas?id=${proj.id}` as never)}
                 style={s.projCard}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${proj.name}`}
               >
                 <LinearGradient
                   colors={theme.primaryGradient}
@@ -348,6 +371,7 @@ export default function StudioScreen() {
             style={s.projEmptyRow}
             activeOpacity={0.8}
             onPress={() => router.push('/design' as never)}
+            accessibilityRole="button"
           >
             <Icon name="folder" size={20} color={theme.muted} style={{ marginRight: SP.sm }} />
             <Text style={s.projEmptyText}>No projects yet — tap to create your first</Text>
@@ -358,7 +382,7 @@ export default function StudioScreen() {
         {/* ── TEMPLATES ── */}
         <View style={[s.sectionHeader, s.sectionHeaderTop]}>
           <Text style={s.sectionTitle}>Templates</Text>
-          <TouchableOpacity onPress={() => router.push('/design-templates' as never)} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => router.push('/design-templates' as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Browse all templates" hitSlop={14}>
             <Text style={s.sectionAction}>Browse all →</Text>
           </TouchableOpacity>
         </View>
@@ -376,9 +400,11 @@ export default function StudioScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/design-templates' as never);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`${tmpl.label} template`}
             >
               <LinearGradient
-                colors={tmpl.colors}
+                colors={[`${theme.muted}40`, theme.card]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={s.templateCard}
@@ -431,6 +457,9 @@ const makeStyles = (theme: any) => {
   },
 
   myProjectsBtn: {
+    // Sized to its label — without this the pill stretched the full header
+    // width and read as a bar rather than a button.
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -523,7 +552,7 @@ const makeStyles = (theme: any) => {
     letterSpacing: -0.1,
   },
   toolDesc: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: muted,
     lineHeight: 16,
@@ -615,12 +644,12 @@ const makeStyles = (theme: any) => {
     gap: 8,
   },
   projType: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.regular,
     color: muted,
   },
   projCta: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.medium,
     color: subtle,
   },

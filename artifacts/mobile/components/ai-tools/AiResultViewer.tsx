@@ -85,6 +85,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
             <Glass variant="regular" radius={RADIUS.pill} style={s.glassBtn}>
               <TouchableOpacity
                 onPress={() => setShowBefore((v) => !v)}
+                accessibilityRole="button"
                 accessibilityLabel={showBefore ? 'Show generated photo' : 'Show original photo'}
                 style={s.glassBtnInner}
               >
@@ -105,6 +106,7 @@ export function AiResultViewer({ visible, items, index, onIndexChange, onClose, 
                   key={a.label}
                   style={s.actionBarBtn}
                   onPress={() => a.onPress(current)}
+                  accessibilityRole="button"
                   accessibilityLabel={a.label}
                   disabled={loading}
                 >

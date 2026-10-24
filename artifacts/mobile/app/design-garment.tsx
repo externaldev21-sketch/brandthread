@@ -1,3 +1,4 @@
+import { SUCCESS } from '@/lib/theme';
 /**
  * Brandthread Design Studio — Garment Design Mode
  * Route: /design-garment?projectId=<id>&garmentType=tshirt&garmentColor=#FFFFFF
@@ -17,7 +18,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
@@ -65,7 +65,7 @@ function garmentLabel(type: string): string {
     tank: 'Tank Top', longsleeve: 'Long Sleeve', shorts: 'Shorts',
     joggers: 'Joggers',
   };
-  return map[type] ?? type;
+  return map[type] ?? GARMENT_TYPES.find(t => t.value === type)?.label ?? type;
 }
 
 // Approximate placement zone rects as % of garment preview area
@@ -209,7 +209,7 @@ export default function DesignGarmentScreen() {
   // Reset view when garment type changes
   useEffect(() => {
     if (!(availableViews as string[]).includes(currentView)) {
-      setCurrentView(availableViews[0] ?? 'Front');
+      setCurrentView(availableViews[0] ?? 'front');
     }
     setSelectedZone(null);
   }, [garmentType]);
@@ -220,14 +220,27 @@ export default function DesignGarmentScreen() {
       return;
     }
     setSaving(true);
-    await updateProject(projectId, {
-      garmentType,
-      garmentColor,
-      updatedAt: new Date().toISOString(),
-    } as any);
-    setSaving(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Saved', 'Placement saved to project.');
+    try {
+      await updateProject(projectId, {
+        garmentType,
+        garmentColor,
+        updatedAt: new Date().toISOString(),
+      } as any);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Placement saved to project.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save this placement. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openInEditor() {
+    if (!projectId) {
+      Alert.alert('No project', 'Create a project first.');
+      return;
+    }
+    router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any);
   }
 
   // The canvas takes its garment view from the saved project
@@ -424,6 +437,8 @@ export default function DesignGarmentScreen() {
             onPress={handleSavePlacement}
             disabled={saving}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: saving }}
           >
             <Icon name="save" size={ICON.sm} color="#000000" />
             <Text style={gs.savePlacementText}>{saving ? 'Saving…' : 'Save Placement'}</Text>
@@ -432,6 +447,7 @@ export default function DesignGarmentScreen() {
             style={gs.openEditorLargeBtn}
             onPress={openInEditor}
             activeOpacity={0.85}
+            accessibilityRole="button"
           >
             <Icon name="edit-2" size={ICON.sm} color={FG} />
             <Text style={gs.openEditorLargeText}>Open in Editor</Text>
@@ -464,7 +480,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   garmentCaptionText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
   zoneOverlay:  { position: 'absolute', borderRadius: RADIUS.xs, borderWidth: 2, borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },
+  safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: MUTED, backgroundColor: 'rgba(192,192,192,0.12)', borderStyle: 'dashed' },
   embroideryOverlay: { position: 'absolute', left: '25%', top: '15%', width: '50%', height: '40%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: CYAN, backgroundColor: CYAN_DIM, borderStyle: 'dashed' },
 
   viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },

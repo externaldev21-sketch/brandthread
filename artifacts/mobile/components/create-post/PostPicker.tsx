@@ -160,12 +160,12 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
             onCrop={(crop) => setSlides((prev) => prev.map((sl) => (sl.id === focused.id ? { ...sl, crop } : sl)))}
           />
         ) : (
-          <Text style={s.previewHint}>{media.permission === 'denied' ? 'Allow photo access to pick from your library' : 'Choose photos or videos'}</Text>
+          <Text style={s.previewHint}>{media.permission === 'denied' && !media.isWeb ? 'Allow photo access to pick from your library' : 'Choose photos or videos'}</Text>
         )}
       </View>
 
       <View style={s.recentsRow}>
-        <Pressable onPress={() => { tap(); setAlbumPage(true); }} style={s.recents} accessibilityRole="button" accessibilityLabel="Choose album" testID="picker-album">
+        <Pressable onPress={() => { tap(); setAlbumPage(true); }} disabled={media.isWeb} hitSlop={12} style={s.recents} accessibilityRole="button" accessibilityLabel="Choose album" testID="picker-album">
           <Text style={s.recentsText}>{media.isWeb ? 'Files' : media.album.title}</Text>
           {!media.isWeb ? <Icon name="chevron-down" size={18} color={CP.white} /> : null}
         </Pressable>
@@ -202,7 +202,7 @@ export function PostPicker({ modes, mode, onChangeMode, onClose, onNext, onOpenC
       {albumPage ? (
         <SubPage title="Albums" onBack={() => setAlbumPage(false)} testID="picker-album-page">
           {media.albums.map((a) => (
-            <Pressable key={a.id ?? 'recents'} style={s.albumRow} onPress={() => { tap(); media.selectAlbum(a); setAlbumPage(false); }} accessibilityRole="button">
+            <Pressable key={a.id ?? 'recents'} style={s.albumRow} onPress={() => { tap(); media.selectAlbum(a); setAlbumPage(false); }} accessibilityRole="button" accessibilityState={{ selected: a.id === media.album.id }}>
               <Text style={s.albumTitle}>{a.title}</Text>
               {a.id === media.album.id ? <Icon name="check" size={20} color={CP.white} /> : null}
             </Pressable>

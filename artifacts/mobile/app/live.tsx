@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '@/lib/safety';
 /**
  * LIVE show viewer — one show full-bleed, swipe up/down to the next live
  * show. Laid out 1:1 with Whatnot's show screen (host + Follow top-left,
@@ -515,7 +516,7 @@ export default function LiveScreen() {
                 onSend={async text => {
                   if (!requireSignIn()) return;
                   try { await pager.sendChat(text); } catch (e: any) {
-                    setNotice(e?.message ? String(e.message) : 'Message not sent');
+                    setNotice(apiErrorMessage(e, 'Message not sent. Try again.'));
                     throw e;
                   }
                 }}

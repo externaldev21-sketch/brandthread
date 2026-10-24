@@ -1,3 +1,4 @@
+import { GARMENT_TYPES } from '@/services/designTypes';
 /**
  * Design Mockup Preview — /design-mockup-preview
  */
@@ -192,6 +193,9 @@ export default function DesignMockupPreviewScreen() {
               onPress={() => { Haptics.selectionAsync(); setActiveView(v); }}
               style={[styles.tabBtn, activeView === v && styles.tabBtnActive]}
               activeOpacity={0.8}
+              hitSlop={{ top: 6, bottom: 6 }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeView === v }}
             >
               <Text style={[styles.tabText, activeView === v && styles.tabTextActive]}>{v}</Text>
             </TouchableOpacity>
@@ -224,7 +228,7 @@ export default function DesignMockupPreviewScreen() {
               {project.name}
             </Text>
             <Text style={[styles.overlayType, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#333' : MUTED }]}>
-              {project.garmentType ?? 'Garment'} · {activeView}
+              {GARMENT_TYPES.find(t => t.value === project.garmentType)?.label ?? project.garmentType ?? 'Garment'} · {activeView}
             </Text>
           </View>
         </View>
@@ -238,6 +242,10 @@ export default function DesignMockupPreviewScreen() {
               onPress={() => { Haptics.selectionAsync(); setBgColor(opt.color); }}
               style={[styles.bgSwatch, { backgroundColor: opt.color, borderColor: bgColor === opt.color ? PURPLE : BORDER }]}
               activeOpacity={0.8}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel={`${opt.label} background`}
+              accessibilityState={{ selected: bgColor === opt.color }}
             />
           ))}
         </ScrollView>
@@ -251,6 +259,10 @@ export default function DesignMockupPreviewScreen() {
               onPress={() => { Haptics.selectionAsync(); setShadow(s); }}
               style={[styles.shadowPill, shadow === s && styles.shadowPillActive]}
               activeOpacity={0.8}
+              hitSlop={{ top: 6, bottom: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel={`${s} shadow`}
+              accessibilityState={{ selected: shadow === s }}
             >
               <Text style={[styles.shadowText, shadow === s && styles.shadowTextActive]}>{s}</Text>
             </TouchableOpacity>

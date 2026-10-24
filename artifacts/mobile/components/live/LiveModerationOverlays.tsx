@@ -70,5 +70,5 @@ const styles = StyleSheet.create({
   tileFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tileInitials: { fontFamily: FONT.semibold, fontSize: 20 },
   tileName: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 3 },
-  tileNameText: { fontFamily: FONT.semibold, fontSize: 11 },
+  tileNameText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });

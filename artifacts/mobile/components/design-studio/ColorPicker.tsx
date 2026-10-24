@@ -8,11 +8,12 @@
  * itself, not just this sheet.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import {
-  BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON,
+  BG, SURFACE, CARD_ELEVATED, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   hsvToHex, hexToHsv, isValidHex, discPointToHs, hsToDiscPoint, contrastingBW,
@@ -115,23 +116,30 @@ export default function ColorPicker(props: ColorPickerProps) {
     },
   }), [hsv.h, color]);
 
-  function makeDragResponder(onMove: (pct: number) => void) {
+  // The Value tab's channel tracks are flex: 1 (wider than the fixed 200pt
+  // Disc/Classic tracks), so they report their real width here; dividing
+  // by a hard-coded 200 made those sliders jump ahead of the finger.
+  const valueTrackWidthRef = useRef(200);
+  function makeDragResponder(onMove: (pct: number) => void, widthRef?: { current: number }) {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderMove: (e) => {
-        const pct = Math.max(0, Math.min(1, e.nativeEvent.locationX / 200));
+        const width = widthRef?.current || 200;
+        const pct = Math.max(0, Math.min(1, e.nativeEvent.locationX / width));
         onMove(pct);
       },
     });
   }
 
   const hueSliderResponder = useMemo(() => makeDragResponder(pct => commitHsv(pct * 360, hsv.s, hsv.v)), [hsv.s, hsv.v, color]);
-  const satSliderResponder = useMemo(() => makeDragResponder(pct => commitHsv(hsv.h, pct, hsv.v)), [hsv.h, hsv.v, color]);
   const valSliderResponder = useMemo(() => makeDragResponder(pct => commitHsv(hsv.h, hsv.s, pct)), [hsv.h, hsv.s, color]);
-  const rSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(pct * 255, rgb.g, rgb.b)), [rgb.g, rgb.b, color]);
-  const gSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, pct * 255, rgb.b)), [rgb.r, rgb.b, color]);
-  const bSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, rgb.g, pct * 255)), [rgb.r, rgb.g, color]);
+  const vHueResponder      = useMemo(() => makeDragResponder(pct => commitHsv(pct * 360, hsv.s, hsv.v), valueTrackWidthRef), [hsv.s, hsv.v, color]);
+  const vSatResponder      = useMemo(() => makeDragResponder(pct => commitHsv(hsv.h, pct, hsv.v), valueTrackWidthRef), [hsv.h, hsv.v, color]);
+  const vValResponder      = useMemo(() => makeDragResponder(pct => commitHsv(hsv.h, hsv.s, pct), valueTrackWidthRef), [hsv.h, hsv.s, color]);
+  const rSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(pct * 255, rgb.g, rgb.b), valueTrackWidthRef), [rgb.g, rgb.b, color]);
+  const gSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, pct * 255, rgb.b), valueTrackWidthRef), [rgb.r, rgb.b, color]);
+  const bSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, rgb.g, pct * 255), valueTrackWidthRef), [rgb.r, rgb.g, color]);
   const harmonyDiscResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
@@ -164,13 +172,13 @@ export default function ColorPicker(props: ColorPickerProps) {
     <View style={s.panel} testID="color-picker">
       <View style={s.header}>
         <Text style={s.title}>Colours</Text>
-        <TouchableOpacity onPress={onClose} testID="color-done">
+        <TouchableOpacity onPress={onClose} testID="color-done" accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={s.doneLabel}>Done</Text>
         </TouchableOpacity>
       </View>
 
       <View style={s.actionsRow}>
-        <TouchableOpacity onPress={onRequestEyedropper} testID="color-eyedropper">
+        <TouchableOpacity onPress={onRequestEyedropper} testID="color-eyedropper" accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <Text style={s.actionLabel}>Eyedropper</Text>
         </TouchableOpacity>
         {!!previousColor && (
@@ -178,6 +186,8 @@ export default function ColorPicker(props: ColorPickerProps) {
             style={s.previousColorBtn}
             onPress={() => onChange(previousColor)}
             testID="color-previous"
+            accessibilityRole="button"
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
           >
             <View style={[s.previousSwatch, { backgroundColor: previousColor }]} />
             <Text style={s.actionLabel}>Previous colour</Text>
@@ -211,11 +221,22 @@ export default function ColorPicker(props: ColorPickerProps) {
               testID="color-sv-square"
             >
               {/* White->transparent (saturation) and transparent->black (value)
-                  gradients approximated with two overlapping washes, since RN
-                  has no native 2-stop-corner gradient without an extra lib —
-                  the knob position still drives the real s/v math above. */}
-              <View style={s.squareSatWash} pointerEvents="none" />
-              <View style={s.squareValWash} pointerEvents="none" />
+                  gradients drawn as two overlapping react-native-svg linear
+                  gradients; the knob position drives the real s/v math above. */}
+              <Svg style={StyleSheet.absoluteFill} width={SQUARE_SIZE} height={SQUARE_SIZE} pointerEvents="none">
+                <Defs>
+                  <LinearGradient id="cp-sat" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
+                    <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+                  </LinearGradient>
+                  <LinearGradient id="cp-val" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0" stopColor="#000000" stopOpacity={0} />
+                    <Stop offset="1" stopColor="#000000" stopOpacity={1} />
+                  </LinearGradient>
+                </Defs>
+                <Rect x={0} y={0} width={SQUARE_SIZE} height={SQUARE_SIZE} fill="url(#cp-sat)" />
+                <Rect x={0} y={0} width={SQUARE_SIZE} height={SQUARE_SIZE} fill="url(#cp-val)" />
+              </Svg>
               <View
                 style={[
                   s.squareKnob,
@@ -284,6 +305,9 @@ export default function ColorPicker(props: ColorPickerProps) {
                       onPress={() => onChange(hHex)}
                       style={[s.harmonyKnob, { left: hx - 10, top: hy - 10, backgroundColor: hHex }]}
                       testID={`color-harmony-swatch-${i}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Harmony colour ${hHex}`}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     />
                   );
                 })}
@@ -296,13 +320,17 @@ export default function ColorPicker(props: ColorPickerProps) {
           <View style={s.valueTabWrap} testID="color-value-tab">
             <Text style={s.channelGroupLabel}>HSB</Text>
             {[
-              { key: 'h', label: 'H', val: Math.round(hsv.h), max: 360, responder: hueSliderResponder, pct: hsv.h / 360 },
-              { key: 's', label: 'S', val: Math.round(hsv.s * 100), max: 100, responder: satSliderResponder, pct: hsv.s },
-              { key: 'v', label: 'B', val: Math.round(hsv.v * 100), max: 100, responder: valSliderResponder, pct: hsv.v },
+              { key: 'h', label: 'H', val: Math.round(hsv.h), max: 360, responder: vHueResponder, pct: hsv.h / 360 },
+              { key: 's', label: 'S', val: Math.round(hsv.s * 100), max: 100, responder: vSatResponder, pct: hsv.s },
+              { key: 'v', label: 'B', val: Math.round(hsv.v * 100), max: 100, responder: vValResponder, pct: hsv.v },
             ].map(c => (
               <View key={c.key} style={s.channelRow} testID={`color-channel-${c.key}`}>
                 <Text style={s.channelLetter}>{c.label}</Text>
-                <View {...c.responder.panHandlers} style={s.channelTrack}>
+                <View
+                  {...c.responder.panHandlers}
+                  style={s.channelTrack}
+                  onLayout={e => { valueTrackWidthRef.current = e.nativeEvent.layout.width; }}
+                >
                   <View style={[s.trackThumb, { left: `${c.pct * 100}%` }]} />
                 </View>
                 <Text style={s.channelValue}>{c.val}{c.key === 'h' ? '°' : '%'}</Text>
@@ -317,7 +345,11 @@ export default function ColorPicker(props: ColorPickerProps) {
             ].map(c => (
               <View key={c.key} style={s.channelRow} testID={`color-channel-${c.key}`}>
                 <Text style={s.channelLetter}>{c.label}</Text>
-                <View {...c.responder.panHandlers} style={s.channelTrack}>
+                <View
+                  {...c.responder.panHandlers}
+                  style={s.channelTrack}
+                  onLayout={e => { valueTrackWidthRef.current = e.nativeEvent.layout.width; }}
+                >
                   <View style={[s.trackThumb, { left: `${c.pct * 100}%` }]} />
                 </View>
                 <Text style={s.channelValue}>{c.val}</Text>
@@ -328,7 +360,7 @@ export default function ColorPicker(props: ColorPickerProps) {
 
         {tab === 'palettes' && (
           <View style={s.palettesTabWrap} testID="color-palettes-tab">
-            <TouchableOpacity onPress={onNewPalette} testID="color-new-palette">
+            <TouchableOpacity onPress={onNewPalette} testID="color-new-palette" accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
               <Text style={s.actionLabel}>New palette</Text>
             </TouchableOpacity>
             {palettes.map(p => (
@@ -350,7 +382,7 @@ export default function ColorPicker(props: ColorPickerProps) {
                     </TouchableOpacity>
                   )}
                   <View style={{ flexDirection: 'row', gap: SP.sm, alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => onSetDefaultPalette(p.id)} testID={`palette-set-default-${p.id}`}>
+                    <TouchableOpacity onPress={() => onSetDefaultPalette(p.id)} testID={`palette-set-default-${p.id}`} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}>
                       <Text style={[s.defaultLabel, p.isDefault && s.defaultLabelActive]}>
                         {p.isDefault ? 'Default' : 'Set Default'}
                       </Text>
@@ -365,7 +397,7 @@ export default function ColorPicker(props: ColorPickerProps) {
                 </View>
                 <View style={s.swatchRow}>
                   {p.colors.map(c => (
-                    <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} />
+                    <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }} />
                   ))}
                   {p.colors.length === 0 && <Text style={s.emptyPaletteText}>Tap + to add the current colour</Text>}
                 </View>
@@ -391,7 +423,7 @@ export default function ColorPicker(props: ColorPickerProps) {
         {recentColors.length > 0 && (
           <View style={s.swatchRow}>
             {recentColors.slice(0, 10).map(c => (
-              <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} />
+              <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }} />
             ))}
           </View>
         )}
@@ -401,7 +433,7 @@ export default function ColorPicker(props: ColorPickerProps) {
             <Text style={s.paletteName}>{defaultPalette.name}</Text>
             <View style={s.swatchRow}>
               {defaultPalette.colors.map(c => (
-                <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} />
+                <TouchableOpacity key={c} onPress={() => onChange(c)} style={[s.swatch, { backgroundColor: c }]} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }} />
               ))}
             </View>
           </View>
@@ -415,6 +447,9 @@ export default function ColorPicker(props: ColorPickerProps) {
             style={[s.tabBtn, tab === t.key && s.tabBtnActive]}
             onPress={() => setTab(t.key)}
             testID={`color-tab-${t.key}`}
+            accessibilityRole="tab"
+            accessibilityLabel={t.label}
+            accessibilityState={{ selected: tab === t.key }}
           >
             <Icon name={t.icon} size={ICON.sm} color={tab === t.key ? FG : MUTED} />
             <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
@@ -454,8 +489,6 @@ const s = StyleSheet.create({
 
   classicWrap: { alignItems: 'center', gap: SP.sm },
   square: { width: SQUARE_SIZE, height: SQUARE_SIZE, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  squareSatWash: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.0)' },
-  squareValWash: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.0)' },
   squareKnob: { position: 'absolute', width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
 
   harmonyWrap: { gap: SP.sm },
@@ -477,7 +510,7 @@ const s = StyleSheet.create({
   channelGroupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: SUBTLE, includeFontPadding: false, textTransform: 'uppercase', letterSpacing: 0.5 },
   channelRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   channelLetter: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, width: 16, includeFontPadding: false },
-  channelTrack: { flex: 1, height: 20, borderRadius: RADIUS.xs, backgroundColor: SURFACE, justifyContent: 'center' },
+  channelTrack: { flex: 1, height: 20, borderRadius: RADIUS.xs, backgroundColor: BORDER, justifyContent: 'center' },
   channelValue: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, width: 44, textAlign: 'right', includeFontPadding: false },
 
   palettesTabWrap: { gap: SP.md },
@@ -486,7 +519,7 @@ const s = StyleSheet.create({
     fontFamily: FONT.medium, fontSize: FS.sm, color: FG, includeFontPadding: false,
     borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, paddingVertical: 2, minWidth: 120,
   },
-  defaultLabel: { fontFamily: FONT.medium, fontSize: 10, color: SUBTLE, includeFontPadding: false },
+  defaultLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: SUBTLE, includeFontPadding: false },
   defaultLabelActive: { color: FG },
   emptyPaletteText: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, includeFontPadding: false },
 
@@ -497,7 +530,7 @@ const s = StyleSheet.create({
     backgroundColor: SURFACE, borderRadius: RADIUS.xs, paddingHorizontal: SP.sm, paddingVertical: 6,
     borderWidth: 1, borderColor: BORDER_SUBTLE,
   },
-  hexInputError: { borderColor: '#F87171' },
+  hexInputError: { borderColor: RED },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   swatch: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER },
   paletteBlock: { gap: 6, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, paddingTop: SP.sm },
@@ -510,6 +543,6 @@ const s = StyleSheet.create({
   },
   tabBtn: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 4 },
   tabBtnActive: {},
-  tabLabel: { fontFamily: FONT.medium, fontSize: 10, color: MUTED, includeFontPadding: false },
+  tabLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
   tabLabelActive: { color: FG },
 });

@@ -22,16 +22,19 @@ import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ORANGE,
+  FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, SecondaryButton, EmptyState, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getVersions, duplicateProject, createProject, updateProject } from '@/services/designService';
+import { getVersions, duplicateProject, createProject, updateProject, restoreVersion } from '@/services/designService';
+import { ORANGE } from '@/lib/theme';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
+
+const ACTION_HIT = { top: 13, bottom: 13, left: 8, right: 8 };
 
 function formatDate(iso: string): string {
   try {
@@ -74,7 +77,7 @@ export default function DesignVersionsScreen() {
   const handleRestore = useCallback((version: DesignVersion) => {
     Alert.alert(
       'Restore Version',
-      `Restore "${version.label}"? This will create a new project from this version.`,
+      `Restore "${version.label}"? Your project will be replaced with this version.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -82,19 +85,8 @@ export default function DesignVersionsScreen() {
           onPress: async () => {
             setRestoring(version.id);
             try {
-              // Restore into a NEW project, as the dialog says — the current
-              // project (possibly still open in the editor behind this screen)
-              // is left untouched.
-              const snap = version.snapshot;
-              const created = await createProject(
-                snap.type,
-                `${snap.name} (${version.label})`,
-                snap.canvas,
-                snap.garmentType,
-                snap.garmentColor,
-              );
-              const restored = await updateProject(created.id, { layers: snap.layers });
-              Alert.alert('Version restored', 'A new project has been created from this version.');
+              const restored = await restoreVersion(version.id);
+              Alert.alert('Version restored', 'Your project now matches this version.');
               router.replace(`/design-canvas?id=${restored.id}` as never);
             } catch {
               Alert.alert('Error', 'Failed to restore version. Please try again.');
@@ -109,7 +101,12 @@ export default function DesignVersionsScreen() {
 
   const handleDuplicate = useCallback(async (version: DesignVersion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newProject = await duplicateProject(version.projectId);
+    let newProject: Awaited<ReturnType<typeof duplicateProject>> | null = null;
+    try {
+      const snap = version.snapshot;
+      const created = await createProject(snap.type, `${snap.name} (${version.label})`, snap.canvas, snap.garmentType, snap.garmentColor);
+      newProject = await updateProject(created.id, { layers: snap.layers });
+    } catch { /* handled below */ }
     if (newProject) {
       router.push(`/design-canvas?id=${newProject.id}` as never);
     } else {
@@ -136,6 +133,9 @@ export default function DesignVersionsScreen() {
           onPress={() => handlePreview(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
+          hitSlop={ACTION_HIT}
+          accessibilityRole="button"
+          accessibilityLabel={`Preview ${item.label}`}
         >
           <Icon name="eye" size={14} color={CYAN} />
           <Text style={[styles.actionText, { color: CYAN }]}>Preview</Text>
@@ -145,6 +145,9 @@ export default function DesignVersionsScreen() {
           style={styles.actionBtn}
           activeOpacity={0.8}
           disabled={restoring === item.id}
+          hitSlop={ACTION_HIT}
+          accessibilityRole="button"
+          accessibilityLabel={`Restore ${item.label}`}
         >
           <Icon name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
           <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore</Text>
@@ -153,6 +156,9 @@ export default function DesignVersionsScreen() {
           onPress={() => handleDuplicate(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
+          hitSlop={ACTION_HIT}
+          accessibilityRole="button"
+          accessibilityLabel={`Duplicate ${item.label}`}
         >
           <Icon name="copy" size={14} color={ORANGE} />
           <Text style={[styles.actionText, { color: ORANGE }]}>Duplicate</Text>
@@ -192,8 +198,8 @@ export default function DesignVersionsScreen() {
             <EmptyState
               icon="clock"
               title="No saved versions yet"
-              description="Save your project to create a version."
-              action={{ label: 'Save now', onPress: () => goBackOr(router) }}
+              description={projectId ? 'Saved versions of this project will appear here.' : 'Open a project to see its version history.'}
+              action={{ label: projectId ? 'Back to project' : 'Go back', onPress: () => goBackOr(router) }}
               style={styles.emptyState}
             />
           }

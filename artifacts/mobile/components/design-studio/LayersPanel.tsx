@@ -185,13 +185,13 @@ export default function LayersPanel(props: LayersPanelProps) {
     <View style={s.panel} testID="layers-panel">
       <View style={s.header}>
         <Text style={s.title}>Layers</Text>
-        <TouchableOpacity onPress={onClose} accessibilityLabel="Done" accessibilityRole="button" testID="layers-done">
+        <TouchableOpacity onPress={onClose} accessibilityLabel="Done" accessibilityRole="button" testID="layers-done" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={s.doneLabel}>Done</Text>
         </TouchableOpacity>
       </View>
 
       <View style={s.actionsRow}>
-        <TouchableOpacity onPress={onAddLayer} testID="layers-add-layer">
+        <TouchableOpacity onPress={onAddLayer} testID="layers-add-layer" accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <Text style={s.actionLabel}>New layer</Text>
         </TouchableOpacity>
       </View>
@@ -215,6 +215,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     style={[s.swipeBtn, { backgroundColor: MEDIA.background }]}
                     onPress={() => { onToggleLocked(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-lock-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Icon name={layer.locked ? 'unlock' : 'lock'} size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>{layer.locked ? 'Unlock' : 'Lock'}</Text>
@@ -223,6 +224,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     style={[s.swipeBtn, { backgroundColor: MEDIA.background }]}
                     onPress={() => { onDuplicateLayer(layer.id); closeSwipe(layer.id); }}
                     testID={`layer-swipe-duplicate-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Icon name="copy" size={ICON.xs} color={FG} />
                     <Text style={s.swipeBtnText}>Duplicate</Text>
@@ -250,12 +252,12 @@ export default function LayersPanel(props: LayersPanelProps) {
                     {layer.type === 'image' && data?.uri ? (
                       <RNImage source={{ uri: data.uri }} style={s.thumbImage} resizeMode="cover" />
                     ) : layer.type === 'text' ? (
-                      <Text style={[s.thumbGlyph, { color: isSelected ? BG : MUTED }]}>Aa</Text>
+                      <Text style={[s.thumbGlyph, { color: MUTED }]}>Aa</Text>
                     ) : (
                       <Icon
                         name={layer.type === 'shape' ? 'square' : 'edit-3'}
                         size={ICON.sm}
-                        color={isSelected ? BG : MUTED}
+                        color={MUTED}
                       />
                     )}
                   </View>
@@ -283,8 +285,10 @@ export default function LayersPanel(props: LayersPanelProps) {
                   <TouchableOpacity
                     onPress={() => onToggleVisible(layer.id)}
                     style={[s.checkbox, layer.visible && s.checkboxChecked, isSelected && layer.visible && s.checkboxCheckedOnSelected]}
-                    accessibilityLabel="Toggle visibility"
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`Show ${layer.name}`}
                     accessibilityState={{ checked: layer.visible }}
+                    hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
                     testID={`layer-visibility-${layer.id}`}
                   >
                     {layer.visible && (
@@ -298,13 +302,15 @@ export default function LayersPanel(props: LayersPanelProps) {
 
               {menuFor === layer.id && (
                 <View style={s.contextMenu} testID={`layer-context-menu-${layer.id}`}>
-                  <TouchableOpacity style={s.menuItem} onPress={() => startRename(layer)} testID={`layer-menu-rename-${layer.id}`}>
+                  <TouchableOpacity style={s.menuItem} onPress={() => startRename(layer)} testID={`layer-menu-rename-${layer.id}`}
+                    accessibilityRole="button">
                     <Text style={s.menuItemText}>Rename</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={s.menuItem}
                     onPress={() => { onSelect(layer.id); setMenuFor(null); }}
                     testID={`layer-menu-select-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Text style={s.menuItemText}>Select</Text>
                   </TouchableOpacity>
@@ -312,6 +318,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     style={s.menuItem}
                     onPress={() => { onDuplicateLayer(layer.id); setMenuFor(null); }}
                     testID={`layer-menu-copy-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Text style={s.menuItemText}>Copy</Text>
                   </TouchableOpacity>
@@ -319,6 +326,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     style={s.menuItem}
                     onPress={() => onToggleAlphaLock(layer.id)}
                     testID={`layer-menu-alphalock-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Text style={s.menuItemText}>Alpha Lock{layer.alphaLocked ? '  ✓' : ''}</Text>
                   </TouchableOpacity>
@@ -326,6 +334,7 @@ export default function LayersPanel(props: LayersPanelProps) {
                     style={s.menuItem}
                     onPress={() => onToggleClippingMask(layer.id)}
                     testID={`layer-menu-mask-${layer.id}`}
+                    accessibilityRole="button"
                   >
                     <Text style={s.menuItemText}>Mask{layer.clippingMask ? '  ✓' : ''}</Text>
                   </TouchableOpacity>
@@ -337,8 +346,10 @@ export default function LayersPanel(props: LayersPanelProps) {
                         onPress={() => onSetBlendMode(layer.id, mode)}
                         style={[s.blendChip, (layer.blendMode ?? 'normal') === mode && s.blendChipActive]}
                         testID={`layer-blend-${mode}-${layer.id}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: (layer.blendMode ?? 'normal') === mode }}
                       >
-                        <Text style={[s.blendChipText, (layer.blendMode ?? 'normal') === mode && s.blendChipTextActive]}>{mode}</Text>
+                        <Text style={[s.blendChipText, (layer.blendMode ?? 'normal') === mode && s.blendChipTextActive]}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -361,7 +372,10 @@ export default function LayersPanel(props: LayersPanelProps) {
           <TouchableOpacity
             onPress={onToggleBackgroundVisible}
             style={[s.checkbox, canvasBackgroundVisible && s.checkboxChecked]}
-            accessibilityLabel="Toggle background visibility"
+            accessibilityRole="checkbox"
+            accessibilityLabel="Show background colour"
+            accessibilityState={{ checked: canvasBackgroundVisible }}
+            hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
             testID="layer-visibility-background"
           >
             {canvasBackgroundVisible && (
@@ -406,7 +420,7 @@ const s = StyleSheet.create({
     position: 'absolute', right: 0, top: 0, bottom: 0, flexDirection: 'row', width: SWIPE_ACTIONS_WIDTH,
   },
   swipeBtn: { width: 56, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  swipeBtnText: { fontFamily: FONT.medium, fontSize: 10, color: FG, includeFontPadding: false },
+  swipeBtnText: { fontFamily: FONT.medium, fontSize: FS.xs, color: FG, includeFontPadding: false },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingHorizontal: SP.sm, height: ROW_HEIGHT, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE,
@@ -452,6 +466,6 @@ const s = StyleSheet.create({
     backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER_SUBTLE,
   },
   blendChipActive: { backgroundColor: FG, borderColor: FG },
-  blendChipText: { fontFamily: FONT.medium, fontSize: 10, color: MUTED, includeFontPadding: false },
+  blendChipText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
   blendChipTextActive: { color: BG },
 });

@@ -301,6 +301,9 @@ export default function DesignExportScreen() {
             key={fmt.id}
             onPress={() => selectFormat(fmt.id)}
             activeOpacity={0.8}
+            accessibilityRole="radio"
+            accessibilityLabel={`${fmt.label}, ${fmt.desc}`}
+            accessibilityState={{ checked: selectedFormat === fmt.id }}
           >
             <BrandthreadCard
               style={[styles.formatCard, selectedFormat === fmt.id && styles.formatCardActive]}
@@ -330,6 +333,9 @@ export default function DesignExportScreen() {
             key={sz.id}
             onPress={() => selectSize(sz.id)}
             activeOpacity={0.8}
+            accessibilityRole="radio"
+            accessibilityLabel={`${sz.label}, ${sz.desc}`}
+            accessibilityState={{ checked: selectedSize === sz.id }}
           >
             <BrandthreadCard
               style={[styles.sizeCard, selectedSize === sz.id && styles.formatCardActive]}

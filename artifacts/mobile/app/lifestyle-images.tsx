@@ -19,6 +19,7 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { Icon } from '@/components/ui/Icon';
+import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
@@ -190,7 +191,7 @@ export default function LifestyleImagesScreen() {
         Alert.alert('Generation failed', 'Could not generate the lifestyle photo. Please try again.');
       }
     } catch {
-      Alert.alert('Something went wrong', 'Could not generate the lifestyle photo. Please try again.');
+      Alert.alert('Generation failed', 'Could not generate the lifestyle photo. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -214,6 +215,9 @@ export default function LifestyleImagesScreen() {
               style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
               onPress={() => removePhoto(group, p.id)}
               activeOpacity={0.8}
+              hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+              accessibilityRole="button"
+              accessibilityLabel="Remove photo"
             >
               <Icon name="x" size={11} color="#FFF" />
             </TouchableOpacity>
@@ -223,6 +227,8 @@ export default function LifestyleImagesScreen() {
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
             onPress={() => pickPhotos(group)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={group === 'reference' ? 'Add reference photos' : 'Add product photos'}
             style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
             <Icon name="plus" size={20} color={colors.primary} />
@@ -248,7 +254,7 @@ export default function LifestyleImagesScreen() {
                 backgroundColor: step === s ? colors.primary : (
                   (s === 'reference' && step !== 'reference') || (s === 'product' && step === 'result')
                     ? colors.primary
-                    : colors.secondary
+                    : colors.mutedForeground
                 ),
               }]} />
               {i < 2 && <View style={[styles.stepLine, { backgroundColor: colors.border }]} />}
@@ -340,7 +346,7 @@ export default function LifestyleImagesScreen() {
         {step === 'result' && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              {loading ? 'Generating your lifestyle photo…' : resultB64 ? 'Your lifestyle photo' : 'Something went wrong'}
+              {loading ? 'Generating your lifestyle photo…' : resultB64 ? 'Your lifestyle photo' : "Couldn't generate your photo"}
             </Text>
             <View style={[styles.resultFrame, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {loading ? (
@@ -383,6 +389,12 @@ export default function LifestyleImagesScreen() {
                       <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Regenerate</Text>
                     </TouchableOpacity>
                   </>
+                )}
+                {!resultB64 && (
+                  <TouchableOpacity onPress={generate} activeOpacity={0.85} accessibilityRole="button" style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
+                    <Feather name="refresh-cw" size={16} color={colors.primaryForeground} />
+                    <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Try again</Text>
+                  </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={startOver} activeOpacity={0.7} style={styles.secondaryBtn}>
                   <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Start over</Text>

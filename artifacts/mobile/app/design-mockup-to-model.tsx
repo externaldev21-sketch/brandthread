@@ -38,6 +38,7 @@ import { ReferencePhotoTiles } from '@/components/ai-tools/ReferencePhotoTiles';
 import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
 import {
   generateMockupToModel,
   retryMockupToModelRef,
@@ -294,7 +295,7 @@ export default function MockupToModelScreen() {
         return next.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', error: 'No result received.' } : slot);
       });
     } catch (err: any) {
-      const msg = err?.message ?? 'Generation failed. Please try again.';
+      const msg = aiToolErrorMessage(err, 'Generation failed. Please try again.');
       setSlots(prev => prev.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', error: msg } : slot));
     } finally {
       setIsGenerating(false);
@@ -320,7 +321,7 @@ export default function MockupToModelScreen() {
         return next;
       });
     } catch (err: any) {
-      const msg = err?.message ?? 'Retry failed. Please try again.';
+      const msg = aiToolErrorMessage(err, 'Retry failed. Please try again.');
       setSlots(prev => {
         const next = [...prev];
         if (next[refIndex]) next[refIndex] = { ...next[refIndex], status: 'failed', error: msg };
@@ -364,6 +365,14 @@ export default function MockupToModelScreen() {
               <ActivityIndicator size="small" color={FG} />
               <Text style={s.progressText}>
                 Generating {slots.filter(sl => sl.status === 'generating').length} photo{slots.filter(sl => sl.status === 'generating').length !== 1 ? 's' : ''}…
+              </Text>
+            </View>
+          )}
+          {allDone && successCount === 0 && failCount > 0 && (
+            <View style={s.progressBar}>
+              <Feather name="alert-circle" size={ICON.sm} color={FG} />
+              <Text style={[s.progressText, { color: FG }]}>
+                No photos were created. Tap Retry to try again.
               </Text>
             </View>
           )}
@@ -439,7 +448,7 @@ export default function MockupToModelScreen() {
                 keyExtractor={p => p.id}
                 contentContainerStyle={{ padding: SP.md }}
                 renderItem={({ item }) => (
-                  <TouchableOpacity style={s.productRow} onPress={() => confirmUseAsProduct(item)} activeOpacity={0.82}>
+                  <TouchableOpacity style={s.productRow} onPress={() => confirmUseAsProduct(item)} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={`Use for ${item.name}`}>
                     {item.media?.[0]?.uri ? (
                       <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
                     ) : (
@@ -491,6 +500,7 @@ export default function MockupToModelScreen() {
             <TouchableOpacity
               style={s.uploadRemoveBtn}
               onPress={removeMockup}
+              hitSlop={9}
               accessibilityLabel="Remove garment mockup"
               accessibilityRole="button"
             >
@@ -631,6 +641,6 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md,
     padding: SP.md, marginBottom: SP.lg, borderWidth: 1, borderColor: BORDER,
   },
-  progressText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  progressText: { flexShrink: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   footerRow: { marginTop: SP.lg, gap: SP.sm },
 });

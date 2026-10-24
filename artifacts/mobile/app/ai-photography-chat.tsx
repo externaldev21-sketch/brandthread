@@ -183,7 +183,7 @@ export default function AIPhotographyChatScreen() {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Couldn't create that photo. Try different photos.",
+        content: "Couldn't create that photo. Please try again.",
         error: true,
       };
       setMessages((prev) => [aiMsg, ...prev]);
@@ -271,7 +271,7 @@ export default function AIPhotographyChatScreen() {
       setMessages((prev) => [{
         id: `${Date.now()}-outfit-error`,
         role: 'assistant',
-        content: "Couldn't create that photo. Try different photos.",
+        content: "Couldn't create that photo. Please try again.",
         error: true,
       }, ...prev]);
     } finally {
@@ -350,6 +350,9 @@ export default function AIPhotographyChatScreen() {
           <TouchableOpacity
             activeOpacity={0.82}
             onPress={() => setMode('free')}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'free', disabled: loading }}
             testID="ai-photography-mode-free"
             hitSlop={MODE_CHIP_HIT_SLOP}
             accessibilityRole="button"
@@ -364,6 +367,9 @@ export default function AIPhotographyChatScreen() {
           <TouchableOpacity
             activeOpacity={0.82}
             onPress={() => setMode('outfitSwap')}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'outfitSwap', disabled: loading }}
             testID="ai-photography-mode-outfit-swap"
             hitSlop={MODE_CHIP_HIT_SLOP}
             accessibilityRole="button"
@@ -492,6 +498,8 @@ export default function AIPhotographyChatScreen() {
             style={[styles.resetHeroBtn, { borderColor: colors.border }]}
             onPress={resetOutfitSwap}
             activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button"
             accessibilityLabel="Start a new Outfit Swap"
             accessibilityHint="Releases this hero photo so you can lock a different scene"
           >
@@ -513,6 +521,8 @@ export default function AIPhotographyChatScreen() {
                 onPress={() => removePhoto(p.id)}
                 activeOpacity={0.8}
                 testID={`ai-photography-remove-${p.id}`}
+                hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+                accessibilityRole="button"
                 accessibilityLabel="Remove photo"
               >
                 <Icon name="x" size={11} color={colors.destructiveForeground} />
@@ -569,7 +579,7 @@ const styles = StyleSheet.create({
   modeChip: { flex: 1, flexBasis: 0, minWidth: 0, minHeight: 40, borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   modeChipText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   outfitNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
-  outfitNoticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
+  outfitNoticeText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 17 },
   // Narrow enough that the badge never eats into the title's available
   // width — a wider badge here previously clipped "AI Product Photography"
   // (251px of text in a 246px box) once the header row split the space.
@@ -585,17 +595,17 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
-  loadingText: { fontSize: 13, fontFamily: FONT.regular },
+  loadingText: { fontSize: FS.sm, fontFamily: FONT.regular },
   retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: radius.sm, borderWidth: 1 },
-  retryBtnText: { fontSize: 12, fontFamily: FONT.semibold },
+  retryBtnText: { fontSize: FS.meta, fontFamily: FONT.semibold },
   retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 56, height: 56, borderRadius: 8 },
   lockedHeroTray: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   lockedHeroCopy: { flex: 1, marginLeft: 10 },
-  lockedHeroTitle: { fontSize: 12, fontFamily: FONT.semibold },
-  lockedHeroSub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  lockedHeroTitle: { fontSize: FS.meta, fontFamily: FONT.semibold },
+  lockedHeroSub: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
   resetHeroBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   trayRemove: {
     position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9,

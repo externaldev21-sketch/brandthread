@@ -73,6 +73,7 @@ export function LiveThreadCashSheet({
   const { theme } = useAppTheme();
   const api = useApi();
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   // Shown inside the sheet: a toast from the caller would sit behind this Modal.
@@ -96,7 +97,7 @@ export function LiveThreadCashSheet({
     let cancelled = false;
     api.threadCash.get()
       .then(status => { if (!cancelled) setBalanceCents(status.balanceCents); })
-      .catch(() => { if (!cancelled) setBalanceCents(0); });
+      .catch(() => { if (!cancelled) { setBalanceCents(null); setBalanceError(true); } });
     return () => { cancelled = true; };
   }, [visible, api]);
 

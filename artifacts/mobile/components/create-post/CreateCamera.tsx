@@ -31,7 +31,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { Button } from '@/components/ui/Button';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
-import { FONT, FS } from '@/lib/theme';
+import { CREATE_CANVAS, FONT, FS } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { FADE_MS, PRESS_SPRING } from '@/constants/motion';
 import {
@@ -369,7 +369,7 @@ export function CreateCamera({
   const showPrompt = !IS_WEB && !cameraPermission?.granted;
 
   return (
-    <View style={[s.root, { backgroundColor: theme.background }]} testID={testID}>
+    <View style={[s.root, { backgroundColor: CREATE_CANVAS.black }]} testID={testID}>
       {/* ── Live camera (or clean black placeholder) ── */}
       <View ref={cameraWrapRef} style={StyleSheet.absoluteFill} collapsable={false}>
         {hasCamera ? (
@@ -455,7 +455,7 @@ export function CreateCamera({
         <Animated.View
           style={[
             s.menu,
-            { top: topInset + 50, backgroundColor: theme.background, borderColor: theme.border },
+            { top: topInset + 50, backgroundColor: CREATE_CANVAS.black, borderColor: theme.border },
             { opacity: menuAnim, transform: [{ scale: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] },
           ]}
           testID="create-camera-mode-menu"
@@ -557,7 +557,7 @@ export function CreateCamera({
           {/* Camera roll (bottom-left) */}
           {!isRecording ? (
             <Pressable
-              style={[s.roll, { borderColor: theme.text, backgroundColor: theme.background }]}
+              style={[s.roll, { borderColor: theme.text, backgroundColor: CREATE_CANVAS.black }]}
               onPress={onOpenLibrary}
               accessibilityLabel="Open camera roll"
               accessibilityRole="button"
@@ -614,7 +614,7 @@ export function CreateCamera({
           {/* Flip (bottom-right) */}
           {!isRecording ? (
             <Pressable
-              style={[s.flip, { borderColor: theme.border, backgroundColor: theme.background }]}
+              style={[s.flip, { borderColor: theme.border, backgroundColor: CREATE_CANVAS.black }]}
               onPress={() => setFacing((v) => (v === 'back' ? 'front' : 'back'))}
               accessibilityLabel="Flip camera"
               accessibilityRole="button"

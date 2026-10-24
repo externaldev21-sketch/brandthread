@@ -303,6 +303,7 @@ export default function DesignCanvasScreen() {
   // ── Project state ──────────────────────────────────────────────────────────
   const [project, setProject]         = useState<DesignProject | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [supportChatOpen, setSupportChatOpen] = useState(false);
   const [projectName, setProjectName] = useState('Untitled');
   const [editingName, setEditingName] = useState(false);
@@ -521,8 +522,10 @@ export default function DesignCanvasScreen() {
   const [activeBrushId, setActiveBrushId] = useState('b4'); // Studio Pen, matches the old default index 3
   const [brushSize, setBrushSize]       = useState(10);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
-  const [drawColor, setDrawColor]       = useState('#FFFFFF');
-  const [prevColor, setPrevColor]       = useState('#000000');
+  // Black ink by default: the default artboard is white (#FFFFFF), so a
+  // white default made the first stroke/text invisible.
+  const [drawColor, setDrawColor]       = useState('#000000');
+  const [prevColor, setPrevColor]       = useState('#FFFFFF');
   const [eraserSize, setEraserSize]     = useState(24);
   const [smudgeSize, setSmudgeSize]     = useState(20);
 
@@ -631,6 +634,7 @@ export default function DesignCanvasScreen() {
         ? await getProject(projectId)
         : await createProject('canvas', 'Untitled Artwork', {});
       if (!proj) {
+        if (!cancelled) setLoadFailed(true);
         Alert.alert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
         return;
       }
@@ -724,6 +728,7 @@ export default function DesignCanvasScreen() {
       if (__DEV__ && !isStale) {
         console.error('[design-canvas] failed to load project:', error);
       }
+      if (!cancelled) setLoadFailed(true);
      }
     }
     load();
@@ -3241,6 +3246,20 @@ export default function DesignCanvasScreen() {
   // stuck". Also waits on designFontsLoaded so the font picker and any
   // already-placed text layer never render in a system fallback font for a
   // flash before their real face loads in.
+  if (loadFailed) {
+    return (
+      <View style={[styles.root, { paddingTop: headerTopInset, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.md }]}>
+        <Text style={{ fontFamily: FONT.semibold, fontSize: FS.md, color: FG, textAlign: 'center' }}>
+          This design couldn't be opened
+        </Text>
+        <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' }}>
+          It may have been deleted. Go back to your gallery and try again.
+        </Text>
+        <Button label="Go back" variant="secondary" onPress={() => goBackOr(router)} />
+      </View>
+    );
+  }
+
   if (loading || !designFontsLoaded) {
     const skW = Math.min(SW - SP.lg * 2, 420);
     return (
@@ -3265,6 +3284,8 @@ export default function DesignCanvasScreen() {
     );
   }
 
+  // Bottom sheets clear the home indicator, not just a fixed SP.lg.
+  const sheetBottomPad = { paddingBottom: insets.bottom + SP.lg };
   const bgHex = project?.canvas?.backgroundHex ?? BG;
   // Real background-visibility toggle, driven from the Layers panel's pinned
   // "Background colour" row checkbox — not a fake control. `backgroundOpacity`
@@ -3395,6 +3416,8 @@ export default function DesignCanvasScreen() {
             onPress={() => openSheet('wrench')}
             testID="btn-actions"
             accessibilityLabel="Actions"
+            accessibilityRole="button"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           >
             <Icon name="tool" size={ICON.sm} color={activeSheet === 'wrench' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3407,6 +3430,8 @@ export default function DesignCanvasScreen() {
             }}
             testID="btn-adjustments"
             accessibilityLabel="Adjustments"
+            accessibilityRole="button"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           >
             <Icon name="zap" size={ICON.sm} color={activeTopTool === 'adjustments' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3415,6 +3440,8 @@ export default function DesignCanvasScreen() {
             onPress={() => selectTool(activeTopTool === 'select' ? 'brush' : 'select')}
             testID="btn-select"
             accessibilityLabel="Selection"
+            accessibilityRole="button"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           >
             <Text style={[styles.modeLetter, activeTopTool === 'select' && styles.modeLetterActive]}>S</Text>
           </TouchableOpacity>
@@ -3431,6 +3458,8 @@ export default function DesignCanvasScreen() {
             }}
             testID="btn-transform"
             accessibilityLabel="Transform"
+            accessibilityRole="button"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           >
             <Icon name="arrow-up-right" size={ICON.sm} color={activeTopTool === 'transform' ? FG : MUTED} />
           </TouchableOpacity>
@@ -3481,6 +3510,9 @@ export default function DesignCanvasScreen() {
               hitSlop={SIDEBAR_BTN_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Undo"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !undoModelRef.current.canUndo }}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Icon name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
             </TouchableOpacity>
@@ -3490,6 +3522,9 @@ export default function DesignCanvasScreen() {
               hitSlop={SIDEBAR_BTN_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Redo"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !undoModelRef.current.canRedo }}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Icon name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
             </TouchableOpacity>
@@ -3856,7 +3891,7 @@ export default function DesignCanvasScreen() {
               testID="eyedropper-overlay"
             >
               <View style={styles.eyedropperHint} pointerEvents="none">
-                <Text style={styles.eyedropperHintText}>Tap anywhere to pick a color</Text>
+                <Text style={styles.eyedropperHintText}>Tap anywhere to pick a colour</Text>
               </View>
             </Pressable>
           )}
@@ -4011,6 +4046,9 @@ export default function DesignCanvasScreen() {
                 style={styles.animBtn}
                 onPress={() => animGoToFrame(animCurrentFrame - 1)}
                 disabled={animCurrentFrame === 0}
+                accessibilityRole="button"
+                accessibilityLabel="Previous frame"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Icon name="chevron-left" size={14} color={animCurrentFrame === 0 ? SUBTLE : FG} />
               </TouchableOpacity>
@@ -4021,6 +4059,9 @@ export default function DesignCanvasScreen() {
                 style={styles.animBtn}
                 onPress={() => animGoToFrame(animCurrentFrame + 1)}
                 disabled={animCurrentFrame >= animFrames.length - 1}
+                accessibilityRole="button"
+                accessibilityLabel="Next frame"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Icon name="chevron-right" size={14} color={animCurrentFrame >= animFrames.length - 1 ? SUBTLE : FG} />
               </TouchableOpacity>
@@ -4326,11 +4367,11 @@ export default function DesignCanvasScreen() {
         <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
           <View style={styles.modalOverlay}>
             <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-            <SheetRise style={[styles.sheet, { maxHeight: '40%' }]}>
+            <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '40%' }]}>
               <SheetHandle />
               <View style={styles.sheetHeaderRow}>
                 <Text style={styles.sheetTitle}>{activeTopTool === 'eraser' ? 'Eraser' : 'Smudge'}</Text>
-                <TouchableOpacity onPress={closeSheet}>
+                <TouchableOpacity onPress={closeSheet} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -4367,7 +4408,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
+          <View style={[styles.layersModalSheetWrap, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 32) }]} pointerEvents="box-none">
             <ColorPickerComponent
               color={drawColor}
               previousColor={prevColor}
@@ -4390,7 +4431,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <View style={styles.layersModalSheetWrap} pointerEvents="box-none">
+          <View style={[styles.layersModalSheetWrap, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 32) }]} pointerEvents="box-none">
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
@@ -4420,11 +4461,11 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'layerOptions'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>{layerOptionsLayer?.name ?? 'Layer'}</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <TouchableOpacity onPress={closeSheet} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -4502,7 +4543,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'canvasResize'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Size & Crop</Text>
 
@@ -4576,7 +4617,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'export'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Export</Text>
@@ -4658,7 +4699,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Info</Text>
             {[
@@ -4667,7 +4708,7 @@ export default function DesignCanvasScreen() {
               { label: 'Display Size',  value: `${Math.round(canvasSize.w)} × ${Math.round(canvasSize.h)} px` },
               { label: 'Scale',         value: `${dispScaleX.toFixed(3)} × ${dispScaleY.toFixed(3)}` },
               { label: 'Layer Count',   value: `${layers.length}` },
-              { label: 'Status',        value: project?.status ?? 'draft' },
+              { label: 'Status',        value: (() => { const st = project?.status ?? 'draft'; return st.charAt(0).toUpperCase() + st.slice(1); })() },
               { label: 'Saved',         value: saveStatus === 'saved' ? 'Just now' : saveStatus === 'saving' ? 'Saving…' : 'Unsaved changes' },
               { label: 'Background',    value: bgHex },
               { label: 'Crop',          value: cropRect ? `${Math.round(cropRect.w)}×${Math.round(cropRect.h)} @ (${Math.round(cropRect.x)},${Math.round(cropRect.y)}) — export will be cropped` : 'None' },
@@ -4739,6 +4780,8 @@ export default function DesignCanvasScreen() {
             <TouchableOpacity
               style={{ alignSelf: 'flex-end', marginTop: SP.xs }}
               onPress={() => setQuickMenuVisible(false)}
+              accessibilityRole="button"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.medium }}>Dismiss</Text>
             </TouchableOpacity>
@@ -4750,11 +4793,11 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'selection'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Selection Settings</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <TouchableOpacity onPress={closeSheet} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -4792,11 +4835,11 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'transformTool'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Transform Settings</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <TouchableOpacity onPress={closeSheet} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -4814,7 +4857,7 @@ export default function DesignCanvasScreen() {
               </TouchableOpacity>
             </View>
             <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular, marginBottom: SP.sm }}>
-              Snaps to 8-unit grid. Distort/Warp modes use {transformMode === 'warp' ? 'vector affine warp' : 'affine decomposition'} approximation.
+              Snaps moves and resizes to an 8-point grid.
             </Text>
             <TouchableOpacity
               style={styles.fontChip}
@@ -4843,7 +4886,7 @@ export default function DesignCanvasScreen() {
       <Modal visible={activeSheet === 'adjustments'} transparent animationType="fade" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1 }}>
@@ -4901,6 +4944,9 @@ export default function DesignCanvasScreen() {
                               style={styles.animBtn}
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.max(row.min, +(value - row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-dec`}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Decrease ${row.label.toLowerCase()}`}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Icon name="minus" size={14} color={MUTED} />
                             </TouchableOpacity>
@@ -4911,6 +4957,9 @@ export default function DesignCanvasScreen() {
                               style={styles.animBtn}
                               onPress={() => updateLayerHsb(selectedLayer.id, { ...hsb, [row.key]: Math.min(row.max, +(value + row.step).toFixed(2)) })}
                               testID={`hsb-${row.key}-inc`}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Increase ${row.label.toLowerCase()}`}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Icon name="plus" size={14} color={MUTED} />
                             </TouchableOpacity>
@@ -4968,7 +5017,7 @@ export default function DesignCanvasScreen() {
                     return (
                       <View style={{ height: 40, marginBottom: SP.sm, backgroundColor: SURFACE, borderRadius: RADIUS.sm, padding: SP.xs, justifyContent: 'center', alignItems: 'center' }}>
                         <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular }}>
-                          Histogram unavailable (raster layer)
+                          Histogram is only available for drawing layers
                         </Text>
                       </View>
                     );
@@ -5236,7 +5285,7 @@ function WrenchActionsSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
       <SheetRise style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
         <SheetHandle />
 
@@ -5545,16 +5594,16 @@ function WrenchActionsSheet({
                 <Text style={styles.guideSectionTitle}>Pressure Curve</Text>
               </View>
               <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular, marginBottom: SP.xs }}>
-                Maps raw stylus force (x) → effective brush size multiplier (y).
+                Sets how much stylus pressure changes brush size.
               </Text>
               {/* Simple textual representation of control points */}
               {prefs.pressureCurve.map((pt, i) => (
                 <View key={i} style={{ flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginBottom: SP.xs }}>
-                  <Text style={{ fontSize: FS.xs, color: MUTED, width: 60 }}>Force {Math.round(pt.force * 100)}%</Text>
+                  <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular, width: 60 }}>Force {Math.round(pt.force * 100)}%</Text>
                   <View style={{ flex: 1, height: 4, backgroundColor: BORDER, borderRadius: 2 }}>
                     <View style={{ width: `${pt.size * 100}%`, height: 4, backgroundColor: PURPLE_LIGHT, borderRadius: 2 }} />
                   </View>
-                  <Text style={{ fontSize: FS.xs, color: FG, width: 36, textAlign: 'right' }}>{Math.round(pt.size * 100)}%</Text>
+                  <Text style={{ fontSize: FS.xs, color: FG, fontFamily: FONT.medium, width: 36, textAlign: 'right' }}>{Math.round(pt.size * 100)}%</Text>
                   {i > 0 && i < prefs.pressureCurve.length - 1 && (
                     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove"
                       onPress={() => {
@@ -5600,7 +5649,7 @@ function WrenchActionsSheet({
               </Text>
               {prefs.quickMenuSlots.map((slot, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-                  <Text style={{ fontSize: FS.xs, color: MUTED, width: 24 }}>#{i + 1}</Text>
+                  <Text style={{ fontSize: FS.xs, color: MUTED, fontFamily: FONT.regular, width: 24 }}>#{i + 1}</Text>
                   <TouchableOpacity
                     style={[styles.fontChip, { flex: 1, justifyContent: 'space-between' }, quickMenuEditSlot === i && styles.fontChipActive]}
                     onPress={() => onQuickMenuEditSlot(quickMenuEditSlot === i ? null : i)}
@@ -5655,7 +5704,7 @@ function WrenchActionsSheet({
               />
               <ActionCell
                 icon="mail" label="Contact Support" sub="support@brandthread.app"
-                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => {}); }}
+                onPress={() => { Linking.openURL('mailto:support@brandthread.app').catch(() => Alert.alert('Contact Support', 'Email us at support@brandthread.app.')); }}
                 testID="help-support"
               />
               <ActionCell
@@ -5691,6 +5740,8 @@ interface TextSheetProps {
 }
 
 function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGHT }: TextSheetProps) {
+  const insets = useSafeAreaInsets();
+  const sheetBottomPad = { paddingBottom: insets.bottom + SP.lg };
   const [content, setContent]       = useState('');
   const [fontSize, setFontSize]     = useState(28);
   const [color, setColor]           = useState(drawColor);
@@ -5713,12 +5764,12 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
-        <SheetRise style={[styles.sheet, { maxHeight: '85%' }]}>
+        <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '85%' }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Add Text</Text>
-              <TouchableOpacity onPress={onClose}>
+              <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -5808,10 +5859,10 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
 
             <View style={styles.toggleRow}>
               {([
-                { label: 'B', active: bold,   onPress: () => setBold(v => !v) },
-                { label: 'I', active: italic, onPress: () => setItalic(v => !v) },
-              ] as { label: string; active: boolean; onPress: () => void }[]).map(t => (
-                <TouchableOpacity key={t.label} style={[styles.toggleBtn, t.active && styles.toggleBtnActive]} onPress={t.onPress}>
+                { label: 'B', a11y: 'Bold',   active: bold,   onPress: () => setBold(v => !v) },
+                { label: 'I', a11y: 'Italic', active: italic, onPress: () => setItalic(v => !v) },
+              ] as { label: string; a11y: string; active: boolean; onPress: () => void }[]).map(t => (
+                <TouchableOpacity key={t.label} style={[styles.toggleBtn, t.active && styles.toggleBtnActive]} onPress={t.onPress} accessibilityRole="button" accessibilityLabel={t.a11y} accessibilityState={{ selected: t.active }} hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}>
                   <Text style={[styles.toggleBtnText, t.active && { color: PURPLE_LIGHT }]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -5822,18 +5873,28 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
               ))}
             </View>
 
-            <Text style={styles.sheetLabel}>Color</Text>
+            <Text style={styles.sheetLabel}>Colour</Text>
             <View style={styles.paletteGrid}>
               {DEFAULT_PALETTE.slice(0, 14).map(c => (
                 <TouchableOpacity
                   key={c}
                   style={[styles.paletteDot, { backgroundColor: c }, color === c && styles.paletteDotActive]}
                   onPress={() => setColor(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Text colour ${c}`}
+                  accessibilityState={{ selected: color === c }}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 />
               ))}
             </View>
 
-            <TouchableOpacity style={styles.addBtn} onPress={submit}>
+            <TouchableOpacity
+              style={[styles.addBtn, !content.trim() && { opacity: 0.4 }]}
+              onPress={submit}
+              disabled={!content.trim()}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !content.trim() }}
+            >
               <Text style={styles.addBtnText}>Add to Canvas</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -6088,7 +6149,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: SP.sm, fontFamily: FONT.regular,
     minHeight: 80, textAlignVertical: 'top', marginBottom: SP.sm,
   },
-  fontChip:       { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
+  fontChip:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   fontChipActive: { borderColor: BORDER_ACTIVE },
   fontChipText:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   toggleRow:      { flexDirection: 'row', gap: SP.xs, marginBottom: SP.sm },

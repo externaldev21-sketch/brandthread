@@ -173,12 +173,13 @@ function VideoCoverPage({ uri, from, to, offset, onPick, onBack }: {
 }) {
   const player = useVideoPlayer(uri, (p) => { p.loop = false; p.pause(); p.currentTime = from + offset; });
   const len = Math.max(0.1, to - from);
+  const insets = useSafeAreaInsets();
   return (
     <SubPage title="Edit cover" onBack={onBack} testID="cover-page">
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />
       </View>
-      <View style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+      <View style={{ paddingHorizontal: 20, paddingBottom: Math.max(insets.bottom, 24) }}>
         <Scrubber value={offset} max={len} onChange={(t) => { player.currentTime = from + t; onPick(t); }} />
         <Text style={s.hintCenter}>Drag to choose a cover frame</Text>
         <PillButton label="Done" onPress={onBack} testID="cover-done" flex={false} />
@@ -190,6 +191,7 @@ function VideoCoverPage({ uri, from, to, offset, onPick, onBack }: {
 function SlideCoverPage({ media, onPick, onBack }: {
   media: Extract<MediaDraft, { kind: 'slides' }>; onPick: (i: number) => void; onBack: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <SubPage title="Edit cover" onBack={onBack} testID="cover-page">
       <ScrollView contentContainerStyle={s.coverGrid}>
@@ -200,7 +202,7 @@ function SlideCoverPage({ media, onPick, onBack }: {
           </Pressable>
         ))}
       </ScrollView>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 24 }}><PillButton label="Done" onPress={onBack} testID="cover-done" flex={false} /></View>
+      <View style={{ paddingHorizontal: 16, paddingBottom: Math.max(insets.bottom, 24) }}><PillButton label="Done" onPress={onBack} testID="cover-done" flex={false} /></View>
     </SubPage>
   );
 }
@@ -331,7 +333,7 @@ function VisibilityPage({ visibility, noun, onChange, onBack }: {
   return (
     <SubPage title="Who can view this" onBack={onBack} testID="visibility-page">
       {options.map((o) => (
-        <Pressable key={String(o.id)} style={s.productRow} onPress={() => { tap(); onChange({ ...visibility, isPublic: o.id }); }} accessibilityRole="radio" accessibilityState={{ selected: (visibility.isPublic ?? true) === o.id }} testID={`visibility-${o.id ? 'everyone' : 'me'}`}>
+        <Pressable key={String(o.id)} style={s.productRow} onPress={() => { tap(); onChange({ ...visibility, isPublic: o.id }); }} accessibilityRole="radio" accessibilityState={{ checked: (visibility.isPublic ?? true) === o.id }} testID={`visibility-${o.id ? 'everyone' : 'me'}`}>
           <View style={{ flex: 1 }}>
             <Text style={s.rowLabel}>{o.title}</Text>
             <Text style={s.rowValue}>{o.body}</Text>
@@ -384,6 +386,7 @@ function SchedulePage({ value, onChange, onBack }: { value: string | null; onCha
   const [hour, setHour] = useState(initial.getHours());
   const [minute, setMinute] = useState(initial.getMinutes());
   const [error, setError] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
   const days = useMemo(() => Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d.getTime(); }), []);
   const chosen = new Date(day); chosen.setHours(hour, minute, 0, 0);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -417,7 +420,7 @@ function SchedulePage({ value, onChange, onBack }: { value: string | null; onCha
       <Text style={s.hintCenter}>{chosen.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}</Text>
       {error ? <Text style={[s.hintCenter, { color: CP.white, fontFamily: FONT.semibold }]}>{error}</Text> : null}
       <View style={{ flex: 1 }} />
-      <View style={s.scheduleButtons}>
+      <View style={[s.scheduleButtons, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         {value ? <PillButton label="Post now" variant="secondary" onPress={() => { onChange(null); onBack(); }} testID="schedule-clear" /> : null}
         <PillButton label="Confirm" testID="schedule-confirm" onPress={() => {
           if (chosen.getTime() <= Date.now() + 60_000) { setError('Choose a time in the future.'); return; }

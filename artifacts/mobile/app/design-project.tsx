@@ -125,7 +125,7 @@ export default function DesignProjectScreen() {
   const [useCustomDims, setUseCustomDims] = useState(false);
   const [backgroundHex, setBackgroundHex] = useState('#000000');
   const [bgMode, setBgMode] = useState<string>('#000000');
-  const [customHex, setCustomHex] = useState('#1A1A2E');
+  const [customHex, setCustomHex] = useState('#C0C0C0');
   const [projectName, setProjectName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -213,6 +213,9 @@ export default function DesignProjectScreen() {
   const options = projectTypeOptions(theme);
   const accent = projectType ? typeAccent(projectType, theme) : PURPLE;
   const canProceedStep2 = projectType === 'garment' ? selectedTemplate !== null : selectedPreset !== null;
+  // Same canvas bounds the gallery's New Canvas sheet enforces (8–16384 px).
+  const dimsValid = [canvasWidth, canvasHeight].every(n => Number.isSafeInteger(n) && n >= 8 && n <= 16384);
+  const bgValid = bgMode !== 'custom' || /^#[0-9A-Fa-f]{6}$/.test(customHex);
   const finalName = projectName || (projectType ? PROJECT_TYPE_LABELS[projectType] : 'New Project');
 
   return (
@@ -231,6 +234,9 @@ export default function DesignProjectScreen() {
                   style={[styles.typeCard, projectType === opt.type && { borderColor: opt.accent }]}
                   onPress={() => selectType(opt.type)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${opt.label}. ${opt.desc}`}
+                  accessibilityState={{ selected: projectType === opt.type }}
                 >
                   <View style={[styles.typeIcon, { backgroundColor: opt.accent + '22' }]}>
                     <Icon name={opt.icon as any} size={ICON.lg} color={opt.accent} />
@@ -262,6 +268,9 @@ export default function DesignProjectScreen() {
                       style={[styles.templateCard, isSelected && { borderColor: accent }]}
                       onPress={() => selectTemplate(tmpl)}
                       activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityLabel={tmpl.label}
+                      accessibilityState={{ checked: isSelected }}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
                         <Icon name="layers" size={ICON.md} color={accent} />
@@ -270,8 +279,8 @@ export default function DesignProjectScreen() {
                       <Text style={styles.templateViews}>{tmpl.views.join(' · ')}</Text>
                       <View style={styles.badgeRow}>
                         {tmpl.hasPrintArea && (
-                          <View style={[styles.badge, { backgroundColor: BLUE + '22' }]}>
-                            <Text style={[styles.badgeText, { color: BLUE }]}>Print</Text>
+                          <View style={[styles.badge, { backgroundColor: accent + '22' }]}>
+                            <Text style={[styles.badgeText, { color: accent }]}>Print</Text>
                           </View>
                         )}
                         {tmpl.hasEmbroideryArea && (
@@ -294,6 +303,9 @@ export default function DesignProjectScreen() {
                       style={[styles.templateCard, isSelected && { borderColor: accent }]}
                       onPress={() => selectPreset(preset)}
                       activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${preset.label}, ${preset.width} by ${preset.height}`}
+                      accessibilityState={{ checked: isSelected }}
                     >
                       <View style={[styles.templateIcon, { backgroundColor: accent + '22' }]}>
                         <Icon name="crop" size={ICON.md} color={accent} />
@@ -301,7 +313,7 @@ export default function DesignProjectScreen() {
                       <Text style={styles.templateName}>{preset.label}</Text>
                       <Text style={styles.templateViews}>{preset.width} × {preset.height}</Text>
                       {preset.ratio && (
-                        <View style={[styles.badge, { backgroundColor: accent + '22' }]}>
+                        <View style={[styles.badge, { alignSelf: 'flex-start', backgroundColor: accent + '22' }]}>
                           <Text style={[styles.badgeText, { color: accent }]}>{preset.ratio}</Text>
                         </View>
                       )}
@@ -355,6 +367,7 @@ export default function DesignProjectScreen() {
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
+                          accessibilityLabel="Canvas width in pixels"
                         />
                         <Text style={styles.dimUnit}>px</Text>
                       </View>
@@ -370,6 +383,7 @@ export default function DesignProjectScreen() {
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
+                          accessibilityLabel="Canvas height in pixels"
                         />
                         <Text style={styles.dimUnit}>px</Text>
                       </View>
@@ -378,6 +392,9 @@ export default function DesignProjectScreen() {
                   <TouchableOpacity
                     style={styles.customToggle}
                     onPress={() => { setUseCustomDims(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel="Use custom dimensions"
+                    accessibilityState={{ checked: useCustomDims }}
                   >
                     <Icon
                       name={useCustomDims ? 'check-square' : 'square'}
@@ -393,6 +410,7 @@ export default function DesignProjectScreen() {
               <PrimaryButton
                 label="Next"
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep(4); }}
+                disabled={!dimsValid}
                 icon="arrow-right"
               />
             </View>
@@ -412,6 +430,9 @@ export default function DesignProjectScreen() {
                     style={[styles.bgPill, isSelected && { borderColor: accent, backgroundColor: accent + '18' }]}
                     onPress={() => selectBg(opt.value)}
                     activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${opt.label} background`}
+                    accessibilityState={{ checked: isSelected }}
                   >
                     <View style={[styles.bgSwatch, {
                       backgroundColor: opt.value === 'transparent' ? 'transparent' : opt.value === 'custom' ? customHex : opt.value,
@@ -436,10 +457,11 @@ export default function DesignProjectScreen() {
                       setCustomHex(hex);
                       setBackgroundHex(hex);
                     }}
-                    placeholder="1A1A2E"
+                    placeholder="C0C0C0"
                     placeholderTextColor={SUBTLE}
                     maxLength={6}
                     autoCapitalize="characters"
+                    accessibilityLabel="Custom background hex color"
                   />
                   <View style={[styles.hexPreview, { backgroundColor: customHex }]} />
                 </View>
@@ -449,6 +471,7 @@ export default function DesignProjectScreen() {
               <PrimaryButton
                 label="Next"
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep(5); }}
+                disabled={!bgValid}
                 icon="arrow-right"
               />
             </View>
@@ -469,6 +492,7 @@ export default function DesignProjectScreen() {
                 placeholderTextColor={SUBTLE}
                 autoFocus
                 maxLength={80}
+                accessibilityLabel="Project name"
               />
             </BrandthreadCard>
             <View style={styles.nextRow}>
@@ -536,7 +560,6 @@ export default function DesignProjectScreen() {
 // ─── Summary Row ──────────────────────────────────────────────────────────────
 
 function SummaryRow({ label, value, swatch, swatchColor }: { label: string; value: string; swatch?: boolean; swatchColor?: string }) {
-  const styles = createStyles(useAppTheme().theme);
   return (
     <View style={sr.row}>
       <Text style={sr.label}>{label}</Text>
@@ -743,6 +766,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
+    minHeight: 44,
   },
   customToggleText: {
     fontFamily: FONT.medium,

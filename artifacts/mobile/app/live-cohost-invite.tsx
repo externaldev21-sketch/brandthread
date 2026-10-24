@@ -109,6 +109,7 @@ export default function LiveCohostInviteScreen() {
                   <Button
                     label="Decline" variant="secondary" size="small" fullWidth
                     disabled={busy === invite.streamId} onPress={() => void respond(invite, false)}
+                    accessibilityLabel={`Decline co-host invite from ${invite.hostName}`}
                   />
                 </View>
                 <View style={s.actionBtn}>
@@ -116,9 +117,11 @@ export default function LiveCohostInviteScreen() {
                     label="Accept" size="small" fullWidth
                     loading={busy === invite.streamId} disabled={!canAccept || busy === invite.streamId}
                     onPress={() => void respond(invite, true)}
+                    accessibilityLabel={`Accept co-host invite from ${invite.hostName}`}
                   />
                 </View>
               </View>
+              {!canAccept && <Text style={s.note}>Accept from the iOS or Android app, where your camera is available.</Text>}
             </View>
           ))}
         </View>
@@ -135,4 +138,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   card: { paddingBottom: SP.sm },
   actions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm },
   actionBtn: { flex: 1 },
+  note: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, marginTop: SP.sm },
 });

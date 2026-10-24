@@ -159,7 +159,7 @@ export default function DesignTemplatesScreen() {
           <EmptyState
             icon="layout"
             title="No templates found"
-            description="Choose a starting point for your next design."
+            description="No templates match your search. Try a different word or category."
             action={{ label: 'Clear Search', onPress: () => setSearch('') }}
           />
         </View>
@@ -210,6 +210,9 @@ export default function DesignTemplatesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Use template, ${item.name}`}
                 disabled={creatingId === item.id}
+                hitSlop={{ top: 6, bottom: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Use ${item.name} template`}
               >
                 {creatingId === item.id ? (
                   <ActivityIndicator size="small" color={PURPLE_LIGHT} />

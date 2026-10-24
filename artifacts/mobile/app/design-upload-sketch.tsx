@@ -150,6 +150,32 @@ export default function UploadSketchScreen() {
     }
   }
 
+  async function handleSaveToAssets(uri: string, idx: number) {
+    try {
+      await createBrandAsset({ name: `Cleaned sketch #${idx + 1}`, type: 'graphic', uri, tags: ['ai-generated', 'sketch'] });
+      Alert.alert('Saved', 'Added to Brand Assets.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
+    }
+  }
+
+  async function handleExport(uri: string) {
+    const saved = await saveImageToCameraRoll(uri, 'sketch');
+    if (saved.ok) return;
+    Alert.alert(
+      saved.reason === 'permission' ? 'Permission required' : 'Save failed',
+      saved.reason === 'permission' ? 'Allow photo library access to save this image.' : 'Could not save this image. Please try again.',
+    );
+  }
+
+  async function handleSaveAll() {
+    const imageUris = doneSlots.map(slot => slot.imageUri!);
+    if (imageUris.length === 0) return;
+    const { succeeded, failed } = await saveAllToCameraRoll(imageUris, 'sketch');
+    if (failed === 0) Alert.alert('Saved', `${succeeded} design${succeeded !== 1 ? 's' : ''} saved.`);
+    else Alert.alert('Some saves failed', `${succeeded} of ${imageUris.length} designs saved.`);
+  }
+
   function reset() {
     setStep('upload');
     setSketchUri(null);
@@ -183,7 +209,7 @@ export default function UploadSketchScreen() {
             libraryId={libraryId}
           />
           <View style={s.footerRow}>
-            <TouchableOpacity style={s.footerBtn} onPress={reset}>
+            <TouchableOpacity style={s.footerBtn} onPress={reset} accessibilityRole="button">
               <Feather name="refresh-cw" size={ICON.sm} color={FG} />
               <Text style={s.footerBtnText}>New sketch</Text>
             </TouchableOpacity>
@@ -239,6 +265,8 @@ export default function UploadSketchScreen() {
                 key={st.value}
                 style={[s.styleCard, style === st.value && s.styleCardActive]}
                 onPress={() => setStyle(st.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: style === st.value }}
               >
                 <Text style={[s.styleCardText, style === st.value && s.styleCardTextActive]}>
                   {st.label}
@@ -307,6 +335,8 @@ export default function UploadSketchScreen() {
               <TouchableOpacity
                 style={[s.toggle, contrastEnabled && s.toggleActive]}
                 onPress={() => setContrastEnabled(!contrastEnabled)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: contrastEnabled }}
               >
                 <Feather name="sun" size={ICON.sm} color={contrastEnabled ? CYAN : MUTED} />
                 <Text style={[s.toggleText, contrastEnabled && { color: CYAN }]}>Faint lines</Text>
@@ -553,7 +583,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: 'rgba(7,7,15,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
     paddingVertical: 2,
@@ -632,7 +662,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   loadingOverlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(7,7,15,0.92)',
+    backgroundColor: 'rgba(0,0,0,0.92)',
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'center',

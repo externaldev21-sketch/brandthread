@@ -137,7 +137,10 @@ function AiResultTile({
               key={a.label}
               style={s.actionBtn}
               onPress={a.onPress}
+              hitSlop={5}
+              accessibilityRole="button"
               accessibilityLabel={a.label}
+              accessibilityState={{ disabled: !!a.loading, busy: !!a.loading }}
               disabled={a.loading}
             >
               {a.loading ? <ActivityIndicator size="small" color={FG} /> : <Icon name={a.icon} size={ICON.sm} color={FG} />}

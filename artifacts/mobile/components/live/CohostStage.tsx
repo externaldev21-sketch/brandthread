@@ -54,6 +54,7 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
   // Co-host bag: add your own products to the host's live.
   const [productsOpen, setProductsOpen] = useState(false);
   const engineRef = useRef<any>(null);
+  const chatRef = useRef<ScrollView>(null);
   const doneRef = useRef(false);
 
   function finish() {
@@ -165,7 +166,12 @@ export function CohostStage({ streamId, creds, onDone }: Props) {
       </View>
 
       <View style={[s.chat, { paddingBottom: insets.bottom + SP.md }]} pointerEvents="none">
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.chatContent}>
+        <ScrollView
+          ref={chatRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.chatContent}
+          onContentSizeChange={() => chatRef.current?.scrollToEnd({ animated: true })}
+        >
           {comments.map((c) => (
             <Text key={c.id} style={s.chatLine}>
               <Text style={s.chatName}>{c.display_name} </Text>{c.message}

@@ -114,7 +114,7 @@ export default function DesignBrandAssetsScreen() {
       {
         text: 'Brand Color',
         onPress: () => {
-          Alert.prompt('Brand Color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
+          Alert.prompt('Brand Color', 'Enter hex color (e.g. #C0C0C0):', async (hex) => {
             if (!hex?.trim()) return;
             const color = (hex.trim().startsWith('#') ? hex.trim() : '#' + hex.trim()).toUpperCase();
             if (!/^#[0-9A-F]{6}$/.test(color)) {
@@ -207,13 +207,13 @@ export default function DesignBrandAssetsScreen() {
         },
       },
       {
-        text: 'Download',
+        text: 'Share',
         onPress: async () => {
           const uri = (asset as any).uri ?? (asset as any).thumbnailUrl ?? '';
           try {
             await Share.share({ message: asset.name, url: uri });
           } catch {
-            Alert.alert('Download', 'Could not share this asset.');
+            Alert.alert('Share', 'Could not share this asset.');
           }
         },
       },
@@ -246,9 +246,13 @@ export default function DesignBrandAssetsScreen() {
     return (
       <TouchableOpacity
         style={bas.assetCard}
+        onPress={() => handleLongPress(item)}
         onLongPress={() => handleLongPress(item)}
         activeOpacity={0.8}
         delayLongPress={400}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${item.type.replace('_', ' ')}`}
+        accessibilityHint="Opens asset options"
       >
         {/* Thumbnail */}
         {item.type === 'color' && item.color ? (
@@ -293,12 +297,15 @@ export default function DesignBrandAssetsScreen() {
 
       {/* ── CATEGORY TABS ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bas.tabsScroll} contentContainerStyle={bas.tabsContent}>
-        {BRAND_ASSET_TYPES.map(tab => (
+        {[{ key: 'all', label: 'All' }, ...BRAND_ASSET_TYPES].map(tab => (
           <TouchableOpacity
             key={tab.key}
             style={[bas.tab, activeTab === tab.key && bas.tabActive]}
             hitSlop={TAB_HIT_SLOP}
             onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.key); }}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: activeTab === tab.key }}
           >
             <Text style={[bas.tabText, activeTab === tab.key && { color: PURPLE_LIGHT }]}>{tab.label}</Text>
           </TouchableOpacity>

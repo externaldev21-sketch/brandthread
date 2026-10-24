@@ -39,6 +39,7 @@ import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
 import { pickImageOnWeb, fileToPickedImage } from '@/lib/webFilePicker';
 import { makeDemoCutout } from '@/lib/demoCutout';
 import { saveResult } from '@/services/bgRemovalService';
+import { surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import { BG, FG, MUTED, BORDER, RED, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
@@ -181,7 +182,7 @@ export default function DesignBgRemovalScreen() {
 
   const loadPhoto = useCallback(async (p: { uri: string; base64: string; mime: string }, key?: string) => {
     if (!ACCEPTED_TYPES.includes(p.mime)) {
-      Alert.alert('Cannot use this image', `Unsupported format (${p.mime}).`);
+      Alert.alert('Cannot use this image', 'Use a PNG, JPEG, HEIC or WebP photo.');
       return;
     }
     if (Math.ceil((p.base64.length * 3) / 4) > MAX_BYTES) {
@@ -286,10 +287,14 @@ export default function DesignBgRemovalScreen() {
       if (controller.signal.aborted) return;
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({ error: 'Unknown error' }));
+        if (resp.status === 402 && body?.code === 'insufficient_credits') {
+          surfaceAiCreditsError('insufficient_credits');
+          return fail('Not enough AI credits. Add credits to keep removing backgrounds.');
+        }
         return fail(
           resp.status === 429 ? 'Too many requests. Please wait a minute and try again.'
           : resp.status >= 500 ? 'The service is temporarily unavailable. Please try again shortly.'
-          : (body?.error ?? 'Background removal failed.'),
+          : (typeof body?.error === 'string' ? body.error : 'Background removal failed. Please try again.'),
         );
       }
       const data: { b64_json: string; storageKey: string | null; size: number; createdAt: string; id: string } = await resp.json();

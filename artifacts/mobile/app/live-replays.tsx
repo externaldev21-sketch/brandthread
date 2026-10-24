@@ -159,7 +159,7 @@ export default function LiveReplaysScreen() {
                   onPress={() => openReplay(item)}
                   onLongPress={item.isOwner ? () => { haptics.rigid(); openManage(item); } : undefined}
                   accessibilityRole="button"
-                  accessibilityLabel={`Play replay ${item.title}`}
+                  accessibilityLabel={`Play replay ${item.title}${hidden ? ', hidden from visitors' : ''}`}
                   testID={`live-replay-tile-${item.streamId}`}
                   style={styles.thumb}
                 >
@@ -179,7 +179,7 @@ export default function LiveReplaysScreen() {
                 {item.isOwner ? (
                   <Pressable
                     onPress={() => openManage(item)}
-                    hitSlop={8}
+                    hitSlop={9}
                     accessibilityRole="button"
                     accessibilityLabel={`Manage replay ${item.title}`}
                     testID={`live-replay-manage-${item.streamId}`}

@@ -119,7 +119,11 @@ export default function TechPackGeneratorScreen() {
   }
 
   function addSize() {
-    const label = `Size ${sizes.length + 1}`;
+    // Size names double as column keys — never add one that already exists
+    // (e.g. after removing a column, `Size ${length + 1}` can repeat).
+    let n = sizes.length + 1;
+    while (sizes.includes(`Size ${n}`)) n += 1;
+    const label = `Size ${n}`;
     setSizes((prev) => [...prev, label]);
   }
   function removeSize(size: string) {
@@ -205,7 +209,7 @@ export default function TechPackGeneratorScreen() {
         setStep('details');
         return;
       }
-      Alert.alert('Something went wrong', 'Could not generate the tech pack. Please try again.');
+      Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -328,6 +332,9 @@ export default function TechPackGeneratorScreen() {
                     style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                     onPress={() => removePhoto(p.id)}
                     activeOpacity={0.8}
+                    hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove photo"
                   >
                     <Icon name="x" size={11} color="#FFF" />
                   </TouchableOpacity>
@@ -337,6 +344,8 @@ export default function TechPackGeneratorScreen() {
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
                   onPress={pickPhotos}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add photos"
                   style={[styles.addTile, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
                   <Icon name="plus" size={20} color={colors.primary} />
