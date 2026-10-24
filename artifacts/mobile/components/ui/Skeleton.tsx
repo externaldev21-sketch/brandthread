@@ -11,6 +11,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { RADII } from '@/constants/radii';
 
 export function SkeletonBlock({ width, height, radius = RADII.chip, style }: {
@@ -21,8 +22,11 @@ export function SkeletonBlock({ width, height, radius = RADII.chip, style }: {
 }) {
   const { theme } = useAppTheme();
   const pulse = useRef(new Animated.Value(0.4)).current;
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
+    // Reduce Motion: a still block (mid-pulse opacity) instead of the loop.
+    if (reduceMotion) { pulse.setValue(0.7); return undefined; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
@@ -31,7 +35,7 @@ export function SkeletonBlock({ width, height, radius = RADII.chip, style }: {
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
   return (
     <Animated.View

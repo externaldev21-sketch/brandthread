@@ -65,6 +65,14 @@ const POPULAR = FAQS.filter(f => f.popular);
 /** Same address as the Terms / Privacy Policy and REVIEW_NOTES.md. */
 const SUPPORT_EMAIL = 'support@brandthread.app';
 
+const REPLY_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Error copy for the "Reply email" field, or null when it's a usable address. */
+export function replyEmailError(value: string): string | null {
+  const v = value.trim();
+  if (!v) return 'Enter an email so we can reply';
+  return REPLY_EMAIL_RE.test(v) ? null : 'Enter a valid email';
+}
+
 export default function HelpScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -100,6 +108,11 @@ export default function HelpScreen() {
   const [category, setCategory]     = useState<Category>('General');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
+  // No email on the account: ask where to reply instead of inventing one.
+  const accountEmail = user?.primaryEmailAddress?.emailAddress?.trim() || '';
+  const needsReplyEmail = !!isSignedIn && !accountEmail;
+  const [replyEmail, setReplyEmail] = useState('');
+  const [replyEmailTouched, setReplyEmailTouched] = useState(false);
 
   async function handleSubmitTicket() {
     if (!subject.trim() || !ticketBody.trim()) {
@@ -113,9 +126,13 @@ export default function HelpScreen() {
       Linking.openURL(url).catch(() => Alert.alert('Email us', SUPPORT_EMAIL));
       return;
     }
+    if (needsReplyEmail && replyEmailError(replyEmail)) {
+      setReplyEmailTouched(true);
+      return;
+    }
     setSubmitting(true);
     try {
-      const email = user?.primaryEmailAddress?.emailAddress ?? 'unknown@brandthread.app';
+      const email = accountEmail || replyEmail.trim();
       const name  = user?.fullName ?? user?.firstName ?? 'Brandthread User';
       await api.support.submitTicket({
         subject: subject.trim(),
@@ -172,7 +189,7 @@ export default function HelpScreen() {
   return (
     <View style={s.root}>
       <ScreenHeader
-        title="Help & Support"
+        title="Help & support"
         actions={[
           { icon: 'life-buoy', onPress: scrollToContact, accessibilityLabel: 'Jump to contact support' },
         ]}
@@ -347,10 +364,25 @@ export default function HelpScreen() {
                   placeholder="Describe your issue…"
                   multiline
                 />
+                {needsReplyEmail ? (
+                  <FormInput
+                    label="Reply email"
+                    value={replyEmail}
+                    onChange={(v) => { setReplyEmail(v); if (replyEmailTouched && !replyEmailError(v)) setReplyEmailTouched(false); }}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    autoCapitalize="none"
+                    helper="Your account has no email, so tell us where to reply."
+                    validate={replyEmailError}
+                    error={replyEmailTouched ? replyEmailError(replyEmail) ?? undefined : undefined}
+                  />
+                ) : null}
                 <PrimaryButton
                   label={submitting ? 'Sending…' : 'Send Message'}
                   onPress={handleSubmitTicket}
-                  disabled={!subject.trim() || !ticketBody.trim() || submitting}
+                  disabled={!subject.trim() || !ticketBody.trim() || (needsReplyEmail && !replyEmail.trim()) || submitting}
                   loading={submitting}
                 />
               </>
@@ -406,8 +438,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   search:        { borderWidth: 1, borderColor: theme.border },
   sectionHeader: { paddingHorizontal: 0 },
-  categoryCard: { width: '31%', backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: 4, alignItems: 'flex-start' },
-  categoryIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  categoryCard: { width: '31%', backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, gap: SP.xs, alignItems: 'flex-start' },
+  categoryIconWrap: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs },
   categoryLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   categoryCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, fontVariant: ['tabular-nums'] },
 
@@ -423,7 +455,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
 
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }, // theme-exempt: neutral modal scrim
   sheetCard:     { maxHeight: '80%', backgroundColor: theme.background, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border },
-  sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4 },
+  sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold },
   sheetTitle:    { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   sheetBody:     { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, lineHeight: 23 },

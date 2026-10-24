@@ -1,10 +1,14 @@
 import { Icon as Feather } from '@/components/ui/Icon';
 /**
- * Archive — shows posts the owner has archived and lets them restore or delete.
- * Tap navigates to the post viewer; long-press opens a restore/delete action sheet.
+ * Archive — shows posts the owner has archived and lets them restore or delete,
+ * plus the owner's expired stories (GET /api/social/highlights/stories, non-live).
+ * Post tap navigates to the post viewer; long-press opens a restore/delete
+ * action sheet. Expired stories can't be opened in the story viewer (the
+ * server only serves live stories by id), so story cells are view-only with a
+ * long-press "Delete permanently" (DELETE /api/social/stories/:id).
  */
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, FlatList, RefreshControl, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 
@@ -25,7 +29,8 @@ import type { BuyerPost } from '@/services/socialTypes';
 import { useApi, type HighlightPickerStory } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { previewHighlightPickerStories } from '@/lib/previewHighlights';
-import { apiErrorMessage } from '@/lib/safety';
+import { showAlert, confirmDestructiveActionSheet } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { CachedImage } from '@/components/CachedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -62,6 +67,8 @@ export default function BuyerArchive() {
   const [postsFailed, setPostsFailed] = useState(false);
   const [storiesFailed, setStoriesFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // First fetch still in flight: show a spinner instead of the empty state.
+  const [loaded, setLoaded] = useState(false);
   const [selectedPost, setSelectedPost] = useState<BuyerPost | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +85,7 @@ export default function BuyerArchive() {
     else setPostsFailed(true);
     if (storiesResult.status === 'fulfilled') { setArchivedStories(storiesResult.value); setStoriesFailed(false); }
     else setStoriesFailed(true);
+    setLoaded(true);
   }, [api]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -99,7 +107,7 @@ export default function BuyerArchive() {
       await loadData();
     } catch (error) {
       setSelectedPost(null);
-      Alert.alert("Couldn't restore post", apiErrorMessage(error, 'Try again.'));
+      showAlert("Couldn't restore post", friendlyError(error, 'Try again.'));
     } finally {
       setBusy(false);
     }
@@ -108,6 +116,12 @@ export default function BuyerArchive() {
   const handleRestore = () => restoreArchivedPost(selectedPost);
   const deleteArchivedPost = async (post: typeof selectedPost) => {
     if (!post || busy) return;
+    const ok = await confirmDestructiveActionSheet({
+      title: 'Delete this post?',
+      message: "It will be removed permanently. You can't undo this.",
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await deletePost(post.id);
@@ -117,7 +131,27 @@ export default function BuyerArchive() {
       await loadData();
     } catch (error) {
       setSelectedPost(null);
-      Alert.alert("Couldn't delete post", apiErrorMessage(error, 'Try again.'));
+      showAlert("Couldn't delete post", friendlyError(error, 'Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteArchivedStory = async (story: HighlightPickerStory) => {
+    if (busy) return;
+    const ok = await confirmDestructiveActionSheet({
+      title: 'Delete this story?',
+      message: "It will be removed permanently, including from any highlight. You can't undo this.",
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      if (!isBuyerDevPreview()) await api.social.deleteStory(story.storyId);
+      haptic('select');
+      setArchivedStories(prev => prev.filter(st => st.storyId !== story.storyId));
+    } catch (error) {
+      showAlert("Couldn't delete story", friendlyError(error, 'Try again.'));
     } finally {
       setBusy(false);
     }
@@ -177,12 +211,23 @@ export default function BuyerArchive() {
   }
 
   function renderStory({ item }: { item: HighlightPickerStory }) {
+    const dateLabel = new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     return (
-      <View
+      <TouchableOpacity
         style={styles.cell}
-        accessible
-        accessibilityLabel={`Archived story from ${new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+        accessibilityLabel={`Archived story from ${dateLabel}`}
+        accessibilityHint="Long-press to delete"
         testID={`archive-story-${item.storyId}`}
+        // View-only: the story viewer can't open expired stories.
+        disabled={busy}
+        activeOpacity={1}
+        onLongPress={() => {
+          haptic('longPress');
+          showActionSheet(`Story from ${dateLabel}`, undefined, [
+            { text: 'Delete permanently', style: 'destructive', onPress: () => { void deleteArchivedStory(item); } },
+            { text: 'Cancel', style: 'cancel' },
+          ]);
+        }}
       >
         <LinearGradient colors={[SURFACE, BG] as [string, string]} style={styles.cellInner}>
           {item.thumbnailUrl ? (
@@ -190,14 +235,12 @@ export default function BuyerArchive() {
           ) : (
             <Feather name="clock" size={ICON.md} color={MUTED} />
           )}
-          <Text style={styles.cellCaption} numberOfLines={1}>
-            {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </Text>
+          <Text style={styles.cellCaption} numberOfLines={1}>{dateLabel}</Text>
           <View style={styles.archivedBadge}>
             <Feather name="archive" size={10} color={MUTED} />
           </View>
         </LinearGradient>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -226,7 +269,11 @@ export default function BuyerArchive() {
         ))}
       </View>
 
-      {tab === 'posts' ? (
+      {!loaded ? (
+        <View style={styles.loading} testID="archive-loading">
+          <ActivityIndicator color={PURPLE} />
+        </View>
+      ) : tab === 'posts' ? (
         archivedPosts.length === 0 ? (
           postsFailed ? (
             <EmptyState
@@ -293,8 +340,9 @@ const makeStyles = (theme: { accent: string; accentDim: string }, CELL: number) 
   grid: { paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
   cell: { width: CELL, height: CELL, borderRadius: RADIUS.sm, overflow: 'hidden' },
   cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
-  cellCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
+  cellCaption: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
   archivedBadge: { position: 'absolute', top: SP.xs, right: SP.xs, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 2 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },

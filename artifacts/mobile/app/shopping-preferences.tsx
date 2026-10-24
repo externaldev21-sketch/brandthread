@@ -1,12 +1,15 @@
 import * as Haptics from 'expo-haptics';
 /**
- * Shopping Preferences — full buyer preferences screen
- * Sizes, fit, categories, alerts, and activity toggles
+ * Shopping preferences — sizes, fit, categories, alerts, and activity toggles.
+ * Every control saves as soon as it changes. Signed in, sizes and style
+ * categories read/write the account's buyer_preferences (the same source and
+ * option set as My sizes — BUYER_SIZE_OPTIONS); signed out / dev preview they
+ * fall back to local settings.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 
@@ -34,22 +37,19 @@ import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
 import { minHitSlop } from '@/lib/hitSlop';
 
-import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
+import { BUYER_SIZE_OPTIONS, loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
 
 import { mergeStyleInterests, selectedCategoriesFromInterests, type ShoppingSizeField } from '@/lib/shoppingPreferences';
 
 import { updateBuyerSettings } from '@/lib/buyerSettingsSync';
-import { apiErrorMessage } from '@/lib/safety';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useApi } from '@/lib/api';
 import { radius } from '@/constants/radii';
 
-const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
-const BOTTOMS = ['28', '29', '30', '31', '32', '33', '34', '36', '38', '40+'];
-const SHOES = ['6', '7', '8', '9', '10', '11', '12', '13', '14'];
-
-const FIT_OPTIONS: { key: BuyerSettingsState['preferredFit']; label: string; desc: string }[] = [
+const FIT_OPTIONS: { key: Exclude<BuyerSettingsState['preferredFit'], ''>; label: string; desc: string }[] = [
   { key: 'slim', label: 'Slim', desc: 'Close to the body' },
   { key: 'regular', label: 'Regular', desc: 'Classic fit' },
   { key: 'oversized', label: 'Oversized', desc: 'Relaxed & roomy' },
@@ -79,7 +79,7 @@ function SizeSelector({
   label, options, selected, onSelect,
 }: {
   label: string;
-  options: string[];
+  options: readonly string[];
   selected: string;
   onSelect: (v: string) => void;
 }) {
@@ -89,16 +89,16 @@ function SizeSelector({
   return (
     <View style={s.sizeBlock}>
       <Text style={s.sizeLabel}>{label}</Text>
-      <View style={s.sizeRow}>
+      <View style={s.sizeRow} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {options.map(opt => (
           <TouchableOpacity
             key={opt}
             style={[s.sizeBubble, selected === opt && s.sizeBubbleActive]}
             onPress={() => { haptic('select'); onSelect(opt); }}
             hitSlop={SIZE_BUBBLE_HIT_SLOP}
-            accessibilityRole="button"
+            accessibilityRole="radio"
             accessibilityLabel={`${label}, ${opt}`}
-            accessibilityState={{ selected: selected === opt }}
+            accessibilityState={{ selected: selected === opt, checked: selected === opt }}
           >
             <Text style={[s.sizeBubbleText, selected === opt && s.sizeBubbleTextActive]}>{opt}</Text>
           </TouchableOpacity>
@@ -118,7 +118,6 @@ export default function ShoppingPreferences() {
   const api = useApi();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
-  const [hasChanges, setHasChanges] = useState(false);
   // Sizes and style categories live on the account (buyer_preferences, the
   // same source as My sizes). Signed out / dev preview: local settings only.
   const { preferences, status: prefsStatus, update: updatePreferences } = useBuyerPreferences();
@@ -130,13 +129,15 @@ export default function ShoppingPreferences() {
 
   const serverCatsRef = useRef<string[]>([]);
   serverCatsRef.current = prefsLoaded ? selectedCategoriesFromInterests(preferences.styleInterests, CATEGORIES) : [];
+  const signedInRef = useRef(signedIn);
+  signedInRef.current = signedIn;
 
   useFocusEffect(useCallback(() => {
     catsTouched.current = false;
     loadBuyerSettings().then(s => {
       setSettings(s);
-      const fromServer = serverCatsRef.current;
-      setSelectedCats(new Set(fromServer.length ? fromServer : (s.styleCategories ?? [])));
+      // Signed in, only the account copy counts; local is the signed-out fallback.
+      setSelectedCats(new Set(signedInRef.current ? serverCatsRef.current : (s.styleCategories ?? [])));
     });
   }, []));
 
@@ -144,28 +145,34 @@ export default function ShoppingPreferences() {
   useEffect(() => {
     if (!prefsLoaded || catsTouched.current) return;
     const fromServer = selectedCategoriesFromInterests(preferences.styleInterests, CATEGORIES);
-    if (fromServer.length) setSelectedCats(new Set(fromServer));
+    setSelectedCats(new Set(fromServer));
   }, [prefsLoaded, preferences.styleInterests]);
 
-  const sizeTops = sizeOverride.tops || (prefsLoaded && preferences.sizes.tops) || settings?.sizeTops || '';
-  const sizeBottoms = sizeOverride.bottoms || (prefsLoaded && preferences.sizes.bottoms) || settings?.sizeBottoms || '';
-  const sizeShoes = sizeOverride.shoes || (prefsLoaded && preferences.sizes.shoes) || settings?.sizeShoes || '';
+  // Signed in, the account copy is the only source (no stale device value).
+  const localSize = (field: ShoppingSizeField) =>
+    settings?.[field === 'tops' ? 'sizeTops' : field === 'bottoms' ? 'sizeBottoms' : 'sizeShoes'] || '';
+  const sizeFor = (field: ShoppingSizeField) =>
+    sizeOverride[field] ?? (signedIn ? (prefsLoaded ? preferences.sizes[field] ?? '' : '') : localSize(field));
+  const sizeTops = sizeFor('tops');
+  const sizeBottoms = sizeFor('bottoms');
+  const sizeShoes = sizeFor('shoes');
 
   async function patch(updates: Partial<BuyerSettingsState>) {
     const next = await patchBuyerSettings(updates);
     setSettings(next);
-    setHasChanges(true);
   }
 
   async function selectSize(field: ShoppingSizeField, value: string) {
-    const localKey = field === 'tops' ? 'sizeTops' : field === 'bottoms' ? 'sizeBottoms' : 'sizeShoes';
-    await patch({ [localKey]: value } as Partial<BuyerSettingsState>);
-    if (!signedIn) return;
+    if (!signedIn) {
+      const localKey = field === 'tops' ? 'sizeTops' : field === 'bottoms' ? 'sizeBottoms' : 'sizeShoes';
+      await patch({ [localKey]: value } as Partial<BuyerSettingsState>);
+      return;
+    }
     setSizeOverride(prev => ({ ...prev, [field]: value }));
     try {
       await updatePreferences({ sizes: { [field]: value } });
-    } catch {
-      Alert.alert('Could not update setting', 'Try again.');
+    } catch (error) {
+      showAlert('Couldn’t update size', friendlyError(error, 'Try again.'));
     } finally {
       setSizeOverride(prev => {
         if (prev[field] !== value) return prev;
@@ -183,35 +190,49 @@ export default function ShoppingPreferences() {
       setSettings(await updateBuyerSettings(api, { personalizedRecommendations: v }));
     } catch (error) {
       setSettings(prev => prev ? { ...prev, personalizedRecommendations: !v } : prev);
-      Alert.alert('Couldn’t update recommendations', apiErrorMessage(error, 'Check your connection and try again.'));
+      showAlert('Couldn’t update recommendations', friendlyError(error, 'Check your connection and try again.'));
     }
   }
 
-  async function save() {
-    // Persist selected style categories alongside other preferences
-    const cats = Array.from(selectedCats);
-    await patchBuyerSettings({ styleCategories: cats });
-    if (signedIn) {
-      try {
-        await updatePreferences({ styleInterests: mergeStyleInterests(preferences.styleInterests, cats, CATEGORIES) });
-      } catch {
-        Alert.alert('Could not save preferences', 'Try again.');
+  // Category toggles save immediately, like every other control here. Saves
+  // run one at a time so a quick double toggle can't land out of order.
+  const selectedCatsRef = useRef(selectedCats);
+  selectedCatsRef.current = selectedCats;
+  const catSaveChain = useRef<Promise<void>>(Promise.resolve());
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
+
+  function saveCategories(next: Set<string>, prev: Set<string>) {
+    const cats = Array.from(next);
+    catSaveChain.current = catSaveChain.current.then(async () => {
+      if (!signedIn) {
+        await patchBuyerSettings({ styleCategories: cats });
         return;
       }
-    }
-    setHasChanges(false);
-    goBackOr(router);
+      try {
+        await updatePreferences({ styleInterests: mergeStyleInterests(preferencesRef.current.styleInterests, cats, CATEGORIES) });
+      } catch (error) {
+        // Roll back only if nothing newer was picked meanwhile.
+        if (selectedCatsRef.current === next) setSelectedCats(prev);
+        showAlert('Couldn’t update categories', friendlyError(error, 'Try again.'));
+      }
+    });
   }
 
   function toggleCat(key: string) {
+    // Saving before the account copy loads would overwrite interests set elsewhere.
+    if (signedIn && !prefsLoaded) {
+      showAlert('Still loading your preferences', 'Try again in a moment.');
+      return;
+    }
     catsTouched.current = true;
     haptic('select');
-    setSelectedCats(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-    setHasChanges(true);
+    const prev = selectedCatsRef.current;
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    selectedCatsRef.current = next;
+    setSelectedCats(next);
+    saveCategories(next, prev);
   }
 
   if (!settings) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
@@ -228,23 +249,26 @@ export default function ShoppingPreferences() {
         <Text style={s.sectionTitle}>Your sizes</Text>
         <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
         <View style={s.card}>
-          <SizeSelector label="Tops" options={TOPS} selected={sizeTops} onSelect={v => selectSize('tops', v)} />
+          <SizeSelector label="Tops" options={BUYER_SIZE_OPTIONS.tops} selected={sizeTops} onSelect={v => selectSize('tops', v)} />
           <View style={s.divider} />
-          <SizeSelector label="Bottoms" options={BOTTOMS} selected={sizeBottoms} onSelect={v => selectSize('bottoms', v)} />
+          <SizeSelector label="Bottoms" options={BUYER_SIZE_OPTIONS.bottoms} selected={sizeBottoms} onSelect={v => selectSize('bottoms', v)} />
           <View style={s.divider} />
-          <SizeSelector label="Shoes (US)" options={SHOES} selected={sizeShoes} onSelect={v => selectSize('shoes', v)} />
+          <SizeSelector label="Shoes (US)" options={BUYER_SIZE_OPTIONS.shoes} selected={sizeShoes} onSelect={v => selectSize('shoes', v)} />
         </View>
 
         {/* Fit */}
         <Text style={s.sectionTitle}>Preferred fit</Text>
         <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
-        <View style={s.card}>
+        <View style={s.card} accessibilityRole="radiogroup" accessibilityLabel="Preferred fit">
           {FIT_OPTIONS.map((opt, i) => (
             <React.Fragment key={opt.key}>
               <TouchableOpacity
                 style={s.fitRow}
                 onPress={() => patch({ preferredFit: opt.key })}
                 activeOpacity={0.7}
+                accessibilityRole="radio"
+                accessibilityLabel={`${opt.label}, ${opt.desc}`}
+                accessibilityState={{ selected: settings.preferredFit === opt.key, checked: settings.preferredFit === opt.key }}
               >
                 <View style={s.fitRadio}>
                   {settings.preferredFit === opt.key && <View style={s.fitRadioFill} />}
@@ -270,9 +294,9 @@ export default function ShoppingPreferences() {
               onPress={() => toggleCat(cat.key)}
               activeOpacity={0.7}
               hitSlop={CAT_CHIP_HIT_SLOP}
-              accessibilityRole="button"
+              accessibilityRole="checkbox"
               accessibilityLabel={cat.label}
-              accessibilityState={{ selected: selectedCats.has(cat.key) }}
+              accessibilityState={{ checked: selectedCats.has(cat.key) }}
             >
               <Text style={s.catEmoji}>{cat.emoji}</Text>
               <Text style={[s.catLabel, selectedCats.has(cat.key) && s.catLabelActive]}>
@@ -342,11 +366,11 @@ export default function ShoppingPreferences() {
         </View>
       </ScrollView>
 
-      {/* Save button */}
+      {/* Everything saves as it changes; this just closes the screen. */}
       <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md + tabBarInset }]}>
-        <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
+        <TouchableOpacity onPress={() => goBackOr(router)} activeOpacity={0.85} style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel="Done">
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save preferences</Text>
+            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Done</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

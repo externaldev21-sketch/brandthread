@@ -28,6 +28,10 @@ import { APPEARANCE_ICON_IMAGES, APPEARANCE_THEME_IMAGES, preloadAppearanceAsset
 
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
 const presetById = (id: AppThemeId): AppThemePreset =>
   APP_THEME_PRESETS.find((preset) => preset.id === id) ?? APP_THEME_PRESETS[0];
 
@@ -47,13 +51,21 @@ export default function AppearanceScreen() {
   async function chooseTheme(id: AppThemeId) {
     if (id === theme.id) return;
     haptic('select');
-    await selectTheme(id);
+    try {
+      await selectTheme(id);
+    } catch (err) {
+      showAlert('Couldn’t change the theme', friendlyError(err, 'Try again.'));
+    }
   }
 
   async function chooseIcon(nextPreference: AppIconPreference) {
     if (nextPreference === preference) return;
     haptic('select');
-    await selectIcon(nextPreference);
+    try {
+      await selectIcon(nextPreference);
+    } catch (err) {
+      showAlert('Couldn’t change the app icon', friendlyError(err, 'Try again.'));
+    }
   }
 
   function toggleFollowTheme(follow: boolean) {
@@ -226,7 +238,7 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingVertical: SP.xl, borderRadius: RADIUS.lg, overflow: 'hidden' },
   heroIcon: { width: 120, height: 120, borderRadius: 16 },
   heroName: { fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: SP.md },
-  heroSubtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
+  heroSubtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.xs },
 
   sectionLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: SP.lg, marginBottom: SP.sm },
 
@@ -245,6 +257,6 @@ const styles = StyleSheet.create({
   icon: { width: '100%', height: '100%', borderRadius: 16 },
   iconLocked: { opacity: 0.35 },
   lockBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2A2C', borderWidth: 2, borderColor: '#000' },
-  selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
+  selectedBadge: { position: 'absolute', right: -2, top: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
 });

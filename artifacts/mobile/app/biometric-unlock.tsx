@@ -28,6 +28,10 @@ import { GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSe
 
 import { crispPx } from '@/lib/crispPixel';
 
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
 export default function AppLockSettingsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
@@ -58,26 +62,36 @@ export default function AppLockSettingsScreen() {
     if (!available || busy) return;
     setBusy(true);
     setMessage(null);
-    const result = await authenticateForAppLock({
-      reason: nextEnabled ? `Turn on App Lock with ${label}` : 'Turn off App Lock',
-    });
-    if (!result.success) {
+    try {
+      const result = await authenticateForAppLock({
+        reason: nextEnabled ? `Turn on App Lock with ${inlineLabel}` : 'Turn off App Lock',
+      });
+      if (!result.success) {
+        if (!result.cancelled) setMessage('We couldn’t verify it’s you, so nothing changed.');
+        return;
+      }
+      const next = { ...settings, enabled: nextEnabled };
+      await saveAppLockSettings(next);
+      setSettings(next);
+      haptics.success();
+    } catch (err) {
+      showAlert('Couldn’t update App Lock', friendlyError(err, 'Nothing changed. Try again.'));
+    } finally {
       setBusy(false);
-      if (!result.cancelled) setMessage('We couldn’t verify it’s you, so nothing changed.');
-      return;
     }
-    const next = { ...settings, enabled: nextEnabled };
-    await saveAppLockSettings(next);
-    setSettings(next);
-    setBusy(false);
-    haptics.success();
   }
 
   async function chooseGrace(graceSeconds: GraceSeconds) {
     haptics.selection();
+    const prev = settings;
     const next = { ...settings, graceSeconds };
     setSettings(next);
-    await saveAppLockSettings(next);
+    try {
+      await saveAppLockSettings(next);
+    } catch (err) {
+      setSettings(prev);
+      showAlert('Couldn’t update App Lock', friendlyError(err, 'Nothing changed. Try again.'));
+    }
   }
 
   return (

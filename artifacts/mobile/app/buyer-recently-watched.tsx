@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@clerk/expo';
@@ -149,7 +150,7 @@ export default function BuyerRecentlyWatched() {
               <Icon name="chevron-right" size={18} color={theme.muted} />
             </Pressable>
           )}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={reload} tintColor={theme.text} />}
+          refreshControl={<ThemedRefreshControl refreshing={false} onRefresh={reload} />}
           onEndReached={() => loadMore()}
           onEndReachedThreshold={0.4}
           ListFooterComponent={visible.loadingMore

@@ -39,7 +39,7 @@ describe('seller inbox: search', () => {
 
 describe('seller inbox: swipe actions', () => {
   it('uses the shared InboxSwipeRow component', () => {
-    expect(src).toContain("import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';");
+    expect(src).toContain("import InboxSwipeRow, { inboxSwipeAccessibilityProps, type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';");
     expect(src).toContain('<InboxSwipeRow rowId={conv.id} actions={swipeActions}>');
   });
 

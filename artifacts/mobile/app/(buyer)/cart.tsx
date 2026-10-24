@@ -25,7 +25,7 @@ import { Icon } from '@/components/ui/Icon';
 
 import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { applyCartQuantity } from '@/lib/cartOptimistic';
 
@@ -215,6 +215,13 @@ export default function CartScreen() {
   const walletAllowed = Platform.OS === 'ios' ? checkoutLive.applePay : Platform.OS === 'android' ? checkoutLive.googlePay : false;
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
+  // Rewards (app/loyalty.tsx) hands over the points the buyer chose there;
+  // prefill them here, where the redemption is actually created and tied to
+  // the checkout session. Never auto-applies — the buyer still taps Apply.
+  const { redeemPoints: redeemPointsParam } = useLocalSearchParams<{ redeemPoints?: string }>();
+  useEffect(() => {
+    if (typeof redeemPointsParam === 'string' && /^\d{1,7}$/.test(redeemPointsParam)) setPointsInput(redeemPointsParam);
+  }, [redeemPointsParam]);
   const [refreshing, setRefreshing] = useState(false);
   // THREAD CASH HOOK POINT — see components/thread-cash/UseThreadCashCard.tsx.
   const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');

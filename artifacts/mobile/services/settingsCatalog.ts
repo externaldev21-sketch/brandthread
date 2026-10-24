@@ -102,8 +102,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Account privacy', description: 'Account privacy and who can see your content', aliases: ['privacy', 'private account', 'visibility', 'public'], icon: 'lock', route: '/buyer-privacy-settings', audience: 'buyer' },
       { label: 'Close Friends', description: 'The people who see your close friends posts', aliases: ['close friends'], icon: 'star', route: '/buyer-close-friends', audience: 'buyer' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
-      { label: 'Who can message and see me', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
-      { label: 'Content you see', description: 'Favorites, content preferences, and suggested content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
+      { label: 'Who can message and see me', description: 'Who can message you, and blocked accounts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
+      { label: 'Content you see', description: 'Hidden words and muted accounts', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
       { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'buyer' },
       { label: 'Blocked', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Follow requests', description: 'Confirm or delete requests to follow your private account', aliases: ['requests', 'follow requests', 'private account'], icon: 'user-plus', route: '/buyer-friend-requests', audience: 'buyer' },
@@ -112,7 +112,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'How others can interact with you',
     items: [
-      { label: 'Messages and story replies', description: 'Messages, story replies, tags, mentions, comments, and sharing', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can', 'story replies'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
+      { label: 'Messages and story replies', description: 'Who can message you, and blocked accounts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can', 'story replies'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
       { label: 'Restricted', description: 'Accounts with limited interaction with you', aliases: ['restrict', 'restricted'], icon: 'user-x', route: '/buyer-restricted', audience: 'buyer' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'hidden words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
     ],
@@ -121,22 +121,21 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     title: 'What you see',
     items: [
       { label: 'Muted accounts', description: 'Accounts whose posts and comments are muted', aliases: ['mute', 'muted'], icon: 'volume-x', route: '/buyer-muted', audience: 'buyer' },
-      { label: 'Content preferences', description: 'Favorites, content preferences, and suggested content', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content', 'content you see'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
+      { label: 'Content preferences', description: 'Hidden words and muted accounts', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content', 'content you see'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
     ],
   },
   {
-    title: 'Your app and media',
+    title: 'Your app & media',
     items: [
       { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
-      { label: 'App language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/app-language', audience: 'buyer' },
-      { label: 'Accessibility and data usage', description: 'Media quality, data usage, and accessibility options', aliases: ['accessibility', 'media quality', 'data usage', 'wifi'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
+      { label: 'Accessibility', description: 'Motion, captions, and text size', aliases: ['accessibility', 'reduce motion', 'captions', 'text size'], icon: 'eye', route: '/buyer-settings-detail?section=accessibility', audience: 'buyer' },
       { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
       { label: 'Sounds & haptics', description: 'Turn haptics on or off', aliases: ['haptics', 'vibration', 'vibrate', 'sounds', 'feedback', 'taptic'], icon: 'smartphone', route: '/sounds-haptics', audience: 'shared' },
     ],
   },
   {
-    title: 'Your orders and payments',
+    title: 'Your orders & payments',
     items: [
       { label: 'Orders and returns', description: 'View purchases, returns, and order support', aliases: ['orders', 'purchases', 'refunds', 'returns'], icon: 'package', route: '/(buyer)/orders', audience: 'buyer' },
       { label: 'Payment methods', description: 'Cards and payment methods saved with your account', aliases: ['cards', 'billing', 'checkout payment'], icon: 'credit-card', route: '/buyer-payment-methods', audience: 'buyer' },
@@ -157,13 +156,13 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     ],
   },
   {
-    title: 'More info and support',
+    title: 'More info & support',
     items: [
       { label: 'Help', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Report a problem', description: 'Tell us about a bug or an issue', aliases: ['bug', 'issue', 'feedback'], icon: 'alert-triangle', route: '/buyer-problem-report', audience: 'buyer' },
       { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
       { label: 'About Brandthread', description: 'App version, terms, and policies', aliases: ['about', 'version', 'terms'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
-      { label: 'About', description: 'App version, terms, policies, and licenses', aliases: ['about', 'version', 'licenses', 'legal'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
+      { label: 'About', description: 'App version, terms, and policies', aliases: ['about', 'version', 'legal'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
       ...LEGAL_ITEMS,
     ],
   },
@@ -266,7 +265,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     ],
   },
   {
-    title: 'Privacy and safety',
+    title: 'Shipping',
     items: [
       { label: 'Shipping and delivery', description: 'Configure rates, zones, and carriers', aliases: ['shipping', 'delivery', 'rates', 'carriers'], icon: 'truck', route: '/shipping-delivery', audience: 'seller' },
       { label: 'Shipping methods', description: 'Fulfillment and shipping method settings', aliases: ['fulfillment', 'methods'], icon: 'send', route: '/shipping', audience: 'seller' },

@@ -277,9 +277,6 @@ export default function MutedWordsScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md },
   inputShell: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: SP.md, paddingRight: SP.sm, height: 54,
@@ -287,7 +284,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   // minWidth 0 lets the field shrink on web instead of pushing Mute into the border.
   input: { flex: 1, minWidth: 0, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base, height: '100%' },
-  addBtn: { height: 40, paddingHorizontal: 16, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { height: 40, paddingHorizontal: SP.md, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' },
   addText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
   hint: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 8 },
   errorCard: {

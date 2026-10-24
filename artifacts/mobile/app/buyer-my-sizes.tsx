@@ -2,7 +2,9 @@
  * My sizes — the buyer's saved sizes and optional body measurements.
  * Stored server-side (api.buyer.preferences) so size recommendations and the
  * onboarding survey read the same data. Tap a size to save it, tap it again
- * to clear. Measurements save when a field loses focus.
+ * to clear. Measurements save when a field loses focus. Lengths (cm/in) and
+ * weight (kg/lb) have independent display units; values are always stored
+ * metric.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
@@ -29,7 +31,7 @@ import { haptics } from '@/lib/haptics';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { FONT } from '@/lib/theme';
+import { FONT, SP } from '@/lib/theme';
 
 import { TYPE_SCALE } from '@/constants/typography';
 
@@ -37,12 +39,14 @@ import { SPACING } from '@/constants/spacing';
 
 import type { BuyerPreferencesPatch } from '@/lib/api';
 import type { SizeCategory } from '@/lib/sizeRecommendation';
+import { BUYER_SIZE_OPTIONS } from '@/lib/buyerSettings';
+import { toDisplay, toMetric, unitFor, type LengthUnit, type WeightUnit, type Units } from '@/lib/measurementUnits';
 
-const CATEGORIES: { key: SizeCategory; label: string; options: string[] }[] = [
-  { key: 'tops', label: 'Tops', options: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'] },
-  { key: 'bottoms', label: 'Bottoms', options: ['26', '28', '29', '30', '31', '32', '33', '34', '36', '38', '40'] },
-  { key: 'outerwear', label: 'Outerwear', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
-  { key: 'shoes', label: 'Shoes', options: ['6', '7', '8', '8.5', '9', '9.5', '10', '10.5', '11', '12', '13', '14'] },
+const CATEGORIES: { key: SizeCategory; label: string; options: readonly string[] }[] = [
+  { key: 'tops', label: 'Tops', options: BUYER_SIZE_OPTIONS.tops },
+  { key: 'bottoms', label: 'Bottoms', options: BUYER_SIZE_OPTIONS.bottoms },
+  { key: 'outerwear', label: 'Outerwear', options: BUYER_SIZE_OPTIONS.outerwear },
+  { key: 'shoes', label: 'Shoes', options: BUYER_SIZE_OPTIONS.shoes },
 ];
 
 type MKey = 'heightCm' | 'weightKg' | 'chestCm' | 'waistCm' | 'hipsCm';
@@ -54,24 +58,6 @@ const MEASUREMENTS: { key: MKey; label: string; kind: 'length' | 'weight' }[] = 
   { key: 'hipsCm', label: 'Hips', kind: 'length' },
 ];
 
-const CM_PER_IN = 2.54;
-const KG_PER_LB = 0.45359237;
-
-type Unit = 'cm' | 'in';
-function toDisplay(kind: 'length' | 'weight', metric: number | undefined, unit: Unit): string {
-  if (metric === undefined) return '';
-  const v = kind === 'length' ? (unit === 'in' ? metric / CM_PER_IN : metric) : (unit === 'in' ? metric / KG_PER_LB : metric);
-  return String(Math.round(v * 10) / 10);
-}
-function toMetric(kind: 'length' | 'weight', text: string, unit: Unit): number | null | undefined {
-  const t = text.trim().replace(',', '.');
-  if (!t) return null;
-  const n = parseFloat(t);
-  if (!Number.isFinite(n) || n <= 0) return undefined;
-  const metric = kind === 'length' ? (unit === 'in' ? n * CM_PER_IN : n) : (unit === 'in' ? n * KG_PER_LB : n);
-  return Math.round(metric * 10) / 10;
-}
-
 export default function BuyerMySizes() {
   const palette = useColors();
   const s = makeStyles(palette);
@@ -79,7 +65,7 @@ export default function BuyerMySizes() {
   const insets = useSafeAreaInsets();
   const tabInset = useBuyerTabBarInset();
   const { preferences, status, update, retry } = useBuyerPreferences();
-  const [unit, setUnit] = useState<Unit>('cm');
+  const [units, setUnits] = useState<Units>({ length: 'cm', weight: 'kg' });
   const [drafts, setDrafts] = useState<Partial<Record<MKey, string>>>({});
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,20 +99,29 @@ export default function BuyerMySizes() {
   function commitMeasurement(key: MKey, kind: 'length' | 'weight') {
     const text = drafts[key];
     if (text === undefined) return;
-    const metric = toMetric(kind, text, unit);
+    const metric = toMetric(kind, text, units);
     setDrafts((d) => { const { [key]: _omit, ...rest } = d; return rest; });
     if (metric === undefined) { flash('Enter a valid number', 'error'); return; }
     if (metric === (sizes.measurements?.[key] ?? null)) return;
     void save({ sizes: { measurements: { [key]: metric } } }, 'Measurements saved');
   }
 
-  const unitLabel = (kind: 'length' | 'weight') => (kind === 'length' ? unit : unit === 'in' ? 'lb' : 'kg');
+  const unitLabel = (kind: 'length' | 'weight') => unitFor(kind, units);
+  // Switching a unit drops unsaved drafts of that kind only.
+  const changeUnits = (kind: 'length' | 'weight', next: LengthUnit | WeightUnit) => {
+    setDrafts((d) => {
+      const kept: Partial<Record<MKey, string>> = {};
+      for (const m of MEASUREMENTS) if (m.kind !== kind && d[m.key] !== undefined) kept[m.key] = d[m.key];
+      return kept;
+    });
+    setUnits((u) => (kind === 'length' ? { ...u, length: next as LengthUnit } : { ...u, weight: next as WeightUnit }));
+  };
 
   return (
     <View style={s.page}>
       <ScreenHeader title="My sizes" hideDivider onBack={() => goBackOr(router)} />
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom, tabInset) + 32 }}
+        contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: Math.max(insets.bottom, tabInset) + SP.xl }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -158,13 +153,23 @@ export default function BuyerMySizes() {
         <View style={s.section}>
           <View style={s.sectionHead}>
             <Text style={s.label}>Measurements</Text>
-            <View style={{ width: 110 }}>
-              <SegmentedControl
-                size="compact"
-                options={[{ id: 'cm', label: 'cm' }, { id: 'in', label: 'in' }]}
-                selectedId={unit}
-                onChange={(id) => { setDrafts({}); setUnit(id as Unit); }}
-              />
+            <View style={s.unitToggles}>
+              <View style={{ width: 110 }}>
+                <SegmentedControl
+                  size="compact"
+                  options={[{ id: 'cm', label: 'cm' }, { id: 'in', label: 'in' }]}
+                  selectedId={units.length}
+                  onChange={(id) => changeUnits('length', id as LengthUnit)}
+                />
+              </View>
+              <View style={{ width: 110 }}>
+                <SegmentedControl
+                  size="compact"
+                  options={[{ id: 'kg', label: 'kg' }, { id: 'lb', label: 'lb' }]}
+                  selectedId={units.weight}
+                  onChange={(id) => changeUnits('weight', id as WeightUnit)}
+                />
+              </View>
             </View>
           </View>
           {MEASUREMENTS.map((m, i) => (
@@ -172,7 +177,7 @@ export default function BuyerMySizes() {
               <Text style={s.mLabel}>{m.label}</Text>
               <TextInput
                 style={s.input}
-                value={drafts[m.key] ?? toDisplay(m.kind, sizes.measurements?.[m.key], unit)}
+                value={drafts[m.key] ?? toDisplay(m.kind, sizes.measurements?.[m.key], units)}
                 onChangeText={(v) => setDrafts((d) => ({ ...d, [m.key]: v }))}
                 onBlur={() => commitMeasurement(m.key, m.kind)}
                 placeholder="Add"
@@ -199,7 +204,8 @@ const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create(
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm },
   label: { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: palette.foreground },
   value: { ...TYPE_SCALE.footnote, color: palette.mutedForeground },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  unitToggles: { flexDirection: 'row', gap: SP.sm },
   mRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border },
   mLabel: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground },
   input: { minWidth: 80, textAlign: 'right', ...TYPE_SCALE.body, color: palette.foreground, padding: 0 },

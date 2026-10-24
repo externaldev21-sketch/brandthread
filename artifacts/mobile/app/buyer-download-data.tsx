@@ -25,6 +25,7 @@ import { haptics, haptic } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 
 import { SPACING } from '@/constants/spacing';
+import { RADIUS, SP } from '@/lib/theme';
 
 import { EmailExportSection } from '@/components/security/EmailExportSection';
 import { saveExportFile } from '@/lib/saveExportFile';
@@ -181,7 +182,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create(
   // same as the icons on the left (audit QA-0376/1043).
   card: { padding: 0, paddingHorizontal: SPACING.md, overflow: 'hidden', marginBottom: SPACING.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: 32 + SPACING.sm },
-  note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
+  note: { flexDirection: 'row', gap: SP.sm, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
   footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center', fontVariant: ['tabular-nums'] },
   errorNote: { marginTop: SPACING.sm },

@@ -1,32 +1,13 @@
 /**
- * Whether the OS-level "Reduce Motion" accessibility setting is on. No
- * existing precedent for this in the app (checked before adding it), so this
- * is a small, self-contained hook: subscribes to AccessibilityInfo's change
- * event and reads the initial value on mount. Defaults to false (normal
- * animation) until the initial check resolves, and fails safe to false on
- * any platform that doesn't support the query (e.g. web).
+ * Whether motion should be reduced: the buyer's Settings → Accessibility →
+ * "Reduce motion" switch OR the OS-level Reduce Motion setting. Re-renders
+ * when either changes. Defaults to false (normal animation) until the OS
+ * check resolves, and fails safe to false where the OS query isn't supported
+ * (e.g. web). See lib/reduceMotion.ts.
  */
-import { useEffect, useState } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { useSyncExternalStore } from 'react';
+import { isMotionReduced, subscribeReduceMotion } from '@/lib/reduceMotion';
 
 export function useReduceMotion(): boolean {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    AccessibilityInfo.isReduceMotionEnabled?.()
-      .then((enabled) => { if (active) setReduceMotion(!!enabled); })
-      .catch(() => {});
-
-    const subscription = AccessibilityInfo.addEventListener?.(
-      'reduceMotionChanged',
-      (enabled: boolean) => setReduceMotion(!!enabled),
-    );
-    return () => {
-      active = false;
-      subscription?.remove?.();
-    };
-  }, []);
-
-  return reduceMotion;
+  return useSyncExternalStore(subscribeReduceMotion, isMotionReduced, isMotionReduced);
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/expo';
 import { SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
@@ -10,6 +11,8 @@ import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 export default function BuyerSecurity() {
   const colors = useColors();
@@ -17,6 +20,9 @@ export default function BuyerSecurity() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { user } = useUser();
+  // Clerk is the source of truth for 2FA; the local twoFactor setting is never read here.
+  const twoFactorOn = user?.twoFactorEnabled ?? false;
   const [loginAlerts, setLoginAlerts] = useState(true);
   const [saveLogin, setSaveLogin] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -36,7 +42,11 @@ export default function BuyerSecurity() {
   async function onToggleLoginAlerts(v: boolean) {
     setLoginAlerts(v);
     await patchBuyerSettings({ loginAlerts: v });
-    api.notificationPrefs.update({ categories: { login_alerts: v } }).catch(() => setLoginAlerts(!v));
+    api.notificationPrefs.update({ categories: { login_alerts: v } }).catch((err) => {
+      setLoginAlerts(!v);
+      void patchBuyerSettings({ loginAlerts: !v });
+      showAlert("Couldn’t update login alerts", friendlyError(err, 'Try again.'));
+    });
   }
 
   async function onToggleSaveLogin(v: boolean) {
@@ -65,6 +75,7 @@ export default function BuyerSecurity() {
             icon="shield"
             title="Two-factor authentication"
             subtitle="Add a second step when you sign in."
+            value={twoFactorOn ? 'On' : 'Off'}
             chevron
             onPress={() => router.push('/login-methods' as never)}
           />
@@ -94,7 +105,7 @@ export default function BuyerSecurity() {
           <View style={s.divider} />
           <ListRow
             icon="smartphone"
-            title="Where you're logged in"
+            title="Login activity"
             chevron
             onPress={() => router.push('/login-activity' as never)}
           />

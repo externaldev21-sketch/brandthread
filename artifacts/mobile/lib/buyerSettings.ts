@@ -10,17 +10,32 @@
  *   "pending" and sent in one debounced PATCH. A failed send stays pending
  *   and is retried on the next load.
  * - Not synced through here: sizes / style categories (buyer_preferences via
- *   useBuyerPreferences), the four push categories that already go through
+ *   useBuyerPreferences — My sizes and Shopping preferences both read/write
+ *   that server copy when signed in; sizeTops/sizeBottoms/sizeShoes/
+ *   styleCategories below are only the signed-out local fallback), the four push categories that already go through
  *   /api/notification-prefs, and device-only switches (biometric lock, saved
  *   login, the local two-factor placeholder).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SizeCategory } from '@/lib/sizeRecommendation';
 import { useSyncExternalStore } from 'react';
 import { getAccountStorageScope, resolveAccountKey } from '@/lib/accountStorage';
 import {
   canSyncAccountServer, fetchAccountSettings, isPermanentSettingsError, patchAccountSettings, withTimeout,
   type AccountSettings,
 } from '@/lib/accountSettings';
+
+/**
+ * The one size option set for every size picker (My sizes, Shopping
+ * preferences). Values are what buyer_preferences.sizes stores and what size
+ * recommendations read.
+ */
+export const BUYER_SIZE_OPTIONS: Readonly<Record<SizeCategory, readonly string[]>> = {
+  tops: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  bottoms: ['26', '28', '29', '30', '31', '32', '33', '34', '36', '38', '40'],
+  outerwear: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  shoes: ['6', '7', '8', '8.5', '9', '9.5', '10', '10.5', '11', '12', '13', '14'],
+};
 
 /** Pre-scoping device-wide key (claimed once by the first signed-in account). */
 const LEGACY_KEY = 'brandthread_buyer_settings_v2';
@@ -61,7 +76,8 @@ export interface BuyerSettingsState {
   sizeTops: string;
   sizeBottoms: string;
   sizeShoes: string;
-  preferredFit: 'slim' | 'regular' | 'oversized';
+  /** '' = no fit chosen yet. */
+  preferredFit: '' | 'slim' | 'regular' | 'oversized';
   styleCategories: string[];
   language: string;
   theme: 'system' | 'dark' | 'light';
@@ -109,7 +125,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   sizeTops: '',
   sizeBottoms: '',
   sizeShoes: '',
-  preferredFit: 'regular',
+  preferredFit: '',
   styleCategories: [],
   language: 'English',
   theme: 'system',

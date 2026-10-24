@@ -139,7 +139,8 @@ export default function BuyerPersonalDetails() {
       }
       // Mirror the saved account values locally so other screens agree.
       await Promise.all([
-        saveBuyerProfile({ ...local, ...next }),
+        // Phone lives on the Clerk account only; drop any legacy device-only copy.
+        saveBuyerProfile({ ...local, ...next, phone: '' }),
         updateMyProfile(next),
       ]);
       haptic('save');
@@ -158,7 +159,7 @@ export default function BuyerPersonalDetails() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Personal Details" />
+      <ScreenHeader title="Personal details" />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
@@ -169,6 +170,8 @@ export default function BuyerPersonalDetails() {
           {FIELDS.map((field, i) => {
             const isEditable = field.editable !== false;
             const isBirthday = field.key === 'birthday';
+            const isPhone = field.key === 'phone';
+            const hasPhone = !!user?.primaryPhoneNumber;
             const value = getValue(field.key);
             const row = (
               <View style={s.row}>
@@ -204,6 +207,14 @@ export default function BuyerPersonalDetails() {
                   >
                     {row}
                   </Pressable>
+                ) : isPhone ? (
+                  <Pressable
+                    onPress={() => router.push('/change-phone' as never)}
+                    accessibilityRole="button"
+                    accessibilityLabel={hasPhone ? `Phone, ${value}. Change phone number` : 'Phone, not added. Add phone number'}
+                  >
+                    {row}
+                  </Pressable>
                 ) : row}
                 {error?.field === field.key && (
                   <Text style={s.fieldError} accessibilityLiveRegion="polite">{error.message}</Text>
@@ -229,12 +240,12 @@ export default function BuyerPersonalDetails() {
         <Card style={[s.card, { marginTop: SPACING.md, paddingHorizontal: SPACING.md }]}>
           <ListRow icon="mail" title="Change email" subtitle="Verify a new email address" chevron onPress={() => router.push('/change-email' as never)} />
           <View style={s.divider} />
-          <ListRow icon="phone" title="Change phone number" subtitle="Verify a new phone number" chevron onPress={() => router.push('/change-phone' as never)} />
+          <ListRow icon="phone" title={user?.primaryPhoneNumber ? 'Change phone number' : 'Add phone number'} subtitle="Verify a new phone number" chevron onPress={() => router.push('/change-phone' as never)} />
         </Card>
       </ScrollView>
 
       {hasChanges && (
-        <StickyBottomCTA label="Save Changes" loading={saving} disabled={saving} onPress={() => { void handleSave(); }} />
+        <StickyBottomCTA label="Save changes" loading={saving} disabled={saving} onPress={() => { void handleSave(); }} />
       )}
     </View>
   );
@@ -247,7 +258,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typ
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
-  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
   inputDisabled: { color: palette.mutedForeground },
   note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },

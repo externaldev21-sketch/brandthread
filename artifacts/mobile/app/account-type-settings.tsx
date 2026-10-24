@@ -12,7 +12,7 @@
  * Replaces the old flip-your-role cards, which merged a buyer and a brand into
  * one public account.
  */
-import { Alert, ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -47,6 +47,10 @@ import { useLinkedProfiles } from '@/hooks/useLinkedProfiles';
 
 import { useRole } from '@/contexts/RoleContext';
 
+import { ErrorState } from '@/components/ui/ErrorState';
+
+import { showAlert } from '@/lib/actionSheet';
+
 
 import { addProfileLabel, otherRole, roleExistsMessage, type ProfileRole } from '@/lib/linkedProfiles';
 
@@ -64,7 +68,15 @@ export default function AccountProfilesScreen() {
   // Arrived here because this profile was deleted while the login's other
   // profile lives on: just pick the profile to continue with.
   const handoff = params.handoff === '1';
-  const { data, loading, busy, preview, switchTo, startProfile } = useLinkedProfiles();
+  const { data, loading, busy, preview, refresh, switchTo, startProfile } = useLinkedProfiles();
+  // useLinkedProfiles swallows a failed load (data just stays null); once a
+  // request has finished without data, show an error with Retry instead of a blank screen.
+  const sawLoading = useRef(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  useEffect(() => {
+    if (loading) { sawLoading.current = true; setLoadFailed(false); return; }
+    if (sawLoading.current) setLoadFailed(!data && !!isSignedIn && !preview);
+  }, [loading, data, isSignedIn, preview]);
 
   const current = data?.profiles.find((p) => p.isCurrent) ?? null;
   const currentRole: ProfileRole = current?.role ?? (localRole === 'seller' ? 'seller' : 'buyer');
@@ -76,16 +88,16 @@ export default function AccountProfilesScreen() {
   async function handleStart() {
     const outcome = await startProfile(wanted);
     if (outcome.kind === 'exists') {
-      Alert.alert(roleExistsMessage(wanted), undefined, [
+      showAlert(roleExistsMessage(wanted), undefined, [
         { text: 'Cancel', style: 'cancel' },
         ...(outcome.profileClerkId
           ? [{ text: 'Switch to it', onPress: () => { void switchTo(outcome.profileClerkId!); } }]
           : []),
       ]);
     } else if (outcome.kind === 'finish-setup') {
-      Alert.alert('Finish setting up this account first.');
+      showAlert('Finish setting up this account first.');
     } else if (outcome.kind === 'error' && outcome.message) {
-      Alert.alert(outcome.message);
+      showAlert(outcome.message);
     }
   }
 
@@ -93,7 +105,7 @@ export default function AccountProfilesScreen() {
     try {
       await switchTo(clerkId);
     } catch {
-      Alert.alert("Couldn't switch accounts. Try again.");
+      showAlert("Couldn't switch accounts. Try again.");
     }
   }
 
@@ -101,9 +113,14 @@ export default function AccountProfilesScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={title} onBack={() => goBackOr(router, '/buyer-settings-menu')} />
+      <ScreenHeader title={title} onBack={() => goBackOr(router, currentRole === 'seller' ? '/seller-settings' : '/buyer-settings-menu')} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: bottomInset + SP.xl }}>
-        {handoff ? (
+        {loadFailed && !handoff ? (
+          <ErrorState
+            message="Couldn't load your profiles."
+            onRetry={() => { void refresh(); }}
+          />
+        ) : handoff ? (
           <View style={s.block}>
             <Text style={s.headline}>This profile was deleted.</Text>
             <Text style={s.body}>Your other profile on this login still works.</Text>

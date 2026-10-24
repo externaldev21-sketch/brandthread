@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { RADIUS, SP } from '@/lib/theme';
 
 /** A single shimmering placeholder block. Compose these to match a screen's real layout. */
@@ -20,8 +21,11 @@ export function SkeletonBlock({ width, height, radius = RADIUS.sm, style }: {
 }) {
   const { theme } = useAppTheme();
   const pulse = useRef(new Animated.Value(0.4)).current;
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
+    // Reduce Motion: a still block (mid-pulse opacity) instead of the loop.
+    if (reduceMotion) { pulse.setValue(0.7); return undefined; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
@@ -30,7 +34,7 @@ export function SkeletonBlock({ width, height, radius = RADIUS.sm, style }: {
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
   return (
     <Animated.View

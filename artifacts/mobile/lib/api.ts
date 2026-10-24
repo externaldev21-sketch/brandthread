@@ -3903,8 +3903,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; followedAt: string; isFollowingBack: boolean; followsMe?: boolean;
+          /** Own list only: I tapped "Dismiss" on this follower's follow-back prompt. */
+          followBackDismissed?: boolean;
         }>>(`/api/social/followers${qs ? `?${qs}` : ''}`);
       },
+      /** Hide a follower's follow-back prompt (Connections > Incoming) on every device. Keeps the follow. */
+      dismissFollower: (userId: string) =>
+        post<{ ok: boolean; dismissed: boolean }>(`/api/social/followers/${encodeURIComponent(userId)}/dismiss`, {}),
       /**
        * Search real user profiles by name / username — both buyer and
        * seller accounts (not just brands/storefronts). `roleTag` is "Buyer"

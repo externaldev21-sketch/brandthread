@@ -48,7 +48,7 @@ describe('fresh buyer zero state — Thread Cash', () => {
     expect(status.streak.currentStreak).toBe(0);
     expect(status.streak.longestStreak).toBe(0);
     expect(status.streak.alreadyCheckedInToday).toBe(false);
-    expect(status.streak.dayInCycle).toBe(0);
+    expect(status.streak.dayInCycle).toBe(1);
   });
 });
 

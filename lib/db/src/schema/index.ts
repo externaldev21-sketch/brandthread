@@ -1967,6 +1967,9 @@ export const follows = pgTable('follows', {
   followerId:  text('follower_id').notNull(),   // Clerk user ID of the follower
   followingId: text('following_id').notNull(),  // Clerk user ID of the person being followed
   createdAt:   timestamp('created_at').defaultNow().notNull(),
+  // Migration 642: the followed person tapped "Dismiss" on this follower in
+  // Connections > Incoming (the follow-back prompt). The follow itself stays.
+  followBackDismissedAt: timestamp('follow_back_dismissed_at'),
 }, (t) => ({
   pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
   followingIdx: index('follows_following_idx').on(t.followingId),

@@ -28,6 +28,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale, HapticSwitch} from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { showAlert } from '@/lib/actionSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
@@ -312,9 +313,12 @@ export default function ConversationDetailsScreen() {
         onPress: async () => {
           if (!participant?.userId) return;
           const subject = { userId: participant.userId, name: displayName };
+          // Preview applies the block locally (like mute / theme / disappearing
+          // above) — the confirm still shows, but no real API call is made.
+          const previewNoop = async () => {};
           const ok = isBlocked
-            ? await confirmUnblock(subject, api.social.unblock)
-            : await confirmBlock(subject, api.social.block);
+            ? await confirmUnblock(subject, isPreview ? previewNoop : api.social.unblock, showAlert)
+            : await confirmBlock(subject, isPreview ? previewNoop : api.social.block, showAlert);
           if (ok) setIsBlocked((v) => !v);
         },
       },

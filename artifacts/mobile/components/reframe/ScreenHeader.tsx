@@ -30,9 +30,11 @@ const ICON_EDGE_PULL = (ICON_BOX - 20) / 2;
  * the left for pushed screens. Same height on every screen.
  */
 export function ScreenHeader({
-  title, showBack = false, onBack, backTestID, align = 'left', actions, trailing, divider = false, style, testID = 'screen-header',
+  title, subtitle, showBack = false, onBack, backTestID, align = 'left', actions, trailing, divider = false, style, testID = 'screen-header',
 }: {
   title: string;
+  /** Optional quiet line under a left-aligned title (e.g. "3 unread"); the row keeps its 44pt height. */
+  subtitle?: string;
   showBack?: boolean;
   onBack?: () => void;
   backTestID?: string;
@@ -110,15 +112,37 @@ export function ScreenHeader({
         ) : (
           <>
             {back}
-            <Text
-              testID="screen-header-title"
-              accessibilityRole="header"
-              maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
-              numberOfLines={1}
-              style={[X_TYPE.title, styles.titleLeft, { color: c.text }]}
-            >
-              {title}
-            </Text>
+            {subtitle ? (
+              <View style={styles.titleLeft}>
+                <Text
+                  testID="screen-header-title"
+                  accessibilityRole="header"
+                  maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
+                  numberOfLines={1}
+                  style={[X_TYPE.title, { color: c.text }]}
+                >
+                  {title}
+                </Text>
+                <Text
+                  testID="screen-header-subtitle"
+                  maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
+                  numberOfLines={1}
+                  style={[X_TYPE.meta, { color: c.secondary }]}
+                >
+                  {subtitle}
+                </Text>
+              </View>
+            ) : (
+              <Text
+                testID="screen-header-title"
+                accessibilityRole="header"
+                maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}
+                numberOfLines={1}
+                style={[X_TYPE.title, styles.titleLeft, { color: c.text }]}
+              >
+                {title}
+              </Text>
+            )}
             {right}
           </>
         )}

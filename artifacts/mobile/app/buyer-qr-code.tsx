@@ -93,7 +93,7 @@ export default function BuyerQRCode() {
           ) : (
             <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
               <Icon name="user-x" size={40} color={MUTED} />
-              <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
+              <Text style={[s.hint, { marginTop: SP.sm, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
               <Button
                 label="Set username"
                 variant="secondary"
@@ -169,7 +169,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   qrBg: { padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.accent },
 
   handleRow: { alignItems: 'center', marginBottom: SP.md },
-  handleBadge: { paddingHorizontal: SP.lg, paddingVertical: 8, borderRadius: RADIUS.pill },
+  handleBadge: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.pill },
   handleText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 
   hint: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.lg },

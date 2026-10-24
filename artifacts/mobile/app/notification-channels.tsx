@@ -4,7 +4,7 @@
  * notification settings screens).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
@@ -21,6 +21,8 @@ import { BUYER_NOTIFICATION_TYPES, SELLER_NOTIFICATION_TYPES } from '@/lib/notif
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 type Channel = 'inApp' | 'email';
 type ChannelState = Record<Channel, Record<string, boolean>>;
@@ -57,17 +59,32 @@ export default function NotificationChannelsScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Functional, per-key updates: a quick second toggle must not be rolled back
+  // (or overwritten by a stale server snapshot) when the first one settles.
+  const setChannelKey = useCallback((channel: Channel, key: string, value: boolean | undefined) => {
+    setChannels((prev) => {
+      const nextChannel = { ...prev[channel] };
+      if (value === undefined) delete nextChannel[key];
+      else nextChannel[key] = value;
+      return { ...prev, [channel]: nextChannel };
+    });
+  }, []);
+
   const change = useCallback(async (channel: Channel, key: string, value: boolean) => {
-    const prior = channels;
-    setChannels({ ...channels, [channel]: { ...channels[channel], [key]: value } });
+    let prior: boolean | undefined;
+    setChannels((prev) => {
+      prior = prev[channel][key];
+      return { ...prev, [channel]: { ...prev[channel], [key]: value } };
+    });
     try {
       const result = await api.notificationPrefs.update({ channels: { [channel]: { [key]: value } } });
-      setChannels({ inApp: result.channels.inApp, email: result.channels.email });
-    } catch {
-      setChannels(prior);
-      Alert.alert('Couldn’t update notifications', 'Check your connection and try again.');
+      const saved = result.channels?.[channel]?.[key];
+      if (typeof saved === 'boolean') setChannelKey(channel, key, saved);
+    } catch (err) {
+      setChannelKey(channel, key, prior);
+      showAlert('Couldn’t update notifications', friendlyError(err, 'Check your connection and try again.'));
     }
-  }, [api, channels]);
+  }, [api, setChannelKey]);
 
   const changeQuietHours = useCallback(async (preset: QuietHoursPreset) => {
     const prior = quietHours;
@@ -76,9 +93,9 @@ export default function NotificationChannelsScreen() {
       await api.notificationPrefs.update({
         quietHours: quietHoursBody(preset.start, preset.end),
       });
-    } catch {
+    } catch (err) {
       setQuietHours(prior);
-      Alert.alert('Couldn’t update quiet hours', 'Check your connection and try again.');
+      showAlert('Couldn’t update quiet hours', friendlyError(err, 'Check your connection and try again.'));
     }
   }, [api, quietHours]);
 

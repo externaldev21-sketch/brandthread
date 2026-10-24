@@ -144,6 +144,8 @@ export default function BuyerAddressesScreen() {
   // Signed-out buyer preview: no account, so never call the protected
   // address API — edits stay on this screen. Demo seeds sample addresses.
   const localPreview = !userId && isBuyerDevPreview();
+  // Signed out for real: saving would fail, so offer sign-in instead of a form.
+  const signedOut = !userId && !localPreview;
 
   const load = async () => {
     if (!userId) {
@@ -371,7 +373,7 @@ export default function BuyerAddressesScreen() {
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>ZIP / postal code</Text>
-                  <TextInput value={postalCode} ref={(r) => { fieldRefs.current.postalCode = r; }} accessibilityLabel="ZIP / postal code" onChangeText={setPostalCode} style={styles.input} placeholder="90012" placeholderTextColor={palette.mutedForeground} keyboardType={country === 'US' ? 'number-pad' : 'default'} textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('phone')} />
+                  <TextInput value={postalCode} ref={(r) => { fieldRefs.current.postalCode = r; }} accessibilityLabel="ZIP / postal code" onChangeText={setPostalCode} style={styles.input} placeholder="90012" placeholderTextColor={palette.mutedForeground} keyboardType={country === 'US' ? 'number-pad' : 'default'} autoCapitalize="characters" autoCorrect={false} textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={focusField('phone')} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SPACING.sm }]}>
                   <Text style={styles.label}>Country</Text>
@@ -443,6 +445,16 @@ export default function BuyerAddressesScreen() {
                     }}
                   />
                 </View>
+              ) : signedOut ? (
+                <View style={styles.errorWrap}>
+                  <EmptyState
+                    icon="map-pin"
+                    title="Sign in to save addresses"
+                    description="Your shipping addresses are saved to your account for faster checkout."
+                    compact
+                  />
+                  <Button label="Sign in" onPress={() => router.push('/sign-in' as never)} />
+                </View>
               ) : addresses.length === 0 ? (
                 <EmptyState
                   icon="map-pin"
@@ -506,7 +518,9 @@ export default function BuyerAddressesScreen() {
                 </View>
               )}
 
-              <Button label="Add new address" onPress={handleAddNew} variant="secondary" icon="plus" style={styles.addBtn} />
+              {signedOut ? null : (
+                <Button label="Add new address" onPress={handleAddNew} variant="secondary" icon="plus" style={styles.addBtn} />
+              )}
             </>
           )}
         </ScrollView>

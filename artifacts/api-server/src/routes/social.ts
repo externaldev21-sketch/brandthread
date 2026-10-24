@@ -537,6 +537,23 @@ router.delete("/followers/:userId", rateLimit("follow"), async (req, res) => {
   res.json({ ok: true, removed: result.removed, followersCount: result.followersCount });
 });
 
+// ─── POST /api/social/followers/:userId/dismiss ─────────────────────────────
+// "Dismiss" on a follower in Connections > Incoming: hides the follow-back
+// prompt for that follower on every device. Unlike DELETE /followers/:userId
+// the follow is kept — it only stamps follows.follow_back_dismissed_at, which
+// GET /followers reports back (as followBackDismissed) on the viewer's own list.
+router.post("/followers/:userId/dismiss", rateLimit("follow"), async (req, res) => {
+  const myId   = (req as any).clerkUserId as string;
+  const target = req.params.userId as string;
+  if (target === myId) { res.status(400).json({ error: "Cannot dismiss yourself" }); return; }
+  const updated = await db.update(follows)
+    .set({ followBackDismissedAt: new Date() })
+    .where(and(eq(follows.followerId, target), eq(follows.followingId, myId)))
+    .returning({ followerId: follows.followerId });
+  if (!updated.length) { res.status(404).json({ error: "Not following you", code: "NOT_FOUND" }); return; }
+  res.json({ ok: true, dismissed: true });
+});
+
 // ─── POST /api/social/see-less — mute a notification type or actor ─────────
 // Instagram's "See less" from the Activity "..." menu. Persists a per-user
 // preference (activity_mutes) that both future publishNotification() calls
@@ -1250,7 +1267,7 @@ router.get("/followers", async (req, res) => {
   if (!ownerId) return;
   const { limit, offset } = page.data;
   const rows = await db
-    .select({ followerId: follows.followerId, createdAt: follows.createdAt })
+    .select({ followerId: follows.followerId, createdAt: follows.createdAt, followBackDismissedAt: follows.followBackDismissedAt })
     .from(follows).where(and(eq(follows.followingId, ownerId), notBlockedWith(myId, follows.followerId), listSearchCondition(req.query.q, follows.followerId)))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
@@ -1275,6 +1292,8 @@ router.get("/followers", async (req, res) => {
     isFollowingBack:  iFollowBack.has(r.followerId),
     isFollowing:      iFollowBack.has(r.followerId),
     followsMe:        followsMeSet.has(r.followerId),
+    // Only meaningful (and only exposed) on the viewer's own list.
+    ...(ownerId === myId ? { followBackDismissed: r.followBackDismissedAt != null } : {}),
   })));
 });
 

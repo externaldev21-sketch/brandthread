@@ -45,6 +45,8 @@ import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
 import { describeUserAgent } from '@/lib/deviceLabel';
 
+import { useRole } from '@/contexts/RoleContext';
+
 import { fmtRelativeDay } from '@/lib/format';
 
 /**
@@ -87,8 +89,11 @@ function deviceIcon(session: AccountSession): IconName {
   return 'monitor';
 }
 
-export default function LoginActivity() {
+export default function LoginActivity({ securityRoute }: { securityRoute?: string } = {}) {
   const { theme } = useAppTheme();
+  const { role } = useRole();
+  // Sellers manage credentials in Login methods; buyers in Password and security.
+  const passwordRoute = securityRoute ?? (role === 'seller' ? '/login-methods' : '/buyer-security');
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -305,7 +310,7 @@ export default function LoginActivity() {
             style={s.dangerBtn}
           />
 
-          <PressableScale onPress={() => router.push('/login-methods' as never)} style={s.linkRow} accessibilityRole="button">
+          <PressableScale onPress={() => router.push(passwordRoute as never)} style={s.linkRow} accessibilityRole="button">
             <Icon name="key" size={16} color={theme.text} />
             <Text style={s.linkText}>Password and two-factor authentication</Text>
             <Icon name="chevron-right" size={16} color={theme.subtle} />

@@ -60,10 +60,13 @@ export default function ThreadCashHistoryScreen() {
     : balance.balanceCents;
 
   // History is newest-first; walk backward from the current balance so each
-  // row shows the balance immediately AFTER that entry took effect.
+  // row shows the balance immediately AFTER that entry took effect. Until the
+  // balance is actually known (loading or failed) there is nothing honest to
+  // walk back from, so running balances read "—" instead of starting at $0.
+  const balanceKnown = balanceCents != null && !balance.loading;
   let running = balanceCents ?? 0;
   const rows = history.map((entry) => {
-    const balanceAfter = running;
+    const balanceAfter: number | null = balanceKnown ? running : null;
     running -= entry.amountCents;
     return { entry, balanceAfter };
   });
@@ -76,9 +79,11 @@ export default function ThreadCashHistoryScreen() {
         <ThreadCashBillIcon size={16} />
         {balance.loading ? (
           <SkeletonBlock width={96} height={14} />
+        ) : balanceCents == null ? (
+          <RetryRow label="Couldn't load balance" onRetry={() => void balance.reload()} testID="thread-cash-history-balance-retry" />
         ) : (
           <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-history-balance">
-            {formatCents(balanceCents ?? 0)} balance
+            {formatCents(balanceCents)} balance
           </Text>
         )}
       </View>
@@ -122,7 +127,7 @@ export default function ThreadCashHistoryScreen() {
                     {entry.amountCents >= 0 ? '+' : '−'}{formatCents(Math.abs(entry.amountCents))}
                   </Text>
                   <Text style={[styles.runningBalance, TABULAR_NUMS, { color: theme.subtle }]} numberOfLines={1}>
-                    {formatCents(balanceAfter)}
+                    {balanceAfter == null ? '—' : formatCents(balanceAfter)}
                   </Text>
                 </View>
               </View>

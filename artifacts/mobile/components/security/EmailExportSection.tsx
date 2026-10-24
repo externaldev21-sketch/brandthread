@@ -13,7 +13,7 @@ import { Button, Card } from '@/components/ui';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { FONT } from '@/lib/theme';
+import { FONT, SP } from '@/lib/theme';
 
 const EXTRA_CATEGORIES = ['follows', 'posts', 'saved', 'addresses', 'blocks'];
 
@@ -133,7 +133,7 @@ export function EmailExportSection({ categories }: { categories: string[] }) {
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: { marginTop: SPACING.lg },
   group: { ...TYPE_SCALE.caption, color: colors.mutedForeground, marginBottom: SPACING.xs },
-  card: { padding: SPACING.md, paddingHorizontal: SPACING.md, gap: 4 },
+  card: { padding: SPACING.md, paddingHorizontal: SPACING.md, gap: SP.xs },
   title: { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: colors.foreground },
   body: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, lineHeight: 18 },
   btn: { marginTop: SPACING.sm },

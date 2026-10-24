@@ -31,7 +31,7 @@ import { getBuyerOrder } from '@/services/orderService';
 
 import { BuyerOrderView } from '@/services/orderTypes';
 
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, ON_DARK, RED, RED_DIM, FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, ON_DARK, RED, RED_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -139,7 +139,7 @@ export default function BuyerProblemReportScreen() {
         <View style={s.successIcon}><Icon name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>{isGeneralReport ? 'Your problem report has been received. Our team will review it and reach out if needed.' : 'Your report was sent to the seller and our support team. We\'ll reach out if we need more details.'}</Text>
-        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
+        <PrimaryButton label="Done" onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );
   }
@@ -188,7 +188,7 @@ export default function BuyerProblemReportScreen() {
         {/* Evidence note */}
         {/* Evidence photos */}
         <TouchableOpacity
-          style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
+          style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderStyle: 'dashed' }]}
           onPress={pickEvidence}
           activeOpacity={0.8}
         >
@@ -198,10 +198,10 @@ export default function BuyerProblemReportScreen() {
           </Text>
         </TouchableOpacity>
         {evidencePhotos.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: SP.sm }}>
+            <View style={{ flexDirection: 'row', gap: SP.sm }}>
               {evidencePhotos.map((uri, idx) => (
-                <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                <View key={idx} style={{ width: 72, height: 72, borderRadius: RADIUS.sm, overflow: 'hidden', position: 'relative' }}>
                   <Image source={{ uri }} style={{ width: 72, height: 72 }} contentFit="cover" />
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
@@ -284,13 +284,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   disputeNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1, lineHeight: 17 },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
-  submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
-  submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-   submitText: { fontSize: FS.base, fontFamily: FONT.bold },
   successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
   successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.lg },
   doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
-  doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-   doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
 });

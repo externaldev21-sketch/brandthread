@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 
 import { PressableScale } from '@/components/BrandthreadUI';
-import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
+import InboxSwipeRow, { inboxSwipeAccessibilityProps, type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { CommunityAvatar } from '@/components/community/CommunityAvatar';
 import { VerifiedMark } from '@/components/community/VerifiedMark';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -58,6 +58,7 @@ export function CommunityInboxRow({ community, onPress, onToggleMute, horizontal
   return (
     <InboxSwipeRow rowId={`community-${community.id}`} actions={actions}>
       <PressableScale
+        {...inboxSwipeAccessibilityProps(actions)}
         style={[styles.row, { backgroundColor: theme.background, paddingHorizontal: horizontalPad, minHeight }]}
         activeOpacity={0.75}
         onPress={onPress}
