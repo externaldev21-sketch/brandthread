@@ -1,10 +1,17 @@
 /**
  * Analytics data backed by the API. Endpoints that do not exist yet reject so
- * callers can distinguish unavailable analytics from an empty result.
+ * callers can distinguish unavailable analytics from an empty result. Every
+ * currency value from the API is integer cents.
+ *
+ * The signed-out web preview never calls the API: it maps the fixtures in
+ * analyticsPreviewFixtures (fresh = zeros, &demo=1 = a populated store)
+ * through the same mappers as live data.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { formatCents } from '@/lib/money';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { analyticsPreviewPayload, type AnalyticsPreviewKey } from './analyticsPreviewFixtures';
 import {
   AnalyticsOverview, SalesAnalytics, ProductAnalytics, CustomerAnalytics,
   ContentAnalytics, StoreAnalytics, MarketingAnalytics, InventoryAnalytics,
@@ -37,6 +44,21 @@ function cents(value: unknown, field: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) throw new Error(`Analytics ${field} must be an integer number of cents.`);
   return parsed;
+}
+
+/** Live API payload, or the preview fixture of the same shape. */
+async function analyticsRequest<T>(key: AnalyticsPreviewKey, path: string): Promise<T> {
+  if (isSellerDevPreview()) return analyticsPreviewPayload(key, isPreviewDemoMode() ? 'demo' : 'fresh') as T;
+  return serviceRequest<T>(path, {}, false);
+}
+
+function list(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/** A metric the backend does not measure yet: shown as a dash, not a fake 0. */
+function untracked(key: string, label: string, unit: AnalyticsMetric['unit']): AnalyticsMetric {
+  return { key, label, value: 0, formatted: '—', unit };
 }
 
 function metric(key: string, label: string, value: number, unit: AnalyticsMetric['unit']): AnalyticsMetric {
@@ -96,28 +118,37 @@ export async function getOverview(filter?: AnalyticsFilterState): Promise<Analyt
 }
 
 export async function getSalesAnalytics(filter?: AnalyticsFilterState): Promise<SalesAnalytics> {
-  const data = await serviceRequest<any>(`/api/analytics/revenue?period=${periodFor(filter)}&tz=${-new Date().getTimezoneOffset()}`, {}, false);
-  const daily = Array.isArray(data?.daily) ? data.daily : [];
+  const data = await analyticsRequest<any>('revenue', `/api/analytics/revenue?period=${periodFor(filter)}&tz=${-new Date().getTimezoneOffset()}`);
+  const daily = list(data?.daily);
+  const dateOf = (row: any) => typeof row.day === 'string' ? row.day.slice(0, 10) : '';
   const salesChart = daily.map((row: any) => ({
-    date: typeof row.day === 'string' ? row.day.slice(0, 10) : '',
+    date: dateOf(row),
     value: cents(row.total_cents ?? 0, 'daily revenue'),
+  }));
+  const ordersChart = daily.map((row: any) => ({ date: dateOf(row), value: number(row.order_count) }));
+  const breakdown = list(data?.breakdown).map((row: any) => ({
+    key: String(row.productId ?? row.label ?? ''),
+    label: String(row.label ?? ''),
+    revenue: cents(row.revenueCents ?? 0, 'product sales'),
+    orders: number(row.orders),
+    units: number(row.units),
+    sharePct: number(row.sharePct),
   }));
   return {
     grossSales: metric('gross_sales', 'Gross Sales', cents(data?.totalCents ?? 0, 'sales total'), 'currency'),
-    ordersChart: [], unitsChart: [], aovChart: [], refundsChart: [],
-    salesChart, breakdownBy: 'product', breakdown: [],
-    // orderCount is an API value, exposed through the existing orders chart is
-    // not possible because the endpoint has no daily order series.
+    ordersChart, unitsChart: [], aovChart: [], refundsChart: [],
+    salesChart, breakdownBy: 'product', breakdown,
     orders: metric('orders', 'Orders', number(data?.orderCount), 'number'),
   } as unknown as SalesAnalytics;
 }
 
 export async function getProductAnalytics(_filter?: AnalyticsFilterState): Promise<ProductAnalytics> {
-  const response = await serviceRequest<any>('/api/analytics/products', {}, false);
-  const rows = Array.isArray(response) ? response : [];
+  const response = await analyticsRequest<any>('products', '/api/analytics/products');
+  const rows = list(response);
   const mapped = rows.map((row: any) => ({
     productId: String(row.productId ?? ''),
     name: String(row.name ?? ''),
+    imageUrl: typeof row.imageUrl === 'string' && row.imageUrl.length > 0 ? row.imageUrl : undefined,
     revenueCents: cents(row.revenueCents ?? 0, 'product revenue'),
     unitsSold: number(row.unitsSold),
     inventoryStatus: row.inventoryStatus,

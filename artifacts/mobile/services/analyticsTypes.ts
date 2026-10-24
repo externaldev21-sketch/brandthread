@@ -285,6 +285,16 @@ export interface StoreAnalytics {
   funnel:           StoreFunnelStep[];
   sections:         StoreSectionAnalytics[];
   visitorsChart:    AnalyticsPoint[];
+  /** Store visits split by where the buyer came from (feed/search/profile/external). */
+  trafficSources?:  StoreTrafficSource[];
+}
+
+export interface StoreTrafficSource {
+  source:       string;
+  label:        string;
+  visits:       number;
+  productViews: number;
+  sharePct:     number;
 }
 
 // ── Marketing ─────────────────────────────────────────────────────────────────

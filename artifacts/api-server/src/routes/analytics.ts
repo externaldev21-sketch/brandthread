@@ -6,6 +6,7 @@ import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
 import { inFlightPayoutCents } from "../lib/money/sellerPayouts";
 import { buildAdvancedAnalyticsResponse, ADVANCED_MONTHS } from "./analyticsAdvanced";
+import { buildSalesBreakdown } from "./sellerAnalyticsBuilders";
 import {
   DAY_MS,
   TEN_MIN_MS,
@@ -540,11 +541,32 @@ router.get("/revenue", async (req, res) => {
     .orderBy(sql`1`)
     .limit(400);
 
+  // "By Product": units and line revenue per product over the same counted
+  // orders and window, net of item refunds. order_items keeps the name at
+  // purchase, so a since-deleted product still shows under the name it sold as.
+  const breakdownRows = await db
+    .select({
+      product_id: products.id,
+      name: sql<string>`coalesce(${products.name}, ${orderItems.productName})`,
+      units: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      revenue_cents: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.priceCents} - coalesce(${orderItems.refundedCents}, 0)), 0)::int`,
+      order_count: sql<number>`count(DISTINCT ${orders.id})::int`,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .leftJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .leftJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER))
+    .groupBy(products.id, sql`coalesce(${products.name}, ${orderItems.productName})`)
+    .orderBy(sql`revenue_cents DESC`)
+    .limit(20);
+
   res.json({
     period,
     totalCents:  result?.totalCents ?? 0,
     orderCount:  result?.orderCount ?? 0,
     daily,
+    breakdown: buildSalesBreakdown(breakdownRows),
   });
 });
 
@@ -557,6 +579,7 @@ router.get("/products", async (req, res) => {
     SELECT
       p.id           AS product_id,
       p.name,
+      p.images       AS images,
       COALESCE(SUM(oi.quantity * oi.price_cents), 0)::int  AS revenue_cents,
       COALESCE(SUM(oi.quantity), 0)::int                    AS units_sold,
       COUNT(DISTINCT o.id)::int                             AS order_count
@@ -593,6 +616,7 @@ router.get("/products", async (req, res) => {
     return {
       productId:       r.product_id,
       name:            r.name,
+      imageUrl:        Array.isArray(r.images) && typeof r.images[0] === "string" ? r.images[0] : null,
       revenueCents:    r.revenue_cents,
       unitsSold:       r.units_sold,
       orderCount:      r.order_count,

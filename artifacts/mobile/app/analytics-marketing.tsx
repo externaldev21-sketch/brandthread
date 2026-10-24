@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState, getPushNotificationResults } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState, PushNotificationResults } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -108,8 +109,10 @@ export default function AnalyticsMarketingScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -131,7 +134,7 @@ export default function AnalyticsMarketingScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   const totalMarketing = data?.marketingRevenue.value ?? 0;
