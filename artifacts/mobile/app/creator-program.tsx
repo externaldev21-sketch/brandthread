@@ -4,7 +4,7 @@
  * Overview (earnings, codes per brand, share links) and Payouts (Stripe
  * account status + history).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Linking, ActivityIndicator, TextInput, Share } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { friendlyError } from '@/lib/friendlyError';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -26,6 +27,11 @@ import {
 } from '@/components/affiliate/AffiliateUI';
 
 type Tab = 'overview' | 'payouts';
+
+// Shown whenever payouts are off. The server's `reason` is developer wording
+// ("not configured on this server"), so it's never displayed. True to the
+// payout runner: commissions keep accruing and are paid once payouts open.
+const PAYOUTS_UNAVAILABLE_COPY = "Payouts aren't available yet. Your earnings are tracked and will be paid out once payouts open.";
 
 export default function CreatorProgramScreen() {
   const { theme } = useAppTheme();
@@ -43,6 +49,10 @@ export default function CreatorProgramScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [brandRef, setBrandRef] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  // `${brandId}:code` / `${brandId}:link` while that button reads "Copied".
+  const [copied, setCopied] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
   const load = useCallback(async () => {
     if (previewOnly) {
@@ -72,10 +82,13 @@ export default function CreatorProgramScreen() {
     else if (payoutsReturn === 'returned') setNote('Payout details received. Status updates once Stripe finishes checking them.');
   }, [payoutsReturn]);
 
-  const copy = async (text: string, what: string) => {
+  // Feedback shows on the tapped button itself ("Copied" for ~2s), not in the
+  // note under the tabs, which is off-screen when copying from a lower card.
+  const copy = async (text: string, key: string) => {
     await Clipboard.setStringAsync(text);
-    setNote(`${what} copied`);
-    setTimeout(() => setNote(null), 1800);
+    setCopied(key);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), 2000);
   };
 
   const respond = async (id: string, accept: boolean) => {
@@ -96,8 +109,8 @@ export default function CreatorProgramScreen() {
       const { url } = await api.affiliate.onboardPayouts();
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.href = url;
       else await Linking.openURL(url);
-    } catch (e: any) {
-      setNote(e?.message ?? "Couldn't open payout setup.");
+    } catch (e) {
+      setNote(friendlyError(e, "Couldn't open payout setup. Try again."));
     } finally {
       setBusy(null);
     }
@@ -166,18 +179,30 @@ export default function CreatorProgramScreen() {
                     <KeyStatRow label="Attribution window" value={`${b.windowDays} days`} />
                     <KeyStatRow label="Buyer discount" value={b.buyerDiscountPercent > 0 ? `${pct(b.buyerDiscountPercent)} off` : 'None'} last />
                     <View style={s.row}>
-                      <ActionButton label="Copy code" flex outline onPress={() => copy(b.code, 'Code')} />
                       <ActionButton
-                        label="Share link"
+                        label={copied === `${b.id}:code` ? 'Copied' : 'Copy code'}
+                        accessibilityLabel={copied === `${b.id}:code` ? 'Code copied' : 'Copy code'}
                         flex
-                        disabled={!b.shareLink}
+                        outline
+                        disabled={!b.programEnabled}
+                        onPress={() => copy(b.code, `${b.id}:code`)}
+                      />
+                      <ActionButton
+                        label={copied === `${b.id}:link` ? 'Copied' : 'Share link'}
+                        accessibilityLabel={copied === `${b.id}:link` ? 'Link copied' : 'Share link'}
+                        flex
+                        disabled={!b.programEnabled || !b.shareLink}
                         onPress={async () => {
-                          if (!b.shareLink) return;
-                          if (Platform.OS === 'web') await copy(b.shareLink, 'Link');
+                          if (!b.programEnabled || !b.shareLink) return;
+                          if (Platform.OS === 'web') await copy(b.shareLink, `${b.id}:link`);
                           else await Share.share({ message: b.shareLink });
                         }}
                       />
                     </View>
+                    {/* The brand paused its whole program: the code shows but can't be shared. */}
+                    {!b.programEnabled ? (
+                      <Text style={[s.cardBody, { color: theme.muted, marginTop: SP.xs }]}>Sharing is paused while the brand's program is paused.</Text>
+                    ) : null}
                     <KeyStatRow label="Clicks" value={String(b.stats.clicks)} />
                     <KeyStatRow label="Orders" value={String(b.stats.orders)} />
                     <KeyStatRow label="Earned" value={formatCents(b.stats.earnedCents)} last />
@@ -221,7 +246,7 @@ export default function CreatorProgramScreen() {
               </View>
               <Text style={[s.cardBody, { color: theme.muted }]}>
                 {!data.payout.available
-                  ? (data.payout.reason ?? 'Payouts are unavailable right now.') + ' Your earnings keep tracking and will be paid once payouts are on.'
+                  ? PAYOUTS_UNAVAILABLE_COPY
                   : data.payout.ready
                     ? 'Your Stripe account can receive payouts.'
                     : 'Finish Stripe onboarding to start receiving payouts.'}

@@ -13,7 +13,6 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
-import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ScreenHeader } from '@/components/ScreenHeader';

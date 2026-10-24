@@ -11,6 +11,8 @@ import { SP } from '@/lib/theme';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { friendlyError } from '@/lib/friendlyError';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useApi, type EmailAudience, type EmailCampaignBody, type EmailMarketingStatus } from '@/lib/api';
@@ -46,12 +48,19 @@ export default function EmailCampaignComposeScreen() {
   const [status, setStatus] = useState<EmailMarketingStatus | null>(null);
   const [missingAddress, setMissingAddress] = useState(false);
   const [productsList, setProductsList] = useState<PickProduct[]>([]);
-  const [busy, setBusy] = useState<null | 'save' | 'test' | 'send'>(null);
+  // Schedule and Send now are separate so only the tapped button spins.
+  const [busy, setBusy] = useState<null | 'save' | 'test' | 'schedule' | 'send'>(null);
   const [storeName, setStoreName] = useState('Your store');
   // A failed load must not leave an empty, editable form: saving it would
   // overwrite the stored campaign with blanks.
   const [loadError, setLoadError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  // Form contents as last loaded or saved; null until the load settles, so
+  // the guard only compares against what's actually stored.
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  // Navigation that waits one render after a save, so the guard has already
+  // seen the form as clean and doesn't ask to discard what was just saved.
+  const [leaveTo, setLeaveTo] = useState<null | 'back' | string>(null);
 
   useEffect(() => {
     let off = false;
@@ -93,7 +102,7 @@ export default function EmailCampaignComposeScreen() {
           setCtaLabel(cmp.body.cta?.label ?? ''); setCtaUrl(cmp.body.cta?.url ?? '');
         }
       } catch {
-        if (!off) Alert.alert("Couldn't load campaign", 'Go back and open it again.');
+        if (!off) setLoadError(true);
       } finally { if (!off) setLoading(false); }
     })();
     return () => { off = true; };
@@ -107,39 +116,54 @@ export default function EmailCampaignComposeScreen() {
 
   const input = { subject: subject.trim(), preheader: preheader.trim(), audience, body: fullBody };
 
+  const snapshot = JSON.stringify([subject, preheader, audience, body, ctaLabel, ctaUrl]);
+  useEffect(() => {
+    if (!loading && !loadError && savedSnapshot === null) setSavedSnapshot(snapshot);
+  }, [loading, loadError, savedSnapshot, snapshot]);
+  const dirty = savedSnapshot !== null && snapshot !== savedSnapshot;
+  const onBack = useUnsavedChangesGuard(dirty);
+
+  useEffect(() => {
+    if (!leaveTo) return;
+    setLeaveTo(null);
+    if (leaveTo === 'back') router.back();
+    else router.replace(leaveTo as never);
+  }, [leaveTo, router]);
+
   const save = async (): Promise<string | null> => {
-    if (mode !== 'live') return id ?? 'preview';
+    if (mode !== 'live') { setSavedSnapshot(snapshot); return id ?? 'preview'; }
     try {
       const saved = id ? await api.emailMarketing.updateCampaign(id, input) : await api.emailMarketing.createCampaign(input);
       setId(saved.id);
+      setSavedSnapshot(snapshot);
       return saved.id;
     } catch (e: any) {
-      Alert.alert('Not saved', typeof e?.message === 'string' && e.message.length < 140 ? e.message : "Couldn't save this campaign.");
+      Alert.alert('Not saved', friendlyError(e, "Couldn't save this campaign."));
       return null;
     }
   };
 
-  const run = async (kind: 'save' | 'test' | 'send', fn: (cid: string) => Promise<void>) => {
+  const run = async (kind: 'save' | 'test' | 'schedule' | 'send', fn: (cid: string) => Promise<void>) => {
     setBusy(kind);
     try { const cid = await save(); if (cid) await fn(cid); } finally { setBusy(null); }
   };
 
-  const saveDraft = () => run('save', async () => { router.back(); });
+  const saveDraft = () => run('save', async () => { setLeaveTo('back'); });
 
   const sendTest = () => run('test', async (cid) => {
     if (mode !== 'live') return;
     try { const r = await api.emailMarketing.sendTest(cid); Alert.alert('Test sent', `Sent to ${r.sentTo}.`); }
-    catch (e: any) { Alert.alert('Test not sent', typeof e?.message === 'string' && e.message.length < 140 ? e.message : "Couldn't send the test email."); }
+    catch (e: any) { Alert.alert('Test not sent', friendlyError(e, "Couldn't send the test email.")); }
   });
 
-  const doSend = (scheduleAt?: string) => run('send', async (cid) => {
+  const doSend = (scheduleAt?: string) => run(scheduleAt ? 'schedule' : 'send', async (cid) => {
     if (mode !== 'live') return;
     try {
       const r = await api.emailMarketing.send(cid, scheduleAt);
-      router.replace(`/email-campaign-results?id=${r.id}` as never);
+      setLeaveTo(`/email-campaign-results?id=${r.id}`);
     } catch (e: any) {
       if (promptUpgradeOnPlanGate(e, router)) return;
-      Alert.alert('Not sent', typeof e?.message === 'string' && e.message.length < 140 ? e.message : "Couldn't send this campaign.");
+      Alert.alert('Not sent', friendlyError(e, "Couldn't send this campaign."));
     }
   });
 
@@ -191,7 +215,7 @@ export default function EmailCampaignComposeScreen() {
       <View style={{ flex: 1, backgroundColor: c.background }}>
         <ScreenHeader title={routeId ? 'Edit campaign' : 'New campaign'} />
         <View style={{ padding: SP.md }}>
-          <RetryRow label="Couldn't load this campaign" onRetry={() => { setLoading(!!routeId); setReloadToken((n) => n + 1); }} />
+          <RetryRow label="Couldn't load this campaign" onRetry={() => { setLoading(!!routeId); setSavedSnapshot(null); setReloadToken((n) => n + 1); }} />
         </View>
       </View>
     );
@@ -199,7 +223,7 @@ export default function EmailCampaignComposeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <ScreenHeader title={id ? 'Edit campaign' : 'New campaign'} />
+      <ScreenHeader title={id ? 'Edit campaign' : 'New campaign'} onBack={onBack} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {status && !status.enabled && <Notice text={status.message ?? 'Email sending isn\'t set up yet. Drafts are saved and nothing is sent.'} />}
 
@@ -244,7 +268,7 @@ export default function EmailCampaignComposeScreen() {
 
         <Heading>Preview</Heading>
         <View style={[st.preview, { borderColor: c.border }]}>
-          <Text style={[st.pvStore, { color: c.foreground }]}>{mode === 'demo' ? DEMO_SETTINGS.defaultFromName : 'Your store'}</Text>
+          <Text style={[st.pvStore, { color: c.foreground }]}>{storeName}</Text>
           {fullBody.imageUrl ? <Image cachePolicy="memory-disk" source={{ uri: fullBody.imageUrl }} style={st.pvImage} contentFit="cover" /> : null}
           {fullBody.headline ? <Text style={[st.pvHead, { color: c.foreground }]}>{fullBody.headline}</Text> : null}
           {fullBody.text ? <Text style={[st.pvText, { color: c.foreground }]}>{fullBody.text}</Text> : null}
@@ -275,8 +299,8 @@ export default function EmailCampaignComposeScreen() {
         )}
         <View style={{ gap: 10 }}>
           <SolidButton label="Send test to me" outline loading={busy === 'test'} disabled={!status?.enabled || !subject.trim() || !hasContent || mode !== 'live'} onPress={sendTest} />
-          <SolidButton label="Schedule" outline loading={busy === 'send'} disabled={!canSend} onPress={schedule} />
-          <SolidButton label="Send now" loading={busy === 'send'} disabled={!canSend} onPress={confirmSend} />
+          <SolidButton label="Schedule" outline loading={busy === 'schedule'} disabled={!canSend || busy === 'send'} onPress={schedule} />
+          <SolidButton label="Send now" loading={busy === 'send'} disabled={!canSend || busy === 'schedule'} onPress={confirmSend} />
           <SolidButton label="Save draft" outline loading={busy === 'save'} onPress={saveDraft} />
         </View>
       </ScrollView>

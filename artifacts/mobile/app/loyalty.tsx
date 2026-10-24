@@ -9,7 +9,6 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/hooks/useApi';
 import {
   FONT, FS, SP, RADIUS, FILL_ELEVATED, TEXT_DISABLED,
@@ -56,7 +55,6 @@ export default function LoyaltyScreen() {
   const [balance,     setBalance]     = useState(0);
   const [history,     setHistory]     = useState<PointEntry[]>([]);
   const [redeemPts,   setRedeemPts]   = useState('');
-  const [redeeming,   setRedeeming]   = useState(false);
   // A failed fetch must never render as a genuine "0 points" balance — track
   // it separately so a real outage shows a retry row instead of a fake zero.
   const [loadError,   setLoadError]   = useState(false);
@@ -106,7 +104,7 @@ export default function LoyaltyScreen() {
     if (pts > balance) {
       Alert.alert('Not enough points', `You only have ${balance.toLocaleString()} points.`); return;
     }
-    // Redemptions are deliberately created in the cart, where they are
+    // Redemptions are deliberately created in the bag, where they are
     // persisted with the checkout session and applied to Stripe immediately.
     // Never mint a detached code here: it could be lost before checkout.
     router.navigate({ pathname: '/(buyer)/cart', params: { redeemPoints: String(pts) } } as never);
@@ -163,8 +161,8 @@ export default function LoyaltyScreen() {
         <Text style={s.sectionLabel}>HOW TO EARN</Text>
         {[
           { icon: 'shopping-bag' as const, title: '1 point per $1 spent',  sub: 'Automatically earned on every completed purchase' },
-          { icon: 'users'        as const, title: '500 pts per referral',  sub: 'When a friend joins with your invite. You also get $5 Thread Cash after their first order of $10 or more' },
-          { icon: 'gift'         as const, title: '100 pts on sign-up',    sub: 'One-time welcome bonus for new members' },
+          { icon: 'users'        as const, title: '500 points per referral',  sub: 'When a friend joins with your invite. You also get $5 Thread Cash after their first order of $10 or more' },
+          { icon: 'gift'         as const, title: '100 points on sign-up', sub: 'One-time welcome bonus for new members' },
         ].map((item, i) => (
           <View key={i} style={s.earnCard}>
             <View style={[s.earnIconWrap, { backgroundColor: theme.accentDim }]}>
@@ -190,6 +188,7 @@ export default function LoyaltyScreen() {
               placeholderTextColor={theme.muted}
               keyboardType="number-pad"
               maxLength={7}
+              accessibilityLabel="Points to redeem"
             />
             {previewDiscount >= 100 && (
               <View style={s.discountPreview}>
@@ -198,20 +197,17 @@ export default function LoyaltyScreen() {
             )}
           </View>
           <TouchableOpacity
-            style={[s.redeemBtn, { backgroundColor: theme.accent }, (redeeming || balance < 100) && { backgroundColor: FILL_ELEVATED }]}
+            style={[s.redeemBtn, { backgroundColor: theme.accent }, balance < 100 && { backgroundColor: FILL_ELEVATED }]}
             onPress={handleRedeem}
-            disabled={redeeming || balance < 100}
+            disabled={balance < 100}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Use points in cart"
-            accessibilityState={{ disabled: redeeming || balance < 100 }}
+            accessibilityLabel="Use points in bag"
+            accessibilityState={{ disabled: balance < 100 }}
           >
-             {redeeming
-               ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
-            }
+            <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in bag</Text>
           </TouchableOpacity>
-          <Text style={s.redeemDisabledNote}>Choose your points in your cart when you’re ready to check out.</Text>
+          <Text style={s.redeemDisabledNote}>Choose your points in your bag when you’re ready to check out.</Text>
           {balance < 100 && (
             <Text style={s.redeemDisabledNote}>You need at least 100 points to redeem.</Text>
           )}
@@ -246,7 +242,7 @@ export default function LoyaltyScreen() {
         {history.length === 0 && !loading && (
           <View style={{ alignItems: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.xl }}>
             <Icon name="star" size={32} color={theme.border} />
-            <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No points yet</Text>
+            <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No activity yet</Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 }}>
               Points you earn and redeem show up here.
             </Text>
@@ -282,7 +278,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   earnSub:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
 
   redeemCard:         { marginHorizontal: SP.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md },
-  redeemLabel:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
+  redeemLabel:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: SP.xs },
   redeemRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   redeemInput:        { flex: 1, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
   discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8, flexShrink: 0 },

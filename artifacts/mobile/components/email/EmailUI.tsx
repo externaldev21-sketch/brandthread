@@ -6,8 +6,12 @@ import { FONT, FS, RADIUS, SP, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme'
 import { PressableScale } from '@/components/BrandthreadUI';
 
 export function Field({
-  label, value, onChangeText, max, multiline, ...rest
-}: { label: string; value: string; onChangeText: (t: string) => void; max?: number; multiline?: boolean } & Omit<TextInputProps, 'value' | 'onChangeText'>) {
+  label, value, onChangeText, max, multiline, hint, ...rest
+}: {
+  label: string; value: string; onChangeText: (t: string) => void; max?: number; multiline?: boolean;
+  /** Helper text under the input. */
+  hint?: string;
+} & Omit<TextInputProps, 'value' | 'onChangeText'>) {
   const c = useColors();
   return (
     <View style={{ marginBottom: SP.md }}>
@@ -30,6 +34,7 @@ export function Field({
         ]}
         {...rest}
       />
+      {hint ? <Text style={[st.hint, { color: c.mutedForeground }]}>{hint}</Text> : null}
     </View>
   );
 }
@@ -80,6 +85,7 @@ const st = StyleSheet.create({
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   label: { fontFamily: FONT.semibold, fontSize: FS.sm },
   counter: { fontFamily: FONT.regular, fontSize: FS.xs },
+  hint: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: SP.sm },
   input: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 14, minHeight: 48, fontFamily: FONT.regular, fontSize: FS.md },
   btn: { minHeight: 50, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   btnText: { fontFamily: FONT.bold, fontSize: FS.md },

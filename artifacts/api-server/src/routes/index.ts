@@ -479,7 +479,7 @@ router.use("/seller/morning-brief",      tc, sellerMorningBriefRouter);
 router.use("/seller/milestones",         tc, sellerMilestonesRouter);
 router.use("/seller/live-map",           tc, sellerLiveMapRouter);
 router.use("/seller/brand-assets",       tc, sellerBrandAssetsRouter);
-router.use("/seller/analytics",         tc, sellerAnalyticsRouter);
+router.use("/seller/analytics",         tc, sellerAnalyticsRouter); // marketing, production, profit, payouts, store
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 router.use("/product-qa",                tc, productQaRouter);

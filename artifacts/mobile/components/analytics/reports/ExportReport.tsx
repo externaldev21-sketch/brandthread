@@ -26,7 +26,11 @@ import { Card, CardDivider, SectionTitle } from '@/components/analytics/Analytic
 
 import { SegmentedPills, useReportBottomInset } from '@/components/analytics/InsightFrame';
 
-import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, previewMode, requestExport, type ExportSectionKey, type InsightRange } from '@/services/sellerInsightsService';
+import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+
+import { useAppTheme } from '@/contexts/AppThemeContext';
+
+import { DEFAULT_INSIGHT_RANGE, previewMode, requestExport, type ExportSectionKey, type InsightRange } from '@/services/sellerInsightsService';
 
 import { saveExportFile } from '@/lib/saveExportFile';
 
@@ -47,6 +51,7 @@ const SECTIONS: { key: ExportSectionKey; label: string; detail: string }[] = [
 
 export default function ExportReport() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const s = React.useMemo(() => styles(colors), [colors]);
   const bottom = useReportBottomInset();
   const router = useRouter();
@@ -76,7 +81,7 @@ export default function ExportReport() {
       <ScreenHeader title="Export" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: bottom }} showsVerticalScrollIndicator={false}>
         <SectionTitle>Date range</SectionTitle>
-        <SegmentedPills options={INSIGHT_RANGES} value={range} onChange={setRange} />
+        <View style={{ marginBottom: SP.sm }}><SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} /></View>
         <SectionTitle>Include</SectionTitle>
         <Card>
           {SECTIONS.map((sec, i) => {
@@ -110,4 +115,5 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   detail: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
   box: { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: crispPx(1.5), borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   boxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginBottom: SP.sm },
 });

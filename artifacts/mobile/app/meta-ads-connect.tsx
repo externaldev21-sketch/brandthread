@@ -26,10 +26,14 @@ import {
   PrimaryButton, TertiaryButton, EmptyState,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { friendlyError } from '@/lib/friendlyError';
 import { buildMetaAdsReturnUrl } from '@/services/metaAdsService';
 import type { MetaAdsConnection, MetaBusiness, MetaAdAccount, MetaPage } from '@/lib/api';
 
-type Step = 'loading' | 'not_configured' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
+// 'load_error': GET /meta-ads/connection itself failed (network / 5xx). Kept
+// apart from 'not_connected' so a failed check never offers Connect Meta.
+type Step = 'loading' | 'load_error' | 'not_configured' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
 
 // Meta's Graph API returns `account_status` as a numeric code; show the
 // seller words, never the raw number.
@@ -51,6 +55,7 @@ export default function MetaAdsConnectScreen() {
   const [step, setStep] = useState<Step>('loading');
   const [connection, setConnection] = useState<MetaAdsConnection | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   // Picker state
@@ -66,6 +71,7 @@ export default function MetaAdsConnectScreen() {
   const [disconnecting, setDisconnecting] = useState(false);
 
   const loadConnection = useCallback(async () => {
+    setLoadError(null);
     try {
       const conn = await api.metaAds.connection();
       setConnection(conn);
@@ -79,8 +85,9 @@ export default function MetaAdsConnectScreen() {
       } else {
         setStep('not_connected');
       }
-    } catch {
-      setStep('not_connected');
+    } catch (err) {
+      setLoadError(friendlyError(err, "Couldn't check your Meta connection."));
+      setStep('load_error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
@@ -231,6 +238,13 @@ export default function MetaAdsConnectScreen() {
           </View>
         )}
 
+        {step === 'load_error' && (
+          <ErrorState
+            message={loadError ?? "Couldn't check your Meta connection."}
+            onRetry={() => { setStep('loading'); void loadConnection(); }}
+          />
+        )}
+
         {step === 'not_connected' && (
           <View style={{ gap: SP.lg }}>
             <View style={[s.introCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -337,7 +351,13 @@ function PickerRow({ label, sub, selected, onPress }: { label: string; sub?: str
   const colors = useColors();
   const { theme } = useAppTheme();
   return (
-    <BrandthreadCard onPress={onPress} style={selected ? { borderColor: theme.accent } : undefined}>
+    <BrandthreadCard
+      onPress={onPress}
+      style={selected ? { borderColor: theme.accent } : undefined}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={sub ? `${label}, ${sub}` : label}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
         <View style={[s.radio, { borderColor: selected ? theme.accentLight : colors.mutedForeground }]}>
           {selected && <View style={[s.radioFill, { backgroundColor: theme.accentLight }]} />}

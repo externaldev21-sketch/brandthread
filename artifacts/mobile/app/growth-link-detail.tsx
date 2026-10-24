@@ -5,11 +5,13 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { AnalyticsBarChart, AnalyticsSkeleton, Card, SectionTitle } from '@/components/analytics/AnalyticsKit';
 import { CopyRow, MetricRow, MetricTiles, dollars } from '@/components/growth/GrowthUI';
 import { formatRate } from '@/lib/growthValidation';
+import { countryName } from '@/lib/countryNames';
+import { friendlyError } from '@/lib/friendlyError';
 import { archiveLink, getLinkDetail, type LinkDetail } from '@/services/growthService';
 
 export default function GrowthLinkDetailScreen() {
@@ -17,10 +19,20 @@ export default function GrowthLinkDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [d, setD] = useState<LinkDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  // Missing id, or the API's 404: Retry can never help, so show not-found.
+  const [notFound, setNotFound] = useState(!id);
 
   const load = useCallback(async () => {
-    try { setD(await getLinkDetail(String(id))); setFailed(false); } catch { setFailed(true); }
+    if (!id) { setNotFound(true); return; }
+    try {
+      setD(await getLinkDetail(String(id)));
+      setFailed(null);
+      setNotFound(false);
+    } catch (err) {
+      if ((err as { status?: number } | null)?.status === 404) setNotFound(true);
+      else setFailed(friendlyError(err, "Couldn't load this link's stats."));
+    }
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -32,7 +44,15 @@ export default function GrowthLinkDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title={d?.label || 'Link'} />
-      {failed && !d ? <ErrorState onRetry={load} /> : !d ? <AnalyticsSkeleton kpiCount={4} listRows={2} /> : (
+      {notFound && !d ? (
+        <EmptyState
+          icon="link"
+          title="Link not found"
+          description="It may have been archived, or the link you followed is wrong."
+          action={{ label: 'Back to Links', onPress: () => router.replace('/growth-links' as never) }}
+          style={{ marginTop: SP.xl }}
+        />
+      ) : failed && !d ? <ErrorState message={failed} onRetry={load} /> : !d ? <AnalyticsSkeleton kpiCount={4} listRows={2} /> : (
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}>
           <CopyRow value={d.url} />
           <View style={{ height: SP.md }} />
@@ -50,7 +70,7 @@ export default function GrowthLinkDetailScreen() {
           <SectionTitle>Top countries</SectionTitle>
           <Card padded>
             {d.countries.length === 0 ? <Text style={muted(colors)}>No clicks yet</Text>
-              : d.countries.map((c, i) => <MetricRow key={c.label} label={c.label} value={String(c.count)} last={i === d.countries.length - 1} />)}
+              : d.countries.map((c, i) => <MetricRow key={c.label} label={countryName(c.label)} value={String(c.count)} last={i === d.countries.length - 1} />)}
           </Card>
           <SectionTitle>Top referrers</SectionTitle>
           <Card padded>

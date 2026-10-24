@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { Hairline, Heading, SolidButton } from '@/components/email/EmailUI';
-import { DEMO_AUDIENCE, EMPTY_AUDIENCE, emailMode, formatWhen } from '@/lib/emailMarketing';
+import { DEMO_AUDIENCE, EMPTY_AUDIENCE, appendSubscriberPage, emailMode, formatWhen, signupTotal } from '@/lib/emailMarketing';
 import { FONT, FS, ICON, SP } from '@/lib/theme';
 
 export default function EmailAudienceScreen() {
@@ -20,6 +20,7 @@ export default function EmailAudienceScreen() {
   const [data, setData] = useState<EmailAudienceResponse | null>(null);
   const [error, setError] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const mode = emailMode();
 
   const load = useCallback(() => {
@@ -27,6 +28,18 @@ export default function EmailAudienceScreen() {
     api.emailMarketing.audience().then((r) => { setData(r); setError(false); }).catch(() => setError(true));
   }, [api, mode]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // The API pages Recent signups 50 at a time.
+  const loadMore = async () => {
+    if (!data?.hasMore || loadingMore || mode !== 'live') return;
+    setLoadingMore(true);
+    try {
+      const next = await api.emailMarketing.audience(data.subscribers.length);
+      setData((d) => (d ? appendSubscriberPage(d, next) : next));
+    } catch {
+      Alert.alert("Couldn't load more signups", 'Try again.');
+    } finally { setLoadingMore(false); }
+  };
 
   const exportCsv = async () => {
     if (mode !== 'live') return;
@@ -105,6 +118,14 @@ export default function EmailAudienceScreen() {
                 </View>
               </View>
             ))}
+            {data.hasMore && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={[st.sub, { color: c.mutedForeground, marginBottom: 8 }]}>
+                  Showing {data.subscribers.length} of {signupTotal(data.byStatus)}
+                </Text>
+                <SolidButton label="Load more" outline loading={loadingMore} onPress={loadMore} />
+              </View>
+            )}
             <View style={{ marginTop: 24 }}>
               <SolidButton label="Export CSV" outline loading={exporting} disabled={mode !== 'live' || data.subscribers.length === 0} onPress={exportCsv} />
             </View>

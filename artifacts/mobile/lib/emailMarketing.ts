@@ -81,6 +81,23 @@ export const EMPTY_AUDIENCE: EmailAudienceResponse = {
   counts: { subscribers: 0, customers: 0, followers: 0 }, byStatus: {}, subscribers: [], hasMore: false,
 };
 
+/** Every address on the list, whatever its status (the Recent signups total). */
+export function signupTotal(byStatus: Record<string, number>): number {
+  return Object.values(byStatus).reduce((sum, n) => sum + (Number(n) || 0), 0);
+}
+
+/**
+ * Appends the next Recent signups page. Offset paging can repeat a row when
+ * someone signs up between pages, so rows already shown are skipped.
+ */
+export function appendSubscriberPage(prev: EmailAudienceResponse, next: EmailAudienceResponse): EmailAudienceResponse {
+  const seen = new Set(prev.subscribers.map((s) => s.id));
+  return {
+    ...next,
+    subscribers: [...prev.subscribers, ...next.subscribers.filter((s) => !seen.has(s.id))],
+  };
+}
+
 export const DEMO_CAMPAIGNS: EmailCampaign[] = [
   {
     id: 'demo-c1', subject: 'The spring drop is live', preheader: 'Five new pieces, limited run.', audience: 'subscribers',

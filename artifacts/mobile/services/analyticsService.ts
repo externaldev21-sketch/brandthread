@@ -74,8 +74,11 @@ function periodFor(filter?: AnalyticsFilterState): string {
     case 'today': return 'today';
     case '7d': return 'last7';
     case '90d': return 'last90';
+    case 'this_week': return 'thisWeek';
     case 'this_month': return 'thisMonth';
     case 'last_month': return 'lastMonth';
+    case 'this_year': return 'thisYear';
+    case 'all': return 'all';
     default: return 'last30';
   }
 }
@@ -119,7 +122,7 @@ export async function getOverview(filter?: AnalyticsFilterState): Promise<Analyt
 
 export async function getSalesAnalytics(filter?: AnalyticsFilterState): Promise<SalesAnalytics> {
   const data = await analyticsRequest<any>('revenue', `/api/analytics/revenue?period=${periodFor(filter)}&tz=${-new Date().getTimezoneOffset()}`);
-  const daily = Array.isArray(data?.daily) ? data.daily : [];
+  const daily = list(data?.daily);
   const dateOf = (row: any) => typeof row.day === 'string' ? row.day.slice(0, 10) : '';
   const salesChart = daily.map((row: any) => ({
     date: dateOf(row),

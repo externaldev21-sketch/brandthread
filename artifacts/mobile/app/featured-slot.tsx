@@ -60,7 +60,10 @@ function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function demoAvailability(): FeaturedAvailability {
+// Signed-out web preview availability. Fresh: what a brand-new seller sees
+// (the price list, every length open today). Demo (`&demo=1`): the 14-day
+// length is booked out for two days, as on a busy week.
+function previewAvailability(demo: boolean): FeaturedAvailability {
   const now = Date.now();
   const w = (days: number, startOffset = 0) => ({
     startsAt: new Date(now + startOffset * DAY).toISOString(),
@@ -71,9 +74,22 @@ function demoAvailability(): FeaturedAvailability {
     options: [
       { durationDays: 3, priceCents: 2900, availableNow: true, ...w(3) },
       { durationDays: 7, priceCents: 5900, availableNow: true, ...w(7) },
-      { durationDays: 14, priceCents: 9900, availableNow: false, ...w(14, 2) },
+      demo
+        ? { durationDays: 14, priceCents: 9900, availableNow: false, ...w(14, 2) }
+        : { durationDays: 14, priceCents: 9900, availableNow: true, ...w(14) },
     ],
   };
+}
+
+// Demo only: one past slot so the History section has something in it.
+function demoHistory(): FeaturedSlot[] {
+  const now = Date.now();
+  return [{
+    id: 'preview-featured-1', placement: 'discover_brands', durationDays: 7, priceCents: 5900,
+    startsAt: new Date(now - 40 * DAY).toISOString(), endsAt: new Date(now - 33 * DAY).toISOString(),
+    status: 'ended', displayState: 'ended', paid: true, paidVia: 'stripe',
+    rejectionReason: null, refundStatus: 'none', createdAt: new Date(now - 41 * DAY).toISOString(),
+  }];
 }
 
 export default function FeaturedSlotScreen() {
@@ -88,17 +104,36 @@ export default function FeaturedSlotScreen() {
   // iOS / Android buy through the store (App Store 3.1.1); web keeps Stripe.
   const nativeRail = nativePromotionsEnabled();
 
-  // Signed-out web preview must not call protected APIs: it renders only with &demo=1.
-  const demo = isSellerDevPreview() && isPreviewDemoMode() && !isSignedIn;
+  // Signed-out web preview can't call protected APIs (lib/api.ts rejects
+  // them and lib/previewApiData.ts has no Featured entries), so it renders
+  // local data: the fresh price list, or a populated one with `&demo=1`.
+  const isPreview = isSellerDevPreview() && !isSignedIn;
   const canCallApi = !!isSignedIn;
+  // Expo Router briefly drops the query while it mounts a pushed screen, so
+  // `&demo=1` is re-read just after mount (same as app/billing.tsx). Reading
+  // it only at first render is what left the demo state blank.
+  const [demo, setDemo] = useState(() => isPreview && isPreviewDemoMode());
 
-  const [availability, setAvailability] = useState<FeaturedAvailability | null>(demo ? demoAvailability() : null);
-  const [history, setHistory] = useState<FeaturedSlot[]>([]);
-  const [loading, setLoading] = useState(!demo);
+  const [availability, setAvailability] = useState<FeaturedAvailability | null>(isPreview ? previewAvailability(demo) : null);
+  const [history, setHistory] = useState<FeaturedSlot[]>(isPreview && demo ? demoHistory() : []);
+  const [loading, setLoading] = useState(!isPreview);
   const [selected, setSelected] = useState(7);
   const [busy, setBusy] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const returnConsumed = useRef(false);
+
+  useEffect(() => {
+    if (!isPreview) return;
+    const timer = setTimeout(() => setDemo(isPreviewDemoMode()), 50);
+    return () => clearTimeout(timer);
+  }, [isPreview]);
+
+  useEffect(() => {
+    if (!isPreview) return;
+    setAvailability(previewAvailability(demo));
+    setHistory(demo ? demoHistory() : []);
+    setLoading(false);
+  }, [isPreview, demo]);
 
   const load = useCallback(async () => {
     if (!canCallApi) { setLoading(false); return; }
@@ -107,7 +142,7 @@ export default function FeaturedSlotScreen() {
       setAvailability(a);
       setHistory(mine);
     } catch {
-      Alert.alert("Couldn't load slots", 'Try again.');
+      // Without availability the screen renders its inline ErrorState + Retry.
     } finally {
       setLoading(false);
     }
@@ -218,7 +253,7 @@ export default function FeaturedSlotScreen() {
         {loading ? (
           <View style={s.center}><ActivityIndicator color={FG} /></View>
         ) : !availability ? (
-          <ErrorState message="Couldn't load Featured availability." onRetry={canCallApi ? () => { void load(); } : undefined} />
+          <ErrorState message="Couldn't load Featured availability." onRetry={canCallApi ? () => { setLoading(true); void load(); } : undefined} />
         ) : (
           <>
             {open ? (

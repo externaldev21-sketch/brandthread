@@ -178,14 +178,16 @@ const pillTabStyles = (colors: Colors) => StyleSheet.create({
 export function TrendChip({ changePct, invert = false, size = 'sm' }: { changePct?: number; invert?: boolean; size?: 'sm' | 'md' }) {
   const colors = useColors();
   if (!Number.isFinite(changePct)) return null;
-  const pct = changePct as number;
-  const up = pct >= 0;
+  // Compare at display precision: +0.04% shows as a flat "0.0%", not "+0.0%".
+  const pct = Math.round((changePct as number) * 10) / 10;
+  const flat = pct === 0;
+  const up = pct > 0;
   const good = invert ? !up : up;
-  const color = pct === 0 ? colors.mutedForeground : good ? colors.success : colors.destructive;
+  const color = flat ? colors.mutedForeground : good ? colors.success : colors.destructive;
   const iconSize = size === 'md' ? 12 : 10;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-      {pct !== 0 && <Icon name={up ? 'arrow-up-right' : 'arrow-down-right'} size={iconSize} color={color} />}
+      {!flat && <Icon name={up ? 'arrow-up-right' : 'arrow-down-right'} size={iconSize} color={color} />}
       <Text style={{ fontSize: size === 'md' ? FS.xs + 1 : FS.xs, fontFamily: FONT.semibold, color }}>
         {up ? '+' : ''}{pct.toFixed(1)}%
       </Text>

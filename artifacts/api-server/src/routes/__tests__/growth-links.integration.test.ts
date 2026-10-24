@@ -215,6 +215,13 @@ describe("tracked links", () => {
     expect((await api("GET", `/links/${linkId}`)).body.label).toBe("IG bio");
   });
 
+  it("unknown or malformed link ids are a 404 'Link not found', never a 500", async () => {
+    const unknown = await api("GET", "/links/00000000-0000-4000-8000-000000000000");
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error).toBe("Link not found");
+    expect((await api("GET", "/links/not-a-uuid")).status).toBe(404);
+  });
+
   it("attributes orders and revenue to the link without altering the orders table", async () => {
     const { recordCheckoutAttribution } = await import("../../lib/growth/attribution");
     const stripeA = `cs_test_a_${suffix}`, stripeC = `cs_test_c_${suffix}`, stripeX = `cs_test_x_${suffix}`;

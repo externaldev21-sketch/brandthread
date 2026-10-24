@@ -126,7 +126,7 @@ export default function CohortsReport() {
       {loading ? (
         <AnalyticsSkeleton kpiCount={2} listRows={4} />
       ) : locked ? (
-        <View style={s.centered}><ProLockedState source="analytics-cohorts" title="Customer cohorts are a Pro feature" /></View>
+        <View style={s.centered}><ProLockedState source="analytics-cohorts" title="Customer cohorts are on Growth" /></View>
       ) : loadError || !data ? (
         <View style={s.centered}>
           <ErrorState message="Couldn't load customer cohorts." onRetry={() => load()} />
@@ -154,8 +154,8 @@ export default function CohortsReport() {
             ))}
           </Card>
 
+          <SectionTitle>Average order value</SectionTitle>
           <Card padded>
-            <SectionTitle>Average order value</SectionTitle>
             <AnalyticsBarChart
               points={data.orderValue.map((m) => ({ label: monthLabel(m.month), value: m.averageOrderCents }))}
               color={colors.primary}

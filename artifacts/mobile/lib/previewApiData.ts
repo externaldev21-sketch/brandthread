@@ -250,6 +250,11 @@ const RESOLVERS: Record<string, Resolver> = {
   'seller-hub/quote-requests': () => [],
   'manufacturers/threads': () => [],
   'analytics/products': () => [],
+  // Report screens (a new store's real zeros: the mappers turn {} into 0s).
+  'analytics/reports/store': () => ({}),
+  'analytics/reports/profit': () => ({}),
+  'analytics/reports/marketing': () => ({}),
+  'analytics/reports/production': () => ({}),
   'customers': () => [],
   'seller-hub/rfqs': () => [],
   'seller-hub/manufacturers': () => [],

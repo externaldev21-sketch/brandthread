@@ -88,7 +88,7 @@ export function ListRow({
         {subtitle && <Text style={[TYPE_SCALE.footnote, { color: secondaryColor, marginTop: 2 }]} numberOfLines={subtitleNumberOfLines} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{subtitle}</Text>}
       </View>
       {right}
-      {!right && value && <Text style={[TYPE_SCALE.body, { color: secondaryColor, marginRight: SPACING.xs }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
+      {!right && value && <Text style={[TYPE_SCALE.body, styles.value, { color: secondaryColor }]} numberOfLines={1} maxFontSizeMultiplier={BODY_MAX_FONT_MULTIPLIER}>{value}</Text>}
       {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} accessibilityLabel={title} />}
       {!right && chevron && !toggle && <Icon name="chevron-right" size={17} color={palette.mutedForeground} />}
       {divider && <View pointerEvents="none" style={[styles.divider, { left: avatar ? 48 : icon ? 40 : 0, backgroundColor: palette.border }]} />}
@@ -130,5 +130,7 @@ const styles = StyleSheet.create({
   highlight: { borderRadius: RADII.chip },
   iconWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
+  // A long value (a picked product's name) ellipsizes instead of squeezing the title.
+  value: { flexShrink: 1, maxWidth: '50%', marginRight: SPACING.xs },
   divider: { position: 'absolute', right: 0, bottom: 0, height: StyleSheet.hairlineWidth },
 });

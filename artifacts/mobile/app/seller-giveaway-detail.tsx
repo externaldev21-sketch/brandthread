@@ -1,4 +1,4 @@
-/** Seller view of one giveaway: entries, share link, edit, end / draw, winners, redraw, shipped. */
+/** Seller view of one giveaway: entries, share link, edit, end / cancel / draw, winners, redraw, shipped. */
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,6 +13,8 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { FONT, FS, SP } from '@/lib/theme';
 import { formatDay, phaseLabel, timeLeft } from '@/lib/sellerEngagement';
 import { canEditGiveaway } from '@/lib/giveawayEditForm';
+import { confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 export default function SellerGiveawayDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +28,6 @@ export default function SellerGiveawayDetail() {
   const [redrawFor, setRedrawFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [copied, setCopied] = useState(false);
-  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const load = useCallback(async () => {
     try { setG(await api.sellerGiveaways.get(String(id))); setFailed(false); } catch { setFailed(true); }
@@ -36,7 +37,29 @@ export default function SellerGiveawayDetail() {
 
   async function run(key: string, fn: () => Promise<any>) {
     setBusy(key); setError(null);
-    try { const r = await fn(); if (r && r.winners) setG(r); else await load(); } catch (e: any) { setError(e?.message || "Couldn't update the giveaway. Try again."); await load(); } finally { setBusy(null); }
+    try { const r = await fn(); if (r && r.winners) setG(r); else await load(); } catch (e: any) { setError(friendlyError(e, "Couldn't update the giveaway. Try again.")); await load(); } finally { setBusy(null); }
+  }
+
+  async function endNow() {
+    const ok = await confirmAlert({
+      title: 'End this giveaway now?',
+      message: "Entries close right away and this can't be undone. You can then draw the winners.",
+      confirmLabel: 'End now',
+      cancelLabel: 'Keep running',
+      destructive: true,
+    });
+    if (ok) run('end', () => api.sellerGiveaways.end(g.id));
+  }
+
+  async function cancelGiveaway() {
+    const ok = await confirmAlert({
+      title: 'Cancel this giveaway?',
+      message: "No winners will be drawn and the share link will show it as cancelled. This can't be undone.",
+      confirmLabel: 'Cancel giveaway',
+      cancelLabel: 'Keep giveaway',
+      destructive: true,
+    });
+    if (ok) run('cancel', () => api.sellerGiveaways.cancel(g.id));
   }
 
   if (failed) return <View style={{ flex: 1, backgroundColor: c.background }}><ScreenHeader title="Giveaway" /><View style={{ padding: SP.md }}><RetryRow label="Couldn't load this giveaway" onRetry={() => { setFailed(false); setG(null); load(); }} /></View></View>;
@@ -68,7 +91,13 @@ export default function SellerGiveawayDetail() {
           <Button label="Edit giveaway" icon="edit-2" variant="secondary" fullWidth testID="giveaway-edit"
             onPress={() => router.push(`/seller-giveaway-create?id=${encodeURIComponent(g.id)}` as never)} />
         ) : null}
-        {g.phase === 'live' ? <View style={{ marginTop: SP.md }}><Button label="End now" variant="secondary" fullWidth loading={busy === 'end'} onPress={() => run('end', () => api.sellerGiveaways.end(g.id))} /></View> : null}
+        {g.phase === 'live' ? <View style={{ marginTop: SP.md }}><Button label="End now" variant="secondary" fullWidth loading={busy === 'end'} onPress={endNow} /></View> : null}
+        {/* Scheduled or live (still open): the seller can call it off. */}
+        {g.status === 'open' && (g.phase === 'upcoming' || g.phase === 'live') ? (
+          <View style={{ marginTop: SP.md }}>
+            <Button label="Cancel giveaway" variant="tertiary" fullWidth loading={busy === 'cancel'} onPress={cancelGiveaway} testID="giveaway-cancel" />
+          </View>
+        ) : null}
         {g.phase === 'ended' ? <View style={{ marginTop: SP.md }}><Button label={`Draw ${g.winnerCount === 1 ? 'winner' : `${g.winnerCount} winners`}`} fullWidth loading={busy === 'draw'} disabled={g.entries.eligible === 0} onPress={() => run('draw', () => api.sellerGiveaways.draw(g.id))} /></View> : null}
         {g.phase === 'ended' && g.entries.eligible === 0 ? <Text style={[styles.note, { color: c.mutedForeground, marginTop: 8 }]}>No one is eligible yet, so there is nothing to draw from.</Text> : null}
         {error ? <Text style={[styles.error, { color: c.destructive }]}>{error}</Text> : null}
@@ -79,7 +108,8 @@ export default function SellerGiveawayDetail() {
             {active.map((w: any) => (
               <View key={w.id}>
                 <ListRow avatar={{ uri: w.avatarUrl, name: w.name }} title={w.name} subtitle={w.shippedAt ? `Shipped ${formatDay(w.shippedAt)}` : (w.handle ? `@${w.handle}` : 'Not shipped')}
-                  right={<Button label={w.shippedAt ? 'Unmark' : 'Mark shipped'} size="compact" variant="secondary" loading={busy === `ship${w.id}`}
+                  right={<Button label={w.shippedAt ? 'Not shipped' : 'Mark shipped'}
+                    accessibilityLabel={w.shippedAt ? `Mark ${w.name}'s prize as not shipped` : `Mark ${w.name}'s prize as shipped`} size="compact" variant="secondary" loading={busy === `ship${w.id}`}
                     onPress={() => run(`ship${w.id}`, () => api.sellerGiveaways.markShipped(g.id, w.id, !w.shippedAt))} />} />
                 {redrawFor === w.id ? (
                   <View style={{ gap: 8, paddingBottom: SP.sm }}>
@@ -107,7 +137,7 @@ export default function SellerGiveawayDetail() {
             <SectionHeader title="Draw log" />
             {g.draws.map((d: any) => (
               <Text key={d.id} style={[styles.note, { color: c.mutedForeground, marginBottom: 6 }]}>
-                Draw {d.drawNumber} · {new Date(d.drawnAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })} · {d.eligibleCount} eligible · fingerprint {d.eligibleHash.slice(0, 12)}{d.reason ? ` · ${d.reason}` : ''}
+                Draw {d.drawNumber} · {new Date(d.drawnAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })} · {d.eligibleCount} eligible · Draw ID {d.eligibleHash.slice(0, 12)}{d.reason ? ` · ${d.reason}` : ''}
               </Text>
             ))}
           </>

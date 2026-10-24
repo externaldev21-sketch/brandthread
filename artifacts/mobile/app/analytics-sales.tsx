@@ -12,8 +12,11 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
+import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePills';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { InsightRange } from '@/services/sellerInsightsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState, DateRangeKey } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -29,7 +32,30 @@ const CHART_TAB_LABELS: Record<'sales' | 'orders' | 'units' | 'aov' | 'refunds',
   refunds: 'Refunds',
 };
 
+// The Dashboard's Today / Week / Month / Year / All pills, as calendar
+// periods on GET /api/analytics/revenue (so both screens agree).
+const RANGE_TO_DATE_KEY: Record<InsightRange, { key: DateRangeKey; label: string }> = {
+  today: { key: 'today', label: 'Today' },
+  week:  { key: 'this_week', label: 'This week' },
+  month: { key: 'this_month', label: 'This month' },
+  year:  { key: 'this_year', label: 'This year' },
+  all:   { key: 'all', label: 'All time' },
+};
+
+/** "2026-10-20" (the seller's local day) → "Oct 20", without a UTC shift. */
+function dayLabel(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function withRange(filter: AnalyticsFilterState, range: InsightRange): AnalyticsFilterState {
+  const { key, label } = RANGE_TO_DATE_KEY[range];
+  return { ...filter, dateRange: { key, label, startDate: '', endDate: '' } };
+}
+
 export default function AnalyticsSalesScreen() {
+  const { theme } = useAppTheme();
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -40,6 +66,7 @@ export default function AnalyticsSalesScreen() {
   const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeChart, setActiveChart] = useState<'sales' | 'orders' | 'units' | 'aov' | 'refunds'>('sales');
+  const [range, setRange] = useState<InsightRange>('month');
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
@@ -52,7 +79,7 @@ export default function AnalyticsSalesScreen() {
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      const next = await getSalesAnalytics(f);
+      const next = await getSalesAnalytics(withRange(f, range));
       if (requestUser.current !== requestedUser) return;
       setData(next);
       setLoadError(false);
@@ -60,7 +87,7 @@ export default function AnalyticsSalesScreen() {
       if (requestUser.current !== requestedUser) return;
       setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
-  }, [filter, authLoaded, userId]);
+  }, [filter, authLoaded, userId, range]);
 
   useEffect(() => {
     requestUser.current = null;
@@ -68,6 +95,13 @@ export default function AnalyticsSalesScreen() {
     setLoading(!authLoaded);
     if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
+
+  // A new range reloads in place (the previous numbers stay until it lands).
+  const firstRange = useRef(true);
+  useEffect(() => {
+    if (firstRange.current) { firstRange.current = false; return; }
+    void load(true);
+  }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = (): AnalyticsPoint[] => {
     if (!data) return [];
@@ -80,7 +114,8 @@ export default function AnalyticsSalesScreen() {
     }
   };
 
-  const points = chartData();
+  const points = chartData().slice(-14);
+  const pointLabel = (p?: AnalyticsPoint) => (p?.date ? dayLabel(p.date) : '');
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Sales Analytics" />
@@ -97,6 +132,7 @@ export default function AnalyticsSalesScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
+      <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} />
       {/* Chart */}
       <Card padded>
         <PillTabs
@@ -109,7 +145,7 @@ export default function AnalyticsSalesScreen() {
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 2 }}>
-              {points.slice(-14).map((p, i) => {
+              {points.map((p, i) => {
                 const max = Math.max(...points.map(pt => pt.value), 1);
                 return (
                   <View key={i} style={{ flex: 1, borderRadius: 2, height: Math.max(2, (p.value / max) * 32), backgroundColor: colors.primary, opacity: 0.7 }} />
@@ -117,21 +153,32 @@ export default function AnalyticsSalesScreen() {
               })}
             </View>
             <View style={s.xRow}>
-              <Text style={s.xLabel}>Start</Text>
-              <Text style={s.xLabel}>Today</Text>
+              <Text style={s.xLabel}>{pointLabel(points[0])}</Text>
+              {points.length > 1 && <Text style={s.xLabel}>{pointLabel(points[points.length - 1])}</Text>}
             </View>
           </>
         )}
       </Card>
 
       {/* P&L summary */}
-      <SectionTitle>Revenue Breakdown</SectionTitle>
+      <SectionTitle>Revenue breakdown</SectionTitle>
       <Card>
         {data && <StatRow label={data.grossSales.label} value={data.grossSales.formatted} changePct={data.grossSales.changePct} />}
+        {data?.orders && (
+          <>
+            <CardDivider />
+            <StatRow label={data.orders.label} value={data.orders.formatted} />
+            <CardDivider />
+            <StatRow
+              label="Avg order value"
+              value={data.orders.value > 0 ? formatCents(Math.round(data.grossSales.value / data.orders.value)) : '—'}
+            />
+          </>
+        )}
       </Card>
 
       {/* Breakdown */}
-      <SectionTitle>By Product</SectionTitle>
+      <SectionTitle>By product</SectionTitle>
       <Card>
         {data?.breakdown.map((row, i) => (
           <View key={row.key}>

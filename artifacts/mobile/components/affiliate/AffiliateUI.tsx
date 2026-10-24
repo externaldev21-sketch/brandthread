@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Icon } from '@/components/ui/Icon';
 import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_DISABLED } from '@/lib/theme';
 
 /** Two-tab switch (Overview / Payouts): text tabs with an underline on the active one. */
@@ -53,27 +54,50 @@ export function Pill({ label, tone = 'neutral' }: { label: string; tone?: 'neutr
   );
 }
 
-/** Solid black/white action button; `outline` for the quieter companion action. */
-export function ActionButton({ label, onPress, outline, disabled, loading, flex }: {
-  label: string; onPress: () => void; outline?: boolean; disabled?: boolean; loading?: boolean; flex?: boolean;
+/**
+ * Solid black/white action button; `outline` for the quieter companion action;
+ * `destructive` for an outline button in the theme's error colour (Remove).
+ * `loadingLabel` replaces the generic "Working…" while `loading`.
+ */
+export function ActionButton({ label, onPress, outline, destructive, disabled, loading, loadingLabel, flex, accessibilityLabel }: {
+  label: string; onPress: () => void; outline?: boolean; destructive?: boolean; disabled?: boolean; loading?: boolean;
+  loadingLabel?: string; flex?: boolean; accessibilityLabel?: string;
 }) {
   const { theme } = useAppTheme();
   const inactive = disabled || loading;
+  const bordered = outline || destructive;
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       style={[
         st.btn,
         flex && { flex: 1 },
-        outline ? { borderColor: theme.border, borderWidth: 1, backgroundColor: 'transparent' } : { backgroundColor: inactive ? FILL_ELEVATED : theme.text },
+        bordered
+          ? { borderColor: destructive && !inactive ? theme.error : theme.border, borderWidth: 1, backgroundColor: 'transparent' }
+          : { backgroundColor: inactive ? FILL_ELEVATED : theme.text },
       ]}
     >
       {/* Inactive: solid gray fill + gray label, never a faded button. */}
-      <Text style={[st.btnText, { color: inactive ? TEXT_DISABLED : outline ? theme.text : theme.background }]}>{loading ? 'Working…' : label}</Text>
+      <Text style={[st.btnText, { color: inactive ? TEXT_DISABLED : destructive ? theme.error : outline ? theme.text : theme.background }]}>
+        {loading ? (loadingLabel ?? 'Working…') : label}
+      </Text>
     </TouchableOpacity>
+  );
+}
+
+/** Inline form error: alert-circle icon + text in the theme's error colour. */
+export function InlineError({ message, style }: { message: string | null | undefined; style?: object }) {
+  const { theme } = useAppTheme();
+  if (!message) return null;
+  return (
+    <View style={[st.errorRow, style]} accessibilityLiveRegion="polite">
+      <Icon name="alert-circle" size={14} color={theme.error} />
+      <Text style={[st.errorText, { color: theme.error }]}>{message}</Text>
+    </View>
   );
 }
 
@@ -108,6 +132,8 @@ const st = StyleSheet.create({
   pillText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   btn: { minHeight: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
   btnText: { fontFamily: FONT.bold, fontSize: FS.base },
+  errorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.xs, marginTop: SP.xs },
+  errorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18 },
   card: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md, marginBottom: SP.md },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.xl, marginTop: SP.md, marginBottom: SP.sm, letterSpacing: -0.3 },
 });

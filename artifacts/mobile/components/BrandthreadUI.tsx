@@ -8,7 +8,7 @@ import { radius as ControlRadius, radius } from '@/constants/radii';
  */
 
 import React, { useRef, useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Animated, Platform, ViewStyle, TextStyle, StyleProp, Pressable, SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Animated, Platform, ViewStyle, TextStyle, StyleProp, Pressable, SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps, AccessibilityRole, AccessibilityState } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -402,11 +402,16 @@ interface BrandthreadCardProps {
   onPress?: () => void;
   glow?: boolean;
   elevated?: boolean;
+  /** Optional a11y pass-through for pressable cards used as list choices
+   *  (e.g. a radio-style picker row). Forwarded as-is; no visual effect. */
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
+  accessibilityLabel?: string;
 }
 
 // `glow` is still accepted from existing callers but draws nothing: the
 // seller tab-bar swipe glow is the app's only glow.
-export function BrandthreadCard({ children, style, onPress, elevated = false }: BrandthreadCardProps) {
+export function BrandthreadCard({ children, style, onPress, elevated = false, accessibilityRole, accessibilityState, accessibilityLabel }: BrandthreadCardProps) {
   const colors = useColors();
   const s: ViewStyle = {
     backgroundColor: elevated ? colors.elevated : colors.card,
@@ -416,7 +421,13 @@ export function BrandthreadCard({ children, style, onPress, elevated = false }: 
   };
   if (onPress) {
     return (
-      <PressableScale onPress={onPress} style={[s, style]}>
+      <PressableScale
+        onPress={onPress}
+        style={[s, style]}
+        accessibilityRole={accessibilityRole}
+        accessibilityState={accessibilityState}
+        accessibilityLabel={accessibilityLabel}
+      >
         {children}
       </PressableScale>
     );

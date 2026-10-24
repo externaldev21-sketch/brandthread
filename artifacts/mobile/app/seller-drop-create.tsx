@@ -16,16 +16,19 @@
  * is converted to the correct UTC instant via lib/dropSchedule's
  * zonedTimeToUtc, which is unit-tested for DST + non-whole-hour offsets.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { CachedImage as Image } from '@/components/CachedImage';
 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { confirmAlert, showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -273,13 +276,20 @@ export default function SellerDropCreate() {
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  // Products reload on focus so one added via "Add a product" (pushed from
+  // the empty products section below) shows up on return.
+  useFocusEffect(useCallback(() => {
     let active = true;
     api.products.list().then((rows: any) => {
       if (!active) return;
       setAllProducts(Array.isArray(rows) ? rows : []);
     }).catch(() => {});
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
 
+  useEffect(() => {
+    let active = true;
     if (isEdit && dropId) {
       setLoadFailed(false);
       api.drops.get(dropId).then((data: any) => {
@@ -314,6 +324,29 @@ export default function SellerDropCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropId, loadAttempt]);
 
+  // Unsaved-changes guard: compare the form against the state it opened with
+  // (blank for create, the loaded drop for edit). `leaveTo` is set once a save
+  // or cancel lands; the navigation runs in an effect after that render so the
+  // guard already sees `dirty === false` and doesn't stop it.
+  const formSnapshot = JSON.stringify([
+    name, type, heroImageUrl, heroVideoUrl, releaseDate, releaseTime, timezone,
+    hasEndDate, endDate, endTime, earlyAccessEnabled, earlyAccessMinutes, membersOnly,
+    [...selectedProductIds].sort(),
+  ]);
+  const baselineSnapshot = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loading && !loadFailed && baselineSnapshot.current === null) baselineSnapshot.current = formSnapshot;
+  }, [loading, loadFailed, formSnapshot]);
+  const [leaveTo, setLeaveTo] = useState<{ href: string | null } | null>(null);
+  const dirty = leaveTo === null && baselineSnapshot.current !== null && formSnapshot !== baselineSnapshot.current;
+  const onBack = useUnsavedChangesGuard(dirty);
+  useEffect(() => {
+    if (!leaveTo) return;
+    if (leaveTo.href) router.replace(leaveTo.href as never);
+    else goBackOr(router);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaveTo]);
+
   const timeZones = useMemo(() => listSupportedTimeZones(), []);
   const filteredZones = useMemo(() => {
     const f = tzFilter.trim().toLowerCase();
@@ -324,7 +357,7 @@ export default function SellerDropCreate() {
   async function pickHero(kind: 'image' | 'video') {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Photo access needed', 'Allow photo library access in Settings.');
+      showAlert('Photo access needed', 'Allow photo library access in Settings.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -350,7 +383,7 @@ export default function SellerDropCreate() {
         setHeroImageUrl(null);
       }
     } catch {
-      Alert.alert('Upload failed', 'Try again.');
+      showAlert('Upload failed', 'Try again.');
     } finally {
       setHeroUploading(false);
     }
@@ -366,19 +399,19 @@ export default function SellerDropCreate() {
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Give this drop a name.');
+      showAlert('Name required', 'Give this drop a name.');
       return;
     }
     const releaseParts = parseDateAndTime(releaseDate, releaseTime);
     if (!releaseParts) {
-      Alert.alert('Drop date required', 'Enter the drop date as YYYY-MM-DD and time as HH:MM (24h).');
+      showAlert('Drop date required', 'Enter the drop date as YYYY-MM-DD and time as HH:MM (24h).');
       return;
     }
     let endsAtIso: string | undefined;
     if (hasEndDate) {
       const endParts = parseDateAndTime(endDate, endTime);
       if (!endParts) {
-        Alert.alert('End time required', 'Pick an end day and time, or turn off "Set an end time".');
+        showAlert('End time required', 'Pick an end day and time, or turn off "Set an end time".');
         return;
       }
       endsAtIso = zonedTimeToUtc(endParts, timezone).toISOString();
@@ -416,15 +449,11 @@ export default function SellerDropCreate() {
         ]);
       }
 
-      if (effectiveDropId) {
-        router.replace((`/seller-drop-preview?dropId=${encodeURIComponent(effectiveDropId)}`) as never);
-      } else {
-        goBackOr(router);
-      }
+      setLeaveTo({ href: effectiveDropId ? `/seller-drop-preview?dropId=${encodeURIComponent(effectiveDropId)}` : null });
     } catch (e) {
       // Drops are on Growth+ (server plan config): show the upgrade prompt, not a field error.
       if (promptUpgradeOnPlanGate(e, router)) return;
-      Alert.alert("Couldn't save drop", 'Try again.');
+      showAlert("Couldn't save drop", friendlyError(e, 'Try again.'));
     } finally {
       setSaving(false);
     }
@@ -432,49 +461,44 @@ export default function SellerDropCreate() {
 
   async function handleCancelDrop() {
     if (!dropId) return;
-    Alert.alert('Cancel this drop?', 'This stops the drop from being shown to buyers.', [
-      { text: 'Keep drop', style: 'cancel' },
-      {
-        text: 'Cancel drop',
-        style: 'destructive',
-        onPress: async () => {
-          setCancelling(true);
+    const ok = await confirmAlert({
+      title: 'Cancel this drop?',
+      message: 'This stops the drop from being shown to buyers.',
+      confirmLabel: 'Cancel drop',
+      cancelLabel: 'Keep drop',
+      destructive: true,
+    });
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      await api.drops.cancel(dropId);
+      showAlert('Drop cancelled');
+      setLeaveTo({ href: null });
+    } catch (err: any) {
+      if (err?.code === 'CONFIRM_REQUIRED' || err?.body?.code === 'CONFIRM_REQUIRED') {
+        const n = err?.body?.orderCount ?? err?.orderCount;
+        const refund = await confirmAlert({
+          title: 'Refund held orders?',
+          message: `This drop has${n != null ? ` ${n}` : ''} orders with held funds — cancelling will refund every unshipped order. This can't be undone.`,
+          confirmLabel: 'Refund & cancel',
+          cancelLabel: 'Back out',
+          destructive: true,
+        });
+        if (refund) {
           try {
-            await api.drops.cancel(dropId);
-            Alert.alert('Drop cancelled');
-            goBackOr(router);
-          } catch (err: any) {
-            if (err?.code === 'CONFIRM_REQUIRED' || err?.body?.code === 'CONFIRM_REQUIRED') {
-              const n = err?.body?.orderCount ?? err?.orderCount;
-              Alert.alert(
-                'Refund held orders?',
-                `This drop has${n != null ? ` ${n}` : ''} orders with held funds — cancelling will refund every unshipped order. This can't be undone.`,
-                [
-                  { text: 'Back out', style: 'cancel' },
-                  {
-                    text: 'Refund & cancel',
-                    style: 'destructive',
-                    onPress: async () => {
-                      try {
-                        await api.drops.cancel(dropId, true);
-                        Alert.alert('Drop cancelled', 'Unshipped orders have been refunded.');
-                        goBackOr(router);
-                      } catch {
-                        Alert.alert("Couldn't cancel drop", 'Try again.');
-                      }
-                    },
-                  },
-                ],
-              );
-            } else {
-              Alert.alert("Couldn't cancel drop", 'Try again.');
-            }
-          } finally {
-            setCancelling(false);
+            await api.drops.cancel(dropId, true);
+            showAlert('Drop cancelled', 'Unshipped orders have been refunded.');
+            setLeaveTo({ href: null });
+          } catch (e2) {
+            showAlert("Couldn't cancel drop", friendlyError(e2, 'Try again.'));
           }
-        },
-      },
-    ]);
+        }
+      } else {
+        showAlert("Couldn't cancel drop", friendlyError(err, 'Try again.'));
+      }
+    } finally {
+      setCancelling(false);
+    }
   }
 
   if (loading) {
@@ -497,11 +521,9 @@ export default function SellerDropCreate() {
         <ScreenHeader title="Edit drop" />
         <EmptyState
           icon="alert-circle"
-          variant="error"
           title="Couldn't load this drop"
-          message="Check your connection and try again."
-          actionLabel="Retry"
-          onAction={() => { setLoading(true); setLoadAttempt(n => n + 1); }}
+          description="Check your connection and try again."
+          action={{ label: 'Retry', onPress: () => { setLoading(true); setLoadAttempt(n => n + 1); } }}
         />
       </View>
     );
@@ -510,7 +532,7 @@ export default function SellerDropCreate() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.root, { backgroundColor: theme.background }]}>
-        <ScreenHeader title={isEdit ? 'Edit drop' : 'New drop'} />
+        <ScreenHeader title={isEdit ? 'Edit drop' : 'New drop'} onBack={onBack} />
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xxl + tabBarInset, gap: SP.lg }}>
 
           <View style={styles.field}>
@@ -564,7 +586,7 @@ export default function SellerDropCreate() {
                     <Text style={{ color: theme.muted, fontSize: FS.xs, marginTop: 6 }}>Video selected</Text>
                   </View>
                 )}
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove media"
+                <TouchableOpacity
                   style={[styles.heroRemoveBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
                   onPress={() => { setHeroImageUrl(null); setHeroVideoUrl(null); }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -677,7 +699,19 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.muted }]}>PRODUCTS IN THIS DROP</Text>
             {allProducts.length === 0 ? (
-              <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>Add a product first, then come back to include it.</Text>
+              <View style={{ gap: SP.sm }}>
+                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>Add a product first, then come back to include it.</Text>
+                <TouchableOpacity
+                  style={[styles.secondaryBtn, { borderColor: theme.border }]}
+                  onPress={() => router.push('/add-product' as never)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add a product"
+                  testID="drop-add-product"
+                >
+                  <Icon name="plus" size={16} color={theme.text} />
+                  <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Add a product</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <View style={{ gap: 8 }}>
                 {allProducts.map(product => {

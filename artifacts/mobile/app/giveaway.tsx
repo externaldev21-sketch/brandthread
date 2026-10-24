@@ -59,8 +59,10 @@ export default function GiveawayScreen() {
   const openSeller = () => router.push(`/buyer-other-profile?userId=${encodeURIComponent(g.seller.id)}` as never);
   const openPost = () => router.push(`/buyer-post-comments?postId=${encodeURIComponent(g.postId)}` as never);
   // Signed out (a shared /g/ link): the page is readable; entering needs an
-  // account, so the CTA is the sign-in gate and returns here (BT-319).
-  const cta = !live ? null : !me ? (isSignedIn ? null : { label: 'Log in to enter', onPress: goToSignIn })
+  // account, so the CTA is the sign-in gate, which returns here afterwards
+  // (useSignInGate passes this path as `returnTo`) (BT-319). The seller
+  // preview counts as signed in, so it never shows this button.
+  const cta = !live ? null : !me ? (isSignedIn ? null : { label: 'Sign in to enter', onPress: goToSignIn })
     : !me.followed ? { label: `Follow ${g.seller.name}`, onPress: openSeller }
     : g.requiresComment && !me.commented ? { label: 'Comment to enter', onPress: openPost }
     : null;

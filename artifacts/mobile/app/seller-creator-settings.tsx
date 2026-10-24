@@ -12,24 +12,29 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAffiliate';
-import { ActionButton } from '@/components/affiliate/AffiliateUI';
+import { ActionButton, InlineError } from '@/components/affiliate/AffiliateUI';
+import { friendlyError } from '@/lib/friendlyError';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { validateProgramSettings, type ProgramErrors, type ProgramField } from '@/lib/creatorProgramValidation';
 import { CommissionStepper } from '@/components/affiliate/CommissionStepper';
 
-function Field({ label, value, onChange, suffix, help }: { label: string; value: string; onChange: (v: string) => void; suffix: string; help?: string }) {
+function Field({ label, value, onChange, suffix, help, error }: { label: string; value: string; onChange: (v: string) => void; suffix: string; help?: string; error?: string }) {
   const { theme } = useAppTheme();
   return (
     <View style={{ marginBottom: SP.md }}>
       <Text style={{ fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, marginBottom: 6 }}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: error ? theme.error : theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48 }}>
         <TextInput returnKeyType="done"
           value={value}
           onChangeText={onChange}
           keyboardType="decimal-pad"
           style={{ flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: theme.text }}
           accessibilityLabel={label}
+          accessibilityHint={error}
         />
         <Text style={{ fontFamily: FONT.medium, fontSize: FS.base, color: theme.muted }}>{suffix}</Text>
       </View>
+      <InlineError message={error} />
       {help ? <Text style={{ fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.xs, lineHeight: 16 }}>{help}</Text> : null}
     </View>
   );
@@ -56,6 +61,21 @@ export default function SellerCreatorSettingsScreen() {
   const [holdDays, setHoldDays] = useState('30');
   const [minPayout, setMinPayout] = useState('25');
   const [autoApprove, setAutoApprove] = useState(false);
+  const [errors, setErrors] = useState<ProgramErrors>({});
+  // What was loaded, to tell whether anything has been edited.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const snapshot = JSON.stringify([commission, discount, windowDays, holdDays, minPayout, autoApprove]);
+  const [saved, setSaved] = useState(false);
+  // Not dirty while a save is in flight (the render during the request clears
+  // the guard before the save's own router.back()) or once it has landed.
+  const dirty = !saving && !saved && loaded != null && snapshot !== loaded;
+  const onBack = useUnsavedChangesGuard(dirty);
+
+  // Editing a field clears its own error, so a fixed value stops showing red.
+  const edit = (field: ProgramField, set: (v: string) => void) => (v: string) => {
+    set(v);
+    setErrors((e) => (e[field] ? { ...e, [field]: undefined } : e));
+  };
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +87,10 @@ export default function SellerCreatorSettingsScreen() {
       setHoldDays(String(program.holdDays));
       setMinPayout(String(program.minPayoutCents / 100));
       setAutoApprove(program.autoApprove);
+      setLoaded(JSON.stringify([
+        program.commissionPercent, String(program.buyerDiscountPercent), String(program.windowDays),
+        String(program.holdDays), String(program.minPayoutCents / 100), program.autoApprove,
+      ]));
       setError(false);
     } catch { setError(true); }
     finally { setLoading(false); }
@@ -75,22 +99,15 @@ export default function SellerCreatorSettingsScreen() {
 
   const save = async () => {
     setMsg(null);
-    // Number('') is 0, so an emptied field would otherwise save as 0.
-    if ([commission, discount, windowDays, holdDays, minPayout].some((v) => v.trim() === '')) { setMsg('Enter numbers in every field.'); return; }
-    const body = {
-      ...(commission !== savedCommission ? { commissionPercent: commission } : {}),
-      buyerDiscountPercent: Number(discount),
-      windowDays: Number(windowDays),
-      holdDays: Number(holdDays),
-      minPayoutCents: Math.round(Number(minPayout) * 100),
-      autoApprove,
-    };
-    if (Object.values(body).some((v) => typeof v === 'number' && !Number.isFinite(v))) { setMsg('Enter numbers in every field.'); return; }
+    const checked = validateProgramSettings({ commission, savedCommission, discount, windowDays, holdDays, minPayout, autoApprove });
+    if (!checked.ok) { setErrors(checked.errors); setMsg('Fix the highlighted fields to save.'); return; }
+    setErrors({});
     setSaving(true);
     try {
-      if (!previewOnly) await api.affiliate.seller.saveProgram(body);
+      if (!previewOnly) await api.affiliate.seller.saveProgram(checked.body);
+      setSaved(true);
       router.back();
-    } catch (e: any) { setMsg(e?.message ?? "Couldn't save."); }
+    } catch (e) { setMsg(friendlyError(e, "Couldn't save your program settings. Try again.")); }
     finally { setSaving(false); }
   };
 
@@ -98,23 +115,29 @@ export default function SellerCreatorSettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <ScreenHeader title="Program settings" />
+      <ScreenHeader title="Program settings" onBack={onBack} />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
         {loading ? <ActivityIndicator color={theme.text} /> : error ? <RetryRow label="Couldn't load settings" onRetry={load} /> : (
           <>
             <View style={{ marginBottom: SP.md }}>
-              <CommissionStepper label="Default commission" value={commission} onChange={setCommission} testID="commission-stepper" />
+              <CommissionStepper
+                label="Default commission"
+                value={commission}
+                onChange={(v) => { setCommission(v); setErrors((e) => (e.commission ? { ...e, commission: undefined } : e)); }}
+                testID="commission-stepper"
+              />
+              <InlineError message={errors.commission} />
               <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 16 }}>Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid.</Text>
             </View>
-            <Field label="Buyer discount on creator codes" value={discount} onChange={setDiscount} suffix="%" help="0 keeps the code for tracking only." />
-            <Field label="Attribution window" value={windowDays} onChange={setWindowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />
-            <Field label="Hold period" value={holdDays} onChange={setHoldDays} suffix="days" help="Days after delivery before commission becomes payable." />
-            <Field label="Minimum payout" value={minPayout} onChange={setMinPayout} suffix="USD" />
+            <Field label="Buyer discount on creator codes" value={discount} onChange={edit('discount', setDiscount)} error={errors.discount} suffix="%" help="0 keeps the code for tracking only." />
+            <Field label="Attribution window" value={windowDays} onChange={edit('windowDays', setWindowDays)} error={errors.windowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />
+            <Field label="Hold period" value={holdDays} onChange={edit('holdDays', setHoldDays)} error={errors.holdDays} suffix="days" help="Days after delivery before commission becomes payable." />
+            <Field label="Minimum payout" value={minPayout} onChange={edit('minPayout', setMinPayout)} error={errors.minPayout} suffix="USD" />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.lg }}>
               <Text style={{ fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text }}>Approve applications automatically</Text>
               <HapticSwitch value={autoApprove} onValueChange={setAutoApprove} trackColor={{ true: theme.success, false: theme.border }} accessibilityLabel="Approve applications automatically" />
             </View>
-            {msg ? <Text style={{ fontFamily: FONT.medium, color: theme.error, marginBottom: SP.sm }}>{msg}</Text> : null}
+            <InlineError message={msg} style={{ marginTop: 0, marginBottom: SP.sm }} />
             <ActionButton label="Save" loading={saving} onPress={save} />
           </>
         )}

@@ -3,7 +3,7 @@
  * Turn the program on/off, see creators with clicks/orders/revenue/commission,
  * invite by username, open a creator to pause/remove/override.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -20,6 +20,8 @@ import { EMPTY_SELLER_OVERVIEW, getPreviewSellerOverview } from '@/lib/previewAf
 import type { SellerAffiliateOverview } from '@/lib/affiliateTypes';
 import { ActionButton, Card, KeyStatRow, Pill, SectionTitle, pct } from '@/components/affiliate/AffiliateUI';
 import { formatMoney } from '@/lib/format';
+import { friendlyError } from '@/lib/friendlyError';
+import { showAlert } from '@/lib/actionSheet';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Active', pending: 'Needs approval', paused: 'Paused', invited: 'Invited', removed: 'Removed',
@@ -39,6 +41,10 @@ export default function SellerCreatorProgramScreen() {
   const [inviting, setInviting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
+  // Ids with an approval in flight. The ref guards a second tap that lands
+  // before the re-render disables the button; the state drives the label.
+  const [approving, setApproving] = useState<ReadonlySet<string>>(new Set());
+  const approvingRef = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     if (previewOnly) { setData(getPreviewSellerOverview()); setLoading(false); return; }
@@ -73,8 +79,15 @@ export default function SellerCreatorProgramScreen() {
   };
 
   const approve = async (id: string) => {
-    if (previewOnly) return;
-    try { await api.affiliate.seller.approve(id); await load(); } catch { flash("Couldn't approve. Try again."); }
+    if (previewOnly || approvingRef.current.has(id)) return;
+    approvingRef.current.add(id);
+    setApproving(new Set(approvingRef.current));
+    try { await api.affiliate.seller.approve(id); await load(); }
+    catch (e) { showAlert("Couldn't approve", friendlyError(e, "Couldn't approve this creator. Try again.")); }
+    finally {
+      approvingRef.current.delete(id);
+      setApproving(new Set(approvingRef.current));
+    }
   };
 
   const s = useMemo(() => StyleSheet.create({
@@ -84,7 +97,8 @@ export default function SellerCreatorProgramScreen() {
     body: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: theme.muted, marginTop: 4 },
     input: { borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, justifyContent: 'center', marginBottom: SP.sm },
     inputText: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text },
-    creatorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border, minHeight: 64 },
+    creatorRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border, minHeight: 64 },
+    creatorOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.md, alignSelf: 'stretch' },
     name: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
     meta: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: 2 },
     linkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, minHeight: 44 },
@@ -167,24 +181,34 @@ export default function SellerCreatorProgramScreen() {
             {visible.length === 0 ? (
               <Text style={s.body}>No creators yet. Invite someone by username or share your program link.</Text>
             ) : visible.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={s.creatorRow}
-                onPress={() => router.push({ pathname: '/seller-creator-detail' as any, params: { id: c.id } })}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${c.displayName ?? (c.username ? `@${c.username}` : 'creator')}`}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={s.name}>{c.displayName ?? c.username ?? 'Creator'}</Text>
-                  <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatMoney(c.stats.revenueCents)}</Text>
-                  <Text style={s.meta}>Owed {formatMoney(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatMoney(c.stats.paidCents)}</Text>
-                </View>
+              // The row's open target and the Approve button are siblings, so
+              // Approve isn't a button nested inside another button.
+              <View key={c.id} style={s.creatorRow}>
+                <TouchableOpacity
+                  style={s.creatorOpen}
+                  onPress={() => router.push({ pathname: '/seller-creator-detail' as any, params: { id: c.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${c.displayName ?? (c.username ? `@${c.username}` : 'creator')}`}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.name}>{c.displayName ?? c.username ?? 'Creator'}</Text>
+                    <Text style={s.meta}>{c.code} · {c.stats.orders} orders · {formatMoney(c.stats.revenueCents)}</Text>
+                    <Text style={s.meta}>Owed {formatMoney(c.stats.pendingCents + c.stats.payableCents)} · Paid {formatMoney(c.stats.paidCents)}</Text>
+                  </View>
+                  {c.status !== 'pending' ? (
+                    <Pill label={STATUS_LABEL[c.status] ?? c.status} tone={c.status === 'active' ? 'strong' : 'neutral'} />
+                  ) : null}
+                </TouchableOpacity>
                 {c.status === 'pending' ? (
-                  <ActionButton label="Approve" onPress={() => approve(c.id)} />
-                ) : (
-                  <Pill label={STATUS_LABEL[c.status] ?? c.status} tone={c.status === 'active' ? 'strong' : 'neutral'} />
-                )}
-              </TouchableOpacity>
+                  <ActionButton
+                    label="Approve"
+                    loading={approving.has(c.id)}
+                    loadingLabel="Approving…"
+                    accessibilityLabel={`Approve ${c.displayName ?? (c.username ? `@${c.username}` : 'creator')}`}
+                    onPress={() => approve(c.id)}
+                  />
+                ) : null}
+              </View>
             ))}
           </>
         )}

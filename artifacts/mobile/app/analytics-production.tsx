@@ -17,7 +17,6 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
-import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';

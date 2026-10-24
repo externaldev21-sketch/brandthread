@@ -16,11 +16,10 @@ import { Card, CardDivider, SectionTitle, StatRow } from '@/components/analytics
 import { InsightFrame } from '@/components/analytics/InsightFrame';
 import { InsightLineChart, KpiGrid, ShareBarRow } from '@/components/analytics/InsightCharts';
 import { useSellerInsight } from '@/hooks/useSellerInsight';
+import { countryName } from '@/lib/countryNames';
 import { DEFAULT_INSIGHT_RANGE, getAudienceStats, type InsightRange, type SplitCounts } from '@/services/sellerInsightsService';
 
 const fmt = (v: number | null) => (v === null ? '—' : v.toLocaleString());
-const regionNames = typeof Intl !== 'undefined' && (Intl as any).DisplayNames ? new (Intl as any).DisplayNames(['en'], { type: 'region' }) : null;
-const countryName = (code: string) => { try { return regionNames?.of(code) ?? code; } catch { return code; } };
 const DEVICE_LABEL = { ios: 'iPhone', android: 'Android', web: 'Web', unknown: 'Other' } as const;
 
 function SplitCard({ title, split }: { title: string; split: SplitCounts }) {

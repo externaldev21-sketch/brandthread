@@ -76,7 +76,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
           {typeof p.conversionRate === 'number' && (
             <>
               <Text style={s.dotSep}>·</Text>
-              <Text style={s.prodStat}>{p.conversionRate.toFixed(1)}% conv.</Text>
+              <Text style={s.prodStat}>{p.conversionRate.toFixed(1)}% conversion</Text>
             </>
           )}
         </View>

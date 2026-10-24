@@ -497,7 +497,9 @@ router.get("/home", async (req, res) => {
   });
 });
 
-// GET /api/analytics/revenue?period=today|last7|last30|last90|thisMonth|lastMonth
+// GET /api/analytics/revenue?period=today|last7|last30|last90|thisWeek|thisMonth|lastMonth|thisYear|all
+// (thisWeek / thisMonth / thisYear are the Dashboard's calendar Week / Month /
+// Year pills, so Sales Analytics and the Dashboard agree.)
 router.get("/revenue", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const period  = (req.query.period as string) ?? "last30";
@@ -511,8 +513,11 @@ router.get("/revenue", async (req, res) => {
     last7:     { since: localDaysAgo(6, tz, now) },
     last30:    { since: localDaysAgo(29, tz, now) },
     last90:    { since: localDaysAgo(89, tz, now) },
+    thisWeek:  { since: floorToLocalWeek(now, tz) },
     thisMonth: { since: thisMonth },
     lastMonth: { since: addLocalMonths(thisMonth, -1, tz), until: thisMonth },
+    thisYear:  { since: floorToLocalYear(now, tz) },
+    all:       { since: new Date(0) },
   };
   const { since, until } = periodMap[period] ?? periodMap.last30;
   const window = until
@@ -530,7 +535,8 @@ router.get("/revenue", async (req, res) => {
   // One row per local day that had sales (no 10-row cap: a 90-day chart
   // needs up to 90). `day` is the seller's local date, YYYY-MM-DD.
   const local = sql`(${orders.createdAt} + make_interval(mins => ${tz}))`;
-  const daily = await db
+  // Newest 400 days (an "all" window can be longer), returned oldest first.
+  const dailyDesc = await db
     .select({
       day: sql<string>`to_char(date_trunc('day', ${local}), 'YYYY-MM-DD')`,
       total_cents: NET_REVENUE,
@@ -539,34 +545,37 @@ router.get("/revenue", async (req, res) => {
     .from(orders)
     .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER))
     .groupBy(sql`1`)
-    .orderBy(sql`1`)
+    .orderBy(sql`1 DESC`)
     .limit(400);
+  const daily = dailyDesc.reverse();
 
-  const breakdownRows = await db.execute(sql`
-    SELECT p.id AS product_id,
-           coalesce(p.name, oi.product_name) AS name,
-           coalesce(sum(oi.quantity), 0)::int AS units,
-           coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents,
-           count(DISTINCT orders.id)::int AS order_count
-    FROM orders
-    JOIN order_items oi ON oi.order_id = orders.id
-    LEFT JOIN product_variants pv ON pv.id = oi.variant_id
-    LEFT JOIN products p ON p.id = pv.product_id
-    WHERE orders.owner_id = ${ownerId}
-      AND ${window}
-      AND ${COUNTED_ORDER}
-      AND oi.refunded_at IS NULL
-    GROUP BY p.id, coalesce(p.name, oi.product_name)
-    ORDER BY revenue_cents DESC
-    LIMIT 20
-  `);
+  // "By Product": units and line revenue per product over the same counted
+  // orders and window, net of item refunds. order_items keeps the name at
+  // purchase, so a since-deleted product still shows under the name it sold as.
+  const lineRevenue = sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.priceCents} - coalesce(${orderItems.refundedCents}, 0)), 0)::int`;
+  const breakdownRows = await db
+    .select({
+      product_id: products.id,
+      name: sql<string>`coalesce(${products.name}, ${orderItems.productName})`,
+      units: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      revenue_cents: lineRevenue,
+      order_count: sql<number>`count(DISTINCT ${orders.id})::int`,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .leftJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .leftJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER))
+    .groupBy(products.id, sql`coalesce(${products.name}, ${orderItems.productName})`)
+    .orderBy(sql`${lineRevenue} DESC`)
+    .limit(20);
 
   res.json({
     period,
     totalCents:  result?.totalCents ?? 0,
     orderCount:  result?.orderCount ?? 0,
     daily,
-    breakdown: buildSalesBreakdown(breakdownRows.rows),
+    breakdown: buildSalesBreakdown(breakdownRows),
   });
 });
 

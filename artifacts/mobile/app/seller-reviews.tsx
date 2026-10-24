@@ -2,7 +2,7 @@
  * Seller Reviews — view received reviews and post public replies.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -12,6 +12,8 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
+import { confirmAlert, showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useUser } from '@clerk/expo';
 import { EmptyState } from '@/components/layout';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -61,21 +63,46 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const [replying, setReplying] = useState(false);
+  // Editing reuses the reply form, prefilled with the posted reply.
+  const [editing, setEditing] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const closeForm = () => { setReplying(false); setEditing(false); setReplyText(''); };
 
   const handleSubmitReply = async () => {
     if (!replyText.trim()) return;
     setSubmitting(true);
     try {
-      await api.reviews.reply(review.id, replyText.trim());
-      setReplying(false);
-      setReplyText('');
+      if (editing) await api.reviews.editReply(review.id, replyText.trim());
+      else await api.reviews.reply(review.id, replyText.trim());
+      closeForm();
       onReplySubmitted();
-    } catch {
-      Alert.alert("Couldn't post reply", 'Please try again.');
+    } catch (e) {
+      showAlert(editing ? "Couldn't save reply" : "Couldn't post reply", friendlyError(e, 'Please try again.'));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteReply = async () => {
+    const ok = await confirmAlert({
+      title: 'Delete your reply?',
+      message: 'Buyers will no longer see it on this review.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep reply',
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.reviews.deleteReply(review.id);
+      onReplySubmitted();
+    } catch (e) {
+      showAlert("Couldn't delete reply", friendlyError(e, 'Please try again.'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -105,11 +132,32 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
       {review.body ? <Text style={s.reviewBody}>{review.body}</Text> : null}
 
       {/* Existing reply */}
-      {review.seller_reply ? (
+      {review.seller_reply && !editing ? (
         <View style={s.replyBox}>
           <View style={s.replyHeader}>
             <Icon name="corner-down-right" size={13} color={theme.accentLight} />
-            <Text style={s.replyLabel}>Your reply</Text>
+            <Text style={[s.replyLabel, { flex: 1 }]}>Your reply</Text>
+            <TouchableOpacity
+              onPress={() => { setReplyText(review.seller_reply ?? ''); setEditing(true); }}
+              disabled={deleting}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Edit your reply"
+            >
+              <Text style={s.replyActionText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDeleteReply}
+              disabled={deleting}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete your reply"
+              accessibilityState={{ disabled: deleting, busy: deleting }}
+            >
+              {deleting
+                ? <ActivityIndicator size="small" color={theme.accentLight} />
+                : <Text style={s.replyActionText}>Delete</Text>}
+            </TouchableOpacity>
           </View>
           <Text style={s.replyText}>{review.seller_reply}</Text>
         </View>
@@ -130,7 +178,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
         </TouchableOpacity>
       )}
 
-      {replying && (
+      {(replying || editing) && (
         <View style={s.replyForm}>
           <TextInput
             style={s.replyInput}
@@ -147,7 +195,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
           <View style={s.replyActions}>
             <TouchableOpacity
               style={s.cancelBtn}
-              onPress={() => { setReplying(false); setReplyText(''); }}
+              onPress={closeForm}
               activeOpacity={0.8}
               accessibilityRole="button"
             >
@@ -159,13 +207,13 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
               disabled={!replyText.trim() || submitting}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="Post reply"
+              accessibilityLabel={editing ? 'Save reply' : 'Post reply'}
               accessibilityState={{ disabled: !replyText.trim() || submitting, busy: submitting }}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color={theme.onAccent} />
               ) : (
-                <Text style={s.submitText}>Post reply</Text>
+                <Text style={s.submitText}>{editing ? 'Save reply' : 'Post reply'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -190,6 +238,7 @@ export default function SellerReviewsScreen() {
   const [summary, setSummary] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   // Clerk never finishes loading in the signed-out web preview; treat it as
   // signed out so the screen settles on its empty state.
   const [isPreview] = useState(() => isSellerDevPreview() || isBuyerDevPreview());
@@ -240,6 +289,12 @@ export default function SellerReviewsScreen() {
     load();
   }, [load, clerkLoaded, authReady, user?.id]));
 
+  const handleRefresh = useCallback(() => {
+    if (previewReviewsEnabled() || !clerkLoaded || !user?.id) return;
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
+  }, [load, clerkLoaded, user?.id]);
+
   const avgRating = summary
     ? (summary.totalCount > 0 ? summary.avgRating.toFixed(1) : null)
     : reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
@@ -280,6 +335,9 @@ export default function SellerReviewsScreen() {
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         data={loading ? [] : reviews}
+        refreshControl={(
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={PURPLE} colors={[PURPLE]} />
+        )}
         keyExtractor={(r) => r.id}
         renderItem={({ item: r }) => <ReviewCard review={r} onReplySubmitted={load} />}
         ListEmptyComponent={loading ? (
@@ -342,6 +400,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 8, padding: 12, gap: 6 },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   replyLabel: { fontSize: 11, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  replyActionText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   replyText:  { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 19 },
 
   replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },

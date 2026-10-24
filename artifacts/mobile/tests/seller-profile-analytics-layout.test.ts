@@ -105,13 +105,15 @@ describe('seller analytics overview layout', () => {
     expect(analyticsSource).toContain('await api.analytics.home(range)');
     // Header is bare (no "Last 7 days" subtitle); the period is the
     // Dashboard's own Today/Week/Month/Year/All pills, opening on Today, and
-    // the chart is titled "Revenue" so it follows the selected range.
+    // the chart title follows the selected range ("Revenue by day", …) so it
+    // doesn't repeat the Revenue tile beside it.
     expect(analyticsSource).not.toContain('Last 7 days');
     expect(analyticsSource).toContain('<SellerDashboardRangePills');
     expect(analyticsSource).toContain('useState<InsightRange>(DEFAULT_INSIGHT_RANGE)');
     expect(analyticsSource).toContain('label="Visits"');
     expect(analyticsSource).toContain('label="Revenue"');
-    expect(analyticsSource).toContain('<SectionTitle>Revenue</SectionTitle>');
+    expect(analyticsSource).toContain('<SectionTitle>{CHART_TITLE[range]}</SectionTitle>');
+    expect(analyticsSource).toContain("today: 'Revenue by hour', week: 'Revenue by day'");
     expect(analyticsSource).not.toContain('Daily Revenue');
   });
 

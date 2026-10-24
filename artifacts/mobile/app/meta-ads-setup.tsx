@@ -38,10 +38,15 @@ import { useApi } from '@/hooks/useApi';
 import { BrandthreadScreen, BrandthreadCard, PrimaryButton, EmptyState, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 
 import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+import {
+  validateMetaAdSchedule, isMetaAdScheduleValid, metaAdLatestStart,
+  tidyInterestResults, META_INTEREST_MAX_SELECTED,
+} from '@/lib/metaAdSchedule';
 
 import {
   BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
@@ -244,6 +249,18 @@ export default function MetaAdsSetupScreen() {
     !!promoteKind && !!destinationUrl && mediaObjectPaths.length > 0 &&
     budgetCents >= BUDGET_MIN_CENTS && !!headline.trim();
 
+  // Schedule dates are checked here (real day, not past, within a year) so a
+  // bad date shows under its field and blocks Launch instead of failing on Meta.
+  const scheduleErrors = useMemo(
+    () => validateMetaAdSchedule({ startNow, startDate, endDate }),
+    [startNow, startDate, endDate],
+  );
+  const scheduleValid = isMetaAdScheduleValid(scheduleErrors);
+  const visibleInterestResults = useMemo(
+    () => tidyInterestResults(interestResults, interests),
+    [interestResults, interests],
+  );
+
   // ── Interest search (debounced) ─────────────────────────────────────────
   const interestDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -251,7 +268,7 @@ export default function MetaAdsSetupScreen() {
     if (interestDebounce.current) clearTimeout(interestDebounce.current);
     interestDebounce.current = setTimeout(() => {
       setSearchingInterests(true);
-      api.metaAds.targetingSearch(interestQuery.trim())
+      api.metaAds.targetingSearch(interestQuery.trim().slice(0, 100))
         .then((r) => setInterestResults(r.results))
         .catch(() => setInterestResults([]))
         .finally(() => setSearchingInterests(false));
@@ -344,6 +361,7 @@ export default function MetaAdsSetupScreen() {
 
   async function handleLaunch() {
     setLaunchError(null);
+    if (!scheduleValid) return;
     const id = campaignId ?? await saveDraft();
     if (!id) {
       Alert.alert('Finish your ad', 'Add a headline, budget and creative before launching.');
@@ -353,8 +371,8 @@ export default function MetaAdsSetupScreen() {
     try {
       await api.metaAds.launch(id);
       router.replace('/meta-ads-manage');
-    } catch (e: any) {
-      const msg = String(e?.message ?? '').replace(/^\d+:\s*/, '') || "Couldn't launch this campaign. Try again.";
+    } catch (e) {
+      const msg = friendlyError(e, "Couldn't launch this campaign. Try again.");
       setLaunchError(msg);
       Alert.alert('Launch failed', msg);
     } finally {
@@ -497,10 +515,13 @@ export default function MetaAdsSetupScreen() {
               <FormInput label="Interests" value={interestQuery} onChange={setInterestQuery} placeholder="Search interests…" />
               {searchingInterests && <ActivityIndicator color={theme.accentLight} />}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
-                {interestResults.filter((r) => !interests.some((i) => i.id === r.id)).map((r) => (
-                  <Chip key={r.id} label={r.name} active={false} onPress={() => { setInterests((prev) => [...prev, { id: r.id, name: r.name }]); setInterestQuery(''); setInterestResults([]); }} colors={colors} theme={theme} />
+                {visibleInterestResults.map((r) => (
+                  <Chip key={r.id} label={r.name} active={false} onPress={() => { setInterests((prev) => (prev.some((x) => x.id === r.id) || prev.length >= META_INTEREST_MAX_SELECTED ? prev : [...prev, { id: r.id, name: r.name }])); setInterestQuery(''); setInterestResults([]); }} colors={colors} theme={theme} />
                 ))}
               </View>
+              {interests.length >= META_INTEREST_MAX_SELECTED && (
+                <Text style={[s.helper, { color: colors.mutedForeground }]}>You can add up to {META_INTEREST_MAX_SELECTED} interests. Remove one to add another.</Text>
+              )}
               {interests.length > 0 && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
                   {interests.map((i) => (
@@ -544,8 +565,8 @@ export default function MetaAdsSetupScreen() {
         {/* Schedule */}
         <Section title="Schedule" colors={colors}>
           <ToggleRow label="Start now" value={startNow} onChange={setStartNow} colors={colors} />
-          {!startNow && <NativeDateTimeField mode="date" label="Start date" value={ymdToDate(startDate)} onChange={(d) => setStartDate(dateToYmd(d))} minimumDate={startOfToday()} divider testID="meta-ads-start-date" />}
-          <NativeDateTimeField mode="date" label="End date (optional)" value={ymdToDate(endDate)} onChange={(d) => setEndDate(dateToYmd(d))} onClear={() => setEndDate('')} minimumDate={ymdToDate(startDate) ?? startOfToday()} testID="meta-ads-end-date" />
+          {!startNow && <NativeDateTimeField mode="date" label="Start date" value={ymdToDate(startDate)} onChange={(d) => setStartDate(dateToYmd(d))} minimumDate={startOfToday()} maximumDate={metaAdLatestStart()} error={scheduleErrors.startDate} divider testID="meta-ads-start-date" />}
+          <NativeDateTimeField mode="date" label="End date (optional)" value={ymdToDate(endDate)} onChange={(d) => setEndDate(dateToYmd(d))} onClear={() => setEndDate('')} minimumDate={ymdToDate(startDate) ?? startOfToday()} error={scheduleErrors.endDate} testID="meta-ads-end-date" />
         </Section>
 
         {/* Placements */}
@@ -586,16 +607,20 @@ export default function MetaAdsSetupScreen() {
       </ScrollView>
 
       <View style={[s.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: SP.md }]}>
-        {!requiredValid && (
+        {!requiredValid ? (
           <Text style={[s.helper, { color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.sm }]}>
             Choose what to promote and add a headline to launch.
           </Text>
-        )}
+        ) : !scheduleValid ? (
+          <Text style={[s.helper, { color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.sm }]}>
+            Fix the schedule dates to launch.
+          </Text>
+        ) : null}
         <PrimaryButton
           label={`Launch · ${formatBudgetCents(budgetCents)}${budgetType === 'daily' ? '/day' : ''}`}
           icon="zap"
           onPress={handleLaunch}
-          disabled={!requiredValid || launching}
+          disabled={!requiredValid || !scheduleValid || launching}
           loading={launching}
         />
       </View>

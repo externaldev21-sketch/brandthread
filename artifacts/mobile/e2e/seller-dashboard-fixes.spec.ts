@@ -260,7 +260,7 @@ test.describe('Seller Dashboard + Content Analytics fixes @ 393x852', () => {
         const texts = Array.from(h.querySelectorAll('*')).filter((el) => Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent?.trim())).map((el) => el.textContent!.trim()).filter((t) => /[A-Za-z0-9]/.test(t));
         return { texts, borderBottom: getComputedStyle(h).borderBottomWidth };
       });
-      expect(header.texts).toEqual(['Content Analytics']);
+      expect(header.texts).toEqual(['Threads and videos']);
       expect(parseFloat(header.borderBottom)).toBe(0);
 
       // The Dashboard's range pills, directly under the header, Today selected.

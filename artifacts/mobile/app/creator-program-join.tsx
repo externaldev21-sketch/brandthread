@@ -14,7 +14,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import type { BrandProgramInfo } from '@/lib/affiliateTypes';
-import { ActionButton, Card, KeyStatRow, pct } from '@/components/affiliate/AffiliateUI';
+import { ActionButton, Card, InlineError, KeyStatRow, pct } from '@/components/affiliate/AffiliateUI';
+import { friendlyError } from '@/lib/friendlyError';
 
 export default function CreatorProgramJoinScreen() {
   const { theme } = useAppTheme();
@@ -29,8 +30,12 @@ export default function CreatorProgramJoinScreen() {
   const [info, setInfo] = useState<BrandProgramInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Which action is in flight: apply/join, or accepting/declining an invite.
+  const [saving, setSaving] = useState<'apply' | 'accept' | 'decline' | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
+  // An apply / invite failure. Kept apart from `error` (load state) so a
+  // failed tap doesn't replace the program details with an error page.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ref) { setLoading(false); setError('No brand selected.'); return; }
@@ -57,15 +62,31 @@ export default function CreatorProgramJoinScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const apply = async () => {
-    if (!info) return;
-    setSaving(true);
+    if (!info || saving) return;
+    setSaving('apply');
+    setActionError(null);
     try {
       const res = previewOnly ? { status: info.program.autoApprove ? 'active' : 'pending' } : await api.affiliate.apply(info.sellerId);
       setApplied(res.status);
-    } catch (e: any) {
-      setError(e?.message ?? "Couldn't apply. Try again.");
+    } catch (e) {
+      setActionError(friendlyError(e, "Couldn't apply. Try again."));
     } finally {
-      setSaving(false);
+      setSaving(null);
+    }
+  };
+
+  // The brand already invited this viewer: answer the invite rather than apply.
+  const respond = async (accept: boolean) => {
+    if (!info?.mine || saving) return;
+    setSaving(accept ? 'accept' : 'decline');
+    setActionError(null);
+    try {
+      const res = previewOnly ? { status: accept ? 'active' : 'declined' } : await api.affiliate.respondToInvite(info.mine.id, accept);
+      setApplied(res.status);
+    } catch (e) {
+      setActionError(friendlyError(e, accept ? "Couldn't accept the invite. Try again." : "Couldn't decline the invite. Try again."));
+    } finally {
+      setSaving(null);
     }
   };
 
@@ -108,22 +129,32 @@ export default function CreatorProgramJoinScreen() {
             {applied ? (
               <>
                 <Text style={s.sub}>
-                  {applied === 'active' ? 'You\'re in. Your code and link are ready.' : 'Application sent. The brand will review it.'}
+                  {applied === 'active' ? 'You\'re in. Your code and link are ready.'
+                    : applied === 'declined' ? 'Invite declined.'
+                      : 'Application sent. The brand will review it.'}
                 </Text>
-                <ActionButton label="Open creator program" onPress={() => router.replace('/creator-program' as any)} />
+                <ActionButton label="Open creator program" outline={applied === 'declined'} onPress={() => router.replace('/creator-program' as any)} />
               </>
             ) : open ? (
-              info.mine && info.mine.status !== 'removed' && info.mine.status !== 'declined' && info.mine.status !== 'invited' ? (
+              info.mine?.status === 'invited' ? (
+                <>
+                  <Text style={s.sub}>{info.brandName} invited you to their creator program.</Text>
+                  <View style={{ flexDirection: 'row', gap: SP.sm }}>
+                    <ActionButton label="Accept invite" flex loading={saving === 'accept'} loadingLabel="Accepting…" disabled={saving === 'decline'} onPress={() => respond(true)} />
+                    <ActionButton label="Decline" flex outline loading={saving === 'decline'} loadingLabel="Declining…" disabled={saving === 'accept'} onPress={() => respond(false)} />
+                  </View>
+                </>
+              ) : info.mine && info.mine.status !== 'removed' && info.mine.status !== 'declined' ? (
                 <ActionButton label="View your code" onPress={() => router.replace('/creator-program' as any)} />
               ) : (
                 <ActionButton
                   label={info.program.autoApprove ? 'Join program' : 'Apply'}
-                  loading={saving}
+                  loading={saving === 'apply'}
                   onPress={apply}
                 />
               )
             ) : null}
-            {error && error !== 'retry' ? <Text style={[s.sub, { marginTop: SP.md }]}>{error}</Text> : null}
+            <InlineError message={actionError} style={{ marginTop: SP.md }} />
           </>
         )}
       </ScrollView>

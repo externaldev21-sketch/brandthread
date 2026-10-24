@@ -261,6 +261,17 @@ describe("seeded seller", () => {
     expect(body.daily[0]).toMatchObject({ order_count: 2 });
   });
 
+  it("sales: the Dashboard's calendar Week / Year and All periods cover the same recent orders", async () => {
+    for (const period of ["thisYear", "all"]) {
+      const { body } = await get(`/api/analytics/revenue?period=${period}`);
+      expect(body.period).toBe(period);
+      expect(body.orderCount).toBe(2);
+      expect(body.breakdown.map((row: any) => row.label)).toEqual(["Seeded Tee", "Gift wrap"]);
+    }
+    const week = (await get("/api/analytics/revenue?period=thisWeek")).body;
+    expect(week.orderCount).toBeLessThanOrEqual(2);
+  });
+
   it("products: rows carry the first product image", async () => {
     const { body } = await get("/api/analytics/products");
     expect(body.find((row: any) => row.productId === productId)).toMatchObject({ imageUrl: "https://img.test/seeded-tee.jpg" });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatNextSend, phaseLabel, timeLeft } from './sellerEngagement';
+import { formatNextSend, phaseLabel, pushLinkLabel, timeLeft } from './sellerEngagement';
 
 const now = new Date(2026, 5, 1, 12, 0, 0);
 
@@ -19,3 +19,12 @@ describe('sellerEngagement formatters', () => {
     expect(phaseLabel('drawn')).toBe('Winners drawn');
   });
 });
+
+describe('pushLinkLabel', () => {
+  it('names the picked item next to its type', () => {
+    expect(pushLinkLabel({ type: 'none', label: 'None' })).toBe('None');
+    expect(pushLinkLabel({ type: 'product', label: 'Heavyweight Tee' })).toBe('Product · Heavyweight Tee');
+    expect(pushLinkLabel({ type: 'post', label: '  ' })).toBe('Post');
+  });
+});
+

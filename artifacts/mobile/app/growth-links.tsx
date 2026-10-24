@@ -42,7 +42,7 @@ export default function GrowthLinksScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.primary} />}
         >
           {links.length === 0 ? (
             <EmptyState
