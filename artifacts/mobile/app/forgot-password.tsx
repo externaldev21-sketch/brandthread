@@ -47,17 +47,22 @@ export default function ForgotPasswordScreen() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState('');
+  const [notice, setNotice]     = useState('');
   const [loading, setLoading]   = useState(false);
 
   const isFetching = loading;
+  // Matches the "Use at least 8 characters" hint under the field.
+  const canReset = code.length === 6 && password.length >= 8;
 
   // ─── Send reset code ─────────────────────────────────────────────────────────
   async function handleSendCode() {
     if (!email.trim() || isFetching) return;
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       await api.auth.requestPasswordReset(email.trim().toLowerCase());
+      if (step === 'code') setNotice(`New code sent to ${email.trim()}.`);
       setStep('code');
     } catch (e: any) {
       setError(mapError(e));
@@ -156,6 +161,9 @@ export default function ForgotPasswordScreen() {
                 onPress={handleSendCode}
                 disabled={!email.trim() || isFetching}
                 activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Send reset code"
+                accessibilityState={{ disabled: !email.trim() || isFetching, busy: isFetching }}
               >
                 <LinearGradient
                   colors={(!email.trim() || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
@@ -173,6 +181,7 @@ export default function ForgotPasswordScreen() {
                 style={s.secondaryBtn}
                 onPress={() => { goBackOr(router, '/sign-in'); }}
                 activeOpacity={0.85}
+                accessibilityRole="button"
               >
                 <Text style={s.secondaryBtnText}>Back to sign in</Text>
               </TouchableOpacity>
@@ -194,7 +203,7 @@ export default function ForgotPasswordScreen() {
                   placeholder="000000"
                    placeholderTextColor={theme.subtle}
                   value={code}
-                  onChangeText={t => { setCode(t); setError(''); }}
+                  onChangeText={t => { setCode(t.replace(/[^0-9]/g, '')); setError(''); }}
                   keyboardType="number-pad"
                   autoComplete="one-time-code"
                   textContentType="oneTimeCode"
@@ -237,8 +246,11 @@ export default function ForgotPasswordScreen() {
               <TouchableOpacity
                 style={s.primaryWrap}
                 onPress={handleReset}
-                disabled={!code || !password || isFetching}
+                disabled={!canReset || isFetching}
                 activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Reset password"
+                accessibilityState={{ disabled: !canReset || isFetching, busy: isFetching }}
               >
                 <LinearGradient
                   colors={(!code || !password || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
@@ -257,12 +269,15 @@ export default function ForgotPasswordScreen() {
                 onPress={handleSendCode}
                 disabled={isFetching}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Resend code"
               >
                 <Text style={s.resendText}>
                   {"Didn't get it? "}
                   <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Resend code</Text>
                 </Text>
               </TouchableOpacity>
+              {notice ? <Text style={s.noticeText} accessibilityLiveRegion="polite">{notice}</Text> : null}
             </>
           )}
 
@@ -272,12 +287,12 @@ export default function ForgotPasswordScreen() {
               {/* Success card */}
               <View style={s.successCard}>
                 <LinearGradient
-                   colors={[`${theme.success}1F`, `${theme.success}0A`]}
+                  colors={[theme.card, theme.card]}
                   style={s.successGrad}
                 >
                   <View style={s.successIconWrap}>
                     <LinearGradient
-                       colors={[theme.success, theme.success]}
+                      colors={[theme.text, theme.text]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={s.successIconGrad}
@@ -296,6 +311,7 @@ export default function ForgotPasswordScreen() {
                 style={s.primaryWrap}
                 onPress={() => { router.replace('/sign-in' as never); }}
                 activeOpacity={0.88}
+                accessibilityRole="button"
               >
                 <LinearGradient
                   colors={[theme.accent, theme.secondary]}
@@ -346,7 +362,8 @@ function mapError(err: any): string {
   if (msg.includes('network'))
     return "Couldn't connect. Check your internet and try again.";
 
-  return inner?.message || err?.message || 'Something went wrong. Please try again.';
+  // Never surface a raw runtime exception message.
+  return 'Something went wrong. Please try again.';
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -355,7 +372,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
-  backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', marginBottom: 16 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
   logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text },
@@ -429,6 +446,4 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
      color: theme.muted, lineHeight: 21, textAlign: 'center',
   },
 
-  // Generic card (CARD token)
-  _card: { backgroundColor: theme.card },
 });

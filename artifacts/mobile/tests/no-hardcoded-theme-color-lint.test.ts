@@ -222,7 +222,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/sample-detail.tsx',
   'app/seller-drop-preview.tsx',
   'app/seller-settings.tsx',
-  'app/setup.tsx',
   'app/share-profile.tsx',
   'app/shopping-preferences.tsx',
   'app/sign-in.tsx',

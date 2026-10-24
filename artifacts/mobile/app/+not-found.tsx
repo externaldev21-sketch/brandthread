@@ -45,18 +45,21 @@ function NotFoundContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const goHome = () => {
+  // The header arrow goes back; the "Go home" button always goes home
+  // (it used to go back too whenever there was history, despite its label).
+  const goBack = () => {
     if (router.canGoBack()) {
       goBackOr(router);
     } else {
       router.replace('/');
     }
   };
+  const goHome = () => router.replace('/');
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen options={{ title: 'Not found', headerShown: false }} />
-      <ScreenHeader title="Not found" onBack={goHome} />
+      <ScreenHeader title="Not found" onBack={goBack} />
       <View style={[styles.container, { paddingBottom: insets.bottom + SPACING.xl }]}>
         <View style={[styles.iconCircle, { borderColor: theme.accent + '40' }]}>
           <Icon name="compass" size={26} color={colors.mutedForeground} />

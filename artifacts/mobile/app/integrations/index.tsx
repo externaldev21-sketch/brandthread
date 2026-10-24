@@ -78,6 +78,12 @@ export default function IntegrationsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
+  // Count only the integrations this screen lists: the server can report
+  // other keys (e.g. a Shopify import), which used to read "3 of 2".
+  const connectedCount = INTEGRATION_DEFS.filter((item) => (
+    item.isStripe ? isStripeFullyConnected(stripeStatus) : connectedKeys.has(item.key)
+  )).length;
+
   async function handleConnectStripe() {
     setToggling('stripe');
     try {
@@ -165,6 +171,9 @@ export default function IntegrationsScreen() {
                   <TouchableOpacity
                     key={item.key}
                     onPress={() => handleConnect(item)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
+                    accessibilityHint={connected ? (item.route ? `Opens ${item.label} settings` : undefined) : `Connect ${item.label}`}
                     activeOpacity={connected && !item.route ? 1 : 0.7}
                     accessibilityRole="button"
                     accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
@@ -214,7 +223,7 @@ const s = StyleSheet.create({
   loadingRow: { alignItems: 'center', paddingVertical: 30 },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
-  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8, marginTop: 2 },
+  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', marginTop: 2 },
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },

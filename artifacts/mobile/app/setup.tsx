@@ -129,8 +129,8 @@ function TaskCard({
 }
 
 const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD,
-                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: colors.card,
+                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
                 paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },
@@ -331,12 +331,12 @@ export default function SetupScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -0.7 },
-  subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: colors.foreground, letterSpacing: -0.7 },
+  subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
   pctBadge:     { backgroundColor: colors.accent, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
   pctText:      { fontSize: FS.base, fontFamily: FONT.bold, color: colors.accentForeground },
   progressCard: { marginBottom: SP.md },
   progressThread: { width: '100%', marginBottom: SP.sm },
-  progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
   doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });

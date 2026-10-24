@@ -363,9 +363,7 @@ export default function SignInScreen() {
 
           <Text style={s.headline}>You're already{'\n'}signed in.</Text>
           <Text style={s.subtitle}>
-            {currentEmail
-              ? `You are currently signed in as ${currentEmail}.`
-              : 'You have an active session.'}
+            Continue with this account, or sign out to use a different one.
           </Text>
 
           {/* Info card */}
@@ -437,10 +435,10 @@ export default function SignInScreen() {
             </Text>
 
             <View style={s.fieldWrap}>
-              <Text style={s.label}>Code</Text>
-              <TextInput accessibilityLabel="Verification code"
+              <Text style={s.label}>{useBackupCode ? 'Backup code' : 'Authentication code'}</Text>
+              <TextInput accessibilityLabel={useBackupCode ? 'Backup code' : 'Authentication code'}
                 style={s.input}
-                placeholder="000000"
+                placeholder={useBackupCode ? 'Backup code' : '000000'}
                 placeholderTextColor={theme.subtle}
                 value={totpCode}
                 onChangeText={t => {
@@ -551,12 +549,16 @@ export default function SignInScreen() {
             <PressableScale
               onPress={() => { if (resendSeconds <= 0) { sendCode(true); } }}
               disabled={resendSeconds > 0 || sendingCode}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: resendSeconds > 0 || sendingCode }}
               accessibilityLabel="Resend code"
               style={s.resendRow}
               testID="otp-resend"
             >
               <Text style={[s.resendText, { color: resendSeconds > 0 ? theme.muted : theme.accent }]}>
-                {resendSeconds > 0 ? `Resend code in 0:${String(resendSeconds).padStart(2, '0')}` : 'Resend code'}
+                {resendSeconds > 0
+                  ? `Resend code in ${Math.floor(resendSeconds / 60)}:${String(resendSeconds % 60).padStart(2, '0')}`
+                  : 'Resend code'}
               </Text>
             </PressableScale>
           </ScrollView>
@@ -597,11 +599,12 @@ export default function SignInScreen() {
 
             <View style={s.fieldWrap}>
               <View style={s.pwLabelRow}>
-                <Text style={s.label}>Password</Text>
+                <Text style={[s.label, s.labelInRow]}>Password</Text>
                 <PressableScale
                   onPress={() => router.push('/forgot-password' as never)}
                   accessibilityLabel="Forgot password?"
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={s.forgotBtn}
                 >
                   <Text style={[s.forgotLink, { color: theme.accent }]}>Forgot password?</Text>
                 </PressableScale>
@@ -772,7 +775,7 @@ export default function SignInScreen() {
               autoCorrect={false}
               keyboardType={phoneSupported ? 'default' : 'email-address'}
               textContentType="username"
-              autoComplete="email"
+              autoComplete={phoneSupported ? 'username' : 'email'}
               returnKeyType="go"
               onSubmitEditing={() => sendCode(false)}
             />
@@ -863,7 +866,13 @@ function mapError(err: any): string {
   if (msg.includes('rate limit') || msg.includes('too many'))
     return 'Too many attempts. Please wait a moment.';
 
-  return inner?.message || err?.message || 'Something went wrong. Please try again.';
+  // Only Clerk's own API errors (an `errors[]` entry or a bare ClerkAPIError,
+  // both with a string `code`) carry user-facing copy; a raw runtime exception
+  // (e.g. "Cannot read properties of null") must never reach the UI.
+  const clerkMessage = typeof inner?.code === 'string' && inner.code
+    ? (inner.longMessage ?? inner.message)
+    : undefined;
+  return clerkMessage || 'Something went wrong. Please try again.';
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -912,6 +921,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: SPACING.xs - 2,
   },
+  // The label row is as tall as the 44pt link target; centre both texts on it.
+  labelInRow: { marginBottom: 0 },
+  forgotBtn: { justifyContent: 'center' },
   forgotLink: { fontSize: 12, fontFamily: FONT.semibold },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',

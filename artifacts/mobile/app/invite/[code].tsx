@@ -82,8 +82,8 @@ export default function InviteDeepLinkScreen() {
 
   if (!isLoaded || !isSignedIn) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.text} />
+      <View style={[styles.root, styles.center, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.text} accessibilityLabel="Opening invite" />
       </View>
     );
   }
@@ -107,7 +107,10 @@ export default function InviteDeepLinkScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
+  root: { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, paddingHorizontal: SP.xl },
+  cta: { alignSelf: 'stretch', marginTop: SP.lg },
   title: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
   body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, lineHeight: 20 },
   code: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: 0, marginTop: SP.lg, fontVariant: ['tabular-nums'] },

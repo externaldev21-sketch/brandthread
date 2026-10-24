@@ -119,7 +119,7 @@ export function recommendSellerPlan(stage: string, goals: string[]): SellerPlanR
     .slice(0, 2);
   const stagePhrase = STAGE_LABELS[stage] ?? 'your current brand stage';
   const goalPhrase = strongestGoals.length > 0
-    ? ` and your goals around ${strongestGoals.map((goal) => goal.toLowerCase()).join(' and ')}`
+    ? ` and want to ${strongestGoals.map((goal) => goal.toLowerCase()).join(' and ')}`
     : '';
   return {
     planId,

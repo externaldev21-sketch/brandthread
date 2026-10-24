@@ -97,7 +97,7 @@ export default function AccessCodeScreen() {
   return (
     <View style={s.root}>
       <ScreenHeader
-        title="Access"
+        title="Invite code"
         hideDivider
         backAccessibilityLabel={mode === 'code' ? 'Sign out' : 'Back'}
         onBack={mode === 'code' ? leave : () => show('code')}
@@ -109,6 +109,11 @@ export default function AccessCodeScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.title} accessibilityRole="header">{title}</Text>
+          {mode === 'code' ? (
+            <Text style={s.body}>Brandthread is invite-only right now. Enter the code you were sent, or join the waitlist.</Text>
+          ) : mode === 'waitlist' ? (
+            <Text style={s.body}>We'll email you as soon as a spot opens up.</Text>
+          ) : null}
 
           {mode === 'code' && (
             <View style={s.group} testID="access-form">
@@ -174,13 +179,12 @@ export default function AccessCodeScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  content: { paddingHorizontal: SP.md, paddingTop: SP.xl, gap: SP.md },
+  content: { paddingHorizontal: SP.lg, paddingTop: SP.xl, gap: SP.md },
   group: { gap: SP.md },
   title: {
     fontSize: FS.xxl, fontFamily: FONT.bold, color: theme.text, textAlign: 'center',
-    marginBottom: SP.sm,
   },
-  body: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
+  body: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', marginBottom: SP.sm },
   input: {
     height: COMP.inputH, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.surface, paddingHorizontal: SP.lg,

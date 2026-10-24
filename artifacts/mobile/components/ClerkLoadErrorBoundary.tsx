@@ -53,7 +53,7 @@ export class ClerkLoadErrorBoundary extends Component<PropsWithChildren, State> 
         <Text style={styles.body}>
           We couldn’t reach the sign-in service. Check your connection and try again.
         </Text>
-        <TouchableOpacity onPress={() => { void reload(); }} style={styles.button} accessibilityRole="button">
+        <TouchableOpacity onPress={() => { void reload(); }} style={styles.button} accessibilityRole="button" accessibilityLabel="Retry connecting">
           <Text style={styles.buttonLabel}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -81,5 +81,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F7FA',
     alignItems: 'center',
   },
-  buttonLabel: { color: '#0A0A0B', fontSize: 15, fontWeight: '700' },
+  buttonLabel: { color: '#0A0A0B', fontSize: 15, fontFamily: 'Inter_700Bold' },
 });

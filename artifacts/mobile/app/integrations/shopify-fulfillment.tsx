@@ -85,7 +85,7 @@ export default function ShopifyFulfillmentScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ScreenHeader title="Fulfillment connections" />
         <View style={{ padding: SP.md, gap: 16 }}>
           <LoadingSkeleton height={92} />
@@ -96,7 +96,7 @@ export default function ShopifyFulfillmentScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader title="Fulfillment connections" />
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 60 }}>
         <BrandthreadCard>
@@ -132,6 +132,8 @@ export default function ShopifyFulfillmentScreen() {
                 onChangeText={setShopDomain}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="url"
+                accessibilityLabel="Shopify store domain"
               />
             </>
           )}

@@ -22,8 +22,10 @@ export function SellerPlanRecommendationStep({
   onContinue: () => void;
 }) {
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { packages } = useRevenueCat();
   const recommendation = recommendSellerPlan(brandStage, goals);
+  const selectedPlanName = SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name ?? selectedPlanId;
   // Same rule as the plans screen: only promise a trial the store really offers.
   const hasRealTrialOffer = Platform.OS === 'web' || packages.some((pkg) => !!pkg.product.introPrice);
 
@@ -51,6 +53,9 @@ export function SellerPlanRecommendationStep({
               testID={`onboarding-plan-${plan.id}`}
               activeOpacity={0.82}
               onPress={() => onSelect(plan.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${plan.name}, ${price} per month${recommended ? ', recommended' : ''}`}
               style={[
                 styles.card,
                 selected && { borderColor: theme.accent },
@@ -81,16 +86,22 @@ export function SellerPlanRecommendationStep({
         })}
       </View>
 
-      <TouchableOpacity onPress={onContinue} activeOpacity={0.86} style={[styles.continue, { backgroundColor: theme.accent }]}>
+      <TouchableOpacity
+        onPress={onContinue}
+        activeOpacity={0.86}
+        style={[styles.continue, { backgroundColor: theme.accent }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Continue with ${selectedPlanName}`}
+      >
         <Text style={[styles.continueText, { color: theme.onAccent }]}>
-          Continue with {SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name}
+          Continue with {selectedPlanName}
         </Text>
       </TouchableOpacity>
       <Text style={styles.chargeNote}>No charge is made on this step. You'll confirm your plan right after setup.</Text>
     </ScrollView>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
   eyebrow: { fontSize: 11, fontFamily: FONT.bold, marginBottom: 8 },
   title: { color: '#FFF', fontSize: 36, lineHeight: 40, fontFamily: FONT.bold, letterSpacing: -1.2 },
@@ -99,7 +110,7 @@ const styles = StyleSheet.create({
   trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   trialBadgeText: { fontSize: 11, fontFamily: FONT.bold },
   planRow: { gap: 10, paddingVertical: 18 },
-  card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
+  card: { width: '100%', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: FS.xs, fontFamily: FONT.bold },

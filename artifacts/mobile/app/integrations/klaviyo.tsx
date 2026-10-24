@@ -13,6 +13,7 @@ import { haptics, haptic } from '@/lib/haptics';
 
 
 import { useApi } from '@/hooks/useApi';
+import { ApiError } from '@/lib/networkNotice';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -71,9 +72,11 @@ export default function KlaviyoIntegrationScreen() {
     } catch (err: any) {
       haptic('error');
       const msg = String(err?.message ?? '');
+      const rejected = (err instanceof ApiError && (err.status === 400 || err.status === 401))
+        || msg.includes('401') || msg.toLowerCase().includes('invalid');
       Alert.alert(
         'Connection failed',
-        msg.includes('401') || msg.toLowerCase().includes('invalid')
+        rejected
           ? 'That API key was rejected by Klaviyo. Double-check it and try again.'
           : 'Could not reach Klaviyo. Please try again in a moment.',
       );
@@ -114,7 +117,7 @@ export default function KlaviyoIntegrationScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Klaviyo" />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -198,6 +201,7 @@ export default function KlaviyoIntegrationScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
+              accessibilityLabel="Klaviyo private API key"
             />
             <TouchableOpacity
               style={[styles.connectBtn, { backgroundColor: connecting ? FILL_ELEVATED : colors.primary }]}
@@ -213,8 +217,9 @@ export default function KlaviyoIntegrationScreen() {
 
             <TouchableOpacity
               style={styles.helpRow}
-              onPress={() => Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267')}
+              onPress={() => { Linking.openURL('https://help.klaviyo.com/hc/en-us/articles/115005062267').catch(() => {}); }}
               activeOpacity={0.7}
+              accessibilityRole="link"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="link"
             >

@@ -239,7 +239,7 @@ export default function PublicProfileRoute() {
             <SkeletonBlock width="40%" height={14} />
           </View>
         </View>
-        <Text style={styles.loadingText}>Loading profile…</Text>
+        <Text style={styles.loadingText} accessibilityLiveRegion="polite">Loading profile…</Text>
       </View>
     );
   }
@@ -515,12 +515,16 @@ function makeStyles(theme: AppThemePreset) {
   },
 
   // CTA block
+  // Stretch, not center: PressableScale's outer Pressable carries no style,
+  // so under alignItems:'center' the full-width buttons shrink-wrapped their
+  // labels (Join/Sign in rendered as cramped, unpadded chips).
   ctaBlock: {
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: SP.md,
   },
   ctaLabel: {
+    alignSelf: 'center',
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     color: theme.muted,
