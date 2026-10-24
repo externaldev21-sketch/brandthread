@@ -26,6 +26,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { rememberPendingConsent } from '@/lib/legalConsent';
+import { confirmAlert } from '@/lib/actionSheet';
 import { checkDobInput, setPendingDob, submitPendingAge, type AgeBand } from '@/lib/ageGate';
 import { hydrateMyProfileFromAccount, setSellerFollowing, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
@@ -246,8 +247,10 @@ export default function OnboardingScreen() {
     if (Platform.OS !== 'android') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const back = backTarget(step);
-      if (back) { go(back); return true; }
-      return false;
+      if (!back) return false;
+      if (step === 'CODE') void leaveCode();
+      else go(back);
+      return true;
     });
     return () => sub.remove();
   });
@@ -263,6 +266,18 @@ export default function OnboardingScreen() {
       case 'STAGE': return 'STORE';
       default: return prevProfileStep(id, role);
     }
+  }
+
+  /** Backing out of the code step drops the pending verification, so ask first. */
+  async function leaveCode() {
+    const ok = await confirmAlert({
+      title: 'Abandon verification?',
+      message: 'The code we sent won’t work once you leave. You can request a new one.',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Keep verifying',
+      destructive: true,
+    });
+    if (ok && currentStep.current === 'CODE') go('EMAIL', -1);
   }
 
   // ── Signed in → first profile step ───────────────────────────────────────
@@ -377,7 +392,7 @@ export default function OnboardingScreen() {
         if (signIn.status === 'complete') { await signIn.finalize(); onSignedIn(); return; }
         if (signIn.status === 'needs_second_factor') {
           setError('This account uses two-step verification. Log in with your authenticator code to continue.');
-          router.replace('/sign-in' as never);
+          router.replace(`/sign-in?email=${encodeURIComponent(email.trim().toLowerCase())}` as never);
           return;
         }
         setError('Couldn’t log you in. Try again.');
@@ -506,7 +521,8 @@ export default function OnboardingScreen() {
         const failed = toFollow.filter((_, i) => results[i].status === 'rejected');
         return {
           step: 'BRANDS', followedIds: nextFollowed,
-          ...(failed.length ? { error: `Couldn’t follow ${failed.map((b) => b.name).join(', ')}. Try again or skip.` } : {}),
+          // One summary line, however many follows failed.
+          ...(failed.length ? { error: `Couldn’t follow ${failed.length === 1 ? failed[0].name : `${failed.length} brands`}. Try again or skip.` } : {}),
         };
       } catch (e) {
         return { step: 'BRANDS', error: apiErrorMessage(e, 'Couldn’t follow those brands.') };
@@ -676,6 +692,7 @@ export default function OnboardingScreen() {
           onClose={isAddAccount ? () => router.back() : undefined}
           busy={busy === 'apple' || busy === 'google' ? busy : null}
           error={error}
+          inviteApplied={!!referralCode}
           devBanner={<ClerkKeyBanner />}
         />
       );
@@ -684,7 +701,7 @@ export default function OnboardingScreen() {
     case 'EMAIL':
       return <EmailScreen value={email} onChange={(v) => { setEmail(v); setError(''); }} error={error} onBack={() => go('BIRTHDAY')} onContinue={() => { void continueFromEmail(); }} busy={isBusy('email')} />;
     case 'CODE':
-      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={() => go('EMAIL')} onResend={resendCode} busy={isBusy('code') || isBusy('email')} />;
+      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={() => { void leaveCode(); }} onEditEmail={() => go('EMAIL', -1)} onResend={resendCode} busy={isBusy('code') || isBusy('email')} />;
     case 'DETAILS':
       return (
         <DetailsScreen
@@ -758,7 +775,8 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <OnboardingStepTransition stepId={step} direction={direction} onBack={onBack}>
+    // No edge-swipe back on the code step: leaving it asks first (header back / Android back).
+    <OnboardingStepTransition stepId={step} direction={direction} onBack={step === 'CODE' ? undefined : onBack}>
       {renderStep()}
     </OnboardingStepTransition>
   );

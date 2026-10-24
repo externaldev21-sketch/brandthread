@@ -51,6 +51,17 @@ describe("launch onboarding: requirements", () => {
     expect(profile).toContain("testPrefix=\"onboarding-brands\"");
   });
 
+  it("web notifications step has a single Continue (no Turn on / Skip that do nothing)", () => {
+    expect(profile).toContain("footer={web ? (");
+    expect(profile).toContain('<PillButton testID="onboarding-notifications-continue" label="Continue" onPress={onSkip} />');
+    expect(profile).toContain("Alerts aren’t available in the browser.");
+  });
+
+  it("asks before leaving the code step and disables edge-swipe back there", () => {
+    expect(onboarding).toContain("title: 'Abandon verification?'");
+    expect(onboarding).toContain("onBack={step === 'CODE' ? undefined : onBack}");
+  });
+
   it("uses the system font and theme colors only (no Inter, no hex text colors in the kit)", () => {
     for (const src of [kit, welcome, auth, profile]) {
       expect(src).not.toContain("Inter_");

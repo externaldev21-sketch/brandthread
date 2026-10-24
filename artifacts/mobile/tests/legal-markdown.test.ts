@@ -70,6 +70,12 @@ describe('markdown → sections parser', () => {
     ]);
     expect(plainInline('**x** and [y](https://z.test)')).toBe('x and y');
   });
+
+  it('turns a bare email address into a mailto link', () => {
+    expect(parseInline('Contact privacy@brandthread.app.')).toEqual([
+      { text: 'Contact ' }, { text: 'privacy@brandthread.app', href: 'mailto:privacy@brandthread.app' }, { text: '.' },
+    ]);
+  });
 });
 
 describe('[LAWYER REVIEW] stripping', () => {

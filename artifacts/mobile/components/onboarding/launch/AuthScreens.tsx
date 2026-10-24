@@ -123,6 +123,7 @@ export function CodeScreen({
   onComplete,
   error,
   onBack,
+  onEditEmail,
   onResend,
   busy,
 }: {
@@ -132,6 +133,8 @@ export function CodeScreen({
   onComplete: (code: string) => void;
   error?: string;
   onBack: () => void;
+  /** "Wrong email? Edit": back to the email field with the address kept. */
+  onEditEmail: () => void;
   /** Resolves when the new code is on its way. */
   onResend: () => Promise<void>;
   busy?: boolean;
@@ -163,6 +166,7 @@ export function CodeScreen({
       <Sub style={s.center}>
         We’ve just sent a 6-digit code to{'\n'}<Text style={{ color: theme.text, fontWeight: '600' }}>{email}</Text>.
       </Sub>
+      <TextLink testID="onboarding-code-edit-email" label="Wrong email? Edit" onPress={onEditEmail} muted />
       <Sub style={s.center}>
         It logs you in if you already have a Brandthread account. If you don’t see the email, check your spam.
       </Sub>

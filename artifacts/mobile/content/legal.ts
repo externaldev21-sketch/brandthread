@@ -156,10 +156,14 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocumentContent> = {
   },
 };
 
-/** Display order for the document switcher and the update prompt (the original three). */
-export const LEGAL_DOCUMENT_ORDER: LegalDocId[] = ['terms', 'guidelines', 'privacy'];
-
 /** Every legal document, in the order the About / Legal lists show them. */
 export const LEGAL_ALL_DOCUMENT_ORDER: LegalDocId[] = [
   'terms', 'privacy', 'refund-policy', 'seller-agreement', 'guidelines',
 ];
+
+/**
+ * Display order for the document switcher and the update prompt (the original
+ * three). Same relative order as LEGAL_ALL_DOCUMENT_ORDER, so the 3-pill and
+ * 5-pill switchers never disagree.
+ */
+export const LEGAL_DOCUMENT_ORDER: LegalDocId[] = ['terms', 'privacy', 'guidelines'];

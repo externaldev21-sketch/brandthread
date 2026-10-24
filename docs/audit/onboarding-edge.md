@@ -252,3 +252,46 @@ components or behaviour outside this area, or is pinned by an existing test).
 ---
 
 Counts: 49 entries (47 screens or steps, plus the two brief items that don't exist: the Username/Photo steps and the force-update gate) · 122 fixable findings · 86 fixed in this PR · 36 left open (listed above without the prefix) · 5 entries rendered clean.
+
+---
+
+## Round 2 fix-backs
+
+Rechecked against `dev` after the launch-onboarding rebuild (`app/onboarding.tsx` now runs
+`components/onboarding/launch/*`: Welcome → Birthday → Email → Code → Details → Username → Photo →
+Interest → Brands → Sizes → Notifications → Role → Store → Stage). Several round-1 onboarding entries point
+at screens that are no longer mounted (`AccountTypeStep`, `SharedAuthStep`, the Style / Goals / AI-sample /
+Plan / Success steps, `components/onboarding/WelcomeStep.tsx`, `BrandsToFollowStep.tsx`). Those are marked
+**obsolete** below, with the equivalent fixed on the live screen where one exists. Verified at 390×844.
+
+**Fixed in round 2**
+- Crash fallback: the whole-app boundary's button now says "Restart app" (with "Restart the app, or head back home."). The per-screen boundary keeps "Try again", since that one really retries.
+- Invite link: Welcome shows an "Invite applied" chip when `referralCode` is present.
+- Code step (the old "Verify email"): back asks "Abandon verification?" (Leave / Keep verifying) from the header arrow and Android back. Edge-swipe back is off on this step, and a "Wrong email? Edit" link returns to the email field with the address kept.
+- Account exists → sign in: in the new flow, an existing email logs in by code. The one handoff to `/sign-in` (two-step accounts) now passes `?email=`, which sign-in already prefills.
+- Brands: failed follows now come back as one summary line ("Couldn't follow 3 brands. Try again or skip."; a single failure still names the brand) instead of a comma list.
+- Notifications: on web there's a single Continue, with copy saying alerts live in the mobile app. On native, "Turn on" now really asks for permission (launch flow), so the copy is honest as written.
+- Store setup checklist: "Go to Dashboard" is now "Go to dashboard". Tapping a task now just opens it, without the 3-button Alert; the check circle still marks a task done. Save errors now go through `showAlert` and `friendlyError`. The duplicate `accessibilityLabel` on the check circle is removed.
+- Sign in: a wrong password says "Incorrect email/phone or password." when the identifier was a phone number.
+- Forgot password: now uses Sign-in's `IconButton` back arrow, spacing (`SPACING.xl` gutter, `SPACING.lg` under back, `SPACING.xxxl - 4` under the logo) and the shared `Button`, so it gets the same disabled treatment (`lib/disabledButton.ts`). The `noticeText` style that was referenced but never defined is added.
+- Access gate: the input radius is now `RADIUS.md`, matching both buttons.
+- Legal: `privacy@brandthread.app` (and any bare email in legal markdown) renders as a `mailto:` link through `parseInline`. The 3-pill switcher order is now Terms · Privacy · Guidelines, the same relative order as the 5-pill one. The 5-pill scroll content has end padding so the border clears the clip edge.
+
+**Already fixed on dev before round 2**
+- Sign-in disabled primary button: the shared `Button` uses `getDisabledFilledButtonColors`.
+- Shopify fulfillment footnote: no italic remains.
+- More tab "Integrations" row: it now opens the `/integrations` hub.
+
+**Obsolete (screen no longer exists in the launch flow)**
+- Account type back control (the role choice is now the `ROLE` step, which has a back arrow), seller bullet wrapping and the kicker/title/description repetition.
+- Duplicate legal consent line: Welcome has the single legal line and no checkbox.
+- Sign-up draft first name / username lost on the web reload: the launch flow has no `postAuth` reload. Username is collected after sign-in and persisted (`onboarding_pending_username` plus the per-user draft), and both final saves send it. The Name step is gone (name is asked only when Clerk requires it).
+- Already-signed-in body length, Account-exists "answers are saved" copy.
+- Style chips preselected / ◻️ emoji (Interest is now a single pick with Skip), Goals CTA, AI-sample zap icon, Plan step.
+- Success screen CTA case and the double buyer welcome headline (buyers go straight to `/thread-explainer`). The remaining "Go to Dashboard" in `setup.tsx` is fixed above.
+- `u/[username]` signed-out landing (no back control): the account wall removed the signed-out landing.
+- Not-found unreachable for signed-out visitors: with the account wall, sending them to `/onboarding` is intended.
+
+**Left open (outside this area or a product call)**
+- Welcome pill `getOnAccentTextStyle` text-shadow: the old `WelcomeStep` isn't mounted, and the launch Welcome uses outline rows.
+- Verified badge green: an owner decision, so greens stay.

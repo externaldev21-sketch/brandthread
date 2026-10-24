@@ -24,7 +24,7 @@ export type ErrorFallbackProps = {
   error: Error;
   resetError: () => void;
   /**
-   * 'app' (default) — the root, whole-app boundary: "Try again" reloads the
+   * 'app' (default) — the root, whole-app boundary: "Restart app" reloads the
    * app, since the provider tree itself may be what broke.
    * 'screen' — a per-screen / per-tab boundary (Expo Router's
    * `unstable_screenErrorBoundary`): "Try again" re-renders just the failed
@@ -114,12 +114,13 @@ export function ErrorFallback({ error, resetError, scope = 'app', onBack }: Erro
         </Text>
 
         <Text style={[TYPE_SCALE.body, styles.message, { color: colors.mutedForeground }]}>
-          Try again, or head back home.
+          {isScreen ? 'Try again, or head back home.' : 'Restart the app, or head back home.'}
         </Text>
 
         <View style={styles.actions}>
           <Button
-            label="Try again"
+            // The whole-app boundary reloads the app, so say so.
+            label={isScreen ? 'Try again' : 'Restart app'}
             onPress={handleRetry}
             testID="error-fallback-retry"
             variant="primary"

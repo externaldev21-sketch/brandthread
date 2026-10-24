@@ -10,7 +10,9 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -96,7 +98,6 @@ function TaskCard({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: task.completed, disabled: task.completed }}
-          accessibilityLabel={`Mark ${task.label} done`}
         >
           {task.completed && <Icon name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
@@ -199,7 +200,7 @@ export default function SetupScreen() {
       const next = await completeTask(id, userId, { throwOnSyncError: true });
       setState(next);
     } catch (err) {
-      Alert.alert('Not saved', err instanceof Error && err.message ? err.message : 'Could not save your progress. Check your connection and try again.');
+      showAlert('Not saved', friendlyError(err, 'Could not save your progress. Check your connection and try again.'));
     }
   }
 
@@ -208,7 +209,7 @@ export default function SetupScreen() {
       const next = await skipTask(id, userId, { throwOnSyncError: true });
       setState(next);
     } catch (err) {
-      Alert.alert('Not saved', err instanceof Error && err.message ? err.message : 'Could not save your progress. Check your connection and try again.');
+      showAlert('Not saved', friendlyError(err, 'Could not save your progress. Check your connection and try again.'));
     }
   }
 
@@ -220,17 +221,9 @@ export default function SetupScreen() {
 
   function handleTaskPress(task: SetupTask) {
     if (task.completed) return;
-    if (isAutoTrackedTask(task.id)) {
-      // e.g. "Set up payments" goes straight to payouts setup; it ticks itself
-      // once Stripe reports the account active.
-      openTask(task);
-      return;
-    }
-    Alert.alert(task.label, task.description, [
-      { text: 'Open', onPress: () => openTask(task) },
-      { text: 'Mark complete', onPress: () => handleComplete(task.id) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    // A plain navigation. Marking a task done is the row's own check circle;
+    // auto-tracked tasks (e.g. "Set up payments") tick themselves.
+    openTask(task);
   }
 
   const pct = state ? completionPercent(state) : 0;
@@ -293,7 +286,7 @@ export default function SetupScreen() {
               </View>
             </View>
             <PrimaryButton
-              label="Go to Dashboard"
+              label="Go to dashboard"
               // navigate (not replace): pops the root stack back to the existing
               // (tabs) scene on the Dashboard tab instead of stacking a new one.
               onPress={() => router.navigate('/(tabs)/' as never)}

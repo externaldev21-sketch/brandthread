@@ -27,6 +27,7 @@ export function WelcomeScreen({
   onClose,
   busy,
   error,
+  inviteApplied,
   devBanner,
 }: {
   mode: WelcomeMode;
@@ -39,6 +40,8 @@ export function WelcomeScreen({
   onClose?: () => void;
   busy?: 'apple' | 'google' | null;
   error?: string;
+  /** Arrived from an invite link (/invite/CODE): show that it was recognised. */
+  inviteApplied?: boolean;
   devBanner?: React.ReactNode;
 }) {
   const { theme } = useAppTheme();
@@ -67,6 +70,12 @@ export function WelcomeScreen({
         <Text accessibilityRole="header" style={[s.title, !signup && s.titleLogin, { color: theme.text }]}>
           {signup ? 'Sign up\nfor Brandthread' : 'Log in to Brandthread'}
         </Text>
+        {inviteApplied ? (
+          <View testID="onboarding-invite-applied" style={[s.invite, !signup && s.inviteLogin, { borderColor: theme.border }]} accessible accessibilityLabel="Invite applied">
+            <Feather name="check" size={14} color={theme.text} />
+            <Text style={[s.inviteText, { color: theme.text }]}>Invite applied</Text>
+          </View>
+        ) : null}
         <View style={s.options}>
           {onApple ? (
             <OutlineOption
@@ -119,6 +128,9 @@ const s = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: GUTTER + 8 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.4, marginTop: 24 },
   titleLogin: { fontSize: 26, lineHeight: 32, textAlign: 'center' },
+  invite: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  inviteLogin: { alignSelf: 'center' },
+  inviteText: { fontSize: 13, fontWeight: '600' },
   options: { marginTop: 36, gap: 12 },
   legal: { fontSize: 12, lineHeight: 17, textAlign: 'center', paddingHorizontal: GUTTER + 12, marginBottom: 20 },
   legalLink: { fontWeight: '600' },

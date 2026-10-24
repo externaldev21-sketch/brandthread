@@ -83,7 +83,9 @@ const h = vi.hoisted(() => {
     calls.push(`clerk.sso:${strategy}`);
     return { createdSessionId: 'sess_1', setActive: async () => { clerk.signedIn = true; clerk.notify(); } };
   });
-  return { host, calls, clerk, signUp, signIn, api, storage, startSSOFlow, router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() } };
+  const confirmAlert = vi.fn(async (_opts: { title: string }) => true);
+  const params: Record<string, string> = {};
+  return { host, calls, clerk, signUp, signIn, api, storage, startSSOFlow, confirmAlert, params, router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() } };
 });
 
 vi.mock('react-native', () => ({
@@ -114,7 +116,8 @@ vi.mock('@/lib/haptics', () => ({ hapticLight: vi.fn() }));
 vi.mock('@/components/KeyboardProviderCompat', () => ({ KeyboardAvoidingView: h.host('KeyboardAvoidingView') }));
 vi.mock('@expo/vector-icons', () => ({ Feather: h.host('Feather'), Ionicons: h.host('Ionicons') }));
 vi.mock('@/components/branding/GoogleGlyph', () => ({ default: h.host('GoogleGlyph') }));
-vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => ({}) }));
+vi.mock('expo-router', () => ({ useRouter: () => h.router, useLocalSearchParams: () => h.params }));
+vi.mock('@/lib/actionSheet', () => ({ confirmAlert: h.confirmAlert }));
 vi.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'brandthread://' }));
 vi.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: () => {} }));
 vi.mock('expo-notifications', () => ({
@@ -240,6 +243,8 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     h.signIn.status = 'needs_first_factor';
     h.router.replace.mockClear();
     h.router.push.mockClear();
+    for (const k of Object.keys(h.params)) delete h.params[k];
+    h.confirmAlert.mockImplementation(async () => true);
   });
   afterEach(() => { act(() => tree?.unmount()); vi.restoreAllMocks(); });
 
@@ -366,6 +371,62 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     await flush();
     expect(h.api.auth.uploadAvatar).toHaveBeenCalledTimes(2);
     expect(has('onboarding-interest')).toBe(true);
+  });
+
+  it('summarises failed brand follows in one line instead of listing every brand', async () => {
+    const social = await import('@/services/socialService');
+    vi.mocked(social.setSellerFollowing).mockRejectedValue(new Error('offline'));
+    await render();
+    await signUpWithEmail();
+    await pickUsername();
+    await press('onboarding-photo-skip');
+    await press('onboarding-interest-skip');
+    await press('onboarding-brand-s1');
+    await press('onboarding-brand-s2');
+    await press('onboarding-brands-next');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(has('onboarding-brands')).toBe(true);
+    const messages = tree.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('Couldn’t follow'));
+    expect(messages.map((n) => n.props.children)).toContain('Couldn’t follow 2 brands. Try again or skip.');
+    expect(h.storage.get('onboarding_complete')).not.toBe('true');
+  });
+
+  it('asks before abandoning the code step, and offers a direct "Wrong email? Edit"', async () => {
+    await render();
+    await press('onboarding-use-email');
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    await type('onboarding-email-input', 'sam@exmaple.com');
+    await press('onboarding-email-continue');
+    expect(has('onboarding-code')).toBe(true);
+
+    h.confirmAlert.mockImplementationOnce(async () => false);
+    await press('onboarding-back');
+    expect(h.confirmAlert).toHaveBeenCalledWith(expect.objectContaining({ title: 'Abandon verification?' }));
+    expect(has('onboarding-code')).toBe(true);
+
+    await press('onboarding-back');
+    expect(has('onboarding-email')).toBe(true);
+    expect(byId('onboarding-email-input').props.value).toBe('sam@exmaple.com');
+
+    await press('onboarding-email-continue');
+    h.confirmAlert.mockClear();
+    await press('onboarding-code-edit-email');
+    expect(h.confirmAlert).not.toHaveBeenCalled();
+    expect(has('onboarding-email')).toBe(true);
+    expect(byId('onboarding-email-input').props.value).toBe('sam@exmaple.com');
+  });
+
+  it('shows "Invite applied" on Welcome only when an invite code came with the link', async () => {
+    await render();
+    expect(has('onboarding-invite-applied')).toBe(false);
+    act(() => tree.unmount());
+    h.params.referralCode = 'abc123';
+    await render();
+    expect(has('onboarding-invite-applied')).toBe(true);
   });
 
   it('restores unacknowledged optional work after a restart rather than silently dropping it', async () => {

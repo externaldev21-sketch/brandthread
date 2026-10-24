@@ -209,7 +209,7 @@ export default function SignInScreen() {
           setError("Phone sign-in isn't available yet — try your email instead.");
           return;
         }
-        (isResend ? setCodeError : setError)(mapError(err));
+        (isResend ? setCodeError : setError)(mapError(err, identifierKind));
         return;
       }
       setCode('');
@@ -221,7 +221,7 @@ export default function SignInScreen() {
         setError("Phone sign-in isn't available yet — try your email instead.");
         return;
       }
-      (isResend ? setCodeError : setError)(mapError(e));
+      (isResend ? setCodeError : setError)(mapError(e, identifierKind));
     } finally {
       setSendingCode(false);
     }
@@ -253,10 +253,10 @@ export default function SignInScreen() {
     setError('');
     try {
       const { error: err } = await signIn.password({ identifier: identifier.trim(), password });
-      if (err) { setError(mapError(err)); return; }
+      if (err) { setError(mapError(err, identifierKind)); return; }
       await resolveAfterFirstFactor();
     } catch (e: any) {
-      setError(mapError(e));
+      setError(mapError(e, identifierKind));
     } finally {
       setLoading(false);
     }
@@ -840,14 +840,15 @@ export default function SignInScreen() {
 }
 
 // ─── Error mapper ─────────────────────────────────────────────────────────────
-function mapError(err: any): string {
+function mapError(err: any, identifierKind?: string): string {
   if (!err) return '';
+  const wrongCredentials = identifierKind === 'phone' ? 'Incorrect email/phone or password.' : 'Incorrect email or password.';
   const inner = err?.errors?.[0] ?? err;
   const code  = (inner?.code ?? '').toLowerCase();
   const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
 
   if (code === 'form_identifier_not_found' || code === 'form_password_incorrect')
-    return 'Incorrect email or password.';
+    return wrongCredentials;
   if (code === 'session_exists' || code === 'identifier_already_signed_in')
     return 'You are already signed in.';
   if (code === 'request_rate_limited')
@@ -860,7 +861,7 @@ function mapError(err: any): string {
     return "That code isn't right. Try again.";
 
   if (msg.includes('incorrect') || msg.includes('invalid password') || msg.includes('no user'))
-    return 'Incorrect email or password.';
+    return wrongCredentials;
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout'))
     return "Couldn't connect. Check your internet and try again.";
   if (msg.includes('rate limit') || msg.includes('too many'))
