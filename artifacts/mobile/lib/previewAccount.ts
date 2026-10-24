@@ -34,7 +34,7 @@ export interface PreviewAccount {
 const BASE: Record<PreviewRole, Pick<PreviewAccount, 'id' | 'role' | 'name' | 'username'>> = {
   // Same seller identity the preview already used (and that PR #593's
   // lib/previewIdentity.ts standardises on).
-  seller: { id: 'preview-seller', role: 'seller', name: 'Preview Studio', username: 'preview_studio' },
+  seller: { id: 'preview-seller', role: 'seller', name: 'Maya Okafor', username: 'mayaokafor' },
   buyer: { id: 'preview-buyer', role: 'buyer', name: 'Ava', username: 'ava' },
 };
 
@@ -48,8 +48,8 @@ const DEMO_DETAILS: Record<PreviewRole, Omit<PreviewAccount, 'id' | 'role' | 'na
     tags: ['handmade', 'small batch'],
     location: 'Los Angeles, CA',
     contactEmail: 'hello@example.com',
-    instagram: '@previewstudio',
-    tiktok: '@previewstudio',
+    instagram: '@mayaokafor',
+    tiktok: '@mayaokafor',
     pronouns: '',
     phone: '',
   },

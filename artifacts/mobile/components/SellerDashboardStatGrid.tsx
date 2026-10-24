@@ -41,7 +41,7 @@ export function SellerDashboardStatGrid({
             activeOpacity={0.8}
             onPress={() => onSelect(tile.key)}
             accessibilityRole="button"
-            accessibilityLabel={`${tile.label}: ${tile.value}${tile.deltaLabel ? `, ${tile.deltaLabel}` : ''}. Tap to chart this metric.`}
+            accessibilityLabel={`${tile.label}: ${tile.value}${tile.deltaLabel ? `, ${tile.deltaDirection === 'up' ? 'up ' : tile.deltaDirection === 'down' ? 'down ' : ''}${tile.deltaLabel}` : ''}. Tap to chart this metric.`}
             accessibilityState={{ selected }}
           >
             <Text style={[styles.label, { color: theme.muted }]} numberOfLines={2} maxFontSizeMultiplier={1.8}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, suggestHandle } from './storeSetup';
+import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, socialFieldValue, socialHandleToSave, suggestHandle } from './storeSetup';
 
 describe('suggestHandle', () => {
   it('turns a store name into a handle', () => {
@@ -41,5 +41,27 @@ describe('canSaveSocialLinks', () => {
   });
   it('blocks saving an invalid link', () => {
     expect(canSaveSocialLinks({ instagram: previewSocialLink('instagram', 'https://evil.com/x'), tiktok: empty }, { instagram: 'a', tiktok: '' })).toBe(false);
+  });
+});
+
+describe('social field normalization', () => {
+  it('shows Instagram and TikTok the same way: @handle, whatever was pasted', () => {
+    expect(socialFieldValue('instagram', 'https://www.instagram.com/Studio.One/?hl=en')).toBe('@studio.one');
+    expect(socialFieldValue('instagram', 'instagram.com/studio')).toBe('@studio');
+    expect(socialFieldValue('instagram', '@@studio')).toBe('@studio');
+    expect(socialFieldValue('tiktok', 'https://www.tiktok.com/@studio?lang=en')).toBe('@studio');
+    expect(socialFieldValue('tiktok', 'm.tiktok.com/@studio/')).toBe('@studio');
+    expect(socialFieldValue('tiktok', 'studio')).toBe('@studio');
+  });
+
+  it('leaves unparseable input as typed so the field can flag it', () => {
+    expect(socialFieldValue('instagram', ' https://example.com/studio ')).toBe('https://example.com/studio');
+    expect(socialFieldValue('tiktok', '')).toBe('');
+  });
+
+  it('sends the bare handle (the server builds the canonical link)', () => {
+    expect(socialHandleToSave('instagram', '@studio')).toBe('studio');
+    expect(socialHandleToSave('tiktok', 'https://www.tiktok.com/@studio')).toBe('studio');
+    expect(socialHandleToSave('tiktok', '   ')).toBe('');
   });
 });

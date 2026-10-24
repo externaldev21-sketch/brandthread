@@ -1,18 +1,17 @@
 /**
  * Brandthread Guided Setup Screen
  *
- * Walks the seller through 9 tasks to launch their store.
- * Progress persists on the server via setupStore. Tasks backed by real data
- * (payments, products, logo, publish, ...) are derived there and open their
- * screen instead of being markable complete.
+ * The launch checklist (GET /api/seller/launch-checklist) is the counted list
+ * and the one progress number — the same count the dashboard, More and Launch
+ * your store show. A few extra guided tasks from setupStore (domain, first
+ * post, manufacturer) follow under it, uncounted, with Skip; the one with no
+ * server signal is ticked by hand with a long-press or its circle.
  */
 
 import React, { useState, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
-import { showAlert } from '@/lib/actionSheet';
-import { friendlyError } from '@/lib/friendlyError';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -33,11 +32,17 @@ import { useColors } from '@/hooks/useColors';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
 import {
   getSetupState, completeTask, skipTask,
-  SetupState, SetupTask, SetupTaskId,
-  completionPercent, nextTask, completedRequiredTaskCount,
-  requiredTaskCount, isSetupComplete, isAutoTrackedTask,
+  SetupState, SetupTaskId, isAutoTrackedTask,
 } from '@/lib/setupStore';
 import { useApi } from '@/hooks/useApi';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+import { LAUNCH_STEP_META, launchProgress } from '@/lib/launchChecklist';
+import { confirmAlert, showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+
+/** Guided tasks the launch checklist doesn't already cover. */
+const EXTRA_TASK_IDS: readonly SetupTaskId[] = ['connect_domain', 'first_post', 'connect_manufacturer'];
+const SAVE_FAILED = 'Could not save your progress. Check your connection and try again.';
 
 import { isPreviewDemoMode, isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 
@@ -57,14 +62,27 @@ import { crispPx } from '@/lib/crispPixel';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
 
+/** One row: a launch checklist step, or one of the extra guided tasks. */
+interface SetupRow {
+  id: string;
+  label: string;
+  description: string;
+  route: string;
+  completed: boolean;
+  /** No server signal — the seller can tick it by hand (long-press or the circle). */
+  manual: boolean;
+  /** Extra tasks can be skipped; launch steps can't. */
+  skippable: boolean;
+}
+
 function TaskCard({
   task, active, onComplete, onSkip, onPress,
 }: {
-  task: SetupTask;
+  task: SetupRow;
   active: boolean;
-  onComplete: (id: SetupTaskId) => void;
-  onSkip: (id: SetupTaskId) => void;
-  onPress: (task: SetupTask) => void;
+  onComplete: (task: SetupRow) => void;
+  onSkip: (task: SetupRow) => void;
+  onPress: (task: SetupRow) => void;
 }) {
   const colors = useColors();
   const ts = createTaskStyles(colors);
@@ -74,17 +92,28 @@ function TaskCard({
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }),
-    ]).start(() => onComplete(task.id));
+    ]).start(() => onComplete(task));
+  }
+
+  async function handleLongPress() {
+    if (task.completed || !task.manual) return;
+    const ok = await confirmAlert({ title: task.label, message: task.description, confirmLabel: 'Mark complete' });
+    if (ok) handleComplete();
   }
 
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
         activeOpacity={0.85}
+        // A tap always opens the task's screen; manual tasks are ticked with a
+        // long-press or the circle.
         onPress={() => onPress(task)}
+        onLongPress={task.manual && !task.completed ? () => { void handleLongPress(); } : undefined}
+        accessibilityRole="button"
+        accessibilityLabel={`${task.label}${task.completed ? ', done' : ''}`}
+        accessibilityHint={task.manual && !task.completed ? 'Long-press to mark complete' : undefined}
         style={[
           ts.card,
-          task.completed && ts.cardDone,
           active && !task.completed && ts.cardActive,
         ]}
       >
@@ -92,12 +121,12 @@ function TaskCard({
         <TouchableOpacity
           // Auto-tracked tasks complete only when the real work is done — the
           // circle opens the task instead of ticking it.
-          onPress={task.completed ? undefined : isAutoTrackedTask(task.id) ? () => onPress(task) : handleComplete}
-          accessibilityLabel={task.completed ? `${task.label} done` : isAutoTrackedTask(task.id) ? `Open ${task.label}` : `Mark ${task.label} complete`}
+          onPress={task.completed ? undefined : task.manual ? handleComplete : () => onPress(task)}
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: task.completed, disabled: task.completed }}
+          accessibilityLabel={task.completed ? `${task.label} done` : task.manual ? `Mark ${task.label} complete` : `Open ${task.label}`}
         >
           {task.completed && <Icon name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
@@ -116,10 +145,12 @@ function TaskCard({
         </View>
 
         {/* Right: action */}
-        {!task.completed && (
+        {task.skippable && !task.completed && (
           <TouchableOpacity
-            onPress={() => onSkip(task.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => onSkip(task)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Skip ${task.label}`}
           >
             <Text style={ts.skip}>Skip</Text>
           </TouchableOpacity>
@@ -134,7 +165,6 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
                 borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
                 paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
-  cardDone:   { opacity: 0.6 },
   check:      { width: 26, height: 26, borderRadius: 13, borderWidth: crispPx(1.5), borderColor: colors.primary,
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkDone:  { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -164,6 +194,7 @@ export default function SetupScreen() {
   const { theme } = useAppTheme();
   const [state, setState] = useState<SetupState | null>(null);
   const tabBarInset = useSellerTabBarInset();
+  const { checklist, error: checklistError, reload: reloadChecklist } = useLaunchChecklist();
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -194,43 +225,56 @@ export default function SetupScreen() {
     return () => { active = false; };
   }, [api, previewDemo, userId]));
 
-  async function handleComplete(id: SetupTaskId) {
-    if (isAutoTrackedTask(id)) return; // derived on the server; never ticked by hand
+  async function handleComplete(task: SetupRow) {
+    const id = task.id as SetupTaskId;
+    if (!task.manual || isAutoTrackedTask(id)) return; // derived on the server; never ticked by hand
     try {
       const next = await completeTask(id, userId, { throwOnSyncError: true });
       setState(next);
     } catch (err) {
-      showAlert('Not saved', friendlyError(err, 'Could not save your progress. Check your connection and try again.'));
+      showAlert('Not saved', friendlyError(err, SAVE_FAILED));
     }
   }
 
-  async function handleSkip(id: SetupTaskId) {
+  async function handleSkip(task: SetupRow) {
     try {
-      const next = await skipTask(id, userId, { throwOnSyncError: true });
+      const next = await skipTask(task.id as SetupTaskId, userId, { throwOnSyncError: true });
       setState(next);
     } catch (err) {
-      showAlert('Not saved', friendlyError(err, 'Could not save your progress. Check your connection and try again.'));
+      showAlert('Not saved', friendlyError(err, SAVE_FAILED));
     }
   }
 
-  function openTask(task: SetupTask) {
+  function openTask(task: SetupRow) {
     // push (never replace) with an explicit origin so the task's Cancel/Back
     // pops to this checklist, not to a tabs index (docs/NAVIGATION.md).
     try { router.push(withOrigin(task.route, 'setup') as never); } catch { /* ok */ }
   }
 
-  function handleTaskPress(task: SetupTask) {
-    if (task.completed) return;
-    // A plain navigation. Marking a task done is the row's own check circle;
-    // auto-tracked tasks (e.g. "Set up payments") tick themselves.
-    openTask(task);
-  }
-
-  const pct = state ? completionPercent(state) : 0;
-  const next = state ? nextTask(state) : null;
-  const done = state ? completedRequiredTaskCount(state) : 0;
-  const total = state ? requiredTaskCount(state) : 0;
-  const allDone = state ? isSetupComplete(state) : false;
+  const progress = checklist ? launchProgress(checklist) : null;
+  const launchRows: SetupRow[] = (checklist?.steps ?? []).map((step) => ({
+    id: step.id,
+    label: LAUNCH_STEP_META[step.id].title,
+    description: LAUNCH_STEP_META[step.id].body,
+    route: LAUNCH_STEP_META[step.id].route,
+    completed: step.done,
+    manual: false,
+    skippable: false,
+  }));
+  const extraRows: SetupRow[] = (state?.tasks ?? [])
+    .filter((task) => EXTRA_TASK_IDS.includes(task.id) && !task.skipped)
+    .map((task) => ({
+      id: task.id,
+      label: task.optional ? `${task.label} (optional)` : task.label,
+      description: task.description,
+      route: task.route,
+      completed: task.completed,
+      manual: !isAutoTrackedTask(task.id),
+      skippable: true,
+    }));
+  const pct = progress?.percent ?? 0;
+  const next = progress?.next ? launchRows.find((row) => row.id === progress.next) ?? null : null;
+  const allDone = progress?.complete ?? false;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -239,9 +283,11 @@ export default function SetupScreen() {
         variant="modal"
         onBack={() => goBackOr(router)}
         rightElement={
-          <View style={s.pctBadge}>
-            <Text style={s.pctText}>{pct}%</Text>
-          </View>
+          progress ? (
+            <View style={s.pctBadge}>
+              <Text style={s.pctText}>{progress.label}</Text>
+            </View>
+          ) : undefined
         }
       />
 
@@ -255,7 +301,7 @@ export default function SetupScreen() {
             fraction={pct / 100}
             color={theme.text}
             trackColor={theme.border}
-            accessibilityLabel={`Store setup ${pct}% complete`}
+            accessibilityLabel={progress ? `Store setup, ${progress.done} of ${progress.total} steps done` : 'Store setup'}
             style={s.progressThread}
           />
           {!allDone && next && (
@@ -296,19 +342,48 @@ export default function SetupScreen() {
           </GradientCard>
         )}
 
-        {/* Task checklist */}
-        <SectionHeader title="Setup checklist" style={{ marginBottom: SP.sm }} />
+        {/* Task checklist — the counted launch steps */}
+        <SectionHeader title="Launch checklist" style={{ marginBottom: SP.sm }} />
 
-        {state && state.tasks.map(task => (
+        {!checklist && (
+          <View style={s.loading}>
+            {checklistError ? (
+              <>
+                <Text style={s.progressNext}>Couldn't load your setup steps.</Text>
+                <SecondaryButton label="Try again" small onPress={() => { void reloadChecklist(); }} />
+              </>
+            ) : (
+              <ActivityIndicator color={theme.muted} />
+            )}
+          </View>
+        )}
+
+        {launchRows.map(task => (
           <TaskCard
             key={task.id}
             task={task}
             active={next?.id === task.id}
             onComplete={handleComplete}
             onSkip={handleSkip}
-            onPress={handleTaskPress}
+            onPress={openTask}
           />
         ))}
+
+        {extraRows.length > 0 && (
+          <>
+            <SectionHeader title="Grow your store" style={{ marginTop: SP.md, marginBottom: SP.sm }} />
+            {extraRows.map(task => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                active={false}
+                onComplete={handleComplete}
+                onSkip={handleSkip}
+                onPress={openTask}
+              />
+            ))}
+          </>
+        )}
 
         {/* Save and exit */}
         <SecondaryButton
@@ -331,5 +406,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   progressCard: { marginBottom: SP.md },
   progressThread: { width: '100%', marginBottom: SP.sm },
   progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
+  loading:      { alignItems: 'center', gap: SP.sm, paddingVertical: SP.lg },
   doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });

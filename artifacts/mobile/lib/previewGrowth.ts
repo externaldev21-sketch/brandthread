@@ -76,7 +76,7 @@ export const previewGrowth = {
       exists: false, slug: null, url: siteUrl, published: true,
       displayName: PREVIEW_SELLER_IDENTITY.brandName, bio: demo() ? PREVIEW_SELLER_IDENTITY.bio : '', avatarUrl: null,
       showShopButton: true, shopButtonLabel: 'Shop my store', featuredProductIds: [],
-      socials: demo() ? { instagram: 'https://www.instagram.com/preview_studio', tiktok: 'https://www.tiktok.com/@preview_studio' } : {},
+      socials: demo() ? { instagram: 'https://www.instagram.com/mayaokafor', tiktok: 'https://www.tiktok.com/@mayaokafor' } : {},
       theme: 'dark', accentColor: null, storeAccentColor: null,
       links: demo() ? [
         { id: 'demo-bl-1', title: 'Drop waitlist', url: 'https://preview.example/waitlist', enabled: true, position: 0, clicks30: 84 },

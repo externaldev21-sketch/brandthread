@@ -57,7 +57,7 @@ import { HelpLink } from '@/components/help/HelpLink';
 
 import { errorMessageOr } from '@/lib/errorMessage';
 
-import { SHIPPING_CARRIERS } from '@/lib/orderFulfillment';
+import { SHIPPING_CARRIERS, orderTitle } from '@/lib/orderFulfillment';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { apiErrorMessage } from '@/lib/safety';
 
@@ -71,6 +71,8 @@ const LAST_PACKAGE_KEY = '@brandthread/fulfill-last-package:v1';
 const CARRIERS = SHIPPING_CARRIERS;
 
 type Step = 1 | 2 | 3 | 4;
+// Short enough that all four fit under their dots at 320pt wide.
+const STEP_LABELS = ['Pack', 'Package', 'Ship', 'Confirm'] as const;
 
 type PackageChoice =
   | { kind: 'preset'; presetId: string }
@@ -579,24 +581,24 @@ export default function FulfillOrderScreen() {
     <View style={s.root}>
       <ScreenHeader title="Fulfill order" divider={false} />
 
-      {/* Stepper */}
-      <View style={s.stepperRow}>
+      {/* Stepper — every step is labelled; the current one is emphasized. */}
+      <View style={s.stepperRow} accessible accessibilityLabel={`Step ${step} of 4: ${STEP_LABELS[step - 1]}`}>
         {([1, 2, 3, 4] as Step[]).map((n, idx) => (
           <React.Fragment key={n}>
-            <View style={[s.stepDot, step >= n && { backgroundColor: ACCENT }]}>
-              {step > n ? (
-                <Icon name="check" size={12} color={ON_ACCENT} />
-              ) : (
-                <Text style={[s.stepDotText, step >= n && { color: ON_ACCENT }]}>{n}</Text>
-              )}
+            <View style={s.stepCol}>
+              <View style={[s.stepDot, step >= n && { backgroundColor: ACCENT }]}>
+                {step > n ? (
+                  <Icon name="check" size={12} color={ON_ACCENT} />
+                ) : (
+                  <Text style={[s.stepDotText, step >= n && { color: ON_ACCENT }]}>{n}</Text>
+                )}
+              </View>
+              <Text style={[s.stepLabel, step === n && s.stepLabelCurrent]} numberOfLines={1}>{STEP_LABELS[n - 1]}</Text>
             </View>
             {idx < 3 && <View style={[s.stepLine, step > n && { backgroundColor: ACCENT }]} />}
           </React.Fragment>
         ))}
       </View>
-      <Text style={s.stepLabel}>
-        {step === 1 ? 'Pack the order' : step === 2 ? 'Choose a package' : step === 3 ? 'Ship it' : 'Confirm'}
-      </Text>
 
       <ScrollView
         style={s.content}
@@ -605,7 +607,7 @@ export default function FulfillOrderScreen() {
       >
         {step === 1 && (
           <>
-            <SectionHeader title={`Order #${order.orderNumber}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
+            <SectionHeader title={`Order ${orderTitle(order.orderNumber)}`} action={{ label: 'Packing slip', onPress: handlePackingSlip }} />
             <OrderGiftNote gift={order.gift} />
             {order.lineItems.map(li => (
               <TouchableOpacity
@@ -834,7 +836,7 @@ export default function FulfillOrderScreen() {
           <>
             <SectionHeader title="Confirm & ship" />
             <BrandthreadCard style={{ gap: SP.sm }}>
-              <Row label="Order" value={`#${order.orderNumber}`} />
+              <Row label="Order" value={orderTitle(order.orderNumber)} />
               <Row label="Customer" value={order.customer.name} />
               <Row label="Items" value={String(order.lineItems.reduce((sum, li) => sum + li.quantity, 0))} />
               {label ? (
@@ -885,11 +887,14 @@ const createStyles = (theme: { background: string; card: string; border: string;
     mutedText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
     linkText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ACCENT },
 
-    stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: SP.sm, paddingHorizontal: SP.xl },
+    stepperRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', paddingTop: SP.sm, paddingBottom: SP.xs, paddingHorizontal: SP.md },
+    stepCol: { alignItems: 'center', width: 56 },
     stepDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
     stepDotText: { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED },
-    stepLine: { width: 28, height: 2, backgroundColor: BORDER },
-    stepLabel: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, paddingTop: SP.xs, paddingBottom: SP.xs },
+    // Centred on the 28pt dot (13 = 14 - half the 2pt line).
+    stepLine: { width: 28, height: 2, marginTop: 13, backgroundColor: BORDER },
+    stepLabel: { textAlign: 'center', fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, paddingTop: SP.xs },
+    stepLabelCurrent: { color: FG, fontFamily: FONT.semibold },
 
     itemCard: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
     itemThumb: { width: 48, height: 48, borderRadius: RADIUS.sm },

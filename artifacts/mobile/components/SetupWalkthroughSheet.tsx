@@ -2,15 +2,16 @@
  * SetupWalkthroughSheet — guided, step-by-step store setup walkthrough.
  *
  * Shown automatically to a seller whose account is incomplete, and
- * reachable any time via the "Continue setup" dashboard banner. Built
- * entirely on top of the existing lib/setupStore.ts checklist (from the
- * merged onboarding PR) — no duplicate task list or completion logic.
+ * reachable any time via the "Continue setup" dashboard banner. The steps,
+ * done flags and count are the server launch checklist (the same source as
+ * every other setup prompt); lib/setupStore.ts only keeps the sheet's own
+ * started / dismissed flags.
  */
 import React, { useCallback, useMemo } from 'react';
-import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable } from 'react-native';
+import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 
 import Animated from 'react-native-reanimated';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 
 import { useRouter } from 'expo-router';
 
@@ -26,7 +27,8 @@ import { withOrigin } from '@/lib/navigation/flowOrigin';
 
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 
-import { SetupState, SetupTask, SetupTaskId, completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount, markSetupStarted, dismissWelcome, skipTask } from '@/lib/setupStore';
+import { SetupState, markSetupStarted, dismissWelcome } from '@/lib/setupStore';
+import { LAUNCH_STEP_META, launchProgress, type LaunchChecklistResponse, type LaunchStepId } from '@/lib/launchChecklist';
 
 import SetupProgressRing from '@/components/SetupProgressRing';
 import { radius } from '@/constants/radii';
@@ -35,13 +37,13 @@ export default function SetupWalkthroughSheet({
   visible,
   onClose,
   userId,
-  setupState,
+  checklist,
   onSetupStateChange,
 }: {
   visible: boolean;
   onClose: () => void;
   userId: string | null | undefined;
-  setupState: SetupState;
+  checklist: LaunchChecklistResponse | null;
   onSetupStateChange: (next: SetupState) => void;
 }) {
   const { theme } = useAppTheme();
@@ -63,10 +65,9 @@ export default function SetupWalkthroughSheet({
   // itself is ever in transit.
   const { modalVisible, sheetStyle, backdropStyle } = useSheetTransition(visible, onClose);
 
-  const pct = completionPercent(setupState);
-  const active = nextTask(setupState);
-  const done = completedRequiredTaskCount(setupState);
-  const total = requiredTaskCount(setupState);
+  const progress = checklist ? launchProgress(checklist) : null;
+  const pct = progress?.percent ?? 0;
+  const active = progress?.next ?? null;
 
   const handleClose = useCallback(async () => {
     haptic('sheet');
@@ -75,32 +76,14 @@ export default function SetupWalkthroughSheet({
     onClose();
   }, [onClose, onSetupStateChange, userId]);
 
-  const openTask = useCallback(async (task: SetupTask) => {
+  const openStep = useCallback(async (id: LaunchStepId) => {
     const next = await markSetupStarted(userId);
     onSetupStateChange(next);
     onClose();
     try {
-      router.push(withOrigin(task.route, 'dashboard') as never);
+      router.push(withOrigin(LAUNCH_STEP_META[id].route, 'dashboard') as never);
     } catch { /* ignore */ }
   }, [onClose, onSetupStateChange, router, userId]);
-
-  const handleSkip = useCallback((task: SetupTask) => {
-    Alert.alert(
-      `Skip "${task.label}"?`,
-      'You can always come back to this later from the setup checklist.',
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Skip task',
-          style: 'destructive',
-          onPress: async () => {
-            const next = await skipTask(task.id as SetupTaskId, userId);
-            onSetupStateChange(next);
-          },
-        },
-      ],
-    );
-  }, [onSetupStateChange, userId]);
 
   return (
     <Modal visible={modalVisible} animationType="none" transparent onRequestClose={handleClose}>
@@ -127,10 +110,12 @@ export default function SetupWalkthroughSheet({
             />
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Set up your store</Text>
-              <Text style={s.subtitle}>
-                {done} of {total} steps complete
-                {active ? ` · Next: ${active.label}` : ''}
-              </Text>
+              {progress && (
+                <Text style={s.subtitle}>
+                  {progress.done} of {progress.total} steps complete
+                  {active ? ` · Next: ${LAUNCH_STEP_META[active].title}` : ''}
+                </Text>
+              )}
             </View>
             <TouchableOpacity
               onPress={handleClose}
@@ -147,17 +132,19 @@ export default function SetupWalkthroughSheet({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: SP.sm }}
           >
-            {setupState.tasks.map((task) => {
-              const isActive = active?.id === task.id;
-              const isSkipped = task.skipped && !task.completed;
+            {(checklist?.steps ?? []).map((step) => {
+              const meta = LAUNCH_STEP_META[step.id];
+              const isActive = active === step.id;
               return (
                 <TouchableOpacity
-                  key={task.id}
+                  key={step.id}
                   activeOpacity={0.85}
-                  onPress={() => openTask(task)}
+                  onPress={() => openStep(step.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${meta.title}${step.done ? ', done' : ''}`}
                   style={[
                     s.row,
-                    task.completed && s.rowDone,
+                    step.done && s.rowDone,
                     isActive && s.rowActive,
                   ]}
                 >
@@ -167,38 +154,30 @@ export default function SetupWalkthroughSheet({
                     // solid accent fill + checkmark glyph, never a green tint
                     // (this screen has none of the app's 3 allowed color
                     // accents — LIVE-red, end-call-red, Thread Cash green).
-                    (task.completed || isActive) && { backgroundColor: theme.accent },
+                    (step.done || isActive) && { backgroundColor: theme.accent },
                   ]}>
                     <Icon
-                      name={task.completed ? 'check' : (task.icon as IconName)}
+                      name={step.done ? 'check' : meta.icon}
                       size={ICON.sm}
-                      color={task.completed || isActive ? theme.onAccent : theme.muted}
+                      color={step.done || isActive ? theme.onAccent : theme.muted}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.rowLabel, (task.completed || isSkipped) && s.rowLabelMuted]} numberOfLines={1}>
-                      {task.label}{task.optional ? ' (optional)' : ''}
+                    <Text style={[s.rowLabel, step.done && s.rowLabelMuted]} numberOfLines={1}>
+                      {meta.title}
                     </Text>
                     <Text style={s.rowDesc} numberOfLines={1}>
-                      {isSkipped ? 'Skipped' : task.description}
+                      {meta.body}
                     </Text>
                   </View>
-                  {!task.completed && (
-                    <TouchableOpacity
-                      onPress={() => handleSkip(task)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={s.skip}>Skip</Text>
-                    </TouchableOpacity>
-                  )}
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          <TouchableOpacity style={s.primaryBtn} onPress={() => (active ? openTask(active) : handleClose())}>
+          <TouchableOpacity style={s.primaryBtn} onPress={() => (active ? openStep(active) : handleClose())}>
             <Text style={s.primaryBtnText}>
-              {active ? `Continue: ${active.label}` : 'Done'}
+              {active ? `Continue: ${LAUNCH_STEP_META[active].title}` : 'Done'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.secondaryBtn} onPress={handleClose}>
@@ -241,7 +220,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   rowLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   rowLabelMuted: { textDecorationLine: 'line-through', color: theme.muted },
   rowDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
-  skip: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
   primaryBtn: {
     marginTop: SP.md, height: 50, borderRadius: radius.md, backgroundColor: theme.accent,
     alignItems: 'center', justifyContent: 'center',

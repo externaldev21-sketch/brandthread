@@ -5,7 +5,7 @@ name: ship
 ---
 - openLink: brandthread://fulfill-order?orderId=${ORDER_ID_TO_SHIP}&step=3
 - extendedWaitUntil:
-    visible: "Ship it"
+    visible: "Enter tracking manually instead"
     timeout: 20000
 - tapOn: "Enter tracking manually instead"
 - tapOn: "Tracking number"

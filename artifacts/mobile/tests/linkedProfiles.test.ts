@@ -51,10 +51,10 @@ describe('linked profiles (one login = one buyer + one seller)', () => {
   });
 
   it('preview: fresh offers the other role, demo=1 shows both profiles', () => {
-    const identity = { username: 'preview_studio', brandName: 'Preview Studio' };
+    const identity = { username: 'mayaokafor', brandName: 'Maya Okafor' };
     expect(previewLinkedProfiles('buyer', false, identity).canAdd).toEqual({ buyer: false, seller: true });
     const demo = previewLinkedProfiles('buyer', true, identity);
-    expect(demo.profiles.map((p) => p.username)).toEqual(['ava', 'preview_studio']);
+    expect(demo.profiles.map((p) => p.username)).toEqual(['ava', 'mayaokafor']);
     expect(demo.canAdd).toEqual({ buyer: false, seller: false });
   });
 });

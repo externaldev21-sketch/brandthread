@@ -127,11 +127,11 @@ describe('seller profile', () => {
     expect(controls).toContain('messagesBtnWrap: { flex: 1 },');
   });
 
-  it('header: bigger avatar, 13px handle, "Seller" + plan chips stacked under it', () => {
+  it('header: bigger avatar, 13px handle, "Seller" + plan chips on one line under it', () => {
     expect(read('components/profile/profileAvatarGeometry.ts')).toContain('export const PROFILE_VIDEO_HEADER_AVATAR_SIZE = 88;');
     const header = read('components/profile/ProfileVideoHeader.tsx');
     expect(header).toContain("handleCompact: { fontSize: 13, lineHeight: 17 },");
-    expect(header).toContain("chipStack: { marginTop: 6, gap: 6, alignItems: 'flex-start' },");
+    expect(header).toContain("chipStack: { marginTop: 6, gap: 6, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },");
     const profile = read('app/(tabs)/profile.tsx');
     expect(profile).toContain("extraChips: [{ label: planLabel, icon: hasPaidPlan ? 'award' : 'layers' }],");
   });

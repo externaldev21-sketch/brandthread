@@ -362,6 +362,19 @@ const SORTS: { key: OrderSortKey; label: string }[] = [
 
 // ─── Order Row ────────────────────────────────────────────────────────────────
 
+// Payment states that mean the buyer hasn't paid yet (mirrors lib/orderStatusDot.ts).
+const UNPAID_FOR_SHIP: ReadonlySet<string> = new Set(['pending', 'authorized', 'failed']);
+
+/**
+ * Ship is offered on every paid order that hasn't shipped. A new paid order
+ * doesn't need "Mark processing" first: the server ships (or buys a label for)
+ * a pending order directly, so Ship goes straight to packing.
+ */
+export function canShipFromList(order: Pick<Order, 'status' | 'paymentStatus'>): boolean {
+  if (order.status === 'processing' || order.status === 'ready_to_ship') return true;
+  return order.status === 'new' && !UNPAID_FOR_SHIP.has(order.paymentStatus);
+}
+
 interface OrderRowProps {
   order: OrderListOrder;
   selected: boolean;
@@ -498,7 +511,7 @@ export function OrderRow({
           {/* Quick action — pushed right */}
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
-          {(order.status === 'processing' || order.status === 'ready_to_ship') && (
+          {canShipFromList(order) && (
             <Button
               label="Ship"
               icon="send"
@@ -657,7 +670,7 @@ const OrderListRow = React.memo(function OrderListRow({
   const { theme } = useAppTheme();
   // Orders are automatic (paid orders arrive as "To ship"), so the only useful
   // swipe is Ship, which opens the fulfil / label flow. Neutral, never coloured.
-  const swipeAction = order.status === 'processing' || order.status === 'ready_to_ship'
+  const swipeAction = canShipFromList(order)
     ? { label: 'Ship', icon: 'send' as const, run: () => actions.ship(order.id) }
     : { label: 'Open', icon: 'arrow-right' as const, run: () => actions.press(order) };
 
@@ -1301,7 +1314,7 @@ export default function OrdersScreen() {
           testID="orders-empty"
           message={orders.length === 0
             ? 'Share your store to get your first sale.'
-            : 'Orders show up here once a buyer checks out.'}
+            : 'Orders appear here after checkout.'}
           actionLabel={orders.length === 0 ? 'Share store' : undefined}
           onAction={orders.length === 0 ? () => router.push('/share-store' as never) : undefined}
         />

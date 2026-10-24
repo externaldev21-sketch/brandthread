@@ -65,8 +65,8 @@ describe('groupBucketsByWeek (90D chart points)', () => {
 
 describe('describeHomeDelta', () => {
   it('shows a signed percent with the range comparison', () => {
-    expect(describeHomeDelta(112, 100, 'today')).toEqual({ direction: 'up', label: '+12% vs yesterday' });
-    expect(describeHomeDelta(90, 100, '7d')).toEqual({ direction: 'down', label: '−10% vs previous 7 days' });
+    expect(describeHomeDelta(112, 100, 'today')).toEqual({ direction: 'up', label: '12% vs yesterday' });
+    expect(describeHomeDelta(90, 100, '7d')).toEqual({ direction: 'down', label: '10% vs previous 7 days' });
     expect(describeHomeDelta(100, 100, '90d')).toEqual({ direction: 'flat', label: '0% vs previous 90 days' });
   });
 

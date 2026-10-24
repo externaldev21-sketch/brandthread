@@ -85,6 +85,7 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { PREVIEW_SELLER_IDENTITY } from '@/lib/previewIdentity';
 import { getStorefront } from '@/services/storeService';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
@@ -317,7 +318,7 @@ export default function CreateAdScreen() {
   // identity as Edit profile's preview seller.
   const [storeName, setStoreName] = useState('');
   useEffect(() => {
-    if (isPreviewDemoMode()) { setStoreName('Preview Studio'); return; }
+    if (isPreviewDemoMode()) { setStoreName(PREVIEW_SELLER_IDENTITY.brandName); return; }
     // Signed-out web preview never calls protected store APIs.
     if (isSellerDevPreview()) return;
     getStorefront().then(sf => { if (sf?.settings?.storeName) setStoreName(sf.settings.storeName); }).catch(() => {});

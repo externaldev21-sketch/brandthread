@@ -29,7 +29,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
 
-import { Button, Icon, ICON_SIZE } from '@/components/ui';
+import { Button, Icon, ICON_SIZE, Input } from '@/components/ui';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -55,6 +55,10 @@ import { batchParcelWeightLb } from '@/lib/batchLabels';
 
 type RowResult = { orderId: string; orderNumber: string; ok: boolean; message: string; labelUrl?: string };
 type QuotedOrder = { order: Order; rate: ShippingRate; weight: string };
+/** The seller's own parcel for every label; blank weight keeps the items' weights. */
+type ParcelOverride = { weight: string; length: string; width: string; height: string };
+
+const positive = (v: string) => Number.isFinite(Number(v)) && Number(v) > 0;
 
 export default function FulfillBatchScreen() {
   const { theme } = useAppTheme();
@@ -82,6 +86,8 @@ export default function FulfillBatchScreen() {
   const [boxId, setBoxId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<QuotedOrder[]>([]);
   const [notice, setNotice] = useState<'no_box' | 'no_ship_from' | null>(null);
+  const [parcelOverride, setParcelOverride] = useState<ParcelOverride | null>(null);
+  const [parcelDraft, setParcelDraft] = useState<ParcelOverride | null>(null);
   const quoteTotal = quotes.reduce((sum, q) => sum + q.rate.priceCents, 0);
   // Orders that couldn't be loaded are listed, never silently dropped.
   const [loadFailures, setLoadFailures] = useState<Array<{ id: string; message: string }>>([]);
@@ -125,8 +131,7 @@ export default function FulfillBatchScreen() {
   // Step 1 of "Print labels": quote every unlabeled order with a real box (a
   // saved package preset) and the items' stored weights, from the seller's
   // ship-from address. Nothing is bought until the seller confirms the total.
-  async function handlePrintLabels(pickedBoxId?: string) {
-    
+  async function handlePrintLabels(pickedBoxId?: string, override: ParcelOverride | null = parcelOverride) {
     setRunning('labels');
     setLastRun('labels');
     setNotice(null);
@@ -154,11 +159,16 @@ export default function FulfillBatchScreen() {
         }
         try {
           const suggestion = await getParcelSuggestion(order.id).catch(() => null);
-          const weight = batchParcelWeightLb(suggestion, box.weightOz);
+          const weight = override && positive(override.weight)
+            ? override.weight
+            : batchParcelWeightLb(suggestion, box.weightOz);
           const fromAddress = order.fulfillment.fromAddress;
           const rates = await getShippingRates(order.id, {
             ...(fromAddress ? { fromAddress } : {}),
-            weight, length: String(box.lengthIn), width: String(box.widthIn), height: String(box.heightIn),
+            weight,
+            length: override ? override.length : String(box.lengthIn),
+            width: override ? override.width : String(box.widthIn),
+            height: override ? override.height : String(box.heightIn),
           });
           const cheapest = [...rates].sort((a, b) => a.priceCents - b.priceCents)[0];
           if (!cheapest) {
@@ -206,6 +216,32 @@ export default function FulfillBatchScreen() {
   }
 
   const fulfillable = orders.filter(o => linesToFulfill(o).length > 0);
+  const box = presets.find(p => p.id === boxId) ?? null;
+  const parcelSummary = parcelOverride
+    ? `${parcelOverride.length}×${parcelOverride.width}×${parcelOverride.height} in, ${positive(parcelOverride.weight) ? `${parcelOverride.weight} lb` : 'item weights'}`
+    : box
+      ? `${box.name} (${Number(box.lengthIn)}×${Number(box.widthIn)}×${Number(box.heightIn)} in), item weights`
+      : 'Your saved box, item weights';
+  const draftValid = !!parcelDraft
+    && positive(parcelDraft.length) && positive(parcelDraft.width) && positive(parcelDraft.height)
+    && (parcelDraft.weight.trim() === '' || positive(parcelDraft.weight));
+
+  function editParcel() {
+    setParcelDraft(parcelOverride ?? {
+      weight: '',
+      length: box ? String(Number(box.lengthIn)) : '',
+      width: box ? String(Number(box.widthIn)) : '',
+      height: box ? String(Number(box.heightIn)) : '',
+    });
+  }
+
+  function applyParcel() {
+    if (!parcelDraft || !draftValid) return;
+    const next = { ...parcelDraft, weight: parcelDraft.weight.trim() };
+    setParcelOverride(next);
+    setParcelDraft(null);
+    void handlePrintLabels(undefined, next);
+  }
 
   function startShip() {
     
@@ -340,6 +376,10 @@ export default function FulfillBatchScreen() {
               </View>
             </View>
 
+            <Text style={s.mutedText}>
+              Labels use your saved box and the items' weights at the cheapest rate. You can change the package and see the total before buying.
+            </Text>
+
             {notice === 'no_ship_from' && (
               <BrandthreadCard style={{ gap: SP.sm }}>
                 <Text style={s.mutedText}>Add the address you ship from to buy labels.</Text>
@@ -355,14 +395,56 @@ export default function FulfillBatchScreen() {
 
             {quotes.length > 0 && (
               <>
+                {/* What the quotes assume, before anything is bought. */}
+                <View testID="batch-parcel-summary">
+                <BrandthreadCard style={{ gap: SP.sm }}>
+                  <View style={s.parcelHead}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.orderNumber}>Package</Text>
+                      <Text style={s.mutedText}>{parcelSummary}. Cheapest rate for each order.</Text>
+                    </View>
+                    {!parcelDraft && (
+                      <Button label="Edit" variant="secondary" size="compact" onPress={editParcel} disabled={running !== null} accessibilityLabel="Edit package size and weight" />
+                    )}
+                  </View>
+                  {parcelDraft && (
+                    <>
+                      <Input
+                        label="Weight (lb), blank uses item weights"
+                        value={parcelDraft.weight}
+                        onChangeText={weight => setParcelDraft(d => (d ? { ...d, weight } : d))}
+                        keyboardType="decimal-pad"
+                        testID="batch-parcel-weight"
+                      />
+                      <View style={s.dimsRow}>
+                        {(['length', 'width', 'height'] as const).map(key => (
+                          <Input
+                            key={key}
+                            label={`${key[0].toUpperCase()}${key.slice(1)} (in)`}
+                            value={parcelDraft[key]}
+                            onChangeText={v => setParcelDraft(d => (d ? { ...d, [key]: v } : d))}
+                            keyboardType="decimal-pad"
+                            style={s.dimCell}
+                            testID={`batch-parcel-${key}`}
+                          />
+                        ))}
+                      </View>
+                      <View style={s.actionRow}>
+                        <PrimaryButton label="Update quotes" onPress={applyParcel} disabled={!draftValid || running !== null} style={{ flex: 1 }} />
+                        <SecondaryButton label="Cancel" onPress={() => setParcelDraft(null)} style={{ flex: 1 }} />
+                      </View>
+                    </>
+                  )}
+                </BrandthreadCard>
+                </View>
                 {presets.length > 0 && (
                   <View style={s.boxRow}>
                     {presets.map(p => (
                       <TouchableOpacity
                         key={p.id}
-                        onPress={() => { if (p.id !== boxId) handlePrintLabels(p.id); }}
+                        onPress={() => { if (p.id !== boxId || parcelOverride) { setParcelOverride(null); setParcelDraft(null); handlePrintLabels(p.id, null); } }}
                         disabled={running !== null}
-                        style={[s.boxChip, p.id === boxId && s.boxChipActive]}
+                        style={[s.boxChip, p.id === boxId && !parcelOverride && s.boxChipActive]}
                         accessibilityRole="button"
                         accessibilityLabel={`Use box ${p.name}`}
                       >
@@ -376,7 +458,7 @@ export default function FulfillBatchScreen() {
                 {quotes.map(q => (
                   <BrandthreadCard key={q.order.id} style={s.resultRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.orderNumber}>#{q.order.orderNumber}</Text>
+                      <Text style={s.orderNumber}>{orderTitle(q.order.orderNumber)}</Text>
                       <Text style={s.mutedText}>{q.rate.carrier} {q.rate.service}, {q.weight} lb</Text>
                     </View>
                     <Text style={s.orderNumber}>{formatCents(q.rate.priceCents)}</Text>
@@ -461,5 +543,8 @@ const createStyles = (theme: { text: string; muted: string; border: string }) =>
     boxRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     boxChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, gap: 2 },
     boxChipActive: { borderColor: FG },
+    parcelHead: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+    dimsRow: { flexDirection: 'row', gap: SP.sm },
+    dimCell: { flex: 1, minWidth: 0 },
   });
 };

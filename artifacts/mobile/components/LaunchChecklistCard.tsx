@@ -16,26 +16,33 @@ import { Icon } from '@/components/ui';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
-import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
-
 import { hapticLight } from '@/lib/haptics';
 
-import { getReadyRows } from '@/lib/launchChecklist';
+import { getReadyRows, launchProgress, type LaunchChecklistResponse } from '@/lib/launchChecklist';
 
 import { FILL_ELEVATED, FONT, SP, TEXT } from '@/lib/theme';
 
 import { radius } from '@/constants/radii';
 
-export default function LaunchChecklistCard() {
+/** `checklist` / `dismiss` come from the dashboard's useLaunchChecklist, so
+ * dismissing here hands over to the Continue setup banner straight away. */
+export default function LaunchChecklistCard({
+  checklist,
+  dismiss,
+}: {
+  checklist: LaunchChecklistResponse | null;
+  dismiss: () => void;
+}) {
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
-  const { checklist, dismiss } = useLaunchChecklist();
 
   if (!checklist || checklist.dismissed) return null;
   const rows = getReadyRows(checklist);
-  const doneCount = rows.filter((r) => r.done).length;
-  if (doneCount === rows.length) return null;
+  // The count is the full server checklist (same number as Continue setup,
+  // More and the Launch screen); the rows are its Shopify-order highlights.
+  const progress = launchProgress(checklist);
+  if (progress.complete) return null;
 
   return (
     <View style={s.root} testID="get-ready-to-sell">
@@ -49,14 +56,14 @@ export default function LaunchChecklistCard() {
         </Pressable>
       </View>
       <View style={[s.pill, { borderColor: theme.border }]}>
-        <Text style={s.pillText}>{doneCount} / {rows.length} completed</Text>
+        <Text style={s.pillText}>{progress.done} / {progress.total} completed</Text>
       </View>
       <View style={s.list}>
         {rows.map((row, i) => (
           <Pressable
             key={row.id}
             testID={`get-ready-${row.id}`}
-        onPress={() => { router.push(row.route as never); }}
+            onPress={() => { router.push(row.route as never); }}
             accessibilityRole="button"
             accessibilityLabel={`${row.title}${row.done ? ', done' : ''}`}
             style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
@@ -74,6 +81,16 @@ export default function LaunchChecklistCard() {
             </View>
           </Pressable>
         ))}
+        <Pressable
+          testID="get-ready-all-steps"
+          onPress={() => { router.push('/launch-checklist' as never); }}
+          accessibilityRole="button"
+          accessibilityLabel={`See all ${progress.total} steps`}
+          style={({ pressed }) => [s.allSteps, { borderTopColor: theme.border }, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={s.allStepsText}>See all {progress.total} steps</Text>
+          <Icon name="chevron-right" size={17} color={theme.muted} />
+        </Pressable>
       </View>
     </View>
   );
@@ -97,4 +114,9 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   circleDone: { borderStyle: 'solid', alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingRight: SP.md },
   rowTitle: { ...TEXT.body, color: theme.text, flex: 1 },
+  allSteps: {
+    flexDirection: 'row', alignItems: 'center', minHeight: 48,
+    paddingHorizontal: SP.md, borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  allStepsText: { ...TEXT.footnote, fontFamily: FONT.medium, color: theme.muted, flex: 1 },
 });

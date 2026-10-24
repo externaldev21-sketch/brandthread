@@ -277,10 +277,10 @@ const styles = StyleSheet.create({
   name: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 23, letterSpacing: -0.3 },
   handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm, marginTop: 4 },
   handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 18, flexShrink: 1 },
-  // Seller own profile (stacked-chips layout): a smaller handle under the name.
+  // Seller own profile (chips row under the handle): a smaller handle under the name.
   handleCompact: { fontSize: 13, lineHeight: 17 },
-  // Chips stacked vertically, left-aligned, one gap apart.
-  chipStack: { marginTop: 6, gap: 6, alignItems: 'flex-start' },
+  // Chips side by side on one line ("Seller" · plan), wrapping only if they can't fit.
+  chipStack: { marginTop: 6, gap: 6, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   meta: { paddingTop: 8, gap: 2 },
   coverRow: { paddingTop: 10, alignItems: 'flex-start' },
 

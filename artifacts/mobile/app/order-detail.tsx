@@ -571,10 +571,13 @@ function ItemRow({ item, onPress }: { item: OrderLineItem; onPress?: () => void 
       <View style={s.itemBody}>
         <Text style={s.itemName} numberOfLines={2}>{item.productName}</Text>
         {item.variant ? <Text style={s.itemMeta} numberOfLines={1}>{item.variant}</Text> : null}
-        <Text style={s.itemMeta}>{usd(item.unitPriceCents)}</Text>
+        {/* Unit price and quantity share one line so "× 1" reads with the price it multiplies. */}
+        <View style={s.itemPriceRow}>
+          <Text style={s.itemMeta}>{usd(item.unitPriceCents)}</Text>
+          <Text style={s.itemQty}>× {item.quantity}</Text>
+        </View>
         {item.refundedAt ? <Text style={s.itemMeta}>Refunded {formatLocalDate(item.refundedAt)}</Text> : null}
       </View>
-      <Text style={s.itemQty}>× {item.quantity}</Text>
     </View>
   );
   if (!onPress) return body;
@@ -1480,6 +1483,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   itemName:         { ...TYPE_SCALE.body, fontFamily: FONT.semibold, color: FG },
   itemMeta:         { ...TYPE_SCALE.footnote, color: MUTED },
   itemQty:          { ...TYPE_SCALE.headline, color: FG },
+  itemPriceRow:     { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: SP.sm },
   rowDivider:       { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
   itemCount:        { ...TYPE_SCALE.footnote, color: MUTED, marginTop: SP.md },
 

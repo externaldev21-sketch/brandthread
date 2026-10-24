@@ -22,9 +22,9 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
 
-import { LAUNCH_STEP_META, nextLaunchStep, type LaunchStepId } from '@/lib/launchChecklist';
+import { LAUNCH_STEP_META, launchProgress, nextLaunchStep, type LaunchStepId } from '@/lib/launchChecklist';
 
-import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { COMP, FONT, FS, ICON, RADIUS, SP, TEXT } from '@/lib/theme';
 
 import { crispPx } from '@/lib/crispPixel';
 
@@ -37,6 +37,7 @@ export default function LaunchChecklistScreen() {
   const { checklist, error, reload } = useLaunchChecklist();
   const [open, setOpen] = useState<LaunchStepId | null>(null);
   const [seeded, setSeeded] = useState(false);
+  const progress = checklist ? launchProgress(checklist) : null;
 
   // Start with the next open step expanded; after that the seller drives it.
   useEffect(() => {
@@ -66,10 +67,10 @@ export default function LaunchChecklistScreen() {
           contentContainerStyle={[s.scroll, { paddingBottom: tabBarInset + SP.xl }]}
         >
           <View style={s.pill}>
-            <Text style={s.pillText}>{checklist.doneCount} / {checklist.total} completed</Text>
+            <Text style={s.pillText}>{progress?.label} completed</Text>
           </View>
           <View style={s.track}>
-            <View style={[s.fill, { width: `${(checklist.doneCount / checklist.total) * 100}%` }]} />
+            <View style={[s.fill, { width: `${progress?.percent ?? 0}%` }]} />
           </View>
 
           <View style={s.card}>
@@ -118,7 +119,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md },
   errorText: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted },
   scroll: { paddingHorizontal: SP.md, paddingTop: SP.md },
-  pill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 3 },
+  pill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   pillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.text },
   track: { height: 6, borderRadius: RADIUS.pill, backgroundColor: theme.border, overflow: 'hidden', marginTop: SP.sm, marginBottom: SP.md },
   fill: { height: '100%', borderRadius: RADIUS.pill, backgroundColor: theme.accent },
@@ -132,6 +133,6 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   rowTitle: { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
   rowTitleDone: { color: theme.muted },
   rowBody: { paddingLeft: 22 + SP.sm, paddingBottom: SP.md, gap: SP.sm },
-  rowText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 19 },
+  rowText: { ...TEXT.footnote, color: theme.muted },
   cta: { alignSelf: 'flex-start' },
 });

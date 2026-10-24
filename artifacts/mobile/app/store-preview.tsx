@@ -24,6 +24,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { EmptyState } from '@/components/BrandthreadUI';
 
+import { Button } from '@/components/ui/Button';
+
 import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 
 import { isAuthError } from '@/lib/networkNotice';
@@ -245,9 +247,7 @@ export default function StorePreview() {
         <View style={styles.center}>
           <Icon name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
-          <TouchableOpacity onPress={load} style={styles.retryBtn} accessibilityRole="button" accessibilityLabel="Try loading the store preview again">
-            <Text style={styles.retryText}>Try again</Text>
-          </TouchableOpacity>
+          <Button label="Try again" variant="secondary" size="small" onPress={load} accessibilityLabel="Try loading the store preview again" />
         </View>
       ) : (
         <View
@@ -307,6 +307,4 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   webviewClip: { overflow: 'hidden', width: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.xl },
   errorText: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted, textAlign: 'center' },
-  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.accent },
-  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
 });

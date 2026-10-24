@@ -677,8 +677,8 @@ export default function ProfileScreen() {
           avatarVideoUrl: profile?.avatarVideoUrl ?? null,
           verified: !!profile?.verified,
           roleLabel: 'Seller',
-          // Dev's header layout: "Seller" chip on top, the plan chip
-          // directly below it — stacked, same height and style.
+          // "Seller" chip then the plan chip, side by side on one line,
+          // same height and style.
           extraChips: [{ label: planLabel, icon: hasPaidPlan ? 'award' : 'layers' }],
         }}
         avatar={{

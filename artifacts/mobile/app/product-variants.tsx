@@ -21,12 +21,13 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, PrimaryButton, SectionHeader, HapticSwitch, EmptyState, PressableScale,
 } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { VariantTable } from '@/components/products/VariantTable';
 import { formatCents } from '@/lib/money';
 import { HelpLink } from '@/components/help/HelpLink';
 import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 interface Axis { name: string; values: string[] }
 interface Variant {
@@ -49,11 +50,6 @@ const BEHAVIORS: Array<{ value: Rules['soldOutBehavior']; title: string; body: s
   { value: 'archive', title: 'Archive', body: 'Moved to Archived when the last unit sells.' },
 ];
 
-function errText(err: unknown, fallback: string): string {
-  const message = (err as { message?: string } | null)?.message;
-  // Raw transport errors ("API 403: …") aren't seller-facing copy.
-  return message && message.length < 160 && !/^API \d{3}\b/.test(message) ? message : fallback;
-}
 const toCents = (text: string): number | null => {
   const n = Number(text.replace(/[^0-9.]/g, ''));
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
@@ -117,7 +113,7 @@ export default function ProductVariantsScreen() {
     try {
       applyState(await api.productVariants.get(productId));
     } catch (err) {
-      setLoadError(errText(err, "Couldn't load this product's variants."));
+      setLoadError(friendlyError(err, "Couldn't load this product's variants."));
     } finally {
       setLoading(false);
     }
@@ -167,7 +163,7 @@ export default function ProductVariantsScreen() {
       setEdits({});
       if (result.created === 0) showAlert('Up to date', 'Every combination already exists.');
     } catch (err) {
-      showAlert("Couldn't generate variants", errText(err, 'Try again.'));
+      showAlert("Couldn't generate variants", friendlyError(err, 'Try again.'));
     } finally {
       setBusy(null);
     }
@@ -196,7 +192,7 @@ export default function ProductVariantsScreen() {
       applyState(await api.productVariants.bulkUpdate(productId, updates));
       setEdits({});
     } catch (err) {
-      showAlert("Couldn't save variants", errText(err, 'Nothing was changed. Try again.'));
+      showAlert("Couldn't save variants", friendlyError(err, 'Nothing was changed. Try again.'));
     } finally {
       setBusy(null);
     }
@@ -222,7 +218,7 @@ export default function ProductVariantsScreen() {
       api.productVariants.get(productId).then((d: any) => { setVariants(d.variants ?? []); }).catch(() => undefined);
       showAlert('Saved', 'Stock rules updated.');
     } catch (err) {
-      showAlert("Couldn't save stock rules", errText(err, 'Try again.'));
+      showAlert("Couldn't save stock rules", friendlyError(err, 'Try again.'));
     } finally {
       setBusy(null);
     }
@@ -246,10 +242,8 @@ export default function ProductVariantsScreen() {
   }, [sorted, groupByFirst, axes]);
 
   const header = (
-    <Header
+    <ScreenHeader
       title="Variants & stock"
-      transparent
-      dividerVariant="none"
       onBack={() => goBackOr(router)}
       rightElement={dirtyIds.length > 0
         ? <PrimaryButton label={busy === 'save' ? 'Saving...' : `Save ${dirtyIds.length}`} onPress={saveVariants} loading={busy === 'save'} small style={{ minWidth: 84 }} />
@@ -335,11 +329,14 @@ export default function ProductVariantsScreen() {
               <Text style={st.axisName}>{matrix} variant{matrix === 1 ? '' : 's'}</Text>
               {overCap && <Text style={[st.muted, { color: colors.destructive }]}>Limit is {MAX_VARIANTS}</Text>}
             </View>
-            <View style={st.addRow}>
-              <View style={{ flex: 1 }}>
+            {/* Left blank, new variants take the product's price (the server
+                uses the lowest existing variant price), so the field says so;
+                it gets its own row so the hint fits. */}
+            <View style={[st.addRow, variants.length > 0 && st.addRowWrap]}>
+              <View style={variants.length > 0 ? st.fullField : { flex: 1 }}>
                 <Text style={st.fieldLabel}>{variants.length === 0 ? 'Price' : 'Price for new'}</Text>
                 <TextInput returnKeyType="done" style={st.input} value={genPrice} onChangeText={setGenPrice} keyboardType="decimal-pad"
-                  placeholder={variants.length ? centsToInput(Math.min(...variants.map((v) => v.priceCents))) : '0.00'} placeholderTextColor={colors.subtle} />
+                  placeholder={variants.length ? `Inherits product price (${formatCents(Math.min(...variants.map((v) => v.priceCents)))})` : '0.00'} placeholderTextColor={colors.subtle} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={st.fieldLabel}>Starting stock</Text>
@@ -510,6 +507,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   addBtn: { minWidth: 72, height: 46, paddingHorizontal: 16, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: c.foreground },
   addRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
+  addRowWrap: { flexWrap: 'wrap' },
+  fullField: { width: '100%' },
   input: { fontFamily: FONT.regular, fontSize: FS.base, color: c.foreground, backgroundColor: c.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingHorizontal: SP.md, paddingVertical: 10 },
   fieldLabel: { fontFamily: FONT.medium, fontSize: FS.meta, color: c.mutedForeground, marginBottom: 4 },
   addOption: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, paddingVertical: 12, paddingHorizontal: SP.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' },

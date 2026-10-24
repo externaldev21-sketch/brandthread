@@ -5,7 +5,7 @@
  * uploaded through /api/seller/profile/logo/upload. The banner is the one
  * profile banner (GIF or ≤10s video, also the storefront cover): the tile
  * opens the same "Edit banner" sheet as Edit profile. The accent is saved on
- * Done via PUT /api/seller/profile/accent.
+ * Continue via PUT /api/seller/profile/accent.
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -210,7 +210,7 @@ export default function StoreSetupBrandScreen() {
       <StoreSetupScreen
         header={<ScreenHeader title="Logo and banner" hideDivider />}
         heading="Brand your store"
-        ctaLabel="Done"
+        ctaLabel="Continue"
         onCta={finish}
         ctaDisabled={!canFinish}
         ctaLoading={saving}

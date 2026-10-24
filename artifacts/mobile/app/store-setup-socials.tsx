@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useApi } from '@/hooks/useApi';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
-import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, type SocialPlatform } from '@/lib/storeSetup';
+import { canSaveSocialLinks, handleFromStoredLink, previewSocialLink, socialFieldValue, socialHandleToSave, type SocialPlatform } from '@/lib/storeSetup';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { StoreSetupScreen } from '@/components/store-setup/StoreSetupScreen';
 import { StoreSetupField, type FieldStatus } from '@/components/store-setup/StoreSetupField';
@@ -28,8 +28,9 @@ export default function StoreSetupSocialsScreen() {
   const preview = isSellerDevPreview();
   const demo = preview && isPreviewDemoMode();
 
+  // Both fields hold "@handle" (links are folded to it on blur); the bare handle is what's sent.
   const [instagram, setInstagram] = useState(demo ? '@nightowlstudio' : '');
-  const [tiktok, setTiktok] = useState(demo ? 'https://www.tiktok.com/@nightowlstudio' : '');
+  const [tiktok, setTiktok] = useState(demo ? '@nightowlstudio' : '');
   const [saved, setSaved] = useState<Record<SocialPlatform, string>>({ instagram: '', tiktok: '' });
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -39,8 +40,8 @@ export default function StoreSetupSocialsScreen() {
     let cancelled = false;
     api.seller.getProfile().then((profile) => {
       if (cancelled) return;
-      const ig = handleFromStoredLink('instagram', profile.socialLinks?.instagram);
-      const tt = handleFromStoredLink('tiktok', profile.socialLinks?.tiktok);
+      const ig = socialFieldValue('instagram', handleFromStoredLink('instagram', profile.socialLinks?.instagram));
+      const tt = socialFieldValue('tiktok', handleFromStoredLink('tiktok', profile.socialLinks?.tiktok));
       setInstagram(ig);
       setTiktok(tt);
       setSaved({ instagram: ig, tiktok: tt });
@@ -60,7 +61,12 @@ export default function StoreSetupSocialsScreen() {
     setSaving(true);
     setServerError(null);
     try {
-      if (!preview) await api.seller.saveSocialLinks({ instagram: instagram.trim(), tiktok: tiktok.trim() });
+      if (!preview) {
+        await api.seller.saveSocialLinks({
+          instagram: socialHandleToSave('instagram', instagram),
+          tiktok: socialHandleToSave('tiktok', tiktok),
+        });
+      }
       goBackOr(router);
     } catch (err) {
       setServerError(err instanceof Error && err.message ? err.message : 'Could not save your links. Try again.');
@@ -82,6 +88,7 @@ export default function StoreSetupSocialsScreen() {
         label="Instagram"
         value={instagram}
         onChangeText={(value) => { setInstagram(value); setServerError(null); }}
+        onBlur={() => setInstagram((value) => socialFieldValue('instagram', value))}
         status={statusFor('instagram', instagram, null)}
         placeholder="@yourstore or profile link"
         autoCapitalize="none"
@@ -94,6 +101,7 @@ export default function StoreSetupSocialsScreen() {
         label="TikTok"
         value={tiktok}
         onChangeText={(value) => { setTiktok(value); setServerError(null); }}
+        onBlur={() => setTiktok((value) => socialFieldValue('tiktok', value))}
         status={statusFor('tiktok', tiktok, serverError)}
         placeholder="@yourstore or profile link"
         autoCapitalize="none"
