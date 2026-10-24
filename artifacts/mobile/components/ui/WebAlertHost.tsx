@@ -1,186 +1,127 @@
-import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
-import { MEDIA } from '@/lib/theme';
 /**
- * Renders the web `Alert.alert` / `Alert.prompt` queue from lib/webAlert.ts as
- * a centered dialog (the iOS alert layout: title, message, then the buttons —
- * side by side when there are two, stacked otherwise).
+ * Web-only renderer for `showAlert` / `confirmAlert` (lib/actionSheet.ts).
  *
- * Mounted once by `<ActionSheetHost />` (which app/_layout.tsx already mounts
- * at the root), and renders nothing on native, where the real platform
- * `Alert` is still used.
+ * react-native-web's `Alert.alert` is a silent no-op, so on web `showAlert`
+ * queues its request here instead: a minimal centered card (theme card fill —
+ * black on the default Monochrome theme — white text, silver hairline border,
+ * Inter) with the same buttons, in the same order, running the same
+ * handlers. Native never mounts anything: `showAlert` calls `Alert.alert`
+ * directly there. Mounted once near the root in app/_layout.tsx.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import {
-  dismissWebAlert,
-  installWebAlertPolyfill,
-  orderButtons,
-  primaryButton,
-  resolveWebAlert,
-  subscribeWebAlerts,
-  type WebAlertRequest,
-} from '@/lib/webAlert';
-
-// Patch as soon as this module is evaluated (the root layout imports it), so
-// alerts raised during the very first render are queued, not dropped.
-installWebAlertPolyfill(Alert as any, Platform.OS);
+import { a11yModalProps } from '@/lib/a11y/modal';
+import { registerWebAlertPresenter, type AlertButtonSpec, type WebAlertRequest } from '@/lib/actionSheet';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 export function WebAlertHost() {
   if (Platform.OS !== 'web') return null;
-  return <WebAlertDialog />;
+  return <WebAlertModal />;
 }
 
-function WebAlertDialog() {
+function WebAlertModal() {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
-  const [req, setReq] = useState<WebAlertRequest | null>(null);
-  const [value, setValue] = useState('');
-  const reqRef = useRef<WebAlertRequest | null>(null);
-  const valueRef = useRef('');
-
-  useEffect(
-    () =>
-      subscribeWebAlerts((next) => {
-        reqRef.current = next;
-        setReq(next);
-        const initial = next?.defaultValue ?? '';
-        valueRef.current = initial;
-        setValue(initial);
-      }),
-    [],
-  );
+  // A queue so an error raised from inside a confirm's handler (e.g. "Couldn't
+  // delete" after "Delete story?") shows after the first card closes rather
+  // than replacing it.
+  const [queue, setQueue] = useState<WebAlertRequest[]>([]);
+  const current = queue[0] ?? null;
 
   useEffect(() => {
-    if (!req || typeof document === 'undefined') return;
-    const onKey = (e: KeyboardEvent) => {
-      const cur = reqRef.current;
-      if (!cur) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        dismissWebAlert(cur.id);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        resolveWebAlert(cur.id, primaryButton(cur), valueRef.current);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [req]);
+    registerWebAlertPresenter((request) => setQueue((q) => [...q, request]));
+    return () => registerWebAlertPresenter(null);
+  }, []);
 
-  if (!req) return null;
-  const buttons = orderButtons(req.buttons);
-  const row = buttons.length === 2;
+  const finish = useCallback((button?: AlertButtonSpec) => {
+    const dismissed = current;
+    setQueue((q) => q.slice(1));
+    if (button) {
+      setTimeout(() => button.onPress?.(), 0);
+    } else if (dismissed?.options?.onDismiss) {
+      setTimeout(() => dismissed.options?.onDismiss?.(), 0);
+    }
+  }, [current]);
+
+  // Backdrop click / Escape: run the cancel button when there is one (what a
+  // native dismiss means), close a lone OK, otherwise only when cancelable.
+  const dismiss = useCallback(() => {
+    if (!current) return;
+    const cancel = current.buttons.find((b) => b.style === 'cancel');
+    if (cancel) finish(cancel);
+    else if (current.buttons.length <= 1 || current.options?.cancelable) finish(undefined);
+  }, [current, finish]);
+
+  const stacked = !!current && (current.buttons.length > 2 || current.buttons.some((b) => (b.text ?? '').length > 14));
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => dismissWebAlert(req.id)}>
-      <Pressable
-        style={[styles.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
-        onPress={() => dismissWebAlert(req.id)}
-        accessibilityLabel="Close dialog"
-        testID="web-alert-backdrop"
-      >
-        <Pressable
-          style={[styles.card, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
-          onPress={() => {}}
-          accessibilityRole={'alertdialog' as any}
-          accessibilityLabel={req.title || req.message}
-          testID="web-alert"
-        >
-          <View style={styles.body}>
-            {req.title ? (
-              <Text style={[styles.title, { color: theme.text }]}>{req.title}</Text>
-            ) : null}
-            {req.message ? (
-              <Text style={[styles.message, { color: theme.muted }, !req.title && styles.messageOnly]}>
-                {req.message}
-              </Text>
-            ) : null}
-            {req.kind === 'prompt' ? (
-              <TextInput
-                autoFocus
-                value={value}
-                onChangeText={(t) => {
-                  valueRef.current = t;
-                  setValue(t);
-                }}
-                secureTextEntry={req.secure}
-                style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-                placeholderTextColor={theme.subtle}
-                accessibilityLabel={req.title || 'Value'}
-                testID="web-alert-input"
-              />
-            ) : null}
-          </View>
-          <View style={[styles.buttons, row && styles.buttonsRow, { borderTopColor: theme.border }]}>
-            {buttons.map((btn, i) => (
-              <Pressable
-                key={`${btn.text ?? 'button'}-${i}`}
-                onPress={() => resolveWebAlert(req.id, btn, valueRef.current)}
-                style={({ pressed }) => [
-                  styles.button,
-                  row && styles.buttonInRow,
-                  row && i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.border },
-                  !row && i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                  pressed && { backgroundColor: theme.surface },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={btn.text ?? 'OK'}
-                testID={`web-alert-button-${i}`}
-              >
-                <Text
-                  numberOfLines={1}
+    <Modal visible={!!current} transparent animationType="fade" onRequestClose={dismiss}>
+      <Pressable style={[styles.backdrop, { backgroundColor: `${theme.shadowColor}99` }]} onPress={dismiss} accessibilityLabel="Dismiss">
+        {current ? (
+          <Pressable
+            {...a11yModalProps()}
+            accessibilityRole="alert"
+            onPress={() => {}}
+            style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
+            testID="web-alert"
+          >
+            <View style={styles.body}>
+              <Text style={[styles.title, { color: theme.text }]}>{current.title}</Text>
+              {current.message ? <Text style={[styles.message, { color: theme.muted }]}>{current.message}</Text> : null}
+            </View>
+            <View style={[styles.buttons, stacked ? styles.buttonsStacked : styles.buttonsRow, { borderTopColor: theme.border }]}>
+              {current.buttons.map((button, i) => (
+                <Pressable
+                  key={`${button.text}-${i}`}
+                  onPress={() => finish(button)}
+                  accessibilityRole="button"
+                  accessibilityLabel={button.text}
+                  testID={`web-alert-button-${i}`}
                   style={[
-                    styles.buttonText,
-                    { color: btn.style === 'destructive' ? theme.error : theme.text },
-                    btn.style === 'cancel' ? { fontFamily: FONT.regular, color: theme.muted } : null,
+                    styles.button,
+                    stacked ? styles.buttonStacked : styles.buttonInRow,
+                    i > 0 && (stacked
+                      ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }
+                      : { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.border }),
                   ]}
                 >
-                  {btn.text ?? 'OK'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      { color: button.style === 'destructive' ? theme.error : button.style === 'cancel' ? theme.muted : theme.text },
+                      button.style !== 'cancel' && { fontFamily: FONT.semibold },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {button.text}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        ) : null}
       </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: mediaAlpha(MEDIA.background, 0.55),
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.lg,
-  },
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   card: {
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 320,
     borderRadius: RADIUS.lg,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
-  body: { paddingHorizontal: SP.md, paddingTop: SP.md + 2, paddingBottom: SP.md, alignItems: 'center' },
-  title: { fontSize: FS.md, fontFamily: FONT.semibold, textAlign: 'center' },
-  message: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.xs, lineHeight: 18 },
-  messageOnly: { marginTop: 0, fontSize: FS.base, lineHeight: 20 },
-  input: {
-    alignSelf: 'stretch',
-    marginTop: SP.md - 4,
-    height: 40,
-    borderRadius: RADIUS.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SP.sm + 2,
-    fontSize: FS.base,
-    fontFamily: FONT.regular,
-  },
+  body: { paddingHorizontal: SP.lg, paddingTop: SP.lg, paddingBottom: SP.md, alignItems: 'center', gap: SP.xs },
+  title: { fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center' },
+  message: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },
   buttons: { borderTopWidth: StyleSheet.hairlineWidth },
   buttonsRow: { flexDirection: 'row' },
-  button: { minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.sm },
-  buttonInRow: { flex: 1, flexBasis: 0 },
-  buttonText: { fontSize: FS.md, fontFamily: FONT.semibold },
+  buttonsStacked: { flexDirection: 'column' },
+  button: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  buttonInRow: { flex: 1 },
+  buttonStacked: { alignSelf: 'stretch' },
+  buttonText: { fontFamily: FONT.regular, fontSize: FS.md, textAlign: 'center' },
 });
