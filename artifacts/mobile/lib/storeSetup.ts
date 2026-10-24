@@ -89,6 +89,23 @@ export function handleFromStoredLink(platform: SocialPlatform, stored: string | 
 }
 
 /**
+ * Instagram and TikTok fields read the same way: whatever was typed or pasted
+ * (a handle, "@handle", or a profile link with query/trailing slash) becomes
+ * "@handle" in the field. Anything that doesn't parse is left as typed so the
+ * field's error can point at it.
+ */
+export function socialFieldValue(platform: SocialPlatform, raw: string): string {
+  const handle = parseSocialHandle(platform, raw);
+  return handle ? `@${handle}` : raw.trim();
+}
+
+/** The bare handle the socials step sends to the server ("" when empty or unparseable). */
+export function socialHandleToSave(platform: SocialPlatform, raw: string): string {
+  if (!raw.trim()) return '';
+  return parseSocialHandle(platform, raw) ?? raw.trim();
+}
+
+/**
  * Whether the socials step can save. Clearing every saved link is a real
  * change (it removes them server-side), so an all-empty form may save when
  * something was saved before; it only needs at least one filled link when

@@ -132,6 +132,19 @@ export function nextLaunchStep(checklist: LaunchChecklistResponse): LaunchStepId
   return checklist.steps.find((s) => !s.done)?.id ?? null;
 }
 
+/** Signed-out web preview without `&demo=1`: a brand-new account, nothing done. */
+export function buildFreshLaunchChecklist(): LaunchChecklistResponse {
+  const ids = Object.keys(LAUNCH_STEP_META) as LaunchStepId[];
+  return {
+    steps: ids.map((id) => ({ id, done: false })),
+    doneCount: 0,
+    total: ids.length,
+    complete: false,
+    handle: null,
+    dismissed: false,
+  };
+}
+
 /** Only with `&demo=1` on the web preview; never used against a real account. */
 export function buildDemoLaunchChecklist(): LaunchChecklistResponse {
   const done = new Set<LaunchStepId>(['name_handle', 'logo_banner', 'first_product', 'shipping']);
@@ -143,5 +156,33 @@ export function buildDemoLaunchChecklist(): LaunchChecklistResponse {
     complete: false,
     handle: 'atelier',
     dismissed: false,
+  };
+}
+
+// ─── One progress number ──────────────────────────────────────────────────
+// Every setup prompt (dashboard "Continue setup", Get ready to sell, the
+// walkthrough sheet, More's Store setup row, the Store setup and Launch
+// screens) reads this, so they can never disagree.
+
+export interface LaunchProgress {
+  done: number;
+  total: number;
+  percent: number;
+  /** "3/9" */
+  label: string;
+  complete: boolean;
+  next: LaunchStepId | null;
+}
+
+export function launchProgress(checklist: LaunchChecklistResponse): LaunchProgress {
+  const total = checklist.steps.length;
+  const done = checklist.steps.filter((s) => s.done).length;
+  return {
+    done,
+    total,
+    percent: total > 0 ? Math.round((done / total) * 100) : 0,
+    label: `${done}/${total}`,
+    complete: total > 0 && done === total,
+    next: nextLaunchStep(checklist),
   };
 }

@@ -59,6 +59,6 @@ describe('Orders empty state has a title, matching Products/Collections/Messages
     expect(read('lib/sellerLists/emptyCopy.ts')).toContain("all: { icon: 'shopping-bag', title: 'No orders yet' }");
     // Polish #94: a store with no orders at all gets a real next step.
     expect(source).toContain("'Share your store to get your first sale.'");
-    expect(source).toContain("'Orders show up here once a buyer checks out.'");
+    expect(source).toContain("'Orders appear here after checkout.'");
   });
 });

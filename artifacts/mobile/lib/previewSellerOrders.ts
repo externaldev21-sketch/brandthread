@@ -26,12 +26,14 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+// Same ids, names and prices as the Products tab's demo catalog
+// (lib/previewSellerProducts.ts), so an order line and its product match.
 const CATALOG = [
-  { id: 'preview-product-1', name: 'Classic Crew Tee', priceCents: 3800 },
-  { id: 'preview-product-2', name: 'Heavyweight Hoodie', priceCents: 7800 },
+  { id: 'preview-product-1', name: 'Tailored Long Coat', priceCents: 3800 },
+  { id: 'preview-product-2', name: 'Silver Sculpted Gown', priceCents: 7800 },
   { id: 'preview-product-3', name: 'Wool Overcoat', priceCents: 24000 },
-  { id: 'preview-product-4', name: 'Relaxed Denim', priceCents: 9200 },
-  { id: 'preview-product-5', name: 'Studio Sweatpants', priceCents: 5600 },
+  { id: 'preview-product-4', name: 'Ivory Draped Dress', priceCents: 9200 },
+  { id: 'preview-product-5', name: 'Wide Pleated Trousers', priceCents: 5600 },
 ] as const;
 const VARIANTS = ['Black / S', 'Black / M', 'Black / L', 'Bone / M', 'Bone / L', 'Graphite / M'];
 // [name, city, state/region, postcode, country]. One EU customer so the

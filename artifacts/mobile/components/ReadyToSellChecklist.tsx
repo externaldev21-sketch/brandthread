@@ -24,24 +24,33 @@ interface Props {
   /** null while unknown — the plan block stays hidden rather than flashing. */
   hasPlan: boolean | null;
   onOpen: (route: string) => void;
+  /**
+   * The server launch checklist's count (lib/launchChecklist.ts
+   * `launchProgress`). When given, the pill and bar show it — the same number
+   * as Continue setup, More and the Launch screen — and a last row opens the
+   * full checklist. Without it they count these six rows.
+   */
+  progress?: { done: number; total: number } | null;
   testID?: string;
 }
 
 const CIRCLE = 20;
 const STARTING_PRICE = SELLER_PLANS.reduce((min, p) => Math.min(min, p.priceCents), Infinity);
 
-export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to-sell' }: Props) {
+export function ReadyToSellChecklist({ data, hasPlan, onOpen, progress, testID = 'ready-to-sell' }: Props) {
   const { theme } = useAppTheme();
+  const done = progress ? progress.done : data.steps.filter(step => step.done).length;
+  const total = progress ? progress.total : data.steps.length;
 
   return (
     <View testID={testID}>
       <Text style={[styles.title, { color: theme.text }]}>{READY_TO_SELL_TITLE}</Text>
       <Text style={[styles.subtitle, { color: theme.muted }]}>{READY_TO_SELL_SUBTITLE}</Text>
       <View style={[styles.pill, { borderColor: theme.border }]} testID={`${testID}-count`}>
-        <Text style={[styles.pillText, { color: theme.muted }]}>{completedLabel(data)}</Text>
+        <Text style={[styles.pillText, { color: theme.muted }]}>{progress ? completedLabel({ doneCount: done, total }) : completedLabel(data)}</Text>
       </View>
-      <View style={[styles.progressTrack, { backgroundColor: theme.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: data.steps.length, now: data.steps.filter(step => step.done).length }} testID={`${testID}-progress`}>
-        <View style={{ height: '100%', backgroundColor: theme.text, width: `${data.steps.length ? data.steps.filter(step => step.done).length / data.steps.length * 100 : 0}%` }} />
+      <View style={[styles.progressTrack, { backgroundColor: theme.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: total, now: done }} testID={`${testID}-progress`}>
+        <View style={{ height: '100%', backgroundColor: theme.text, width: `${total ? done / total * 100 : 0}%` }} />
       </View>
 
       <View style={[styles.group, { backgroundColor: theme.surface }]}>
@@ -68,6 +77,18 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, testID = 'ready-to
             </PressableScale>
           );
         })}
+        {progress ? (
+          <PressableScale
+            onPress={() => onOpen('/launch-checklist')}
+            style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}
+            accessibilityRole="button"
+            accessibilityLabel={`See all ${total} steps`}
+            testID={`${testID}-all-steps`}
+          >
+            <Text style={[styles.allSteps, { color: theme.muted }]} numberOfLines={1}>{`See all ${total} steps`}</Text>
+            <Feather name="chevron-right" size={18} color={theme.subtle} />
+          </PressableScale>
+        ) : null}
       </View>
 
       {hasPlan === false ? (
@@ -104,6 +125,7 @@ const styles = StyleSheet.create({
   progressTrack: { height: 4, marginTop: 10, borderRadius: 999, overflow: 'hidden' },
   check: { width: CIRCLE, height: CIRCLE, borderRadius: CIRCLE / 2, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { ...TYPE_SCALE.body, flex: 1 },
+  allSteps: { ...TYPE_SCALE.footnote, flex: 1 },
   plan: { marginTop: 16, borderRadius: 12, paddingVertical: 16 },
   planTitle: { ...TYPE_SCALE.headline },
   planBody: { ...TYPE_SCALE.footnote, marginTop: 4 },

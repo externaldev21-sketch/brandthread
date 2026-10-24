@@ -127,7 +127,8 @@ function makeStyles(t: AppThemePreset) {
     limit: { fontSize: FS.sm, fontFamily: FONT.regular, color: t.muted },
     empty: { height: 120, alignItems: 'center', justifyContent: 'center' },
     row: { paddingHorizontal: SP.md, gap: GAP },
-    tile: { borderRadius: 6, overflow: 'hidden', backgroundColor: t.surface },
+    // flexShrink 0 keeps every tile, the dashed "+" included, at full width in the row.
+    tile: { borderRadius: 6, overflow: 'hidden', backgroundColor: t.surface, flexShrink: 0 },
     image: { width: '100%', height: '100%' },
     overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: `${t.background}99` },
     remove: {

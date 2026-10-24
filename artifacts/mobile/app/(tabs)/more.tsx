@@ -9,7 +9,9 @@ import { hapticPrimaryAction } from '@/lib/haptics';
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
+import { previewSellerPersonName } from '@/lib/previewIdentity';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 
@@ -21,7 +23,8 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 
-import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+import { launchProgress } from '@/lib/launchChecklist';
 
 import { useApi } from '@/lib/api';
 
@@ -94,7 +97,7 @@ const STUDIO_ITEMS: NavItem[] = [
 const OPERATIONS_ITEMS: NavItem[] = [
   { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'muted', route: '/shipping' },
   // FIX ↑ previously had no route — now wired to shipping.tsx
-  { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
+  { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', route: '/manufacturer-hub' },
   { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customers' },
   // FIX ↑ wired to the real customer list (customers.tsx → GET /api/customers);
   //      customer-accounts.tsx is only a "not configurable" settings stub.
@@ -115,7 +118,7 @@ const MONEY_ITEMS: NavItem[] = [
   { icon: 'dollar-sign', label: 'Payouts', desc: 'Bank account and payout history', accent: 'success', route: '/payouts' },
   { icon: 'smartphone', label: 'Pop-up mode', desc: 'Sell in person with Tap to Pay', accent: 'accent', route: '/popup-mode' },
   // ↑ De-duplicated: was also in OPERATIONS without a route — removed from there.
-  { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'muted', badge: true, route: '/subscription' },
+  { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'muted', route: '/subscription' },
   { icon: 'percent', label: 'Taxes and Duties', desc: 'Tax rules and collection', accent: 'muted', route: '/taxes-duties' },
   // FIX ↑ previously had no route — now wired to taxes-duties.tsx
 ];
@@ -152,10 +155,9 @@ export default function MoreScreen() {
   const router   = useRouter();
   const topInset = useHeaderTopInset();
   const { user } = useUser();
-  const { signOut, userId } = useAuth();
+  const { signOut } = useAuth();
   const api = useApi();
 
-  const [setupState, setSetupState]   = useState<SetupState | null>(null);
   const [expanded, setExpanded]       = useState<Record<string, boolean>>(
     // All sections open by default
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
@@ -165,13 +167,10 @@ export default function MoreScreen() {
   const { plan } = useSubscriptionPlan();
   const planLabel = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
 
-  // Same per-seller record the dashboard and Store setup read (an unscoped
-  // read could show 0% while they show real progress); refreshed on focus.
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    getSetupState(userId).then((next) => { if (active) setSetupState(next); });
-    return () => { active = false; };
-  }, [userId]));
+  // The server launch checklist — the one count the dashboard, Store setup
+  // and Launch your store also show; refetched on focus.
+  const { checklist: launchChecklist } = useLaunchChecklist();
+  const progress = launchChecklist ? launchProgress(launchChecklist) : null;
 
   // Refresh unread count whenever this screen is focused
   useFocusEffect(useCallback(() => {
@@ -194,12 +193,13 @@ export default function MoreScreen() {
     return () => { cancelled = true; };
   }, [api]));
 
-  const percent     = setupState ? completionPercent(setupState) : 0;
-  const firstName   = user?.firstName ?? 'Seller';
-  const lastName    = user?.lastName  ?? '';
+  // Signed-out preview: the same seller name the Profile tab shows.
+  const previewName = previewSellerPersonName();
+  const firstName   = user?.firstName ?? previewName?.firstName ?? 'Seller';
+  const lastName    = user?.lastName  ?? previewName?.lastName ?? '';
   const displayName = lastName ? `${firstName} ${lastName}` : firstName;
   const email       = user?.primaryEmailAddress?.emailAddress ?? '';
-  const avatarLetter = (user?.firstName?.[0] ?? 'S').toUpperCase();
+  const avatarLetter = (firstName[0] ?? 'S').toUpperCase();
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -209,7 +209,7 @@ export default function MoreScreen() {
       await AsyncStorage.removeItem('@brandthread/onboarding_complete');
       router.replace('/sign-in');
     } catch {
-      Alert.alert("Couldn't sign out", 'Try again.');
+      showAlert("Couldn't sign out", 'Try again.');
     }
   };
 
@@ -265,14 +265,14 @@ export default function MoreScreen() {
           <View style={styles.setupRow}>
             <Text style={[styles.setupLabel, { color: theme.muted, fontSize: FS.sm }]}>Store setup</Text>
             <Text style={[styles.setupLabel, { color: theme.accentLight, fontSize: FS.sm, fontFamily: FONT.bold }]}>
-              {percent}%
+              {progress ? progress.label : '—'}
             </Text>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${percent}%` }]} />
+            <View style={[styles.progressFill, { width: `${progress?.percent ?? 0}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => { router.push('/settings' as any); }}
+            onPress={() => { router.push('/setup' as any); }}
             hitSlop={CONTINUE_SETUP_HIT_SLOP}
             accessibilityRole="button"
           >

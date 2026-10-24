@@ -1,7 +1,8 @@
 /**
- * SetupContinueBanner — slim dashboard banner shown while the guided store
- * setup is incomplete and the walkthrough sheet has been dismissed. Tapping
- * it reopens the walkthrough. Persists until the seller reaches 100%.
+ * SetupContinueBanner — slim dashboard banner shown while the server launch
+ * checklist is incomplete and its dashboard card is out of the way. Tapping
+ * it opens the checklist. Persists until every step is done. The count is
+ * lib/launchChecklist.ts `launchProgress`, the same one every setup prompt shows.
  */
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -15,16 +16,19 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 export default function SetupContinueBanner({
-  percent,
+  done,
+  total,
   nextLabel,
   onPress,
 }: {
-  percent: number;
+  done: number;
+  total: number;
   nextLabel: string | null;
   onPress: () => void;
 }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
+  const percent = total > 0 ? (done / total) * 100 : 0;
 
   return (
     <TouchableOpacity
@@ -32,13 +36,13 @@ export default function SetupContinueBanner({
       activeOpacity={0.85}
       onPress={() => onPress()}
       accessibilityRole="button"
-      accessibilityLabel={`Continue store setup, ${Math.round(percent)}% complete`}
+      accessibilityLabel={`Continue store setup, ${done} of ${total} steps done`}
     >
       <View style={s.ringTrack}>
         <View style={[s.ringFill, { width: `${Math.max(6, Math.min(100, percent))}%` }]} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={s.title}>Continue setup · {Math.round(percent)}%</Text>
+        <Text style={s.title}>Continue setup · {done}/{total}</Text>
         <Text style={s.subtitle} numberOfLines={1}>
           {nextLabel ? `Next: ${nextLabel}` : 'A few steps left to finish your store'}
         </Text>

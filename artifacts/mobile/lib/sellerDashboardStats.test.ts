@@ -51,13 +51,13 @@ describe('describeDashboardDelta', () => {
   it('renders a positive delta with real amount and percent', () => {
     const delta = describeDashboardDelta(16_200, 15_000, formatCents);
     expect(delta.direction).toBe('up');
-    expect(delta.label).toBe('+$12.00 (8%) vs last period');
+    expect(delta.label).toBe('$12.00 (8%) vs last period');
   });
 
-  it('renders a negative delta with a minus sign and magnitude only (no double negative)', () => {
+  it('renders a negative delta as an unsigned magnitude; direction carries the down arrow', () => {
     const delta = describeDashboardDelta(9_000, 12_000, formatCents);
     expect(delta.direction).toBe('down');
-    expect(delta.label).toBe('-$30.00 (25%) vs last period');
+    expect(delta.label).toBe('$30.00 (25%) vs last period');
   });
 
   it('renders a neutral, non-alarming line for a true zero delta', () => {
@@ -75,13 +75,13 @@ describe('describeDashboardDelta', () => {
   it('never claims a percent when the previous period was zero and current is not', () => {
     const delta = describeDashboardDelta(4_200, 0, formatCents);
     expect(delta.direction).toBe('up');
-    expect(delta.label).toBe('+$42.00 vs last period');
+    expect(delta.label).toBe('$42.00 vs last period');
     expect(delta.label).not.toContain('%');
   });
 
   it('accepts a custom period label and plain-count formatter', () => {
     const delta = describeDashboardDelta(12, 10, (n) => String(n), 'last week');
-    expect(delta.label).toBe('+2 (20%) vs last week');
+    expect(delta.label).toBe('2 (20%) vs last week');
   });
 });
 

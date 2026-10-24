@@ -105,6 +105,8 @@ vi.mock('@/components/ui', () => ({
   ICON_SIZE: { sm: 17, md: 20, lg: 24 },
   Button: ({ label, onPress, disabled, loading }: any) =>
     React.createElement('Button', { label, onPress, disabled, loading, accessibilityLabel: label }),
+  Input: ({ label, value, onChangeText, testID }: any) =>
+    React.createElement('Input', { label, value, onChangeText, testID }),
 }));
 
 const sheetProps: { current: any } = { current: null };
@@ -293,6 +295,38 @@ describe('fulfill-batch per-row summary', () => {
     await flush();
     expect(getShippingRatesMock.mock.calls[0][1]).not.toHaveProperty('fromAddress');
     expect(findByLabel(renderer, 'SecondaryButton', 'Add ship-from address')).toBeTruthy();
+    expect(purchaseShippingLabelMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the package the quotes assume and re-quotes with the seller\'s edited size and weight', async () => {
+    orderGetMock.mockImplementation((id: string) => Promise.resolve(order(id, '1001')));
+    getPackagePresetsMock.mockResolvedValue([box]);
+    getParcelSuggestionMock.mockResolvedValue({ weightLb: 2.2, weightKnown: true });
+    getShippingRatesMock.mockResolvedValue([
+      { id: 'rate-1', carrier: 'USPS', service: 'Priority', priceCents: 500, estimatedDays: 3, estimatedDelivery: 'Jan 1', trackingIncluded: true, insuranceIncluded: false, isRecommended: false },
+    ]);
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillBatchScreen />); });
+    await flush();
+    await act(async () => { await findByLabel(renderer, 'Button', 'Print labels').props.onPress(); });
+    await flush();
+
+    const texts = () => renderer.root.findAllByType('Text' as any).map(n => (Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children));
+    expect(texts()).toContain('Mailer (12×9×3 in), item weights. Cheapest rate for each order.');
+
+    await act(async () => { findByLabel(renderer, 'Button', 'Edit').props.onPress(); });
+    const input = (id: string) => renderer.root.find(n => (n.type as any) === 'Input' && n.props.testID === id);
+    expect(input('batch-parcel-length').props.value).toBe('12');
+    await act(async () => { input('batch-parcel-weight').props.onChangeText('3'); });
+    await act(async () => { input('batch-parcel-height').props.onChangeText('6'); });
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Update quotes').props.onPress(); });
+    await flush();
+
+    // Two selected orders, quoted once with the box and once with the edit.
+    expect(getShippingRatesMock).toHaveBeenCalledTimes(4);
+    expect(getShippingRatesMock.mock.calls[2][1]).toEqual({ weight: '3', length: '12', width: '9', height: '6' });
+    expect(getShippingRatesMock.mock.calls[3][1]).toEqual({ weight: '3', length: '12', width: '9', height: '6' });
+    expect(texts()).toContain('12×9×6 in, 3 lb. Cheapest rate for each order.');
     expect(purchaseShippingLabelMock).not.toHaveBeenCalled();
   });
 });

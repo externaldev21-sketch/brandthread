@@ -279,15 +279,17 @@ export default function ProductsBulkEditScreen() {
       </View>
       <CollectionFilterRow value={collection} onChange={setCollection} enabled={isLoaded === true && isSignedIn === true && !isSellerDevPreview()} />
 
+      {/* Nothing listed → nothing to select: the row is disabled, not a dead tap. */}
       <PressableScale
         style={s.selectAll}
         onPress={toggleAll}
+        disabled={selectable.length === 0}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: allSelected }}
+        accessibilityState={{ checked: allSelected, disabled: selectable.length === 0 }}
         accessibilityLabel="Select all displayed products"
       >
         <Checkbox checked={allSelected} theme={theme} />
-        <Text style={s.selectAllText}>Select all displayed</Text>
+        <Text style={[s.selectAllText, selectable.length === 0 && { color: TEXT_DISABLED }]}>Select all displayed</Text>
         <Text style={s.count}>{items.length}</Text>
       </PressableScale>
 

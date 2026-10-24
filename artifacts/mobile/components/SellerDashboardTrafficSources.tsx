@@ -147,7 +147,10 @@ export function SellerDashboardTrafficSources({
             <Text style={[styles.totalLineLabel, { color: theme.muted }]}> store visits this period</Text>
           </Text>
           {deltaLine && (
-            <Text style={[styles.deltaLine, { color: deltaLine.direction === 'flat' ? theme.muted : theme.text }]}>
+            <Text
+              style={[styles.deltaLine, { color: deltaLine.direction === 'flat' ? theme.muted : theme.text }]}
+              accessibilityLabel={`${deltaLine.direction === 'up' ? 'Up ' : deltaLine.direction === 'down' ? 'Down ' : ''}${deltaLine.label}`}
+            >
               {deltaLine.direction === 'up' ? '↑ ' : deltaLine.direction === 'down' ? '↓ ' : ''}
               {deltaLine.label}
             </Text>

@@ -177,7 +177,7 @@ vi.mock('@/services/orderService', () => ({
   sortOrders: (orders: unknown[]) => orders,
 }));
 
-import { apiRowToOrder, flattenOrderSections, OrderCard } from '@/app/(tabs)/orders';
+import { apiRowToOrder, canShipFromList, flattenOrderSections, OrderCard } from '@/app/(tabs)/orders';
 
 const sellerRowProps = {
   selected: false,
@@ -237,6 +237,14 @@ describe('seller cancelled order rows', () => {
   });
 });
 describe('seller orders list rows', () => {
+  it('offers Ship on a new paid order (the server ships a pending order directly), never on an unpaid one', () => {
+    expect(canShipFromList({ status: 'new', paymentStatus: 'paid' })).toBe(true);
+    expect(canShipFromList({ status: 'processing', paymentStatus: 'paid' })).toBe(true);
+    expect(canShipFromList({ status: 'ready_to_ship', paymentStatus: 'paid' })).toBe(true);
+    expect(canShipFromList({ status: 'new', paymentStatus: 'pending' })).toBe(false);
+    expect(canShipFromList({ status: 'shipped', paymentStatus: 'paid' })).toBe(false);
+  });
+
   it('flattens date groups into header, order and gap rows that FlashList can recycle by type', () => {
     const order = (id: string) => ({ id } as unknown as ReturnType<typeof apiRowToOrder>);
     const rows = flattenOrderSections([

@@ -126,3 +126,33 @@ The seller swipe menu itself (SellerStudioRadialMenu, the swipe gesture, silver 
 - The brand step's CTA says "Done" while the other steps say "Continue", and while disabled it shows as plain grey text.
 - In demo, TikTok is prefilled as a full URL while Instagram is a bare @handle. The two inputs aren't normalized the same way.
 - The "Available" check and the social link confirmation are green, outside the palette.
+
+## Round 2 fix-backs
+
+Checked at 390×844 in the web harness (`?bt_preview=seller`, fresh and `&demo=1`).
+
+**Fixed**
+- One setup number. "Continue setup", Get ready to sell, the dashboard Launch card, the walkthrough sheet, More's Store setup row, Store setup and Launch your store all read the server launch checklist through `launchProgress()` (lib/launchChecklist.ts), so they all say the same thing, e.g. "4/9". Store setup lists those launch steps as its counted list. Domain, first post and manufacturer follow under "Grow your store", uncounted. More's "Continue setup →" now opens Store setup; before, it opened Settings.
+- Change lines show direction once: the arrow stays and the "+"/"−" is gone (hero, stat tiles, traffic). Screen readers hear "up"/"down" instead.
+- Demo Top products show the products' real photos. Demo order lines use the same product names as the Products tab.
+- Product detail: the floating pencil is gone (the header Edit stays). The stat strip has a trailing fade and a peeking third tile. "Last updated" reads "Sep 17, 2026". The margin copy reads "Margin: — Add cost to calculate". The remaining Alert.alert calls are now showAlert.
+- Variants & stock uses the left-aligned seller header. When the "Price for new" field is empty it shows "Inherits product price ($X)". Error copy goes through friendlyError.
+- Bulk edit: "Select all displayed" is disabled when nothing is listed.
+- Orders: Ship shows on NEW paid orders and does both steps, because the server already allows pending → shipped. The empty-state copy fits on one line.
+- Order detail: "× 1" sits on the price line.
+- Fulfill order: all four steps are labelled (Pack / Package / Ship / Confirm). The "##" double prefix is gone.
+- Fulfill multiple shows the package it will use (saved box and item weights, cheapest rate), with an Edit for weight and L×W×H that re-quotes before anything is bought.
+- Profile: the Seller and Free Plan chips sit on one line. The preview identity is "Maya Okafor" on both Profile and More.
+- More: removed the unexplained "•" dots on Subscription and Manufacturer Hub.
+- Public seller profile: a 404 shows "Profile not found", other failures get friendlyError copy, and only a real network failure says "Check your connection".
+- Store preview: retry uses the shared Button.
+- Store setup: done tasks keep the strikethrough without the extra dim. Tapping a row opens its screen. A manual task is marked complete with a long-press (or its circle), with no 3-button alert.
+- Store setup steps: the brand step CTA says "Continue". TikTok and Instagram are both stored as a bare handle and shown as "@handle".
+- Launch checklist pill padding and body text use tokens.
+
+**Already fixed on dev before this round:** the 8-dot order tracker (now 3 labelled stages), the order-detail tab strip (the tabs were removed), the bulk-edit demo products and header, the seller-profile plain arrow, the variants Alert.alert calls.
+
+**Left as-is**
+- Status colors: green, amber, red, gold icons and the iOS-green switches. These are owner decisions.
+- The ProfileStoryAvatar "+" tap target belongs to the profiles area.
+- Add product has no per-variant price rows in the current listing flow, so there is nowhere to put an "Inherits" placeholder.

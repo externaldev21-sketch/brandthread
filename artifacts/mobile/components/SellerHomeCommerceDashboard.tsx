@@ -25,7 +25,9 @@ import { subscribeStoreContext } from '@/lib/api';
 
 import { selectSellerHomeAnalytics, sellerHomeAnalyticsKey, type SellerHomeAnalyticsSnapshot } from '@/lib/sellerHomeAnalytics';
 
-import { completeTask, isSetupComplete, completionPercent, nextTask, markWalkthroughShown, markCelebrated, type SetupState, type SetupTask } from '@/lib/setupStore';
+import { completeTask, markWalkthroughShown, markCelebrated, type SetupState, type SetupTask } from '@/lib/setupStore';
+import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
+import { LAUNCH_STEP_META, launchProgress } from '@/lib/launchChecklist';
 
 import { withOrigin } from '@/lib/navigation/flowOrigin';
 
@@ -235,8 +237,8 @@ function compactDelta(current: number, previous: number): { direction: 'up' | 'd
   const change = computeMetricChange(current, previous);
   if (change.direction === 'flat') return { direction: 'flat', label: '' };
   if (change.percent == null) return { direction: change.direction, label: 'New' };
-  const sign = change.percent > 0 ? '+' : '';
-  return { direction: change.direction, label: `${sign}${change.percent}%` };
+  // Unsigned: the tile draws the ↑/↓ arrow.
+  return { direction: change.direction, label: `${Math.abs(change.percent)}%` };
 }
 
 export default function SellerHomeCommerceDashboard({
@@ -376,23 +378,28 @@ export default function SellerHomeCommerceDashboard({
   const [celebrationVisible, setCelebrationVisible] = useState(false);
   const autoOpenedRef = useRef(false);
   const wasCompleteRef = useRef<boolean | null>(null);
-  const setupComplete = isSetupComplete(setupState);
-  const setupPercent = completionPercent(setupState);
+  // One progress source for every setup prompt here: the server launch
+  // checklist (the same count More, Store setup and Launch your store show).
+  const { checklist: launchChecklist, dismiss: dismissLaunchChecklist } = useLaunchChecklist();
+  const progress = launchChecklist ? launchProgress(launchChecklist) : null;
+  // Unknown until the checklist loads — nothing auto-opens or celebrates early.
+  const setupComplete = progress?.complete ?? false;
 
   // Show the guided walkthrough automatically the first time a seller lands
   // on an incomplete dashboard (e.g. right after signup), then never again
   // uninvited — the "Continue setup" banner takes over from there.
   useEffect(() => {
     if (autoOpenedRef.current) return;
-    if (!userId || setupComplete) return;
+    if (!userId || !progress || setupComplete) return;
     if (setupState.walkthroughShown) return;
     autoOpenedRef.current = true;
     setWalkthroughVisible(true);
     void markWalkthroughShown(userId).then(onSetupStateChange);
-  }, [onSetupStateChange, setupComplete, setupState.walkthroughShown, userId]);
+  }, [onSetupStateChange, progress, setupComplete, setupState.walkthroughShown, userId]);
 
   // One-time celebration the moment every required step becomes complete.
   useEffect(() => {
+    if (!progress) return;
     if (wasCompleteRef.current === null) {
       wasCompleteRef.current = setupComplete;
       if (setupComplete && !setupState.celebrated && userId) {
@@ -406,7 +413,7 @@ export default function SellerHomeCommerceDashboard({
       void markCelebrated(userId).then(onSetupStateChange);
     }
     wasCompleteRef.current = setupComplete;
-  }, [onSetupStateChange, setupComplete, setupState.celebrated, userId]);
+  }, [onSetupStateChange, progress, setupComplete, setupState.celebrated, userId]);
 
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
@@ -468,7 +475,15 @@ export default function SellerHomeCommerceDashboard({
       setEverSoldCount(previewOrders.length);
       setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
       setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
-      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), []));
+      // Photos from the same demo catalog the Products tab lists.
+      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
+      const previewCatalog = isPreviewDemoMode()
+        ? getPreviewSellerProducts().map((product) => ({
+          id: product.id,
+          images: [...product.media].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder).map((m) => m.uri),
+        }))
+        : [];
+      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), previewCatalog));
       setActivityItems(mergeDashboardActivity({ orders: previewOrders.slice(0, 10) }));
       return;
     }
@@ -999,7 +1014,12 @@ export default function SellerHomeCommerceDashboard({
                   // line only holds the hero's height so nothing jumps.
                   <Text style={[styles.heroDelta, { color: theme.muted }]}>{' '}</Text>
                 ) : deltaLine && scrubIndex === null ? (
-                  <View style={styles.heroDeltaRow} testID="seller-dashboard-hero-delta">
+                  <View
+                    style={styles.heroDeltaRow}
+                    testID="seller-dashboard-hero-delta"
+                    accessible
+                    accessibilityLabel={`${deltaLine.direction === 'up' ? 'Up ' : deltaLine.direction === 'down' ? 'Down ' : ''}${deltaLine.label}`}
+                  >
                     {deltaLine.direction !== 'flat' && (
                       <Icon name={deltaLine.direction === 'up' ? 'arrow-up-right' : 'arrow-down-right'} size={14} color={theme.text} />
                     )}
@@ -1171,6 +1191,7 @@ export default function SellerHomeCommerceDashboard({
                   <ReadyToSellChecklist
                     data={readyToSell.data}
                     hasPlan={readyToSell.hasPlan}
+                    progress={progress}
                     onOpen={(route) => nav(route === '/add-product' ? withOrigin(route, 'dashboard') : route)}
                     testID="seller-dashboard-ready-to-sell"
                   />
@@ -1185,21 +1206,23 @@ export default function SellerHomeCommerceDashboard({
             </>
           )}
 
-          {/* ── Setup checklist: "Continue setup" banner opens the guided
-              walkthrough sheet, which owns the full task list — no separate
-              inline checklist duplicated here. ──────────────────────────── */}
-          {!topCard && !showReadyToSell && !firstWeek.visible && !setupComplete && setupState.walkthroughShown && (
+          {/* ── One setup prompt at a time: Get ready to sell for a new
+              seller, else the Launch checklist card, and once that card is
+              dismissed the slim "Continue setup" banner (opens the guided
+              walkthrough). All three show the same server count. ─────────── */}
+          {!topCard && !showReadyToSell && !firstWeek.visible && launchChecklist && !launchChecklist.dismissed && (
+            <LaunchChecklistCard checklist={launchChecklist} dismiss={() => { void dismissLaunchChecklist(); }} />
+          )}
+          {!topCard && !showReadyToSell && !firstWeek.visible && progress && !setupComplete && launchChecklist?.dismissed && (
             <View style={styles.section}>
               <SetupContinueBanner
-                percent={setupPercent}
-                nextLabel={nextTask(setupState)?.label ?? null}
+                done={progress.done}
+                total={progress.total}
+                nextLabel={progress.next ? LAUNCH_STEP_META[progress.next].title : null}
                 onPress={() => setWalkthroughVisible(true)}
               />
             </View>
           )}
-
-          {/* One setup list at a time: Get ready to sell replaces it for a new seller. */}
-          {!topCard && !showReadyToSell && !firstWeek.visible && <LaunchChecklistCard />}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
@@ -1208,7 +1231,7 @@ export default function SellerHomeCommerceDashboard({
         visible={walkthroughVisible}
         onClose={() => setWalkthroughVisible(false)}
         userId={userId}
-        setupState={setupState}
+        checklist={launchChecklist}
         onSetupStateChange={onSetupStateChange}
       />
       <SetupCelebration

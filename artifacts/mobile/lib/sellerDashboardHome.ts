@@ -62,9 +62,8 @@ export function describeHomeDelta(
   if (change.percent == null) return null;
   const comparison = HOME_RANGE_COMPARISON[range];
   if (change.direction === 'flat') return { direction: 'flat', label: `0% ${comparison}` };
-  const magnitude = Math.abs(change.percent);
-  const sign = change.direction === 'up' ? '+' : '−';
-  return { direction: change.direction, label: `${sign}${magnitude}% ${comparison}` };
+  // Unsigned: the hero draws an up/down arrow next to it.
+  return { direction: change.direction, label: `${Math.abs(change.percent)}% ${comparison}` };
 }
 
 // ─── To do ─────────────────────────────────────────────────────────────────

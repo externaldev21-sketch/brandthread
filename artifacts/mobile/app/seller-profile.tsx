@@ -45,6 +45,8 @@ import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents
 import { copyProfileLink } from '@/lib/copyProfileLink';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { friendlyError, FRIENDLY_SIGNED_OUT_MESSAGE } from '@/lib/friendlyError';
+import { ApiError } from '@/lib/networkNotice';
 import {
   connectionsHref, messageSellerHref, productDetailHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
@@ -147,6 +149,8 @@ function httpOrNull(value: unknown): string | null {
 }
 
 /** Adapts GET /api/public/sellers/:id (profile block) or GET /api/seller/profile. */
+const PROFILE_LOAD_FALLBACK = 'Something went wrong on our end. Try again in a moment.';
+
 function toSellerView(profile: any, fallbackId: string): SellerView {
   const brandName = profile?.brandName ?? profile?.displayName ?? 'Seller';
   return {
@@ -213,6 +217,8 @@ export default function SellerProfileScreen() {
   const [profileError, setProfileError] = useState(false);
   // A 404 / missing id is "not found", not a connection problem (no Retry).
   const [profileNotFound, setProfileNotFound] = useState(false);
+  // What went wrong otherwise: a connection problem reads differently from a server failure.
+  const [profileErrorMessage, setProfileErrorMessage] = useState(PROFILE_LOAD_FALLBACK);
   const [reloadTick, setReloadTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -289,7 +295,7 @@ export default function SellerProfileScreen() {
     // The signed-out preview has no Clerk session; its own profile comes from
     // the preview data layer (lib/previewApiData.ts) instead of an error.
     if (loadOwnProfile && !devPreview && (!authLoaded || !userId)) {
-      if (authLoaded) { setProfileLoading(false); setProfileError(true); }
+      if (authLoaded) { setProfileLoading(false); setProfileErrorMessage(FRIENDLY_SIGNED_OUT_MESSAGE); setProfileError(true); }
       return () => { active = false; };
     }
     (async () => {
@@ -337,9 +343,15 @@ export default function SellerProfileScreen() {
         if (view.likesCount != null) setLikes(view.likesCount);
         if (view.followersCount != null) setFollowers((count) => count ?? view.followersCount);
         if (view.followingCount != null) setFollowing((count) => count ?? view.followingCount);
-      } catch {
+      } catch (err) {
         // A cached profile already on screen stays up on a bad connection.
-        if (active && reloadTick === 0 && !hasSellerRef.current) setProfileError(true);
+        if (active && reloadTick === 0 && !hasSellerRef.current) {
+          const notFound = (err instanceof ApiError && err.status === 404)
+            || (err instanceof Error && err.message === 'Seller not found.');
+          setProfileNotFound(notFound);
+          setProfileErrorMessage(friendlyError(err, PROFILE_LOAD_FALLBACK));
+          setProfileError(true);
+        }
       } finally {
         if (active) { setProfileLoading(false); setRefreshing(false); }
       }
@@ -743,7 +755,7 @@ export default function SellerProfileScreen() {
           <EmptyState
             icon="alert-triangle"
             title="Couldn't load this profile"
-            description="Check your connection and try again."
+            description={profileErrorMessage}
             action={{ label: 'Retry', onPress: () => { setProfileLoading(true); setProfileError(false); setReloadTick((tick) => tick + 1); } }}
           />
         )}

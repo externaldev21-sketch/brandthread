@@ -10,7 +10,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { formatCalendarDate } from '@/lib/calendarDate';
 
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, FlatList, Share, Linking, TextInput } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
+import { View, Text, ScrollView, StyleSheet, Animated, FlatList, Share, Linking, TextInput, useWindowDimensions } from 'react-native';
 
 import { CachedImage as Image } from '@/components/CachedImage';
 
@@ -29,8 +30,6 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { isPreviewSellerProductId } from '@/lib/previewSellerProducts';
 
 import { previewAsBuyerHref } from '@/lib/sellerProductPreview';
-
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -64,7 +63,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { MissingItemState } from '@/components/states/MissingItemState';
 
-import { fmtRelativeDay, fmtDate } from '@/lib/format';
+import { fmtDate } from '@/lib/format';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 
@@ -103,7 +102,6 @@ export default function ProductDetailScreen() {
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const { userId } = useAuth();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
 
@@ -252,17 +250,17 @@ export default function ProductDetailScreen() {
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
                     archiveProduct(product.id).then(p => {
-                      if (p) { setProduct(p); Alert.alert('Product archived'); }
+                      if (p) { setProduct(p); showAlert('Product archived'); }
                     }).catch(error => {
                       reportNetworkError(error, () => archiveProduct(product.id).then(p => p && setProduct(p)));
-                      Alert.alert('Could not archive product', 'Check your connection and try again.');
+                      showAlert('Could not archive product', 'Check your connection and try again.');
                     });
                   } else {
                     publishProduct(product.id).then(p => {
-                      if (p) { setProduct(p); haptics.success(); Alert.alert('Product published'); }
+                      if (p) { setProduct(p); haptics.success(); showAlert('Product published'); }
                     }).catch(error => {
                       reportNetworkError(error, () => publishProduct(product.id).then(p => p && setProduct(p)));
-                      Alert.alert('Could not publish product', 'Check your connection and try again.');
+                      showAlert('Could not publish product', 'Check your connection and try again.');
                     });
                   }
                 }},
@@ -276,7 +274,7 @@ export default function ProductDetailScreen() {
                     }
                   }).catch(error => {
                     reportNetworkError(error);
-                    Alert.alert('Could not duplicate product', 'Check your connection and try again.');
+                    showAlert('Could not duplicate product', 'Check your connection and try again.');
                   });
                 }},
                 { text: 'Share', onPress: () => {
@@ -328,7 +326,7 @@ export default function ProductDetailScreen() {
       <ScrollView
         style={s.tabContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarInset + 56 + SP.lg }}
+        contentContainerStyle={{ paddingBottom: tabBarInset + SP.lg }}
       >
         {activeTab === 'overview'   && <OverviewTab   product={product} pricing={pricing} coverImage={coverImage} />}
         {activeTab === 'variants'   && <VariantsTab   product={product} setProduct={setProduct} id={id!} />}
@@ -340,15 +338,6 @@ export default function ProductDetailScreen() {
         {activeTab === 'store'      && <StoreTab      product={product} pricing={pricing} coverImage={coverImage} router={router} id={id!} />}
       </ScrollView>
 
-      {/* ── Floating Action Button ── */}
-      <PressableScale accessibilityLabel="Edit product"
-        style={[s.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={() => { router.push(('/add-product?editId=' + id) as never); }}
-      >
-        <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
-          <Icon name="edit-2" size={ICON.md} color={theme.onAccent} />
-        </LinearGradient>
-      </PressableScale>
       <AIBrainFAB context={{ screen: 'product_detail' as const, productId: String(id ?? ''), productName: String(product.name ?? '') }} bottomOffset={0} />
     </View>
   );
@@ -363,6 +352,10 @@ function OverviewTab({ product, pricing, coverImage }: {
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const ov = React.useMemo(() => makeOvStyles(theme), [theme]);
+  const { width: windowWidth } = useWindowDimensions();
+  // 2.4 tiles across: the third tile always peeks past the right edge.
+  const statTileWidth = Math.floor((windowWidth - SP.md - SP.sm * 2) / 2.4);
+  const [stripAtEnd, setStripAtEnd] = useState(false);
   const statusVariant = product.status === 'active' ? 'success' : product.status === 'draft' ? 'warning' : product.status === 'archived' ? 'neutral' : 'info';
 
   // Fix 8: show '—' if price is 0 or undefined; show '—' for margin if cost is undefined
@@ -404,25 +397,48 @@ function OverviewTab({ product, pricing, coverImage }: {
                 Profit: {profitDisplay} · Margin: {pricing.marginPercent.toFixed(1)}%
               </Text>
             ) : pricing.costCents === undefined ? (
-              <Text style={ov.heroMargin}>Margin: — (add cost to calculate)</Text>
+              <Text style={ov.heroMargin}>Margin: — Add cost to calculate</Text>
             ) : null}
           </View>
         </GradientCard>
       </AnimatedEntrance>
 
       {/* Stat strip */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ov.statStrip}>
-        <StatCard label="Revenue" value={formatCurrency(product.totalRevenueCents)} icon="dollar-sign" accent={GOLD} style={ov.statCard} />
-        <StatCard label="Sold" value={String(product.totalSales)} icon="shopping-bag" accent={theme.accent} style={ov.statCard} />
-        <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={theme.secondary} style={ov.statCard} />
-        <StatCard
-          label="Margin"
-          value={marginDisplay}
-          icon="trending-up"
-          accent={SUCCESS}
-          style={ov.statCard}
-        />
-      </ScrollView>
+      {/* Tiles are sized so the third one peeks past the edge, and a trailing
+          fade sits over the cut until the strip is scrolled to its end — the
+          strip reads as scrollable instead of Stock/Margin just being cut off. */}
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={ov.statStrip}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            setStripAtEnd(contentOffset.x + layoutMeasurement.width >= contentSize.width - 4);
+          }}
+        >
+          <StatCard label="Revenue" value={formatCurrency(product.totalRevenueCents)} icon="dollar-sign" accent={GOLD} style={[ov.statCard, { width: statTileWidth }]} />
+          <StatCard label="Sold" value={String(product.totalSales)} icon="shopping-bag" accent={theme.accent} style={[ov.statCard, { width: statTileWidth }]} />
+          <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={theme.secondary} style={[ov.statCard, { width: statTileWidth }]} />
+          <StatCard
+            label="Margin"
+            value={marginDisplay}
+            icon="trending-up"
+            accent={SUCCESS}
+            style={[ov.statCard, { width: statTileWidth }]}
+          />
+        </ScrollView>
+        {!stripAtEnd && (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[`${BG}00`, BG]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={ov.statStripFade}
+          />
+        )}
+      </View>
 
       {/* Info rows */}
       <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
@@ -437,7 +453,7 @@ function OverviewTab({ product, pricing, coverImage }: {
             right={<StatusBadge label={product.storeSettings.status.toUpperCase()} variant={product.storeSettings.status === 'active' ? 'success' : 'warning'} small />}
           />
           <View style={ov.divider} />
-          <InfoRow label="Last updated" value={fmtRelativeDay(product.updatedAt)} icon="clock" />
+          <InfoRow label="Last updated" value={fmtDate(product.updatedAt)} icon="clock" />
           {product.storeSettings.seo.title && (
             <>
               <View style={ov.divider} />
@@ -505,6 +521,7 @@ const makeOvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   heroMargin:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginTop: 4 },
   statStrip:       { gap: SP.sm, paddingHorizontal: SP.md },
   statCard:        { minWidth: 110 },
+  statStripFade:   { position: 'absolute', top: 0, right: 0, bottom: 0, width: SP.xl },
   infoCard:        { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   infoRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: 12 },
   infoLabel:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, width: 110 },
@@ -530,7 +547,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
   };
 
   const removeVariant = (variant: ProductVariant) => {
-    Alert.alert('Remove variant?', `${variant.title} will no longer be sold.`, [
+    showAlert('Remove variant?', `${variant.title} will no longer be sold.`, [
       { text: 'Keep', style: 'cancel' },
       { text: 'Remove variant', style: 'destructive', onPress: () => {
         (api as any).products?.updateVariant?.(product.id, variant.id, { status: 'inactive' })
@@ -542,7 +559,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
           })
           .catch((error: unknown) => {
             reportNetworkError(error);
-            Alert.alert('Could not remove variant', 'Check your connection and try again.');
+            showAlert('Could not remove variant', 'Check your connection and try again.');
           });
       }},
     ]);
@@ -550,22 +567,22 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
   // Fix 2: bulk edit price handler
   const handleBulkPrice = () => {
     const currentPrice = product.pricing.priceCents;
-    Alert.alert('Bulk Edit Price', `Current price: ${formatCurrency(currentPrice)}`, [
+    showAlert('Edit all prices', `Current price: ${formatCurrency(currentPrice)}`, [
       {
         text: `Set all to ${formatCurrency(currentPrice)}`,
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, priceCents: currentPrice }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) { setProduct(p); Alert.alert('Variant prices updated'); }
+            if (p) { setProduct(p); showAlert('Variant prices updated'); }
           }).catch(error => {
             reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
-            Alert.alert('Could not update variants', 'Check your connection and try again.');
+            showAlert('Could not update variants', 'Check your connection and try again.');
           });
         },
       },
       {
         text: 'Edit individually',
-        onPress: () => Alert.alert('Individual Edit', 'Tap a variant to edit its price.'),
+        onPress: () => showAlert('Edit one variant', 'Tap a variant to edit its price.'),
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -574,16 +591,16 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
   // Fix 2: bulk edit inventory handler
   const handleBulkInventory = () => {
     const totalStock = product.inventory.totalStock;
-    Alert.alert('Bulk Edit Inventory', 'Choose an adjustment for all variants', [
+    showAlert('Edit all inventory', 'Choose an adjustment for all variants', [
       {
         text: 'Add 5 to all',
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: v.inventoryQuantity + 5 }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+            if (p) { setProduct(p); showAlert('Inventory updated'); }
           }).catch(error => {
             reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
-            Alert.alert('Could not update inventory', 'Check your connection and try again.');
+            showAlert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -592,10 +609,10 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: Math.max(0, v.inventoryQuantity - 5) }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+            if (p) { setProduct(p); showAlert('Inventory updated'); }
           }).catch(error => {
             reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
-            Alert.alert('Could not update inventory', 'Check your connection and try again.');
+            showAlert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -604,10 +621,10 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: 0 }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+            if (p) { setProduct(p); showAlert('Inventory updated'); }
           }).catch(error => {
             reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
-            Alert.alert('Could not update inventory', 'Check your connection and try again.');
+            showAlert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -750,7 +767,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
       });
     } catch (error) {
       reportNetworkError(error, () => applyVariantDelta(variant, delta));
-      Alert.alert('Could not update stock', 'Check your connection and try again.');
+      showAlert('Could not update stock', 'Check your connection and try again.');
     }
   }
 
@@ -776,7 +793,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
       });
     } catch (error) {
       reportNetworkError(error, () => applyVariantDirectEntry(variant));
-      Alert.alert('Could not update stock', 'Check your connection and try again.');
+      showAlert('Could not update stock', 'Check your connection and try again.');
     }
   }
 
@@ -800,7 +817,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
       });
     } catch (error) {
       reportNetworkError(error, () => applyProductDelta(delta));
-      Alert.alert('Could not update stock', 'Check your connection and try again.');
+      showAlert('Could not update stock', 'Check your connection and try again.');
     }
   }
 
@@ -1037,7 +1054,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             onPress={() => {
               if (mfg.techPackUri) {
                 Linking.openURL(mfg.techPackUri).catch(() =>
-                  Alert.alert("Couldn't open tech pack", 'Try again.'));
+                  showAlert("Couldn't open tech pack", 'Try again.'));
               }
             }}
             accent={BLUE}
@@ -1461,8 +1478,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   tabUnderline: { position: 'absolute', bottom: 0, left: SP.md, right: SP.md, height: 2,
                   backgroundColor: theme.accent, borderRadius: RADIUS.pill },
   tabContent:   { flex: 1 },
-  fab:          { position: 'absolute', right: SP.lg, width: 56, height: 56, borderRadius: 28,
-                  overflow: 'hidden', shadowColor: theme.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },
-  fabGrad:      { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   });
 };

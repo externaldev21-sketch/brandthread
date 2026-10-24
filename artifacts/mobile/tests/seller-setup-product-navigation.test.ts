@@ -45,8 +45,9 @@ describe('seller setup destination navigation', () => {
     expect(dashboard).toContain("router.push(withOrigin(task.route, 'dashboard') as never)");
     expect(dashboard).toContain("nav(withOrigin('/add-product', 'dashboard'))");
     expect(dashboard).not.toContain('router.replace(withSellerSetupOrigin');
-    expect(walkthrough).toContain('onPress={() => openTask(task)}');
-    expect(walkthrough).toContain("router.push(withOrigin(task.route, 'dashboard') as never)");
+    // The walkthrough lists the server launch checklist steps.
+    expect(walkthrough).toContain('onPress={() => openStep(step.id)}');
+    expect(walkthrough).toContain("router.push(withOrigin(LAUNCH_STEP_META[id].route, 'dashboard') as never)");
     expect(setup).toContain("router.push(withOrigin(task.route, 'setup') as never)");
     expect(setup).not.toContain('router.replace(');
   });

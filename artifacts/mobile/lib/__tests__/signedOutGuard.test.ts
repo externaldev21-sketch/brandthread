@@ -116,7 +116,7 @@ describe('signed-out API guard (lib/api.ts)', () => {
     await expect(api.team.members()).resolves.toMatchObject([{ role: 'owner', isOwner: true }]);
     await expect(api.auth.deletionCheck()).resolves.toMatchObject({ canDelete: true, accountType: 'seller', blockers: [] });
     const profile = await api.seller.getProfile();
-    expect(profile).toMatchObject({ displayName: 'Preview Studio', bio: null, website: null, location: null, contactEmail: null });
+    expect(profile).toMatchObject({ displayName: 'Maya Okafor', bio: null, website: null, location: null, contactEmail: null });
     expect(networkCalls()).toEqual([]);
   });
 

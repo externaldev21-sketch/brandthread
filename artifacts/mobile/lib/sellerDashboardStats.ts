@@ -62,15 +62,15 @@ export function describeDashboardDelta(
   if (change.direction === 'flat') {
     return { direction: 'flat', label: `No change vs ${periodLabel}` };
   }
-  const diff = current - previous;
-  const sign = diff > 0 ? '+' : '-';
-  const amountText = formatValue(Math.abs(diff));
+  // Unsigned: the caller draws the ↑/↓ arrow, so a "+"/"-" would say the
+  // direction twice ("↑ +$31.54").
+  const amountText = formatValue(Math.abs(current - previous));
   if (change.percent == null) {
-    return { direction: change.direction, label: `${sign}${amountText} vs ${periodLabel}` };
+    return { direction: change.direction, label: `${amountText} vs ${periodLabel}` };
   }
   return {
     direction: change.direction,
-    label: `${sign}${amountText} (${Math.abs(change.percent)}%) vs ${periodLabel}`,
+    label: `${amountText} (${Math.abs(change.percent)}%) vs ${periodLabel}`,
   };
 }
 
