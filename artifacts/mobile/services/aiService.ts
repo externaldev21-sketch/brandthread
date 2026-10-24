@@ -39,6 +39,12 @@ import {
   suggestionCategoryAllowed,
 } from './aiSettingsPolicy';
 import { AiConsentRequiredError, isAiConsentRequiredBody, withAiConsent } from '@/lib/aiConsent';
+import {
+  AI_CREDITS_ALERT_COPY,
+  classifyAiCreditsError,
+  surfaceAiCreditsError,
+  type AiCreditsErrorKind,
+} from '@/lib/aiCreditsError';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -231,6 +237,27 @@ function isAIDisabledBody(text: string): boolean {
   }
 }
 
+/** Copy for an out-of-credits refusal (the AI credits screen is opened too). */
+export const AI_OUT_OF_CREDITS_MESSAGE = "You're out of AI credits. Add credits to keep chatting.";
+
+/** An AI chat failure that carries the server's status and credit-gate code. */
+export type AIRequestError = Error & { status?: number; code?: AiCreditsErrorKind };
+
+/**
+ * The AI credit gate's refusals (402 insufficient_credits, 429 user_daily_cap,
+ * 503 global_daily_cap) keep their server code so the screen can tell a daily
+ * cap ("resets tomorrow") from burst rate limiting. A 402 also opens the AI
+ * credits screen, the same way lib/api.ts surfaceAiCreditsError does for
+ * every other AI endpoint (this chat endpoint does not go through lib/api.ts).
+ */
+function creditGateError(status: number, text: string): AIRequestError | null {
+  const kind = classifyAiCreditsError(status, text);
+  if (!kind) return null;
+  if (kind === 'insufficient_credits') surfaceAiCreditsError(kind);
+  const message = kind === 'insufficient_credits' ? AI_OUT_OF_CREDITS_MESSAGE : AI_CREDITS_ALERT_COPY[kind].message;
+  return Object.assign(new Error(message), { status, code: kind });
+}
+
 // ─── Session repair ───────────────────────────────────────────────────────────
 
 /**
@@ -379,8 +406,10 @@ async function callAI(
   }, AI_REQUEST_TIMEOUT_MS);
 
   if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const gate = creditGateError(res.status, text);
+    if (gate) throw gate;
     if (res.status === 403) {
-      const text = await res.text().catch(() => '');
       if (isAIDisabledBody(text)) {
         await markAssistantDisabledLocally();
         throw aiDisabledError();
@@ -396,8 +425,12 @@ async function callAI(
     if (res.status === 503 || res.status === 502) {
       throw new Error('AI isn’t available right now. Try again soon.');
     }
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `AI request failed (${res.status}).`);
+    let serverError: unknown;
+    try { serverError = (JSON.parse(text) as { error?: unknown })?.error; } catch { /* not JSON */ }
+    throw Object.assign(
+      new Error(typeof serverError === 'string' && serverError ? serverError : `AI request failed (${res.status}).`),
+      { status: res.status },
+    );
   }
 
   return res.json() as Promise<AIChatResponse>;
@@ -477,7 +510,10 @@ function callAIStream(
       if (xhr.readyState === 4 && !settled) {
         settled = true;
         cleanup();
-        if (xhr.status === 403 && isAIDisabledBody(xhr.responseText ?? '')) {
+        const gate = creditGateError(xhr.status, xhr.responseText ?? '');
+        if (gate) {
+          reject(gate);
+        } else if (xhr.status === 403 && isAIDisabledBody(xhr.responseText ?? '')) {
           markAssistantDisabledLocally().finally(() => reject(aiDisabledError()));
         } else if (xhr.status === 403 && isAiConsentRequiredBody(403, xhr.responseText)) {
           reject(new AiConsentRequiredError());
@@ -491,7 +527,7 @@ function callAIStream(
         } else if (xhr.status >= 500 || xhr.status === 502 || xhr.status === 503) {
           reject(new Error('AI isn’t available right now. Try again soon.'));
         } else if (xhr.status !== 200) {
-          reject(new Error(`AI request failed (${xhr.status}).`));
+          reject(Object.assign(new Error(`AI request failed (${xhr.status}).`), { status: xhr.status }));
         } else {
           // Stream ended without an explicit "done" event — use what we have.
           resolve({ content: fullContent });

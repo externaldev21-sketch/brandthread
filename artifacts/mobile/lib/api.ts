@@ -1706,8 +1706,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     const installId = await getInstallId().catch(() => null);
     return request<T>(path, { method: 'POST', body: JSON.stringify(body), ...(installId ? { headers: { 'x-bt-install-id': installId } } : {}) }, getToken, false, getCacheScope);
   };
-  const postExpensive = <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
+  const postExpensive = <T>(path: string, body: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body), ...(signal ? { signal } : {}) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope, true,
     isFeedMediaWrite(path, body) ? EXPENSIVE_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
@@ -2365,15 +2365,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         images: string[],
         prompt: string,
         mode: 'photoshoot' | 'mockup_to_model' = 'photoshoot',
-      ) => postExpensive<any>('/api/photography/generate', { images, prompt, mode }),
+        opts?: { signal?: AbortSignal },
+      ) => postExpensive<any>('/api/photography/generate', { images, prompt, mode }, opts?.signal),
       generateOutfitSwap: (
         heroImage: string,
         garmentImages: string[],
         prompt: string,
+        opts?: { signal?: AbortSignal },
       ) => postExpensive<{
         results: { garmentIndex: number; b64_json: string }[];
         errors?: { garmentIndex: number }[];
-      }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }),
+      }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }, opts?.signal),
       retryOutfitSwap: (
         heroImage: string,
         garmentImage: string,

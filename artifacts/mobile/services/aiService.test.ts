@@ -42,6 +42,14 @@ vi.mock('./aiAuditLog', () => ({
   addAuditEntry: () => Promise.resolve(),
 }));
 
+// ─── credit-gate surfacing (navigation to /ai-credits) ─────────────────────
+
+const surfaceAiCreditsErrorMock = vi.fn();
+vi.mock('@/lib/aiCreditsError', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/aiCreditsError')>()),
+  surfaceAiCreditsError: (...args: unknown[]) => surfaceAiCreditsErrorMock(...args),
+}));
+
 // ─── fetch mock (controlled per test) ────────────────────────────────────────
 
 let _fetchImpl: ((...args: unknown[]) => Promise<Response>) | null = null;
@@ -60,7 +68,7 @@ function mockFetchOk(body: unknown): void {
   } as unknown as Response);
 }
 
-function mockFetchError(status: number, body: { error?: string } = {}): void {
+function mockFetchError(status: number, body: { error?: string; code?: string } = {}): void {
   _fetchImpl = () => Promise.resolve({
     ok: false,
     status,
@@ -73,12 +81,17 @@ function mockFetchNetworkError(message = 'Network request failed'): void {
   _fetchImpl = () => Promise.reject(new Error(message));
 }
 
-function mockFetchAbort(): void {
-  _fetchImpl = () => {
-    const err = new Error('AbortError');
-    err.name = 'AbortError';
-    return Promise.reject(err);
-  };
+/** A fetch that never settles on its own and rejects with AbortError once its signal aborts. */
+function mockFetchAbort(onStart?: () => void): void {
+  _fetchImpl = (_url: unknown, init?: unknown) => new Promise<Response>((_resolve, reject) => {
+    const signal = (init as { signal?: AbortSignal } | undefined)?.signal;
+    signal?.addEventListener('abort', () => {
+      const err = new Error('AbortError');
+      err.name = 'AbortError';
+      reject(err);
+    });
+    onStart?.();
+  });
 }
 
 // ─── Set API_BASE so the service doesn't short-circuit ───────────────────────
@@ -243,7 +256,43 @@ describe('5. Failure / retry', () => {
 
     await expect(
       sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' })
-    ).rejects.toThrow(/unavailable/i);
+    ).rejects.toThrow(/isn.t available right now/i);
+  });
+});
+
+describe('5b. Credit gate refusals keep the server code', () => {
+  it('429 user_daily_cap carries the code and the resets-tomorrow copy (not burst rate limiting)', async () => {
+    const { loadSession, sendMessage } = await getService();
+    surfaceAiCreditsErrorMock.mockClear();
+    mockFetchError(429, { error: 'Daily AI limit reached', code: 'user_daily_cap' });
+    const s0 = await loadSession({ screen: 'general' });
+    const err = await sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe('user_daily_cap');
+    expect(err.status).toBe(429);
+    expect(err.message).toMatch(/resets tomorrow/i);
+    expect(err.message).not.toMatch(/rate limit/i);
+    expect(surfaceAiCreditsErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('402 insufficient_credits routes to the AI credits screen and says so', async () => {
+    const { loadSession, sendMessage } = await getService();
+    surfaceAiCreditsErrorMock.mockClear();
+    mockFetchError(402, { error: 'Not enough credits', code: 'insufficient_credits' });
+    const s0 = await loadSession({ screen: 'general' });
+    const err = await sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }).catch((e) => e);
+    expect(err.code).toBe('insufficient_credits');
+    expect(err.message).toMatch(/out of AI credits/i);
+    expect(surfaceAiCreditsErrorMock).toHaveBeenCalledWith('insufficient_credits');
+  });
+
+  it('a plain 429 (no credits code) is still burst rate limiting', async () => {
+    const { loadSession, sendMessage } = await getService();
+    mockFetchError(429);
+    const s0 = await loadSession({ screen: 'general' });
+    const err = await sendMessage({ userText: 'Hi', session: s0, authToken: 'tok' }).catch((e) => e);
+    expect(err.code).toBeUndefined();
+    expect(err.message).toMatch(/rate limit/i);
   });
 });
 
@@ -334,7 +383,9 @@ describe('7. Empty-row repair', () => {
 describe('8. Abort cleanup', () => {
   it('throws AbortError and does not append messages when aborted', async () => {
     const { loadSession, sendMessage, cancelGeneration } = await getService();
-    mockFetchAbort();
+    // The person taps Stop while the request is in flight. (A fetch abort the
+    // caller did not ask for is a timeout — lib/fetchWithTimeout reports 408.)
+    mockFetchAbort(() => cancelGeneration());
 
     const s0 = await loadSession({ screen: 'general' });
 
