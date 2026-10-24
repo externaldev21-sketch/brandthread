@@ -1321,14 +1321,14 @@ export function ShopProductSheet({
                 activeOpacity={0.85}
                 style={[ss.addBtn, (isBusy || (phase !== 'added' && !sizeSelected)) && { opacity: 0.6 }]}
                 accessibilityRole="button"
-                accessibilityLabel={phase === 'added' ? 'View cart' : 'Add to bag'}
+                accessibilityLabel={phase === 'added' ? 'View bag' : 'Add to bag'}
               >
                 {phase === 'adding' ? (
                   <ActivityIndicator color={theme.text} size="small" />
                 ) : (
                   <>
                     <Icon name="shopping-cart" size={17} color={theme.text} />
-                    <Text style={ss.addBtnText}>{phase === 'added' ? 'View cart' : 'Add to bag'}</Text>
+                    <Text style={ss.addBtnText}>{phase === 'added' ? 'View bag' : 'Add to bag'}</Text>
                   </>
                 )}
               </TouchableOpacity>

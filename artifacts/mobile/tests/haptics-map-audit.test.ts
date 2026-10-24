@@ -155,7 +155,6 @@ const AUDITED = [
   'app/seller-settings.tsx',
   'app/seller-verification.tsx',
   'app/setup.tsx',
-  'app/share-profile.tsx',
   'app/share-store.tsx',
   'app/shopify-import.tsx',
   'app/shopping-preferences.tsx',
