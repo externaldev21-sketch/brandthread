@@ -421,7 +421,10 @@ export default function DiscountsScreen() {
   }
 
   function copyCode(codeValue: string) {
-    void Clipboard.setStringAsync(codeValue).then(() => showToast('Code copied', codeValue));
+    void Clipboard.setStringAsync(codeValue).then(
+      () => showToast('Code copied', codeValue),
+      () => Alert.alert("Couldn't copy the code", 'Try again.'),
+    );
   }
 
   const visibleGroups = useMemo(

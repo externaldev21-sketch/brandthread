@@ -181,7 +181,6 @@ export default function PayoutDetailScreen() {
             message="This payout may have been removed or the link is out of date."
             actionLabel="Back to payouts"
             onAction={() => { router.replace('/payouts' as never); }}
-            compact
           />
         ) : (
           <>

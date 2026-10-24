@@ -10,9 +10,10 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT,
-  launchBrowser, openContext, openScreen, serveBuild, waitForQuietNetwork, waitForImages,
+  openContext, openScreen, serveBuild, waitForQuietNetwork, waitForImages,
 } from './harness.mjs';
 import { ensureDemoImages } from './demo-images.mjs';
+import { respond } from './demo-data.mjs';
 
 const OUT = path.resolve(process.argv[2] ?? path.join(MOBILE_ROOT, 'docs/pr-review/seller-ops-round2'));
 mkdirSync(OUT, { recursive: true });
@@ -47,9 +48,30 @@ const SCREENS = [
 async function shot(browser, images, origin, name, target, demo, act) {
   const { context, page, activity } = await openContext(browser, { device, role: 'seller', origin, images });
   const file = `${name}${demo ? '-demo' : ''}`;
+  // The demo seller has no age band, so the payout screens would stop at the
+  // date-of-birth gate (lib/ageGate.ts). Report an adult account.
+  await page.route(/\/auth\/me(\?|$)/, (route) => route.fulfill({
+    json: { ...respond({ method: 'GET', path: '/auth/me', query: {}, role: 'seller' }), ageBand: '18_plus' },
+  }));
   try {
-    await openScreen(page, activity, origin, 'seller', target, { extraQuery: demo ? '&demo=1' : '' });
-    await waitForQuietNetwork(activity, 600, 10_000);
+    // The seller home can open its "Set up your store" sheet on first load;
+    // close it before navigating so it doesn't sit over the target screen.
+    const beforeNavigate = async () => {
+      const later = page.getByText('Continue setup later').first();
+      if (await later.isVisible().catch(() => false)) {
+        await later.click();
+        await page.waitForTimeout(600);
+      }
+    };
+    const want = target.split('?')[0];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await openScreen(page, activity, origin, 'seller', target, { extraQuery: demo ? '&demo=1' : '', beforeNavigate });
+      await waitForQuietNetwork(activity, 600, 10_000);
+      await page.waitForTimeout(800);
+      const onTarget = new URL(page.url()).pathname === want;
+      const sheetUp = await page.getByText('Continue setup later').first().isVisible().catch(() => false);
+      if (onTarget && !sheetUp) break;
+    }
     await page.waitForTimeout(1500);
     await waitForImages(page, 6_000);
     if (act) await act(page);
@@ -63,12 +85,21 @@ async function shot(browser, images, origin, name, target, demo, act) {
   }
 }
 
+async function launchBrowser() {
+  const { chromium } = await import('playwright');
+  // PW_CHROMIUM lets a machine with a preinstalled Chromium (version-mismatched
+  // with the pinned Playwright) point at it directly.
+  return chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : undefined);
+}
+
 async function main() {
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(MOBILE_ROOT, '.store-screenshots', 'demo-images'));
   const { origin, close } = await serveBuild(process.env.BUILD_DIR ?? DEFAULT_BUILD_DIR);
   try {
+    const only = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
     for (const [name, target] of SCREENS) {
+      if (only && !only.test(name)) continue;
       await shot(browser, images, origin, name, target, false);
       await shot(browser, images, origin, name, target, true);
     }
@@ -84,7 +115,10 @@ async function main() {
       await page.waitForTimeout(800);
     });
     await shot(browser, images, origin, 'discounts-copy-toast', '/discounts', true, async (page) => {
-      await page.getByLabel(/copy/i).first().click();
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+      await page.getByText('WELCOME15').first().click();
+      await page.waitForTimeout(800);
+      await page.getByText('Copy code').first().click();
       await page.getByTestId('toast').waitFor({ timeout: 5_000 });
       await page.waitForTimeout(400);
     });
