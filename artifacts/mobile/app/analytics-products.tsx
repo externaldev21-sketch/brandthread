@@ -8,12 +8,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { formatCents } from '@/lib/money';
 import { ProductAnalytics, ProductAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -60,7 +61,9 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
     >
       <View style={s.rankBadge}><Text style={s.rankText}>{rank}</Text></View>
       <View style={s.prodThumb}>
-        <Feather name="package" size={18} color={colors.primary} />
+        {p.imageUrl
+          ? <Image source={{ uri: p.imageUrl }} style={s.prodThumbImage} accessibilityIgnoresInvertColors />
+          : <Feather name="package" size={18} color={colors.primary} />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.prodName} numberOfLines={1}>{p.name}</Text>
@@ -105,8 +108,10 @@ export default function AnalyticsProductsScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -126,7 +131,7 @@ export default function AnalyticsProductsScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   const rows: ProductAnalyticsRow[] = data?.[sortKey] ?? [];
@@ -188,7 +193,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   prodRow:  { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.sm + 2, paddingVertical: SP.sm, gap: SP.sm },
   rankBadge:{ width: 22, height: 22, borderRadius: RADIUS.xs, backgroundColor: colors.elevated, alignItems: 'center', justifyContent: 'center' },
   rankText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.mutedForeground },
-  prodThumb:{ width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  prodThumb:{ width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  prodThumbImage:{ width: 40, height: 40 },
   prodName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 3 },
   prodMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
   prodStat: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },

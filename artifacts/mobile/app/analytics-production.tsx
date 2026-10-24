@@ -15,7 +15,9 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -44,8 +46,8 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
           <Text style={s.mfrSub}>{mfr.productsProduced} products · {mfr.totalUnits.toLocaleString()} units</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.mfrSpend}>${mfr.totalSpend.toLocaleString()}</Text>
-          <Text style={s.mfrUnitCost}>${mfr.avgUnitCost}/unit avg</Text>
+          <Text style={s.mfrSpend}>{formatCents(mfr.totalSpend)}</Text>
+          <Text style={s.mfrUnitCost}>{formatCents(mfr.avgUnitCost)}/unit avg</Text>
         </View>
       </View>
       <View style={s.mfrStats}>
@@ -93,8 +95,10 @@ export default function AnalyticsProductionScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -114,7 +118,7 @@ export default function AnalyticsProductionScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   return (

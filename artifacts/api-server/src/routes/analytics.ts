@@ -4,6 +4,7 @@ import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
 import { buildAdvancedAnalyticsResponse, ADVANCED_MONTHS } from "./analyticsAdvanced";
+import { buildSalesBreakdown } from "./sellerAnalyticsBuilders";
 import {
   DAY_MS,
   TEN_MIN_MS,
@@ -478,14 +479,36 @@ router.get("/revenue", async (req, res) => {
 
   const daily = await db.execute(sql`
     SELECT date_trunc('day', created_at) AS day,
-           coalesce(sum(total_cents), 0)::int AS total_cents
+           coalesce(sum(total_cents), 0)::int AS total_cents,
+           count(*)::int AS order_count
     FROM orders
     WHERE owner_id = ${ownerId}
       AND created_at >= ${since}
       AND status != 'cancelled'
     GROUP BY day
     ORDER BY day ASC
-    LIMIT 10
+    LIMIT 100
+  `);
+
+  // "By Product": units and line revenue per product over the same orders.
+  // order_items keeps the name at purchase, so a since-deleted product still
+  // shows under the name it sold as.
+  const breakdownRows = await db.execute(sql`
+    SELECT p.id AS product_id,
+           coalesce(p.name, oi.product_name) AS name,
+           coalesce(sum(oi.quantity), 0)::int AS units,
+           coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents,
+           count(DISTINCT o.id)::int AS order_count
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+    LEFT JOIN products p ON p.id = pv.product_id
+    WHERE o.owner_id = ${ownerId}
+      AND o.created_at >= ${since}
+      AND o.status != 'cancelled'
+    GROUP BY p.id, coalesce(p.name, oi.product_name)
+    ORDER BY revenue_cents DESC
+    LIMIT 20
   `);
 
   res.json({
@@ -493,6 +516,7 @@ router.get("/revenue", async (req, res) => {
     totalCents:  result?.totalCents ?? 0,
     orderCount:  result?.orderCount ?? 0,
     daily: (daily as any).rows ?? [],
+    breakdown: buildSalesBreakdown((breakdownRows as any).rows ?? []),
   });
 });
 
@@ -505,6 +529,7 @@ router.get("/products", async (req, res) => {
     SELECT
       p.id           AS product_id,
       p.name,
+      p.images       AS images,
       COALESCE(SUM(oi.quantity * oi.price_cents), 0)::int  AS revenue_cents,
       COALESCE(SUM(oi.quantity), 0)::int                    AS units_sold,
       COUNT(DISTINCT o.id)::int                             AS order_count
@@ -513,7 +538,7 @@ router.get("/products", async (req, res) => {
     LEFT JOIN order_items oi      ON oi.variant_id = pv.id
     LEFT JOIN orders o            ON oi.order_id = o.id AND o.status != 'cancelled'
     WHERE p.owner_id = ${ownerId}
-    GROUP BY p.id, p.name
+    GROUP BY p.id
     ORDER BY revenue_cents DESC
     LIMIT 20
   `);
@@ -537,6 +562,7 @@ router.get("/products", async (req, res) => {
     return {
       productId:       r.product_id,
       name:            r.name,
+      imageUrl:        Array.isArray(r.images) && typeof r.images[0] === "string" ? r.images[0] : null,
       revenueCents:    r.revenue_cents,
       unitsSold:       r.units_sold,
       orderCount:      r.order_count,

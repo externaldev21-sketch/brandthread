@@ -11,7 +11,9 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -34,14 +36,16 @@ export default function AnalyticsProfitScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics()]);
+      const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics(f)]);
       if (requestUser.current !== requestedUser) return;
       setProfit(p); setPayout(pay);
       setLoadError(false);
@@ -57,7 +61,7 @@ export default function AnalyticsProfitScreen() {
     requestUser.current = null;
     setProfit(null); setPayout(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   return (
@@ -121,7 +125,7 @@ export default function AnalyticsProfitScreen() {
                           ? { color: colors.destructive }
                           : { color: colors.success },
                     ]}>
-                      {item.isDeduction ? `−$${Math.abs(item.amount).toLocaleString()}` : `$${item.amount.toLocaleString()}`}
+                      {item.isDeduction ? `−${formatCents(Math.abs(item.amount))}` : formatCents(item.amount)}
                     </Text>
                   </View>
                 </View>
