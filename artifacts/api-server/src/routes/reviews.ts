@@ -14,6 +14,7 @@ import { z } from "@workspace/api-zod";
 import { bodyObject, idParams, validateInput } from "../lib/commerceValidation";
 import { logger } from "../lib/logger";
 import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
+import { checkReviewReplyText, reviewReplyAccess } from "../lib/reviewReply";
 import { resolveToClerkId } from "./public";
 import { emptyDetailRatings, sellerDetailRatings } from "../lib/storeTrust";
 import { toPublicReview } from "../lib/publicProfile";
@@ -23,7 +24,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { evaluateContent } from "../lib/contentModerator";
 import { publishNotification } from "./notifications-feed";
 import {
-  MAX_REVIEW_PHOTO_BYTES, REVIEW_REPLY_MAX, normalizeReviewBody, parseDetailRating, parseFitNote,
+  MAX_REVIEW_PHOTO_BYTES, normalizeReviewBody, parseDetailRating, parseFitNote,
   reviewExtras, reviewPhotoPrefix, validateReviewPhotos,
 } from "../lib/reviewContent";
 import { acceptUploadSession } from "../lib/uploadSessions";
@@ -398,31 +399,56 @@ router.get("/mine", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/reviews/:reviewId/reply  (seller only)
-router.post("/:reviewId/reply", requireAuth, rateLimit("review"), validateInput({ params: reviewIdParams, body: replyBody }), async (req, res) => {
-  const sellerId  = (req as any).clerkUserId as string;
-  const reviewId = req.params.reviewId as string;
-  const { replyText } = req.body as { replyText?: string };
+router.post("/:reviewId/reply", requireAuth, rateLimit("review"), validateInput({ params: reviewIdParams, body: replyBody }), (req, res) =>
+  writeSellerReply(req, res, false));
 
-  if (typeof replyText !== "string" || !replyText.trim()) {
-    return res.status(400).json({ error: "replyText is required" });
-  }
-  if (replyText.trim().length > REVIEW_REPLY_MAX) {
-    return res.status(400).json({ error: `Replies can be up to ${REVIEW_REPLY_MAX} characters.` });
-  }
+// ─── PATCH /api/reviews/:reviewId/reply  (seller only — edit an existing reply)
+router.patch("/:reviewId/reply", requireAuth, rateLimit("review"), validateInput({ params: reviewIdParams, body: replyBody }), (req, res) =>
+  writeSellerReply(req, res, true));
+
+// ─── DELETE /api/reviews/:reviewId/reply  (seller only — remove their reply)
+router.delete("/:reviewId/reply", requireAuth, validateInput({ params: reviewIdParams }), async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const reviewId = req.params.reviewId as string;
   if (!UUID_RE.test(reviewId)) return res.status(404).json({ error: "Review not found" });
 
-  const [existing] = await db
-    .select({ id: reviews.id, sellerId: reviews.sellerId })
+  const denied = reviewReplyAccess(await loadReplyTarget(reviewId), sellerId, true);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+
+  await db.execute(sql`
+    UPDATE reviews
+    SET    seller_reply      = NULL,
+           seller_replied_at = NULL,
+           updated_at        = now()
+    WHERE  id        = ${reviewId}
+    AND    seller_id = ${sellerId}
+  `);
+  return res.json({ ok: true });
+});
+
+async function loadReplyTarget(reviewId: string) {
+  const [row] = await db
+    .select({ id: reviews.id, sellerId: reviews.sellerId, sellerReply: reviews.sellerReply })
     .from(reviews)
     .where(eq(reviews.id, reviewId))
     .limit(1);
+  return row;
+}
 
-  if (!existing)                    return res.status(404).json({ error: "Review not found" });
-  if (existing.sellerId !== sellerId) return res.status(403).json({ error: "Forbidden" });
+/** POST (post or replace) and PATCH (edit; the reply must already exist). */
+async function writeSellerReply(req: express.Request, res: express.Response, isEdit: boolean) {
+  const sellerId  = (req as any).clerkUserId as string;
+  const reviewId = req.params.reviewId as string;
+  const checked = checkReviewReplyText((req.body as { replyText?: unknown }).replyText);
+  if (!checked.ok) return res.status(400).json({ error: checked.error });
+  if (!UUID_RE.test(reviewId)) return res.status(404).json({ error: "Review not found" });
+
+  const denied = reviewReplyAccess(await loadReplyTarget(reviewId), sellerId, isEdit);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
 
   const updated = (await db.execute(sql`
     UPDATE reviews
-    SET    seller_reply      = ${replyText.trim()},
+    SET    seller_reply      = ${checked.text},
            seller_replied_at = now(),
            updated_at        = now()
     WHERE  id        = ${reviewId}
@@ -434,6 +460,6 @@ router.post("/:reviewId/reply", requireAuth, rateLimit("review"), validateInput(
   // Private photo paths stay server-side; callers get the reply fields.
   const { photos: _photos, ...rest } = updated;
   return res.json(rest);
-});
+}
 
 export default router;

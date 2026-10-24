@@ -9,6 +9,7 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { Hairline, Heading, SolidButton } from '@/components/email/EmailUI';
 import { AUDIENCE_LABEL, DEMO_CAMPAIGNS, STATUS_LABEL, emailMode, formatWhen, pct } from '@/lib/emailMarketing';
 import { FONT, FS, SP } from '@/lib/theme';
+import { confirmAlert } from '@/lib/actionSheet';
 
 export default function EmailCampaignResultsScreen() {
   const c = useColors();
@@ -33,8 +34,18 @@ export default function EmailCampaignResultsScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const unschedule = async () => {
+    // The API moves the campaign back to a draft; it only sends again if the
+    // seller schedules or sends it from the composer.
+    const ok = await confirmAlert({
+      title: 'Cancel scheduled send?',
+      message: "This campaign moves back to your drafts and won't be sent.",
+      confirmLabel: 'Cancel send',
+      cancelLabel: 'Keep scheduled',
+      destructive: true,
+    });
+    if (!ok) return;
     try { await api.emailMarketing.unschedule(String(id)); router.replace(`/email-campaign-compose?id=${id}` as never); }
-    catch { Alert.alert("Couldn't cancel schedule", 'Try again.'); }
+    catch { Alert.alert('Schedule not cancelled', "Couldn't cancel the schedule. Try again."); }
   };
 
   const s = camp?.stats;

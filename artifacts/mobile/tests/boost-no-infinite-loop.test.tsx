@@ -166,6 +166,7 @@ vi.mock('@/lib/theme', () => ({
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
   RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, pill: 999 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 32, xxl: 40 },
+  COMP: { minTouchTarget: 44 },
   SHADOW_SM: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 }));
 

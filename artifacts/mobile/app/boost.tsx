@@ -46,6 +46,10 @@ import { applyStoreCredit, confirmNativePromotion, isPurchaseCancelled, nativePr
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
+import { confirmAlert, showAlert } from '@/lib/actionSheet';
+
+import { minHitSlop } from '@/lib/hitSlop';
+
 import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON, SHADOW_SM } from '@/lib/theme';
 
 import { divideCents } from '@/lib/money';
@@ -360,6 +364,10 @@ function PostThumbnail({ target }: { target: BoostTarget }) {
     </View>
   );
 }
+
+// Drawn height of the history Pause/Cancel button: SP.xs padding top and
+// bottom around one FS.sm line.
+const PAUSE_BTN_HEIGHT = 26;
 
 const tc = StyleSheet.create({
   fallback: {
@@ -845,35 +853,35 @@ export default function BoostScreen() {
   async function handlePause(boost: Boost) {
     const isActive = boost.status === 'active';
     const newStatus = isActive ? 'paused' : 'cancelled';
-    const title     = isActive ? 'Pause boost' : 'Cancel boost';
     const message   = isActive
       ? 'You can reactivate it later by contacting support.'
       : boost.status === 'in_review'
         ? (nativeRail
-          ? 'Cancel this boost? Your payment will be returned as credit for your next boost.'
-          : 'Cancel this boost? Your payment will be refunded in full.')
-        : 'Are you sure you want to cancel this boost? This cannot be undone.';
+          ? 'Your payment will be returned as credit for your next boost.'
+          : 'Your payment will be refunded in full.')
+        : 'This cannot be undone.';
 
-    Alert.alert(title, message, [
-      { text: 'Keep running', style: 'cancel' },
-      {
-        text: title,
-        style: 'destructive',
-        onPress: async () => {
-          setPausingId(boost.id);
-          try {
-            await boostsRef.current.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
-            setExisting((prev) =>
-              prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
-            );
-          } catch {
-            Alert.alert("Couldn't update boost", 'Try again.');
-          } finally {
-            setPausingId(null);
-          }
-        },
-      },
-    ]);
+    // Cancel is instant and destructive, so both actions confirm first.
+    const confirmed = await confirmAlert({
+      title: isActive ? 'Pause boost?' : 'Cancel boost?',
+      message,
+      confirmLabel: isActive ? 'Pause boost' : 'Cancel boost',
+      cancelLabel: isActive ? 'Keep running' : 'Keep boost',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setPausingId(boost.id);
+    try {
+      await boostsRef.current.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
+      setExisting((prev) =>
+        prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
+      );
+    } catch {
+      showAlert("Couldn't update boost", 'Try again.');
+    } finally {
+      setPausingId(null);
+    }
   }
 
   // ── Render helpers ────────────────────────────────────────────────────────
@@ -893,12 +901,12 @@ export default function BoostScreen() {
     return (
       <View style={s.targetBanner}>
         <View style={s.targetThumb}>
+          {/* Same honest fallback as the grid tiles (PostThumbnail): a plain
+              card, never a film icon standing in for a missing image. */}
           {thumbnailUrl ? (
             <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-              <Icon name="film" size={ICON.xs} color={MUTED} />
-            </View>
+            <View style={tc.fallback} />
           )}
         </View>
         <View style={{ flex: 1 }}>
@@ -1005,9 +1013,13 @@ export default function BoostScreen() {
             {(b.status === 'active' || b.status === 'paused' || b.status === 'in_review') && (
               <TouchableOpacity
                 style={s.pauseBtn}
-                onPress={() => handlePause(b)}
+                onPress={() => { void handlePause(b); }}
                 disabled={pausingId === b.id}
+                // ~26pt drawn height; pad the tap area to 44pt without
+                // changing the card's layout.
+                hitSlop={minHitSlop({ height: PAUSE_BTN_HEIGHT })}
                 accessibilityRole="button"
+                accessibilityLabel={b.status === 'active' ? 'Pause boost' : 'Cancel boost'}
               >
                 {pausingId === b.id ? (
                   <ActivityIndicator size="small" color={MUTED} />

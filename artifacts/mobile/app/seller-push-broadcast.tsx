@@ -11,16 +11,18 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { ListRow } from '@/components/ui/ListRow';
 import { OptionSheet } from '@/components/ui/OptionSheet';
 import { SectionHeader } from '@/components/SectionHeader';
 import { FONT, FS, SP } from '@/lib/theme';
-import { formatNextSend } from '@/lib/sellerEngagement';
+import { formatDay, formatNextSend, pushLinkLabel } from '@/lib/sellerEngagement';
+import { friendlyError } from '@/lib/friendlyError';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticSelection } from '@/lib/haptics';
 
@@ -33,7 +35,8 @@ type LinkOption = { id: string; label: string; type: 'product' | 'drop' | 'post'
 // Each audience has its own server-enforced window.
 type Audience = 'followers' | 'past_buyers';
 const AUDIENCE_WINDOW_MS: Record<Audience, number> = { followers: 24 * 3600_000, past_buyers: 7 * 24 * 3600_000 };
-const AUDIENCE_NOUN: Record<Audience, string> = { followers: 'followers', past_buyers: 'past buyers' };
+const AUDIENCE_NOUN: Record<Audience, [string, string]> = { followers: ['follower', 'followers'], past_buyers: ['past buyer', 'past buyers'] };
+const people = (n: number, a: Audience) => `${n.toLocaleString()} ${AUDIENCE_NOUN[a][n === 1 ? 0 : 1]}`;
 
 export default function SellerPushBroadcastScreen() {
   const api = useApi();
@@ -51,6 +54,8 @@ export default function SellerPushBroadcastScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<any>(null);
+  // A sent push clears the form, so only an unsent title or message counts.
+  const onBack = useUnsavedChangesGuard(title.trim().length > 0 || body.trim().length > 0);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -109,7 +114,7 @@ export default function SellerPushBroadcastScreen() {
     try {
       setReview(await api.sellerPush.preview(payload));
     } catch (e: any) {
-      setError(e?.message || "Couldn't review this push.");
+      setError(friendlyError(e, "Couldn't review this push."));
     } finally { setBusy(false); }
   }
 
@@ -121,7 +126,7 @@ export default function SellerPushBroadcastScreen() {
       setReview(null); setTitle(''); setBody('');
       load();
     } catch (e: any) {
-      setError(e?.message || "Couldn't send. Try again.");
+      setError(friendlyError(e, "Couldn't send this push."));
       load();
     } finally { setBusy(false); }
   }
@@ -140,31 +145,32 @@ export default function SellerPushBroadcastScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <ScreenHeader title="Follower push" />
+      <ScreenHeader title="Follower push" onBack={onBack} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: SP.xl }} keyboardShouldPersistTaps="handled">
           {loading ? <ActivityIndicator color={c.foreground} style={{ marginVertical: 40 }} /> : loadError ? (
-            <View style={{ gap: SP.sm }}>
-              <Text style={[styles.note, { color: c.mutedForeground }]}>Couldn't load follower push.</Text>
-              <Button label="Try again" variant="secondary" onPress={() => { setLoading(true); load(); }} />
-            </View>
+            <RetryRow label="Couldn't load follower push" onRetry={() => { setLoading(true); load(); }} />
           ) : (
             <>
               <Text style={[styles.lead, { color: c.foreground }]}>
                 {audience === 'past_buyers'
                   ? limited
                     ? `You can message past buyers again ${formatNextSend(selected.nextSendAt)}.`
-                    : `Send one push to your ${selected?.audience?.recipients ?? 0} reachable past buyers. You can send one every 7 days.`
+                    : (selected?.audience?.recipients ?? 0) > 0
+                      ? `Send one push to ${people(selected.audience.recipients, 'past_buyers')} who can receive it. You can send one every 7 days.`
+                      : 'None of your past buyers can receive a push yet. You can send one every 7 days.'
                   : limited
                     ? `You can send your next push ${formatNextSend(status.nextSendAt)}.`
-                    : `Send one push to your ${status?.audience?.recipients ?? 0} reachable followers. You can send one every 24 hours.`}
+                    : (status?.audience?.recipients ?? 0) > 0
+                      ? `Send one push to ${people(status.audience.recipients, 'followers')} who can receive it. You can send one every 24 hours.`
+                      : 'None of your followers can receive a push yet. You can send one every 24 hours.'}
               </Text>
 
               {sent ? (
                 <View style={[styles.banner, { borderColor: c.border }]}>
                   <Icon name="check-circle" size={18} color={c.success} />
                   <Text style={[styles.note, { color: c.foreground, flex: 1 }]}>
-                    Sent to {sent.delivery.sent} {AUDIENCE_NOUN[sent.audienceType === 'past_buyers' ? 'past_buyers' : 'followers']}. Your next push opens {formatNextSend(sent.nextSendAt)}.
+                    Sent to {people(sent.delivery.sent ?? 0, sent.audienceType === 'past_buyers' ? 'past_buyers' : 'followers')}. Your next push opens {formatNextSend(sent.nextSendAt)}.
                   </Text>
                 </View>
               ) : null}
@@ -208,7 +214,7 @@ export default function SellerPushBroadcastScreen() {
                   <TextInput value={body} onChangeText={(t) => setBody(t.slice(0, BODY_MAX))} multiline placeholder="Doors open at 6pm. Limited stock." placeholderTextColor={c.mutedForeground}
                     style={[styles.input, styles.multiline, { color: c.foreground, borderColor: c.border }]} accessibilityLabel="Push message" />
                   <Text style={[styles.count, { color: c.mutedForeground }]}>{body.length}/{BODY_MAX}</Text>
-                  <ListRow icon="link" title="Link" value={link.type === 'none' ? 'None' : link.type === 'product' ? 'Product' : link.type === 'drop' ? 'Drop' : 'Post'} chevron onPress={() => setSheet(true)} />
+                  <ListRow icon="link" title="Link" value={pushLinkLabel(link)} chevron onPress={() => setSheet(true)} />
                   <SectionHeader title="Preview" />
                   {previewCard(title, body)}
                 </>
@@ -250,7 +256,7 @@ export default function SellerPushBroadcastScreen() {
                 <>
                   <SectionHeader title="Past pushes" />
                   {status.history.map((h: any) => (
-                    <ListRow key={h.id} title={h.title} subtitle={`${h.audience === 'past_buyers' ? 'Past buyers · ' : ''}${h.sentCount} sent · ${formatNextSend(h.createdAt)}`} chevron
+                    <ListRow key={h.id} title={h.title} subtitle={`${h.audience === 'past_buyers' ? 'Past buyers · ' : ''}${h.sentCount} sent · ${formatDay(h.createdAt)}`} chevron
                       onPress={() => router.push(`/seller-push-broadcast-results?id=${encodeURIComponent(h.id)}` as never)} />
                   ))}
                 </>

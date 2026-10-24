@@ -3195,6 +3195,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Seller — post a public reply to a received review. */
       reply: (reviewId: string, replyText: string) =>
         post<any>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, { replyText }),
+      /** Seller — edit their existing reply on a received review. */
+      editReply: (reviewId: string, replyText: string) =>
+        patch<any>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, { replyText }),
+      /** Seller — delete their reply on a received review. */
+      deleteReply: (reviewId: string) =>
+        del<{ ok: boolean }>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`),
       /** Buyer Payment Methods — Stripe-backed saved cards */
       paymentMethods:      () => get<{ paymentMethods: any[] }>('/api/buyer/payment-methods'),
       setDefaultPaymentMethod: (pmId: string) =>
@@ -4368,7 +4374,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/redraw`, { reason }),
       markShipped: (id: string, winnerId: string, shipped: boolean) =>
         post<any>(`/api/seller/giveaways/${encodeURIComponent(id)}/winners/${encodeURIComponent(winnerId)}/shipped`, { shipped }),
-      myPosts: () => get<any[]>('/api/posts/mine?limit=30'),
+      /** The seller's own posts, newest first (server caps `limit` at 100). */
+      myPosts: (limit = 30, offset = 0) => get<any[]>(`/api/posts/mine?limit=${limit}&offset=${offset}`),
     },
     /** Buyer-facing giveaway reads (card on a brand's profile + the entry page). */
     giveaways: {

@@ -13,6 +13,7 @@ beforeAll(() => {
   const reached = express.Router();
   reached.post("/", (_req, res) => { res.status(201).json({ ok: true }); });
   reached.post("/:reviewId/reply", (_req, res) => { res.json({ ok: true }); });
+  reached.patch("/:reviewId/reply", (_req, res) => { res.json({ ok: true }); });
   reached.get("/product/:id", (_req, res) => { res.json([]); });
   app.use("/api/reviews", reviewTextModeration, reached);
   server = app.listen(0);
@@ -20,9 +21,11 @@ beforeAll(() => {
 });
 afterAll(() => { server?.close(); });
 
-const post = (path: string, body: unknown) => fetch(base + path, {
-  method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+const send = (method: string) => (path: string, body: unknown) => fetch(base + path, {
+  method, headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 });
+const post = send("POST");
+const patch = send("PATCH");
 
 describe("review text moderation", () => {
   it("lets ordinary reviews and replies through", async () => {
@@ -38,6 +41,10 @@ describe("review text moderation", () => {
   it("declines scam / off-platform seller replies", async () => {
     const res = await post("/api/reviews/abc/reply", { replyText: "Pay me on Zelle instead, cheaper" });
     expect(res.status).toBe(422);
+  });
+  it("checks an edited seller reply the same way", async () => {
+    expect((await patch("/api/reviews/abc/reply", { replyText: "Thanks again!" })).status).toBe(200);
+    expect((await patch("/api/reviews/abc/reply", { replyText: "Pay me on Zelle instead, cheaper" })).status).toBe(422);
   });
   it("does not touch reads", async () => {
     expect((await fetch(base + "/api/reviews/product/x")).status).toBe(200);

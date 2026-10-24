@@ -28,6 +28,9 @@ import {
   StatusBadge, IconButton, PrimaryButton,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { RetryRow } from '@/components/ui/RetryRow';
+import { friendlyError } from '@/lib/friendlyError';
 import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents, META_OBJECTIVE_OPTIONS } from '@/services/metaAdsService';
 import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
 import { radius } from '@/constants/radii';
@@ -45,6 +48,9 @@ export default function MetaAdsManageScreen() {
 
   const [checking, setChecking] = useState(true);
   const [connected, setConnected] = useState(false);
+  // The connection check itself failed (network / 5xx) — distinct from a
+  // successful "not connected" answer, which is the only case offering Connect.
+  const [checkError, setCheckError] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,25 +66,32 @@ export default function MetaAdsManageScreen() {
     try {
       const { campaigns } = await api.metaAds.list();
       setRows(campaigns);
-    } catch {
-      setError('Tap Retry to try again.');
+    } catch (err) {
+      // Rows from the last good load stay in place; the render picks the
+      // full error state only when there is nothing to show.
+      setError(friendlyError(err, "Couldn't load your campaigns."));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api]);
+
+  const checkConnection = useCallback(async () => {
+    setChecking(true);
+    setCheckError(null);
+    try {
+      const conn = await api.metaAds.connection();
+      const isConnected = !!conn.connected && conn.status === 'connected';
+      setConnected(isConnected);
+      if (isConnected) { setLoading(true); await loadCampaigns(); setLoading(false); }
+    } catch (err) {
+      setCheckError(friendlyError(err, "Couldn't check your Meta connection."));
+    } finally {
+      setChecking(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const conn = await api.metaAds.connection();
-        const isConnected = !!conn.connected && conn.status === 'connected';
-        setConnected(isConnected);
-        if (isConnected) { setLoading(true); await loadCampaigns(); setLoading(false); }
-      } catch {
-        setConnected(false);
-      } finally {
-        setChecking(false);
-      }
-    })();
+    void checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -169,6 +182,15 @@ export default function MetaAdsManageScreen() {
     );
   }
 
+  if (checkError) {
+    return (
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Meta Ads" onBack={() => goBackOr(router)} />
+        <ErrorState message={checkError} onRetry={() => { void checkConnection(); }} style={{ marginTop: SP.xl }} />
+      </BrandthreadScreen>
+    );
+  }
+
   if (!connected) {
     return (
       <BrandthreadScreen noSafeTop>
@@ -199,8 +221,14 @@ export default function MetaAdsManageScreen() {
           <ActivityIndicator color={theme.accentLight} style={{ marginTop: SP.xl }} />
         )}
 
-        {!loading && error && (
+        {/* Full error only when nothing has loaded yet; a failed refresh keeps
+            the last good cards and shows a compact retry above them. */}
+        {!loading && error && !(rows && rows.length > 0) && (
           <EmptyState icon="alert-circle" title="Couldn't load campaigns" description={error} action={{ label: 'Retry', onPress: loadCampaigns }} />
+        )}
+
+        {!loading && error && rows && rows.length > 0 && (
+          <RetryRow label="Couldn't refresh campaigns" onRetry={() => { void onRefresh(); }} />
         )}
 
         {!loading && !error && rows && rows.length === 0 && (
@@ -331,7 +359,7 @@ function ActionBtn({ label, icon, onPress, busy, spinning, colors, theme }: any)
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      {busy ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Icon name={icon} size={13} color={colors.foreground} />}
+      {spinning ? <ActivityIndicator size="small" color={theme.accentLight} /> : <Icon name={icon} size={13} color={colors.foreground} />}
       <Text style={[s.actionBtnText, { color: colors.foreground }]}>{label}</Text>
     </TouchableOpacity>
   );

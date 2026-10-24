@@ -50,7 +50,8 @@ export const previewGrowth = {
   },
   async linkDetail(id: string): Promise<LinkDetail> {
     const l = L().find((x) => x.id === id);
-    if (!l) throw new Error('Link not found');
+    // Same 404 the API sends for an unknown id, so the screen shows not-found.
+    if (!l) throw Object.assign(new Error('Link not found'), { status: 404 });
     const series = Array.from({ length: 30 }, (_, i) => {
       const day = new Date(Date.now() - (29 - i) * 86_400_000).toISOString().slice(0, 10);
       const c = l.clicks > 0 ? Math.round((l.clicks / 30) * (0.6 + ((i * 7) % 10) / 12)) : 0;

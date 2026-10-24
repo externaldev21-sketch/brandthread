@@ -1,5 +1,5 @@
 /** One creator in the seller's program. Route: /seller-creator-detail?id=<affiliateId> */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,9 +13,12 @@ import { RetryRow } from '@/components/ui/RetryRow';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { getPreviewSellerOverview } from '@/lib/previewAffiliate';
 import type { SellerCreator } from '@/lib/affiliateTypes';
-import { ActionButton, KeyStatRow, Pill, SectionTitle } from '@/components/affiliate/AffiliateUI';
+import { ActionButton, InlineError, KeyStatRow, Pill, SectionTitle } from '@/components/affiliate/AffiliateUI';
 import { formatMoney } from '@/lib/format';
 import { CommissionStepper } from '@/components/affiliate/CommissionStepper';
+import { confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { commissionError } from '@/lib/creatorProgramValidation';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Active', pending: 'Needs approval', paused: 'Paused', invited: 'Invited', removed: 'Removed', declined: 'Declined',
@@ -35,8 +38,11 @@ export default function SellerCreatorDetailScreen() {
   const [error, setError] = useState(false);
   const [rate, setRate] = useState(10);
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirmRemove, setConfirmRemove] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Brief "Saved" on the Save rate button after a rate change lands.
+  const [rateSaved, setRateSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
   const load = useCallback(async () => {
     try {
@@ -50,17 +56,40 @@ export default function SellerCreatorDetailScreen() {
   }, [api, id, previewOnly]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const run = async (key: string, fn: () => Promise<unknown>, leave?: boolean) => {
+  const run = async (key: string, fn: () => Promise<unknown>, leave?: boolean): Promise<boolean> => {
     setBusy(key);
     setMsg(null);
     try {
       if (!previewOnly) await fn();
       if (leave) router.back(); else await load();
-    } catch (e: any) { setMsg(e?.message ?? "Couldn't save that change. Try again."); }
+      return true;
+    } catch (e) { setMsg(friendlyError(e, "Couldn't save that change. Try again.")); return false; }
     finally { setBusy(null); }
   };
 
+  const flashSaved = () => {
+    setRateSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setRateSaved(false), 2000);
+  };
+
+  const saveRate = async (id: string, commissionPercent: number | null) => {
+    if (await run('rate', () => api.affiliate.seller.update(id, { commissionPercent }))) flashSaved();
+  };
+
+  const remove = async (target: SellerCreator) => {
+    const name = target.displayName ?? (target.username ? `@${target.username}` : 'this creator');
+    const ok = await confirmAlert({
+      title: 'Remove creator?',
+      message: `${name} leaves your program and their code stops working right away.`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (ok) await run('remove', () => api.affiliate.seller.remove(target.id), true);
+  };
+
   const c = creator;
+  const rateError = c && rate !== c.commissionPercent ? commissionError(rate, c.commissionPercent) : null;
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScreenHeader title={c?.displayName ?? (c?.username ? `@${c.username}` : 'Creator')} />
@@ -84,13 +113,14 @@ export default function SellerCreatorDetailScreen() {
 
             <SectionTitle>Commission</SectionTitle>
             <View style={{ marginBottom: SP.sm }}>
-              <CommissionStepper label={c.hasOverride ? 'Commission for this creator' : 'Commission (program default)'} value={rate} onChange={setRate} testID="creator-commission-stepper" />
+              <CommissionStepper label={c.hasOverride ? 'Commission for this creator' : 'Commission (program default)'} value={rate} onChange={(v) => { setRate(v); setRateSaved(false); }} testID="creator-commission-stepper" />
+              <InlineError message={rateError} />
             </View>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg }}>
-              <ActionButton label="Save rate" flex loading={busy === 'rate'} disabled={rate === c.commissionPercent}
-                onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: rate }))} />
+              <ActionButton label={rateSaved ? 'Saved' : 'Save rate'} flex loading={busy === 'rate'} disabled={rate === c.commissionPercent || !!rateError}
+                onPress={() => { if (!rateError) void saveRate(c.id, rate); }} />
               <ActionButton label="Use default" flex outline disabled={!c.hasOverride || busy === 'rate'}
-                onPress={() => run('rate', () => api.affiliate.seller.update(c.id, { commissionPercent: null }))} />
+                onPress={() => saveRate(c.id, null)} />
             </View>
             <Text style={{ fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginBottom: SP.lg }}>
               A new rate applies to future orders. Existing commissions keep the rate they were earned at.
@@ -110,10 +140,11 @@ export default function SellerCreatorDetailScreen() {
             ) : null}
             <View style={{ height: SP.sm }} />
             <ActionButton
-              label={confirmRemove ? 'Tap again to remove' : 'Remove creator'}
-              outline
+              label="Remove creator"
+              destructive
               loading={busy === 'remove'}
-              onPress={() => confirmRemove ? run('remove', () => api.affiliate.seller.remove(c.id), true) : setConfirmRemove(true)}
+              loadingLabel="Removing…"
+              onPress={() => remove(c)}
             />
           </>
         )}

@@ -585,6 +585,23 @@ describe("isolation and auth", () => {
     expect(aff.creatorId).toBe(c1.id);
   });
 
+  it("an invited creator sees the invite on the brand page and can decline it (once)", async () => {
+    const seller = await seedSeller("invdec");
+    const creator = await seedCreator("invdec");
+    await call(app.base, "PUT", "/api/seller/affiliate/program", seller, { enabled: true });
+    const inv = await call(app.base, "POST", "/api/seller/affiliate/creators/invite", seller, { username: creator.username });
+    expect(inv.status).toBe(201);
+    const brand = await call(app.base, "GET", `/api/affiliate/brands/${seller}`, creator.id);
+    expect(brand.body.mine).toEqual({ id: inv.body.id, status: "invited" });
+    const declined = await call(app.base, "POST", `/api/affiliate/invites/${inv.body.id}/decline`, creator.id, {});
+    expect(declined.status).toBe(200);
+    expect(declined.body.status).toBe("declined");
+    // Already answered: neither accept nor a second decline goes through.
+    expect((await call(app.base, "POST", `/api/affiliate/invites/${inv.body.id}/accept`, creator.id, {})).status).toBe(404);
+    const [row] = await db.select().from(affiliateCreators).where(eq(affiliateCreators.id, inv.body.id));
+    expect(row.status).toBe("declined");
+  });
+
   it("applying: pending until the seller approves, auto-approve skips the wait, own brand refused", async () => {
     const seller = await seedSeller("apply");
     const creator = await seedCreator("apply");

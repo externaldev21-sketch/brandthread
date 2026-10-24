@@ -39,3 +39,13 @@ export function phaseLabel(phase: string): string {
     default: return phase;
   }
 }
+
+const PUSH_LINK_TYPE_LABEL = { product: 'Product', drop: 'Drop', post: 'Post' } as const;
+
+/** Follower push "Link" row value: "None", or the type and the picked item ("Product · Heavyweight Tee"). */
+export function pushLinkLabel(link: { type: 'product' | 'drop' | 'post' | 'none'; label: string }): string {
+  if (link.type === 'none') return 'None';
+  const name = link.label.trim();
+  return name ? `${PUSH_LINK_TYPE_LABEL[link.type]} · ${name}` : PUSH_LINK_TYPE_LABEL[link.type];
+}
+

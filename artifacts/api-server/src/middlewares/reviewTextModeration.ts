@@ -6,14 +6,15 @@
  *
  *   POST /api/reviews                 body.body       (buyer review text)
  *   POST /api/reviews/:id/reply       body.replyText  (seller reply)
+ *   PATCH /api/reviews/:id/reply      body.replyText  (seller reply, edited)
  */
 import type { NextFunction, Request, Response } from "express";
 import { evaluateContent } from "../lib/contentModerator";
 
 function textFor(req: Request): string | null {
-  if (req.method !== "POST" || !req.body || typeof req.body !== "object") return null;
+  if ((req.method !== "POST" && req.method !== "PATCH") || !req.body || typeof req.body !== "object") return null;
   const path = req.path.replace(/\/+$/, "");
-  if (path === "" || path === "/") {
+  if (req.method === "POST" && (path === "" || path === "/")) {
     return typeof req.body.body === "string" ? req.body.body : null;
   }
   if (/^\/[^/]+\/reply$/.test(path)) {

@@ -10,7 +10,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString();
 export const EMPTY_CREATOR_OVERVIEW: CreatorOverview = {
   brands: [],
   totals: { clicks: 0, orders: 0, revenueCents: 0, earnedCents: 0, pendingCents: 0, payableCents: 0, paidCents: 0 },
-  payout: { available: false, reason: 'Payouts are not configured on this server yet.', connected: false, ready: false },
+  payout: { available: false, reason: "Payouts aren't available yet.", connected: false, ready: false },
 };
 
 export function getPreviewCreatorOverview(): CreatorOverview {
