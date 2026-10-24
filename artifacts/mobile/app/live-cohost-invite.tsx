@@ -6,10 +6,12 @@
  * `&demo=1` shows a sample invite with no API calls.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
@@ -69,8 +71,11 @@ export default function LiveCohostInviteScreen() {
         }
       }
       setInvites((prev) => prev.filter((i) => i.streamId !== invite.streamId));
-    } catch (e: any) {
-      Alert.alert(accept ? 'Couldn’t join' : 'Couldn’t decline', e?.message ?? 'Try again.');
+    } catch (e: unknown) {
+      showAlert(
+        accept ? 'Couldn’t join' : 'Couldn’t decline',
+        friendlyError(e, accept ? 'Couldn’t join this live. Try again.' : 'Couldn’t decline this invite. Try again.'),
+      );
       void load();
     } finally {
       setBusy(null);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toLiveProductOptions } from './liveProductOptions';
+import { liveProductImageUrl, toLiveProductOptions } from './liveProductOptions';
 
 const base = { variantCount: 1, maxPriceCents: 2000, moderationLocked: false };
 
@@ -21,5 +21,20 @@ describe('toLiveProductOptions', () => {
   it('handles empty and missing responses', () => {
     expect(toLiveProductOptions(null)).toEqual([]);
     expect(toLiveProductOptions({ total: 0, items: [] })).toEqual([]);
+  });
+
+  it('resolves stored object paths to the public product photo address', () => {
+    const out = toLiveProductOptions([
+      { ...base, id: 'p 1', name: 'Tee', status: 'active', image: '/objects/uploads/abc', minPriceCents: 1500, totalStock: 2 },
+    ] as any, 'https://api.example.com/');
+    expect(out[0].imageUrl).toBe('https://api.example.com/api/v1/public/media/products/p%201/0');
+  });
+});
+
+describe('liveProductImageUrl', () => {
+  it('passes URLs through and drops paths an image cannot load', () => {
+    expect(liveProductImageUrl('a', 'https://cdn/x.jpg', 'https://api')).toBe('https://cdn/x.jpg');
+    expect(liveProductImageUrl('a', null, 'https://api')).toBeNull();
+    expect(liveProductImageUrl('a', 'relative/thing.jpg', 'https://api')).toBeNull();
   });
 });

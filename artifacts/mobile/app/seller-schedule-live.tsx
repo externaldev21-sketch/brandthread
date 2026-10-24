@@ -5,7 +5,7 @@
  * jobs/scheduledLiveReminders.ts). Opened from a secondary row on the
  * Go Live setup screen; signed-out previews make no API calls.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { useApi } from '@/lib/api';
+import { confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useLiveAvailable } from '@/hooks/useLiveAvailable';
 import { shouldShowGoLive } from '@/lib/liveConfig';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -53,11 +55,28 @@ export default function SellerScheduleLiveScreen() {
   const [error, setError] = useState('');
   const [mine, setMine] = useState<ScheduledLive[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
+  const [mineError, setMineError] = useState(false);
+  // Re-evaluated every 30s so Today's past slots disable themselves.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const loadMine = useCallback(async () => {
     if (!signedIn) { setLoadingMine(false); return; }
-    try { setMine(await fetchMyScheduledLives()); } catch { /* keeps the last list */ }
-    setLoadingMine(false);
+    try {
+      const list = await fetchMyScheduledLives();
+      if (!mountedRef.current) return;
+      setMine(list);
+      setMineError(false);
+    } catch {
+      // Keeps the last list, but never passes a failure off as "nothing scheduled".
+      if (mountedRef.current) setMineError(true);
+    }
+    if (mountedRef.current) setLoadingMine(false);
   }, [signedIn]);
 
   useEffect(() => { void loadMine(); }, [loadMine]);
@@ -82,8 +101,34 @@ export default function SellerScheduleLiveScreen() {
   const day = days.find(d => d.key === dayKey) ?? days[0];
   const time = times.find(t => t.key === timeKey) ?? null;
   const startsAt = time ? combineSchedule(day.date, time) : null;
-  const inPast = !!startsAt && startsAt.getTime() < Date.now() + 60_000;
+  const inPast = !!startsAt && startsAt.getTime() < now + 60_000;
   const canSave = signedIn && !!title.trim() && !!startsAt && !inPast && !saving;
+  // Why "Schedule live" is disabled (the past-time case has its own note).
+  const saveHint = saving || canSave ? ''
+    : !signedIn ? 'Sign in to schedule a live.'
+      : !title.trim() ? 'Add a title to schedule your live.'
+        : !startsAt ? 'Pick a time for your live.'
+          : '';
+
+  // Slots that already passed on the chosen day (only ever Today) can't be picked.
+  const slotPast = useCallback(
+    (t: (typeof times)[number]) => combineSchedule(day.date, t).getTime() < now + 60_000,
+    [day, now],
+  );
+  const firstOpenIndex = Math.max(0, times.findIndex(t => !slotPast(t)));
+  // A selected slot that has since passed (or a switch to Today) is cleared.
+  useEffect(() => {
+    if (time && slotPast(time)) setTimeKey(null);
+  }, [time, slotPast]);
+
+  // Start the time rail at the next open slot instead of 12:00 AM.
+  const timeRailRef = useRef<ScrollView>(null);
+  const slotX = useRef<Record<number, number>>({});
+  const scrollToFirstOpen = useCallback(() => {
+    const x = slotX.current[firstOpenIndex];
+    if (x !== undefined) timeRailRef.current?.scrollTo({ x: Math.max(0, x - SP.md), animated: false });
+  }, [firstOpenIndex]);
+  useEffect(() => { scrollToFirstOpen(); }, [dayKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     if (!canSave || !startsAt) return;
@@ -98,14 +143,25 @@ export default function SellerScheduleLiveScreen() {
       });
       setTitle(''); setDescription(''); setTimeKey(null); setPicked([]); setShowProducts(false);
       await loadMine();
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Could not schedule the live. Try again.');
+    } catch (e: unknown) {
+      setError(friendlyError(e, 'Could not schedule the live. Try again.'));
     } finally {
       setSaving(false);
     }
   }
 
-  async function cancel(id: string) {
+  async function cancel(m: ScheduledLive) {
+    const ok = await confirmAlert({
+      title: `Cancel “${m.title}”?`,
+      message: m.reminderCount > 0
+        ? `${m.reminderCount} follower${m.reminderCount === 1 ? ' is' : 's are'} waiting for a reminder. They won’t get one.`
+        : 'It will be removed from your scheduled lives.',
+      confirmLabel: 'Cancel live',
+      cancelLabel: 'Keep it',
+      destructive: true,
+    });
+    if (!ok) return;
+    const id = m.id;
     setError('');
     try { await cancelScheduledLive(id); } catch { setError('Could not cancel that live. Try again.'); }
     await loadMine();
@@ -163,9 +219,17 @@ export default function SellerScheduleLiveScreen() {
         </ScrollView>
 
         <Text style={[styles.section, { color: theme.text }]}>Time</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow} style={styles.bleed}>
-          {times.map(t => (
-            <Chip key={t.key} label={t.label} selected={t.key === timeKey} onPress={() => setTimeKey(t.key)} />
+        <ScrollView ref={timeRailRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow} style={styles.bleed}>
+          {times.map((t, i) => (
+            <View
+              key={t.key}
+              onLayout={e => {
+                slotX.current[i] = e.nativeEvent.layout.x;
+                if (i === firstOpenIndex) scrollToFirstOpen();
+              }}
+            >
+              <Chip label={t.label} selected={t.key === timeKey} disabled={slotPast(t)} onPress={() => setTimeKey(t.key)} />
+            </View>
           ))}
         </ScrollView>
         {inPast ? <Text style={[styles.note, { color: theme.muted }]}>Pick a time in the future.</Text> : null}
@@ -218,9 +282,17 @@ export default function SellerScheduleLiveScreen() {
 
         {error ? <Text style={[styles.note, { color: theme.text }]}>{error}</Text> : null}
         <Button label="Schedule live" onPress={save} loading={saving} disabled={!canSave} fullWidth />
+        {saveHint ? <Text style={[styles.note, { color: theme.muted, textAlign: 'center' }]} testID="schedule-live-hint">{saveHint}</Text> : null}
 
         {loadingMine ? (
           <ActivityIndicator color={theme.text} style={{ marginTop: SP.lg }} />
+        ) : mineError && mine.length === 0 ? (
+          <RetryRow
+            label="Couldn't load your scheduled lives"
+            onRetry={() => { setLoadingMine(true); void loadMine(); }}
+            style={{ marginTop: SP.md }}
+            testID="scheduled-lives-error"
+          />
         ) : mine.length > 0 ? (
           <>
             <Text style={[styles.section, { color: theme.text, marginTop: SP.md }]}>Scheduled</Text>
@@ -244,7 +316,7 @@ export default function SellerScheduleLiveScreen() {
                   </View>
                   )}
                   <View style={styles.cardAction}>
-                    <Button label="Cancel" variant="secondary" size="compact" fullWidth onPress={() => cancel(m.id)} accessibilityLabel={`Cancel ${m.title}`} />
+                    <Button label="Cancel" variant="secondary" size="compact" fullWidth onPress={() => { void cancel(m); }} accessibilityLabel={`Cancel ${m.title}`} />
                   </View>
                 </View>
               </View>

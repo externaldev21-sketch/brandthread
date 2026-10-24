@@ -44,6 +44,10 @@ describe('LIVE replay (app/live-replay.tsx)', () => {
 
 describe('LIVE co-host sample data', () => {
   it.each(['app/live-cohost.tsx', 'app/live-cohost-invite.tsx'])('%s only shows samples inside the dev preview', (file) => {
-    expect(read(file)).toContain("const demo = params.demo === '1' && isPreviewDemoMode();");
+    // The canonical dev-preview gate (lib/devPreview.ts), never a raw ?demo=1 param
+    // (same rule as lib/__tests__/demoOnlyFallbacks.test.ts).
+    const src = read(file);
+    expect(src).toContain('const demo = isPreviewDemoMode();');
+    expect(src).not.toContain("params.demo === '1'");
   });
 });

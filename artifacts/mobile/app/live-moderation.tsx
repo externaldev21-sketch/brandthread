@@ -4,12 +4,17 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Slow mode, blocked words, and the muted / banned lists for one stream.
  * All rules are enforced server-side (routes/live.ts + lib/liveModeration.ts);
  * this screen only edits them. `&demo=1` renders sample data with no API calls.
+ *
+ * Slow mode, blocked words and "save as default" are a draft saved with Save;
+ * Unmute / Unban apply immediately. Leaving with an unsaved draft asks first,
+ * so edits are never dropped silently.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
+import { confirmAlert, showAlert } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +43,7 @@ function slowLabel(seconds: number): string {
 export default function LiveModerationScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const params = useLocalSearchParams<{ streamId?: string; demo?: string }>();
@@ -51,13 +57,21 @@ export default function LiveModerationScreen() {
   const [wordDraft, setWordDraft] = useState('');
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The last saved draft (slow mode + blocked words + default), to tell
+  // whether leaving would drop edits.
+  const [baseline, setBaseline] = useState<{ words: string[]; slow: number } | null>(
+    demo ? { words: DEMO_STATE.bannedWords, slow: DEMO_STATE.slowModeSeconds } : null,
+  );
+  const allowLeaveRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!live) return;
     setLoading(true);
     setError(null);
     try {
-      setState(await api.liveMod.get(streamId));
+      const next = await api.liveMod.get(streamId);
+      setState(next);
+      setBaseline({ words: next.bannedWords ?? [], slow: next.slowModeSeconds ?? 0 });
     } catch {
       setError('Couldn’t load moderation settings.');
     } finally {
@@ -69,6 +83,44 @@ export default function LiveModerationScreen() {
 
   const words = state?.bannedWords ?? [];
   const slow = state?.slowModeSeconds ?? 0;
+  const dirty = !!state && !!baseline && (
+    slow !== baseline.slow
+    || saveAsDefault
+    || !!wordDraft.trim()
+    || words.length !== baseline.words.length
+    || words.some((w, i) => w !== baseline.words[i])
+  );
+
+  const confirmDiscard = useCallback(() => confirmAlert({
+    title: 'Discard changes?',
+    message: 'Your slow mode and blocked word changes haven’t been saved.',
+    confirmLabel: 'Discard',
+    cancelLabel: 'Keep editing',
+    destructive: true,
+  }), []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!dirty || saving || allowLeaveRef.current) return;
+      e.preventDefault();
+      void confirmDiscard().then((ok) => {
+        if (!ok) return;
+        allowLeaveRef.current = true;
+        navigation.dispatch(e.data.action);
+      });
+    });
+    return unsubscribe;
+  }, [navigation, dirty, saving, confirmDiscard]);
+
+  // Guard the header back directly too, in case 'beforeRemove' is not raised
+  // for this pop (same pattern as post-captions-edit / edit-profile).
+  const handleBack = async () => {
+    if (dirty && !saving && !allowLeaveRef.current) {
+      if (!(await confirmDiscard())) return;
+      allowLeaveRef.current = true;
+    }
+    goBackOr(router);
+  };
 
   function patch(next: Partial<LiveModerationState>) {
     setState((prev) => (prev ? { ...prev, ...next } : prev));
@@ -82,15 +134,16 @@ export default function LiveModerationScreen() {
 
   async function save() {
     if (!state) return;
-    if (!live) { goBackOr(router); return; }
+    if (!live) { allowLeaveRef.current = true; goBackOr(router); return; }
     setSaving(true);
     try {
       await api.liveMod.saveSettings(streamId, {
         bannedWords: state.bannedWords, slowModeSeconds: state.slowModeSeconds, saveAsDefault,
       });
+      allowLeaveRef.current = true;
       goBackOr(router);
     } catch {
-      Alert.alert('Couldn’t save', 'Your changes were not saved. Try again.');
+      showAlert('Couldn’t save', 'Your changes were not saved. Try again.');
     } finally {
       setSaving(false);
     }
@@ -105,7 +158,7 @@ export default function LiveModerationScreen() {
       else await api.liveMod.unban(streamId, user.userId);
     } catch {
       setState(previous);
-      Alert.alert('Couldn’t update', 'Try again.');
+      showAlert('Couldn’t update', `${user.displayName} is still ${kind}. Try again.`);
     }
   }
 
@@ -124,7 +177,7 @@ export default function LiveModerationScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Moderation" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Moderation" onBack={() => { void handleBack(); }} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : !state ? (
