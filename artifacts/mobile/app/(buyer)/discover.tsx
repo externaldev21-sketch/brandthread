@@ -48,7 +48,6 @@ import type { EditorialTileItem } from '@/components/discover/EditorialTile';
 import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
 import { DiscoverGrid, GRID_GAP, GRID_GUTTER, gridGeometry } from '@/components/discover/DiscoverGrid';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
-import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
 import { DiscoverFeaturedRail, useFeaturedBrands } from '@/components/discover/DiscoverFeaturedRail';
@@ -77,6 +76,7 @@ import { useStickyState } from '@/lib/stickyState';
 import { useDiscoverFeed } from '@/hooks/useDiscoverFeed';
 import { hapticLight } from '@/lib/haptics';
 import { prefetchImage } from '@/lib/prefetch';
+import { setDiscoverPlayerQueue } from '@/lib/discoverPlayerQueue';
 
 // First visit with nothing cached: hold the skeleton until the grid AND
 // every rail that sits above/inside it have settled (or this cap passes),
@@ -159,7 +159,6 @@ export default function DiscoverScreen() {
   const featured = useFeaturedBrands();
   const brandsYouMightLike = useBrandsYouMightLike();
 
-  const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
   // Set when the menu came from long-pressing a grid tile: it then shows as
@@ -321,8 +320,14 @@ export default function DiscoverScreen() {
 
   const { refreshControl: threadRefresh, indicator: threadRefreshIndicator } = useThreadRefresh(refreshing, handleRefresh);
 
+  // TikTok-style: a tile opens the real Threads feed player at that post and
+  // swipes on through this grid (app/discover-player.tsx). Pushed on the root
+  // stack, so back lands on this tab with its scroll position intact.
   function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
-    setViewer({ posts: allPosts, startIndex: flatIndex });
+    hapticLight();
+    const index = allPosts[flatIndex]?.id === post.id ? flatIndex : Math.max(0, allPosts.findIndex((p) => p.id === post.id));
+    const token = setDiscoverPlayerQueue(allPosts, index);
+    router.push(`/discover-player?q=${encodeURIComponent(token)}` as never);
   }
 
   function openShopTheLook(post: DiscoverPost) {
@@ -533,16 +538,6 @@ export default function DiscoverScreen() {
           {skeletonHeader}
           <DiscoverGridSkeleton />
         </Animated.View>
-      )}
-
-      {viewer && (
-        <DiscoverPostViewer
-          posts={viewer.posts}
-          startIndex={viewer.startIndex}
-          onClose={() => setViewer(null)}
-          onOpenShopTheLook={openShopTheLook}
-          onSafetyMenu={setSafetyMenuPost}
-        />
       )}
 
       {shopSelection && (

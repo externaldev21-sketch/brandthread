@@ -161,6 +161,8 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/seller-agreement.tsx',
   'app/product-editor.tsx',
   'app/profile-videos.tsx',
+  'app/discover-player.tsx',
+  'app/return-request.tsx',
   'app/seller-conversation.tsx',
   // Renders the shared components/inbox/MessagesInbox.tsx (TabPageHeader, like (buyer)/inbox).
   'app/seller-inbox.tsx',
