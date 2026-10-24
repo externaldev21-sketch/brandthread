@@ -109,6 +109,7 @@ import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { ActionSheetHost, installConfirmationSheets } from '@/components/ui/ActionSheet';
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
+import { ToastHost } from '@/components/ui/Toast';
 import { ContextMenuHost } from '@/components/ui/ContextMenuHost';
 import { PushPrePromptHost } from '@/components/PushPrePromptHost';
 import { handleNotificationAction } from '@/lib/notificationActions';
@@ -1610,6 +1611,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <AiConsentSheet />
       <AppLockGate />
       <AppAlertHost />
+      <ToastHost />
       <ContextMenuHost />
       <ForceUpdateGate />
       <AppSettingsEffects />

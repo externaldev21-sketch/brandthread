@@ -1,7 +1,6 @@
 /**
  * A genuine native action sheet (`ActionSheetIOS.showActionSheetWithOptions`)
- * on iOS, falling back to `Alert.alert` on Android and a themed modal on web
- * (see `showAlert` below) — there is no existing
+ * on iOS, falling back to `Alert.alert` on Android/web — there is no existing
  * true action-sheet helper in this codebase (lib/safety.ts's `confirmBlock`
  * just uses `Alert.alert` everywhere). Used for the Requests-tab "Block"
  * confirmation, which the Instagram/TikTok message-request references both
@@ -48,49 +47,16 @@ export function confirmDestructiveActionSheet(options: ConfirmActionSheetOptions
 
 // ─── Cross-platform alert / confirm ──────────────────────────────────────────
 //
-// `Alert.alert` is a silent no-op on react-native-web (`static alert() {}`),
-// so every confirm, error and Alert-built menu was a dead tap in the web
-// build. `showAlert` takes the exact `Alert.alert` arguments: on iOS/Android it
-// calls `Alert.alert` unchanged; on web it hands the alert to the themed modal
-// host (components/ui/WebAlertHost.tsx, mounted once in app/_layout.tsx).
+// `Alert.alert` is re-pointed at the in-app host on every platform at boot
+// (lib/appAlert.ts via <AppAlertHost />, and lib/webAlert.ts on web), so
+// `showAlert` takes the exact `Alert.alert` arguments and forwards them.
+// Screens call `showAlert` / `confirmAlert` so the alert path lives in one place.
 
 export type AlertButtonSpec = AlertButton;
 
-export interface WebAlertRequest {
-  title: string;
-  message?: string;
-  buttons: AlertButtonSpec[];
-  options?: AlertOptions;
-}
-
-type WebAlertPresenter = (request: WebAlertRequest) => void;
-
-let webAlertPresenter: WebAlertPresenter | null = null;
-/** Alerts raised before the host mounted; flushed when it registers. */
-const pendingWebAlerts: WebAlertRequest[] = [];
-
-/** Called by <WebAlertHost /> on mount (and with null on unmount). */
-export function registerWebAlertPresenter(presenter: WebAlertPresenter | null): void {
-  webAlertPresenter = presenter;
-  if (presenter) {
-    while (pendingWebAlerts.length) presenter(pendingWebAlerts.shift()!);
-  }
-}
-
 /** Drop-in replacement for `Alert.alert(title, message, buttons, options)`. */
 export function showAlert(title: string, message?: string, buttons?: AlertButtonSpec[], options?: AlertOptions): void {
-  if (Platform.OS !== 'web') {
-    Alert.alert(title, message, buttons, options);
-    return;
-  }
-  const request: WebAlertRequest = {
-    title,
-    message,
-    buttons: buttons && buttons.length ? buttons : [{ text: 'OK' }],
-    options,
-  };
-  if (webAlertPresenter) webAlertPresenter(request);
-  else pendingWebAlerts.push(request);
+  Alert.alert(title, message, buttons, options);
 }
 
 export interface ConfirmAlertOptions {
