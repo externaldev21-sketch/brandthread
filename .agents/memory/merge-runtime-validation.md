@@ -26,3 +26,9 @@ After removing a feedback call, inspect its surrounding conditional rather than 
 **Why:** An emptied destructive-only branch can legally capture the next action callback. TypeScript still passes, while ordinary buttons animate but never perform their actions.
 
 **How to apply:** Keep action dispatch independent of optional feedback. Renderer-test enabled, disabled, and loading controls across every shared button variant; syntax and source audits alone cannot verify click behavior.
+
+Treat upstream “dead component” deletions as claims about the branch's original base, not the current integrated tree.
+
+**Why:** Newer screens can load supposedly unused components through dynamic `require()` calls that an import-only audit misses.
+
+**How to apply:** Search all tracked references, including lazy imports and `require()`, before accepting deletions. Retain live dependencies and use typechecking to catch unresolved modules.
