@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { StoreAnalytics, StoreFunnelStep, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -61,8 +62,10 @@ export default function AnalyticsStoreScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -82,7 +85,7 @@ export default function AnalyticsStoreScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   return (

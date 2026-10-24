@@ -15,14 +15,15 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   AnalyticsSkeleton, HeaderPillButton, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
-import { formatCents } from '@/lib/money';
 import { metricTiles } from '@/lib/analyticsMetricTiles';
 
 function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
@@ -79,8 +80,10 @@ export default function AnalyticsProductionScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -100,7 +103,7 @@ export default function AnalyticsProductionScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   return (

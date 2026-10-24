@@ -11,14 +11,15 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
-import { formatCents } from '@/lib/money';
 import { metricTiles } from '@/lib/analyticsMetricTiles';
 
 export default function AnalyticsProfitScreen() {
@@ -37,8 +38,10 @@ export default function AnalyticsProfitScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -46,7 +49,7 @@ export default function AnalyticsProfitScreen() {
       if (!filter) setFilter(f);
       // Profit (orders + recorded costs) and payouts (live Stripe balance)
       // load independently: a missing Stripe account must not hide profit.
-      const [p, pay] = await Promise.allSettled([getProfitAnalytics(f), getPayoutAnalytics()]);
+      const [p, pay] = await Promise.allSettled([getProfitAnalytics(f), getPayoutAnalytics(f)]);
       if (requestUser.current !== requestedUser) return;
       // A failed fetch must never be indistinguishable from "not synced
       // yet" — never render this as a genuine $0 profit/payout state.
@@ -62,7 +65,7 @@ export default function AnalyticsProfitScreen() {
     requestUser.current = null;
     setProfit(null); setPayout(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   return (

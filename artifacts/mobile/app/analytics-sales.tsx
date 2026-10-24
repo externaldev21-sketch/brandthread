@@ -12,7 +12,9 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -41,8 +43,10 @@ export default function AnalyticsSalesScreen() {
   const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
-    if (!authLoaded || !userId) return;
-    const requestedUser = userId;
+    // The signed-out web preview has no Clerk user; the service serves its fixtures.
+    const preview = isSellerDevPreview();
+    if (!preview && (!authLoaded || !userId)) return;
+    const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
@@ -62,7 +66,7 @@ export default function AnalyticsSalesScreen() {
     requestUser.current = null;
     setData(null); setFilter(null);
     setLoading(!authLoaded);
-    if (authLoaded && userId) { setLoading(true); load(); }
+    if (isSellerDevPreview() || (authLoaded && userId)) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
   const chartData = (): AnalyticsPoint[] => {
@@ -138,7 +142,7 @@ export default function AnalyticsSalesScreen() {
                 <Text style={s.breakSub}>{row.orders} orders · {row.units} units</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={s.breakRevenue}>${row.revenue.toLocaleString()}</Text>
+                <Text style={s.breakRevenue}>{formatCents(row.revenue)}</Text>
                 <Text style={s.breakShare}>{row.sharePct.toFixed(1)}% of total</Text>
               </View>
             </View>

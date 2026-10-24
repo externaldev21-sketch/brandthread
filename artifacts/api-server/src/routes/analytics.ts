@@ -6,6 +6,7 @@ import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
 import { inFlightPayoutCents } from "../lib/money/sellerPayouts";
 import { buildAdvancedAnalyticsResponse, ADVANCED_MONTHS } from "./analyticsAdvanced";
+import { buildSalesBreakdown } from "./sellerAnalyticsBuilders";
 import {
   DAY_MS,
   TEN_MIN_MS,
@@ -533,6 +534,7 @@ router.get("/revenue", async (req, res) => {
     .select({
       day: sql<string>`to_char(date_trunc('day', ${local}), 'YYYY-MM-DD')`,
       total_cents: NET_REVENUE,
+      order_count: sql<number>`count(*)::int`,
     })
     .from(orders)
     .where(and(eq(orders.ownerId, ownerId), window, COUNTED_ORDER))
@@ -540,11 +542,31 @@ router.get("/revenue", async (req, res) => {
     .orderBy(sql`1`)
     .limit(400);
 
+  const breakdownRows = await db.execute(sql`
+    SELECT p.id AS product_id,
+           coalesce(p.name, oi.product_name) AS name,
+           coalesce(sum(oi.quantity), 0)::int AS units,
+           coalesce(sum(oi.quantity * oi.price_cents), 0)::int AS revenue_cents,
+           count(DISTINCT orders.id)::int AS order_count
+    FROM orders
+    JOIN order_items oi ON oi.order_id = orders.id
+    LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+    LEFT JOIN products p ON p.id = pv.product_id
+    WHERE orders.owner_id = ${ownerId}
+      AND ${window}
+      AND ${COUNTED_ORDER}
+      AND oi.refunded_at IS NULL
+    GROUP BY p.id, coalesce(p.name, oi.product_name)
+    ORDER BY revenue_cents DESC
+    LIMIT 20
+  `);
+
   res.json({
     period,
     totalCents:  result?.totalCents ?? 0,
     orderCount:  result?.orderCount ?? 0,
     daily,
+    breakdown: buildSalesBreakdown(breakdownRows.rows),
   });
 });
 
@@ -557,6 +579,7 @@ router.get("/products", async (req, res) => {
     SELECT
       p.id           AS product_id,
       p.name,
+      p.images       AS images,
       COALESCE(SUM(oi.quantity * oi.price_cents), 0)::int  AS revenue_cents,
       COALESCE(SUM(oi.quantity), 0)::int                    AS units_sold,
       COUNT(DISTINCT o.id)::int                             AS order_count
@@ -593,6 +616,7 @@ router.get("/products", async (req, res) => {
     return {
       productId:       r.product_id,
       name:            r.name,
+      imageUrl:        Array.isArray(r.images) && typeof r.images[0] === "string" ? r.images[0] : null,
       revenueCents:    r.revenue_cents,
       unitsSold:       r.units_sold,
       orderCount:      r.order_count,

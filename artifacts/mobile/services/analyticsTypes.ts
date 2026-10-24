@@ -285,6 +285,16 @@ export interface StoreAnalytics {
   funnel:           StoreFunnelStep[];
   sections:         StoreSectionAnalytics[];
   visitorsChart:    AnalyticsPoint[];
+  /** Store visits split by where the buyer came from (feed/search/profile/external). */
+  trafficSources?:  StoreTrafficSource[];
+}
+
+export interface StoreTrafficSource {
+  source:       string;
+  label:        string;
+  visits:       number;
+  productViews: number;
+  sharePct:     number;
 }
 
 // ── Marketing ─────────────────────────────────────────────────────────────────
@@ -413,8 +423,22 @@ export interface ProfitAnalytics {
 export interface PayoutAnalytics {
   availableBalance:       AnalyticsMetric;
   pendingBalance:         AnalyticsMetric;
+  heldFunds?:             AnalyticsMetric;
+  totalPaidOut?:          AnalyticsMetric;
+  manufacturerAllocation?: AnalyticsMetric;
+  shippingAllocation?:   AnalyticsMetric;
+  disputeHolds?:         AnalyticsMetric;
+  refundImpact?:         AnalyticsMetric;
+  history?:              PayoutHistoryRow[];
   nextPayoutAmount?:      AnalyticsMetric;
   nextPayoutDate?:        string;
+}
+
+export interface PayoutHistoryRow {
+  id: string;
+  amountCents: number;
+  status: string;
+  arrivalDate: string;
 }
 
 // ── Attribution ───────────────────────────────────────────────────────────────
