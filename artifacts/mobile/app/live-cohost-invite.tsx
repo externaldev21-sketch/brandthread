@@ -19,6 +19,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FONT, FS, SP } from '@/lib/theme';
 import type { LiveCohostInvite } from '@/lib/live/moderationTypes';
 import { isPreviewDemoMode } from '@/lib/devPreview';
+import { friendlyError } from '@/lib/friendlyError';
 
 const DEMO_INVITES: LiveCohostInvite[] = [
   { streamId: 'demo', title: 'Autumn drop, first look', hostName: 'Atelier Nord', hostUsername: 'atelier.nord', hostAvatarUrl: null, createdAt: '' },
@@ -70,7 +71,7 @@ export default function LiveCohostInviteScreen() {
       }
       setInvites((prev) => prev.filter((i) => i.streamId !== invite.streamId));
     } catch (e: any) {
-      Alert.alert(accept ? 'Couldn’t join' : 'Couldn’t decline', e?.message ?? 'Try again.');
+      Alert.alert(accept ? 'Couldn’t join' : 'Couldn’t decline', friendlyError(e, 'Try again.'));
       void load();
     } finally {
       setBusy(null);

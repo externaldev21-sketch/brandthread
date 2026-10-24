@@ -37,6 +37,7 @@ import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { DISABLED_OPACITY } from '@/constants/states';
 
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
+import { getDisabledFilledButtonColors } from '@/lib/disabledButton';
 
 import { minHitSlop } from '@/lib/hitSlop';
 
@@ -123,14 +124,16 @@ export function Button({
     onPress(event);
   };
 
+  // Disabled filled buttons get a visible silver-wash surface + hairline
+  // border (lib/disabledButton.ts) — palette.elevated is black on the
+  // default theme, which left a disabled primary as bare grey text.
+  const disabledFilled = getDisabledFilledButtonColors(theme);
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
     if (colors) return { bg: colors.background, fg: colors.foreground };
     switch (variant) {
-      // Disabled keeps these colours; the whole control drops to
-      // DISABLED_OPACITY below. Destructive is red text only, no red fill.
-      case 'primary': return { bg: theme.accent, fg: theme.onAccent };
-      case 'secondary': return { bg: 'transparent', fg: palette.foreground, border: palette.foreground };
-      case 'tertiary': return { bg: 'transparent', fg: theme.accentLight };
+      case 'primary': return isDisabled ? disabledFilled : { bg: theme.accent, fg: theme.onAccent };
+      case 'secondary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : palette.foreground, border: isDisabled ? palette.border : palette.foreground };
+      case 'tertiary': return { bg: 'transparent', fg: isDisabled ? palette.mutedForeground : theme.accentLight };
       case 'destructive': return { bg: 'transparent', fg: RED };
     }
   })();
@@ -165,10 +168,8 @@ export function Button({
           { height, borderRadius: radius.md, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
-          // Keep disabled filled controls visible without card-like borders or shadows.
-          isFilled && isDisabled && { backgroundColor: palette.border },
+          isFilled && isDisabled && { borderWidth: StyleSheet.hairlineWidth, borderColor: variantStyle.border },
           fullWidth && styles.fullWidth,
-          isDisabled && { opacity: DISABLED_OPACITY },
           innerStyle,
         ]}
       >

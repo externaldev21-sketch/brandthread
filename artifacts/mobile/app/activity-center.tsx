@@ -30,6 +30,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStickyState } from '@/lib/stickyState';
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
+import { showAlert } from '@/lib/actionSheet';
 
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 
@@ -700,7 +701,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     },
     onFailed: (failed) => {
       restoreRows(failed);
-      Alert.alert('Could not delete', 'Check your connection and try again.');
+      showAlert('Could not delete', 'Check your connection and try again.');
     },
   }), [restoreRows]);
   // Leaving Activity sends a waiting delete now rather than dropping it.
@@ -996,7 +997,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       await setSellerFollowing(userId, next);
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -1054,7 +1055,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
       showToast('Blocked');
     } catch {
-      Alert.alert('Could not block', 'Please try again in a moment.');
+      showAlert('Could not block', 'Please try again in a moment.');
     }
   }, [showToast]);
 
@@ -1103,7 +1104,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       setRemoveFollowerTarget(null);
       showToast('Removed');
     } catch {
-      Alert.alert('Could not remove follower', 'Please try again in a moment.');
+      showAlert('Could not remove follower', 'Please try again in a moment.');
     } finally {
       setRemovingFollower(false);
     }
@@ -1121,7 +1122,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     } catch {
       setItems(previous);
       setDotIds(previousDots);
-      Alert.alert('Could not mark all as read', 'Check your connection and try again.');
+      showAlert('Could not mark all as read', 'Check your connection and try again.');
     }
   }, []);
 
@@ -1137,7 +1138,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
         delete next[person.userId];
         return next;
       });
-      Alert.alert('Could not follow', 'Please try again in a moment.');
+      showAlert('Could not follow', 'Please try again in a moment.');
     }
   }, []);
 

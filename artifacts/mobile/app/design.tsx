@@ -70,6 +70,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import ReanimatedAnimated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1651,7 +1652,7 @@ export default function DesignGalleryScreen() {
       cancelSelection();
       loadData();
     } catch (e: unknown) {
-      Alert.alert('Could not stack', e instanceof Error ? e.message : 'Try again.');
+      Alert.alert('Could not stack', friendlyError(e, 'Try again.'));
     }
   }
 

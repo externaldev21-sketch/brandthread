@@ -89,6 +89,7 @@ import { taggedPeople, mentionProfileHref, type TaggedPerson } from '@/lib/story
 import { reshareGradientFromBackground } from '@/lib/storyReshare';
 
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
+import { showAlert } from '@/lib/actionSheet';
 
 
 import { crispPx } from '@/lib/crispPixel';
@@ -336,7 +337,7 @@ export default function BuyerStoryViewer() {
     } catch {
       setLikedSet(prev => { const n = new Set(prev); wasLiked ? n.add(sid) : n.delete(sid); return n; });
       setLikesCounts(prev => ({ ...prev, [sid]: Math.max(0, (prev[sid] ?? 0) + (wasLiked ? 1 : -1)) }));
-      Alert.alert('Could not update like', 'Try again.');
+      showAlert('Could not update like', 'Try again.');
     }
   };
 
@@ -577,7 +578,7 @@ export default function BuyerStoryViewer() {
       } catch (err) {
         const body = (() => { try { return JSON.parse((err as { body?: string })?.body ?? ''); } catch { return null; } })();
         if (body?.stickerState) return body.stickerState;
-        Alert.alert('Could not send your answer', body?.error ?? 'Try again.');
+        showAlert('Could not send your answer', body?.error ?? 'Try again.');
         throw err;
       }
     },
@@ -613,7 +614,7 @@ export default function BuyerStoryViewer() {
       setResponsesOpen(false);
       router.push(`/buyer-conversation?id=${encodeURIComponent(dm.conversationId)}` as never);
     } catch {
-      Alert.alert('Could not open the conversation', 'Try again.');
+      showAlert('Could not open the conversation', 'Try again.');
     }
   };
 
@@ -982,7 +983,7 @@ export default function BuyerStoryViewer() {
               onPress={() => {
                 haptic('sheet');
                 setIsPaused(true);
-                Alert.alert('Your story', undefined, [
+                showAlert('Your story', undefined, [
                   ...(slidePeople.length > 0 ? [{
                     text: 'Tagged people',
                     onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
@@ -993,14 +994,14 @@ export default function BuyerStoryViewer() {
                       try {
                         const MediaLibrary = getMediaLibrary();
                         if (!MediaLibrary) {
-                          Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+                          showAlert('Unavailable', mediaLibraryUnavailableMessage());
                           return;
                         }
                         const perm = await MediaLibrary.requestPermissionsAsync();
                         if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
                         await MediaLibrary.createAssetAsync(currentSlide.imageUri);
                       } catch {
-                        Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
+                        showAlert('Couldn’t save', 'Check your photo library permission and try again.');
                       } finally {
                         setIsPaused(false);
                       }

@@ -476,15 +476,20 @@ interface PrimaryButtonProps {
   testID?: string;
 }
 
+import { getDisabledFilledButtonColors } from '@/lib/disabledButton';
+
 export function PrimaryButton({
   label, onPress, icon, loading, disabled, small, style, colors, testID,
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
-  const palette = useColors();
   const buttonColors = colors ?? theme.primaryGradient;
   const foreground = theme.onAccent;
   const onAccentTextStyle = getOnAccentTextStyle(theme);
   const h = small ? COMP.buttonHSm : COMP.buttonH;
+  // Disabled: a visible silver-wash surface + hairline border with a muted
+  // label (lib/disabledButton.ts) — palette.elevated is black on the default
+  // theme, so the old disabled fill left bare grey text with no container.
+  const disabledColors = getDisabledFilledButtonColors(theme);
   return (
     <PressableScale
       onPress={() => {
@@ -497,20 +502,20 @@ export function PrimaryButton({
       // the caller's `style` sets a slimmer one — so PressableScale's forced
       // 44pt minimum is skipped here (its auto hit-slop still pads the TAP
       // area back up to 44pt; only the drawn box gets slimmer).
-      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, disabled && { opacity: DISABLED_OPACITY }, style]}
+      style={[{ borderRadius: RADIUS.md, overflow: 'hidden', height: h }, disabled && { borderWidth: StyleSheet.hairlineWidth, borderColor: disabledColors.border }, style]}
       noMinHeight
       testID={testID}
     >
       <LinearGradient
-        colors={buttonColors}
+        colors={disabled ? [disabledColors.bg, disabledColors.bg] : buttonColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[pbS.inner, { height: '100%' }]}
       >
         {loading ? (
-          <ActivityIndicator color={foreground} size="small" />
+          <ActivityIndicator color={disabled ? disabledColors.fg : foreground} size="small" />
         ) : (
-          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
+          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[pbS.label, onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }, disabled && { color: disabledColors.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
         )}
       </LinearGradient>
     </PressableScale>

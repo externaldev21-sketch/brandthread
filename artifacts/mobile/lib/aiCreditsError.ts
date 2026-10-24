@@ -4,7 +4,9 @@
  *   429 user_daily_cap        -> standard alert
  *   503 global_daily_cap      -> standard alert
  * The classifier is pure; `surfaceAiCreditsError` does the navigation/alert
- * and is called once from the central request helper in lib/api.ts.
+ * and is called once from the central request helper in lib/api.ts. Callers
+ * that bypass that helper with a raw fetch/XHR (services/aiService.ts — the
+ * AI Brain chat) use `routeAiCreditsRefusal` instead.
  */
 
 import { OUT_OF_CREDITS_ROUTE } from './aiCredits';
@@ -54,4 +56,16 @@ export function surfaceAiCreditsError(kind: AiCreditsErrorKind, now = Date.now()
   } catch {
     // Surfacing is best effort; the original error still reaches the caller.
   }
+}
+
+/**
+ * For raw fetch/XHR callers that bypass lib/api.ts's request helper: sends a
+ * 402 insufficient_credits refusal to the AI credits screen (the same
+ * surface lib/api.ts uses) and returns the classified kind, so the caller can
+ * show its own inline copy for the 429/503 caps instead of a second alert.
+ */
+export function routeAiCreditsRefusal(status: number, body: string | undefined): AiCreditsErrorKind | null {
+  const kind = classifyAiCreditsError(status, body);
+  if (kind === 'insufficient_credits') surfaceAiCreditsError(kind);
+  return kind;
 }

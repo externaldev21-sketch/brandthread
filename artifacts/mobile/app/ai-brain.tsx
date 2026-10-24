@@ -66,6 +66,9 @@ import {
   applyAction,
   undoAction,
   getAISettings,
+  AIServiceError,
+  AI_DAILY_CAP_MESSAGE,
+  AI_NO_CREDITS_MESSAGE,
   syncAISettingsFromServer,
 } from '@/services/aiService';
 import {
@@ -88,8 +91,13 @@ import {
 // ─── Error copy ────────────────────────────────────────────────────────────────
 
 /** Maps raw errors from services/aiService.ts to human copy. Never show server/vendor text. */
-function humanizeAiError(rawMessage?: string): string {
-  const msg = rawMessage ?? '';
+function humanizeAiError(err: unknown): string {
+  if (err instanceof AIServiceError) {
+    if (err.code === 'user_daily_cap') return AI_DAILY_CAP_MESSAGE;
+    if (err.code === 'insufficient_credits') return AI_NO_CREDITS_MESSAGE;
+    if (err.code === 'global_daily_cap') return err.message;
+  }
+  const msg = (err as Error | undefined)?.message ?? '';
   if (msg === AI_DISABLED_MESSAGE) return AI_DISABLED_MESSAGE;
   if (/sign in to use brandthread ai|authentication error/i.test(msg)) {
     return 'Sign in to use Brandthread AI.';
@@ -719,7 +727,7 @@ export default function AiBrainScreen() {
         if (isAIDisabledError(err)) {
           handleDisabledError(text);
         } else if (!isAbort) {
-          setErrorMsg(humanizeAiError((err as Error)?.message));
+          setErrorMsg(humanizeAiError(err));
           // Restore user text so they can retry without retyping.
           setInputText(text);
         }

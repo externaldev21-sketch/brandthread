@@ -18,6 +18,7 @@ import { describeLiveCode, type LiveCode } from '@/lib/live/liveCommerce';
 import { FLASH_DEAL_DURATIONS, dealRemainingMs, formatDealCountdown } from '@/lib/live/flashDeal';
 import { useNowTick } from '@/lib/live/useNowTick';
 import { LIVE_RED } from './LiveAvatarRing';
+import { friendlyError } from '@/lib/friendlyError';
 
 const PERCENTS = [10, 15, 20, 25];
 const LIMITS: Array<{ label: string; value: number | null }> = [
@@ -60,7 +61,7 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
       });
       await load();
     } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Could not create the code. Try again.');
+      setError(friendlyError(e, 'Could not create the code. Try again.'));
     } finally {
       setSaving(false);
     }

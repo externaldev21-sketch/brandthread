@@ -14,6 +14,7 @@ import { Alert, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { registerWebAlertPresenter } from '@/lib/actionSheet';
 import {
   dismissWebAlert,
   installWebAlertPolyfill,
@@ -40,6 +41,11 @@ function WebAlertDialog() {
   const [value, setValue] = useState('');
   const reqRef = useRef<WebAlertRequest | null>(null);
   const valueRef = useRef('');
+
+  useEffect(() => {
+    registerWebAlertPresenter((request) => Alert.alert(request.title, request.message, request.buttons, request.options));
+    return () => registerWebAlertPresenter(null);
+  }, []);
 
   useEffect(
     () =>

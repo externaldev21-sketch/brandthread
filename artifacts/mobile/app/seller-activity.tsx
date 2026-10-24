@@ -63,6 +63,7 @@ import { getVisiblePreviewActivity, isPreviewActivityEnabled, isPreviewActivityI
 
 import { applyPreviewFollowState } from '@/lib/previewFollowStore';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
+import { showAlert } from '@/lib/actionSheet';
 
 import { ChipRow } from '@/components/ui/ChipRow';
 
@@ -132,7 +133,7 @@ export default function SellerActivityScreen() {
     },
     onFailed: (failed) => {
       restoreRows(failed);
-      Alert.alert('Could not delete', 'Check your connection and try again.');
+      showAlert('Could not delete', 'Check your connection and try again.');
     },
   }), [restoreRows]);
   const deferredDeleteRef = useRef(deferredDelete);
@@ -302,7 +303,7 @@ export default function SellerActivityScreen() {
       await setSellerFollowing(userId, next);
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -354,7 +355,7 @@ export default function SellerActivityScreen() {
               setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
               showToast('Blocked');
             })
-            .catch(() => Alert.alert('Could not block', 'Please try again in a moment.'));
+            .catch(() => showAlert('Could not block', 'Please try again in a moment.'));
         },
       });
     }

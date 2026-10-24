@@ -352,13 +352,26 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('keeps the checkout error fallback for non-role failures', async () => {
+  it('shows the checkout fallback copy, not the raw "API 500: …" text, for server failures', async () => {
     checkoutMock.mockRejectedValueOnce(serverError());
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-change-growth');
 
-    expect(alertMock).toHaveBeenCalledWith('Checkout error', 'API 500: Billing service unavailable.');
+    expect(alertMock).toHaveBeenCalledWith('Checkout error', 'Could not start checkout. Please try again.');
+    expect(alertMock).not.toHaveBeenCalledWith('Checkout error', expect.stringContaining('API 500'));
+    renderer.unmount();
+  });
+
+  it('keeps a specific server validation message for checkout 4xx failures', async () => {
+    checkoutMock.mockRejectedValueOnce(new ApiError(400, JSON.stringify({
+      error: { code: 'VALIDATION_ERROR', message: 'You are already on this plan.' },
+    })));
+    const renderer = await renderScreen(SubscriptionScreen);
+
+    await press(renderer, 'seller-subscription-change-growth');
+
+    expect(alertMock).toHaveBeenCalledWith('Checkout error', 'You are already on this plan.');
     renderer.unmount();
   });
 
@@ -375,14 +388,15 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('keeps the portal error fallback for non-role failures', async () => {
+  it('shows the portal fallback copy, not the raw "API 500: …" text, for server failures', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(serverError());
     api.seller.subscription.status.mockResolvedValue({ ...ENDED_PLAN });
     const renderer = await renderScreen(SubscriptionScreen);
 
     await press(renderer, 'seller-subscription-cancel');
 
-    expect(alertMock).toHaveBeenCalledWith('Portal error', 'API 500: Billing service unavailable.');
+    expect(alertMock).toHaveBeenCalledWith('Portal error', 'Could not open billing portal. Please try again.');
+    expect(alertMock).not.toHaveBeenCalledWith('Portal error', expect.stringContaining('API 500'));
     renderer.unmount();
   });
 

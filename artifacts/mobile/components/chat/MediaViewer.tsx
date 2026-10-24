@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-import {
-  Alert, Animated, Modal, PanResponder, Platform, Share, StyleSheet,
+import { Animated, Modal, PanResponder, Platform, Share, StyleSheet,
   Text, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
@@ -8,6 +7,7 @@ import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { TEXT_TERTIARY } from '@/lib/theme';
+import { showAlert } from '@/lib/actionSheet';
 
 /**
  * Full-screen photo viewer: pinch-to-zoom (two-finger, same touch-distance
@@ -99,11 +99,11 @@ export default function MediaViewer({
     setIsSaving(true);
     try {
       const result = await saveImageToMediaLibrary(uri);
-      if (result === 'saved') Alert.alert('Saved', 'Photo saved to your library.');
-      else if (result === 'denied') Alert.alert('Permission needed', 'Allow photo library access in Settings to save.');
-      else Alert.alert('Unavailable', mediaLibraryUnavailableMessage());
+      if (result === 'saved') showAlert('Saved', 'Photo saved to your library.');
+      else if (result === 'denied') showAlert('Permission needed', 'Allow photo library access in Settings to save.');
+      else showAlert('Unavailable', mediaLibraryUnavailableMessage());
     } catch {
-      Alert.alert("Couldn't save photo", 'Try again.');
+      showAlert("Couldn't save photo", 'Try again.');
     } finally {
       setIsSaving(false);
     }
