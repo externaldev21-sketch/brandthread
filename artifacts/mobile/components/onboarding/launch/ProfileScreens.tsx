@@ -539,11 +539,16 @@ export function NotificationsScreen({
   onBack,
 }: HeaderProps & { onTurnOn: () => void; onSkip: () => void; busy?: boolean }) {
   const { theme } = useAppTheme();
+  // The browser build can't take push permission, so there's nothing to turn
+  // on or decline: one Continue, and copy that says where alerts live.
+  const web = Platform.OS === 'web';
   return (
     <OnbScreen
       testID="onboarding-notifications"
       header={<OnbHeader progress={progress} onBack={onBack} />}
-      footer={(
+      footer={web ? (
+        <PillButton testID="onboarding-notifications-continue" label="Continue" onPress={onSkip} />
+      ) : (
         <>
           <PillButton testID="onboarding-notifications-skip" label="Skip" variant="secondary" onPress={onSkip} disabled={busy} />
           <PillButton testID="onboarding-notifications-continue" label="Turn on" onPress={onTurnOn} loading={busy} />
@@ -554,7 +559,11 @@ export function NotificationsScreen({
         <Feather name="bell" size={26} color={theme.background} />
       </View>
       <Title style={s.bellTitle}>Turn on notifications</Title>
-      <Sub>Get order and shipping updates, messages, and drops from brands you follow. You can turn them off anytime.</Sub>
+      <Sub>
+        {web
+          ? 'Alerts aren’t available in the browser. Turn them on anytime in the Brandthread mobile app.'
+          : 'Get order and shipping updates, messages, and drops from brands you follow. You can turn them off anytime.'}
+      </Sub>
     </OnbScreen>
   );
 }

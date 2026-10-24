@@ -217,8 +217,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flexGrow: 0,
     marginHorizontal: 0,
   },
+  // End padding: scrolled to the end, the switcher's rounded border clears
+  // the clip edge instead of being cut by it.
   switcherScrollContent: {
-    paddingHorizontal: 0,
+    paddingLeft: 0,
+    paddingRight: 22,
   },
   switchItem: {
     paddingHorizontal: 16,

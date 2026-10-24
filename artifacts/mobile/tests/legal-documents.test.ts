@@ -7,7 +7,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
-  IS_DRAFT, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_OPEN_ITEMS, LEGAL_VERSION,
+  IS_DRAFT, LEGAL_ALL_DOCUMENT_ORDER, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_OPEN_ITEMS, LEGAL_VERSION,
 } from '../content/legal';
 import { hasAcceptedCurrentTerms } from '../lib/legalConsent';
 
@@ -17,7 +17,9 @@ const text = (id: keyof typeof LEGAL_DOCUMENTS) =>
 
 describe('legal documents (single source)', () => {
   it('defines Terms, Community Guidelines and Privacy Policy with routes', () => {
-    expect(LEGAL_DOCUMENT_ORDER).toEqual(['terms', 'guidelines', 'privacy']);
+    expect(LEGAL_DOCUMENT_ORDER).toEqual(['terms', 'privacy', 'guidelines']);
+    // Same relative order as the five-document switcher.
+    expect(LEGAL_ALL_DOCUMENT_ORDER.filter((id) => LEGAL_DOCUMENT_ORDER.includes(id))).toEqual(LEGAL_DOCUMENT_ORDER);
     expect(LEGAL_DOCUMENTS.terms.route).toBe('/terms');
     expect(LEGAL_DOCUMENTS.privacy.route).toBe('/privacy');
     expect(LEGAL_DOCUMENTS.guidelines.route).toBe('/community-guidelines');

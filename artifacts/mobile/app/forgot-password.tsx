@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ScrollView, StatusBar } from 'react-native';
 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
@@ -21,16 +21,20 @@ import { Icon } from '@/components/ui/Icon';
 
 import { haptics } from '@/lib/haptics';
 
-import { Feather } from '@expo/vector-icons';
-
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+
+import { Button } from '@/components/ui/Button';
+
+import { IconButton } from '@/components/ui/IconButton';
+
+import { SPACING } from '@/constants/spacing';
 
 import { useApi } from '@/lib/api';
 
 import { ApiError } from '@/lib/networkNotice';
 
-import { FONT, FILL_ELEVATED, TEXT_DISABLED } from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -104,17 +108,19 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Back */}
+          {/* Back — same control, size and position as Sign in's */}
           {step !== 'done' && (
-            <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button"
+            <IconButton
+              name="arrow-left"
+              variant="plain"
+              size={20}
+              color={theme.muted}
               style={s.backBtn}
+              accessibilityLabel="Go back"
               onPress={() => {
                 step === 'code' ? setStep('email') : goBackOr(router, '/sign-in');
               }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-               <Icon name="arrow-left" size={20} color={theme.muted} />
-            </TouchableOpacity>
+            />
           )}
 
           {/* Logo */}
@@ -156,35 +162,21 @@ export default function ForgotPasswordScreen() {
                 </View>
               ) : null}
 
-              <TouchableOpacity
-                style={s.primaryWrap}
+              <Button
+                label="Send reset code"
                 onPress={handleSendCode}
-                disabled={!email.trim() || isFetching}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-                accessibilityLabel="Send reset code"
-                accessibilityState={{ disabled: !email.trim() || isFetching, busy: isFetching }}
-              >
-                <LinearGradient
-                  colors={(!email.trim() || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.primaryBtn}
-                >
-                  {isFetching
-                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!email.trim() || isFetching) && { color: TEXT_DISABLED }]}>Send reset code</Text>}
-                </LinearGradient>
-              </TouchableOpacity>
+                disabled={!email.trim()}
+                loading={isFetching}
+                fullWidth
+                style={s.primaryWrap}
+              />
 
-              <TouchableOpacity
-                style={s.secondaryBtn}
+              <Button
+                label="Back to sign in"
+                variant="secondary"
                 onPress={() => { goBackOr(router, '/sign-in'); }}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-              >
-                <Text style={s.secondaryBtnText}>Back to sign in</Text>
-              </TouchableOpacity>
+                fullWidth
+              />
             </>
           )}
 
@@ -243,26 +235,14 @@ export default function ForgotPasswordScreen() {
                 </View>
               ) : null}
 
-              <TouchableOpacity
-                style={s.primaryWrap}
+              <Button
+                label="Reset password"
                 onPress={handleReset}
-                disabled={!canReset || isFetching}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-                accessibilityLabel="Reset password"
-                accessibilityState={{ disabled: !canReset || isFetching, busy: isFetching }}
-              >
-                <LinearGradient
-                  colors={(!code || !password || isFetching) ? [FILL_ELEVATED, FILL_ELEVATED] : [theme.accent, theme.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.primaryBtn}
-                >
-                  {isFetching
-                    ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
-                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme), (!code || !password || isFetching) && { color: TEXT_DISABLED }]}>Reset password</Text>}
-                </LinearGradient>
-              </TouchableOpacity>
+                disabled={!canReset}
+                loading={isFetching}
+                fullWidth
+                style={s.primaryWrap}
+              />
 
               <TouchableOpacity
                 style={s.resendBtn}
@@ -307,21 +287,12 @@ export default function ForgotPasswordScreen() {
                 </LinearGradient>
               </View>
 
-              <TouchableOpacity
-                style={s.primaryWrap}
+              <Button
+                label="Sign in"
                 onPress={() => { router.replace('/sign-in' as never); }}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-              >
-                <LinearGradient
-                  colors={[theme.accent, theme.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.primaryBtn}
-                >
-                  <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Sign in</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                fullWidth
+                style={s.primaryWrap}
+              />
             </>
           )}
         </ScrollView>
@@ -370,11 +341,12 @@ function mapError(err: any): string {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: theme.background },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16 },
+  // Spacing mirrors app/sign-in.tsx so the two screens line up.
+  scroll: { paddingHorizontal: SPACING.xl, paddingTop: SPACING.md },
 
-  backBtn: { width: 44, height: 44, justifyContent: 'center', marginBottom: 16 },
+  backBtn: { marginBottom: SPACING.lg, alignSelf: 'flex-start' },
 
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xxxl - 4 },
   logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text },
 
   headline: {
@@ -413,18 +385,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   errorText: { fontSize: 13, fontFamily: FONT.regular, color: theme.error, flex: 1 },
 
-  primaryWrap: { marginBottom: 10 },
-  primaryBtn:  { borderRadius: 12, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent },
-
-  secondaryBtn: {
-    borderRadius: 12, paddingVertical: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: theme.border,
-  },
-  secondaryBtnText: { fontSize: 15, fontFamily: FONT.bold, color: theme.text },
+  primaryWrap: { marginBottom: SPACING.xs + 2 },
 
   resendBtn:  { paddingVertical: 14, alignItems: 'center' },
   resendText: { fontSize: 15, fontFamily: FONT.regular, color: theme.muted },
+  noticeText: { fontSize: 13, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
 
   // Success card
   successCard: {

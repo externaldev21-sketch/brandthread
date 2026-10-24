@@ -186,7 +186,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   body: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', marginBottom: SP.sm },
   input: {
-    height: COMP.inputH, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
+    height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.surface, paddingHorizontal: SP.lg,
     fontSize: FS.md, fontFamily: FONT.regular, color: theme.text, textAlign: 'center',
   },

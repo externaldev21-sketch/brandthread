@@ -67,12 +67,14 @@ export type InlineSegment = { text: string; bold?: boolean; href?: string };
 /** Splits one line of markdown into bold / link / plain segments. */
 export function parseInline(text: string): InlineSegment[] {
   const out: InlineSegment[] = [];
-  const pattern = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
+  // A bare email address (e.g. privacy@brandthread.app) becomes a mailto link.
+  const pattern = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)|([A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g;
   let last = 0;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text))) {
     if (match.index > last) out.push({ text: text.slice(last, match.index) });
     if (match[1] !== undefined) out.push({ text: match[1], bold: true });
+    else if (match[4] !== undefined) out.push({ text: match[4], href: `mailto:${match[4]}` });
     else out.push({ text: match[2], href: match[3] });
     last = match.index + match[0].length;
   }
