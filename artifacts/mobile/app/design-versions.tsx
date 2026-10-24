@@ -1,5 +1,10 @@
 /**
- * Design Versions — /design-versions
+ * Design Versions — /design-versions?projectId=…
+ *
+ * Lists the snapshots created by the canvas's Share → Save version action.
+ * Restore writes a snapshot back over the project (after snapshotting the
+ * current state so the restore itself can be undone); Duplicate creates a new
+ * project from the version's snapshot, not from the project's current state.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -20,9 +25,12 @@ import {
 import {
   BrandthreadCard, SecondaryButton, EmptyState, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getVersions, restoreVersion, duplicateProject } from '@/services/designService';
+import { createVersion, getVersions, restoreVersion, duplicateVersion } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import DesignLayerCompositor from '@/components/DesignLayerCompositor';
+
+const THUMB_SIZE = 56;
 
 function formatDate(iso: string): string {
   try {
@@ -37,7 +45,7 @@ function formatDate(iso: string): string {
 
 export default function DesignVersionsScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
   const styles = createStyles(theme);
   const router = useRouter();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -45,21 +53,26 @@ export default function DesignVersionsScreen() {
   const [versions, setVersions]   = useState<DesignVersion[]>([]);
   const [loading, setLoading]     = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadVersions = useCallback(async () => {
     if (!projectId) { setLoading(false); return; }
-    getVersions(projectId).then(v => { setVersions(v); setLoading(false); });
+    try {
+      const list = await getVersions(projectId);
+      setVersions([...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    } catch {
+      setVersions([]);
+    } finally {
+      setLoading(false);
+    }
   }, [projectId]);
 
-  const handlePreview = useCallback((version: DesignVersion) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Version Preview', 'Version preview — open editor to compare versions side by side.');
-  }, []);
+  useEffect(() => { void loadVersions(); }, [loadVersions]);
 
   const handleRestore = useCallback((version: DesignVersion) => {
     Alert.alert(
-      'Restore Version',
-      `Restore "${version.label}"? This will create a new project from this version.`,
+      'Restore version',
+      `Replace the current project with "${version.label}"? Its current state is saved as a version first, so you can undo this.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -67,13 +80,13 @@ export default function DesignVersionsScreen() {
           onPress: async () => {
             setRestoring(version.id);
             try {
+              await createVersion(version.projectId, 'Before restore', true);
               const restored = await restoreVersion(version.id);
-              if (restored) {
-                Alert.alert('Version restored', 'A new project has been created from this version.');
-                router.replace(`/design-canvas?id=${restored.id}` as never);
-              } else {
-                Alert.alert('Error', 'Failed to restore version.');
-              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.replace(`/design-canvas?id=${restored.id}` as never);
+            } catch {
+              Alert.alert('Could not restore', 'The project was not changed. Please try again.');
+              void loadVersions();
             } finally {
               setRestoring(null);
             }
@@ -81,21 +94,26 @@ export default function DesignVersionsScreen() {
         },
       ]
     );
-  }, [router]);
+  }, [router, loadVersions]);
 
   const handleDuplicate = useCallback(async (version: DesignVersion) => {
+    if (duplicating) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newProject = await duplicateProject(version.projectId);
-    if (newProject) {
+    setDuplicating(version.id);
+    try {
+      const newProject = await duplicateVersion(version.id);
       router.push(`/design-canvas?id=${newProject.id}` as never);
-    } else {
-      Alert.alert('Error', 'Failed to duplicate project.');
+    } catch {
+      Alert.alert('Could not duplicate', 'No new project was created. Please try again.');
+    } finally {
+      setDuplicating(null);
     }
-  }, [router]);
+  }, [router, duplicating]);
 
   const renderItem = ({ item }: { item: DesignVersion }) => (
     <BrandthreadCard style={styles.versionCard}>
       <View style={styles.versionTop}>
+        <DesignLayerCompositor project={item.snapshot} displaySize={THUMB_SIZE} />
         <View style={styles.versionInfo}>
           {item.autoSaved && (
             <StatusBadge label="Auto-saved" variant="info" small />
@@ -103,24 +121,19 @@ export default function DesignVersionsScreen() {
           <Text style={styles.versionLabel}>{item.label}</Text>
           <Text style={styles.versionDate}>{formatDate(item.createdAt)}</Text>
         </View>
-        {restoring === item.id && (
+        {(restoring === item.id || duplicating === item.id) && (
           <ActivityIndicator color={PURPLE} size="small" />
         )}
       </View>
       <View style={styles.versionActions}>
         <TouchableOpacity
-          onPress={() => handlePreview(item)}
-          style={styles.actionBtn}
-          activeOpacity={0.8}
-        >
-          <Feather name="eye" size={14} color={CYAN} />
-          <Text style={[styles.actionText, { color: CYAN }]}>Preview</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           onPress={() => handleRestore(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
-          disabled={restoring === item.id}
+          disabled={restoring !== null}
+          accessibilityRole="button"
+          accessibilityLabel={`Restore ${item.label}`}
+          testID={`design-version-restore-${item.id}`}
         >
           <Feather name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
           <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore</Text>
@@ -129,6 +142,10 @@ export default function DesignVersionsScreen() {
           onPress={() => handleDuplicate(item)}
           style={styles.actionBtn}
           activeOpacity={0.8}
+          disabled={duplicating !== null}
+          accessibilityRole="button"
+          accessibilityLabel={`Duplicate ${item.label} as a new project`}
+          testID={`design-version-duplicate-${item.id}`}
         >
           <Feather name="copy" size={14} color={ORANGE} />
           <Text style={[styles.actionText, { color: ORANGE }]}>Duplicate</Text>
@@ -139,7 +156,7 @@ export default function DesignVersionsScreen() {
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Version History" />
+      <ScreenHeader title="Version History" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={styles.centered}>
@@ -153,20 +170,32 @@ export default function DesignVersionsScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <EmptyState
-              icon="clock"
-              title="No saved versions yet"
-              description="Save your project to create a version."
-              action={{ label: 'Save now', onPress: () => goBackOr(router) }}
-              style={styles.emptyState}
-            />
+            projectId ? (
+              <EmptyState
+                icon="clock"
+                title="No saved versions yet"
+                description="In the canvas, open Modify → Actions → Share and tap Save version."
+                action={{ label: 'Back to canvas', onPress: () => goBackOr(router) }}
+                style={styles.emptyState}
+                testID="design-versions-empty"
+              />
+            ) : (
+              <EmptyState
+                icon="clock"
+                title="No design selected"
+                description="Open a design in Design Studio to see its version history."
+                action={{ label: 'Open Design Studio', onPress: () => router.replace('/design' as never) }}
+                style={styles.emptyState}
+                testID="design-versions-no-project"
+              />
+            )
           }
           ListFooterComponent={
             versions.length > 0 ? (
               <View style={styles.autosaveNote}>
                 <Feather name="info" size={12} color={SUBTLE} />
                 <Text style={styles.autosaveText}>
-                  Auto-saves are created every 30 seconds while editing.
+                  Versions are saved on this device. Restoring saves the current state as a version first.
                 </Text>
               </View>
             ) : null
@@ -186,7 +215,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyState: { marginTop: 60 },
 
   versionCard: { marginBottom: SP.sm },
-  versionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },
+  versionTop: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   versionInfo: { flex: 1, gap: 4 },
   versionLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   versionDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },

@@ -12,6 +12,7 @@ export const ANALYTICS_REPORTS: { label: string; icon: keyof typeof Feather.glyp
   { label: 'Product stats', icon: 'shopping-bag', href: '/analytics-product-stats' },
   { label: 'Threads and videos', icon: 'play-circle', href: '/analytics-content' },
   { label: 'Audience', icon: 'users', href: '/analytics-audience' },
+  { label: 'Customer analytics', icon: 'user-check', href: '/analytics-customers' },
   { label: 'Goals', icon: 'target', href: '/analytics-goals' },
   { label: 'Export', icon: 'download', href: '/analytics-export' },
   { label: 'Advanced analytics', icon: 'trending-up', href: '/analytics-advanced', badge: 'PRO' },

@@ -106,7 +106,7 @@ describe('app background theme', () => {
     const inlineRootPattern = /<(?:View|KeyboardAvoidingView)[^>]*style=\{?\[[^\]]*(?:\.root|\.container|\.page)[^\]]*,\s*\{\s*backgroundColor:\s*['"]#07070F['"]/g;
     const fullFlexPattern = /<(?:View|KeyboardAvoidingView) style=\{\{\s*flex:\s*1,\s*backgroundColor:\s*['"]#07070F['"]/g;
     // These routes intentionally keep a dark media/modal canvas opaque.
-    const immersiveRoutes = new Set(['camera-capture.tsx', 'product-import.tsx']);
+    const immersiveRoutes = new Set(['product-import.tsx']);
     const offenders = routeFiles(resolve(process.cwd(), 'app'))
       .filter((file) => !file.endsWith('_layout.tsx') && !immersiveRoutes.has(file.split('/').pop() ?? ''))
       .flatMap((file) => {

@@ -209,7 +209,7 @@ function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 
 type ActiveTopTool = 'brush' | 'smudge' | 'eraser' | 'select' | 'transform' | 'adjustments' | 'crop' | 'none';
 type ActiveSheet =
-  | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'export' | 'canvasInfo'
+  | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'canvasInfo'
   | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | null;
 
 // Wrench tab type — Procreate's own Actions tabs are Add / Canvas / Guides /
@@ -2469,6 +2469,10 @@ export default function DesignCanvasScreen() {
       // 3. If a mutation raced while createVersion was running, stay dirty.
       //    The next autosave / user press will persist the new edits.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Version saved', 'You can restore or duplicate it from Version history.', [
+        { text: 'OK' },
+        { text: 'Version history', onPress: () => handleOpenVersionHistory() },
+      ]);
     } catch {
       setSaveStatus('unsaved');
       Alert.alert(
@@ -2476,6 +2480,29 @@ export default function DesignCanvasScreen() {
         'Your latest edits are still on this screen. Try saving again before leaving.',
       );
     }
+  }
+
+  /** Persist pending edits first so the history screen reads the latest project. */
+  async function handleOpenVersionHistory() {
+    if (!project) return;
+    try {
+      await coordinatedSave();
+    } catch {
+      // Versions already on disk are still worth showing; the canvas keeps
+      // its own unsaved state and save indicator.
+    }
+    router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}` as never);
+  }
+
+  async function handleOpenExportOptions() {
+    if (!project) return;
+    try {
+      await coordinatedSave();
+    } catch {
+      Alert.alert('Save failed', 'Save your latest edits before exporting so the file matches the canvas.');
+      return;
+    }
+    router.push(`/design-export?projectId=${encodeURIComponent(project.id)}` as never);
   }
 
   async function handleBack() {
@@ -4248,6 +4275,9 @@ export default function DesignCanvasScreen() {
         onExportJpeg={() => { closeSheet(); setTimeout(() => handleExport('jpeg'), 220); }}
         onShare={() => { closeSheet(); setTimeout(() => handleShare(), 220); }}
         onSaveCopy={handleSaveCopy}
+        onSaveVersion={() => { closeSheet(); void handleManualSave(); }}
+        onOpenVersionHistory={() => { closeSheet(); void handleOpenVersionHistory(); }}
+        onOpenExportOptions={() => { closeSheet(); void handleOpenExportOptions(); }}
         onUseAsProductPhoto={handleUseAsProductPhoto}
         onUseInPost={handleUseInPost}
         exporting={exporting}
@@ -4535,75 +4565,6 @@ export default function DesignCanvasScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </SheetRise>
-        </View>
-      </Modal>
-
-      {/* ── EXPORT SHEET ── */}
-      <Modal visible={activeSheet === 'export'} transparent animationType="fade" onRequestClose={closeSheet}>
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={styles.sheet}>
-            <SheetHandle />
-            <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>Export</Text>
-              {exporting && (
-                <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs }}>Capturing…</Text>
-              )}
-            </View>
-            {(() => {
-              const desc = project ? (() => {
-                try { return resolveMasterDescriptor(project.canvas.width, project.canvas.height, cropRect); }
-                catch { return null; }
-              })() : null;
-              const w = desc?.width ?? logicalW;
-              const h = desc?.height ?? logicalH;
-              const hasCrop = desc?.hasCrop ?? !!cropRect;
-              const items = [
-                {
-                  label: 'Save as PNG',
-                  sub: `PNG — Lossless · ${w} × ${h}${hasCrop ? ' (cropped)' : ''} · saves to Camera Roll`,
-                  icon: 'download' as const, disabled: exporting,
-                  action: () => handleExport('png'),
-                },
-                {
-                  label: 'Save as JPEG',
-                  sub: `JPEG — High quality (${Math.round(MASTER_JPEG_QUALITY * 100)}%) · ${w} × ${h} · compressed for sharing`,
-                  icon: 'image' as const, disabled: exporting,
-                  action: () => handleExport('jpeg'),
-                },
-                {
-                  label: 'Share Image',
-                  sub: 'PNG — Lossless · open system share sheet',
-                  icon: 'share' as const, disabled: exporting,
-                  action: handleShare,
-                },
-                {
-                  label: 'Mockup Preview',
-                  sub: 'See design on garment',
-                  icon: 'eye' as const, disabled: false,
-                  action: () => { closeSheet(); router.push((`/design-mockup-preview?projectId=${project?.id ?? ''}`) as never); },
-                },
-              ];
-              return items.map(item => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.exportRow, item.disabled && styles.exportRowDisabled]}
-                  onPress={item.action}
-                  disabled={item.disabled && !['JPEG — unavailable'].includes(item.label)}
-                  activeOpacity={item.disabled ? 1 : 0.7}
-                >
-                  <View style={[styles.exportIcon, item.disabled && { opacity: 0.4 }]}>
-                    <Feather name={item.icon} size={ICON.sm} color={PURPLE_LIGHT} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.exportLabel, item.disabled && { opacity: 0.4 }]}>{item.label}</Text>
-                    <Text style={styles.exportSub}>{item.sub}</Text>
-                  </View>
-                  {!item.disabled && <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
-                </TouchableOpacity>
-              ));
-            })()}
           </SheetRise>
         </View>
       </Modal>
@@ -5030,6 +4991,9 @@ interface WrenchActionsSheetProps {
   onExportJpeg: () => void;
   onShare: () => void;
   onSaveCopy: () => void;
+  onSaveVersion: () => void;
+  onOpenVersionHistory: () => void;
+  onOpenExportOptions: () => void;
   onUseAsProductPhoto: () => void;
   onUseInPost: () => void;
   exporting: boolean;
@@ -5071,6 +5035,7 @@ function WrenchActionsSheet({
   guideSettings, onGuideSettingsChange,
   hasGarmentTemplate, garmentTemplateVisible, onToggleGarmentGuide,
   onExportPng, onExportJpeg, onShare, onSaveCopy,
+  onSaveVersion, onOpenVersionHistory, onOpenExportOptions,
   onUseAsProductPhoto, onUseInPost, exporting,
   logicalW, logicalH, layerCount, cropRect, masterDescriptor, saveStatus,
   prefs, onPrefsChange, timerDisplay, quickMenuEditSlot, onQuickMenuEditSlot,
@@ -5370,10 +5335,31 @@ function WrenchActionsSheet({
                     disabled: exporting,
                   },
                   {
+                    label: 'More export options',
+                    sub: 'Choose PNG, JPEG or transparent PNG at preset sizes',
+                    icon: 'sliders' as const,
+                    onPress: onOpenExportOptions,
+                    disabled: exporting,
+                  },
+                  {
                     label: 'Save a copy',
                     sub: 'Duplicate editable project to gallery (source layers preserved)',
                     icon: 'copy' as const,
                     onPress: onSaveCopy,
+                    disabled: false,
+                  },
+                  {
+                    label: 'Save version',
+                    sub: 'Snapshot this project so you can restore it later',
+                    icon: 'bookmark' as const,
+                    onPress: onSaveVersion,
+                    disabled: false,
+                  },
+                  {
+                    label: 'Version history',
+                    sub: 'Restore or duplicate a saved version',
+                    icon: 'clock' as const,
+                    onPress: onOpenVersionHistory,
                     disabled: false,
                   },
                   {
@@ -5398,6 +5384,9 @@ function WrenchActionsSheet({
                   onPress={item.disabled ? undefined : item.onPress}
                   disabled={item.disabled}
                   activeOpacity={item.disabled ? 1 : 0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  testID={`wrench-share-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                 >
                   <View style={[styles.exportIcon, item.disabled && { opacity: 0.4 }]}>
                     <Feather name={item.icon} size={ICON.sm} color={FG} />

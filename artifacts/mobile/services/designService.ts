@@ -24,7 +24,7 @@ import {
   GenerateDesignResult, GenerateMockupResult, GeneratePhotoshootResult,
   MockupToModelBatchResult,
   AIStyleKind, CampaignFormatKind, CampaignProject, CampaignAsset,
-  DesignExport, ExportFormatKind, ExportSizeKind, GarmentType,
+  GarmentType,
   SceneStyleKind, ModelStyleKind, LightingStyleKind,
 } from './designTypes';
 
@@ -1145,11 +1145,21 @@ export async function duplicateProject(id: string): Promise<DesignProject> {
   const context = captureSyncContext();
   const project = await getProject(id);
   if (!project) throw new Error(`Project ${id} not found`);
+  return insertProjectCopy(project, `${project.name} (copy)`, context);
+}
+
+/** Save `source` as a brand-new draft project (fresh id, no cloud object paths). */
+async function insertProjectCopy(
+  source: DesignProject,
+  name: string,
+  context: DesignSyncContext,
+): Promise<DesignProject> {
+  const project = JSON.parse(JSON.stringify(source)) as DesignProject;
   const now = new Date().toISOString();
   const copy: DesignProject = {
     ...project,
     id: uid('proj'),
-    name: `${project.name} (copy)`,
+    name,
     status: 'draft',
     createdAt: now,
     updatedAt: now,
@@ -1292,6 +1302,18 @@ export async function getVersions(projectId: string): Promise<DesignVersionMeta[
   return versions.filter(v => v.projectId === projectId);
 }
 
+/**
+ * duplicateVersion — create a new project from a version's saved snapshot
+ * (not the project's current state), leaving the original project untouched.
+ */
+export async function duplicateVersion(versionId: string): Promise<DesignProject> {
+  const context = captureSyncContext();
+  const versions = await loadVersions(context.keys.versions);
+  const version = versions.find(v => v.id === versionId);
+  if (!version) throw new Error(`Version ${versionId} not found`);
+  return insertProjectCopy(version.snapshot, `${version.snapshot.name} (${version.label})`, context);
+}
+
 export async function restoreVersion(versionId: string): Promise<DesignProject> {
   const versions = await loadVersions();
   const version = versions.find(v => v.id === versionId);
@@ -1377,25 +1399,6 @@ export async function getColorPickerState(): Promise<ColorPickerState> {
 
 export async function saveColorPickerState(state: ColorPickerState): Promise<void> {
   await AsyncStorage.setItem(K().colorPicker, JSON.stringify(state));
-}
-
-// ─── Export ───────────────────────────────────────────────────────────────────
-
-// exportProject — accepts 2 args (format as string) used by design-canvas.tsx
-export async function exportProject(
-  projectId: string,
-  format: string,
-  size: ExportSizeKind = 'original',
-): Promise<DesignExport> {
-  await delay(800);
-  return {
-    id: uid('export'),
-    projectId,
-    format: format as ExportFormatKind,
-    size,
-    uri: `mock://export/${projectId}/${format}/${size}`,
-    createdAt: new Date().toISOString(),
-  };
 }
 
 // ─── AI API helpers ───────────────────────────────────────────────────────────

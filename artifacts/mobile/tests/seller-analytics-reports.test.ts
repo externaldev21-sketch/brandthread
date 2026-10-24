@@ -106,6 +106,13 @@ describe('report screens', () => {
     expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-advanced']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');
   });
+  it('lists Customer analytics (an existing, registered screen) right after Audience', () => {
+    expect(existsSync(resolve(ROOT, 'app/analytics-customers.tsx'))).toBe(true);
+    expect(read('app/_layout.tsx')).toContain('<Stack.Screen name="analytics-customers"');
+    const hrefs = ANALYTICS_REPORTS.map(r => r.href);
+    expect(ANALYTICS_REPORTS.find(r => r.href === '/analytics-customers')?.label).toBe('Customer analytics');
+    expect(hrefs.indexOf('/analytics-customers')).toBe(hrefs.indexOf('/analytics-audience') + 1);
+  });
   it('read only through sellerInsightsService, whose preview branch runs before the network', () => {
     for (const name of SCREENS) {
       const src = read(`app/${name}.tsx`);

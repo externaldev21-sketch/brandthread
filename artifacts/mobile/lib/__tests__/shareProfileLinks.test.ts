@@ -1,5 +1,5 @@
 /**
- * Tests for share-profile screen behaviour.
+ * Tests for the share-profile link helpers used by ShareProfileSheet
  * These test the pure logic and URL construction — no native renderer needed.
  */
 import { describe, expect, it } from 'vitest';
@@ -7,7 +7,7 @@ import { buildCanonicalProfileUrl, normalizeUsername, parseProfileDeepLink } fro
 
 // ─── Routing / navigation guards ─────────────────────────────────────────────
 
-describe('share-profile: canonical URL construction', () => {
+describe('shareProfile links: canonical URL construction', () => {
   it('produces the exact canonical URL for a known username', () => {
     const url = buildCanonicalProfileUrl('janedoe');
     expect(url).toBe('https://brandthread.app/u/janedoe');
@@ -66,7 +66,7 @@ describe('share-profile: canonical URL construction', () => {
 
 // ─── Account switch guard ─────────────────────────────────────────────────────
 
-describe('share-profile: account switch cannot show previous URL', () => {
+describe('shareProfile links: account switch cannot show previous URL', () => {
   it('URL for account A and account B are distinct', () => {
     const urlA = buildCanonicalProfileUrl('alice');
     const urlB = buildCanonicalProfileUrl('bob');
@@ -83,7 +83,7 @@ describe('share-profile: account switch cannot show previous URL', () => {
 
 // ─── Missing username guard ───────────────────────────────────────────────────
 
-describe('share-profile: missing username state', () => {
+describe('shareProfile links: missing username state', () => {
   it('no QR and no fake URL when username is absent', () => {
     const url = buildCanonicalProfileUrl(null);
     expect(url).toBeNull(); // No QR code should be rendered.
@@ -97,7 +97,7 @@ describe('share-profile: missing username state', () => {
 
 // ─── QR scanner: scanned-link parsing ────────────────────────────────────────
 
-describe('share-profile: parsing a scanned QR / deep link back to a username', () => {
+describe('shareProfile links: parsing a scanned QR / deep link back to a username', () => {
   it('parses the canonical https URL', () => {
     expect(parseProfileDeepLink('https://brandthread.app/u/janedoe')).toBe('janedoe');
   });

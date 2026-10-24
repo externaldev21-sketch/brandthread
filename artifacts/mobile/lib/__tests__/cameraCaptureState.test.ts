@@ -1,7 +1,7 @@
 /**
  * Camera Capture — visual and state logic unit tests
  *
- * These tests cover the pure state-logic helpers used by camera-capture.tsx.
+ * These tests cover the pure state-logic helpers in lib/videoEditing.ts.
  * No native modules are imported; the tests run in Vitest without a device.
  */
 import { describe, expect, it } from 'vitest';

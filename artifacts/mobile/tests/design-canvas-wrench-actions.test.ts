@@ -15,6 +15,8 @@
  *  - Video tab — no internal task numbers exposed
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type {
   DesignLayer, DesignDrawingLayer, DesignImageLayer, DrawPath,
 } from '../services/designTypes';
@@ -206,13 +208,34 @@ describe('WrenchActionsSheet tab structure', () => {
     CANVAS_ACTIONS.forEach(a => expect(CANVAS_ACTIONS).toContain(a));
   });
 
-  it('SHARE tab includes all 6 share actions', () => {
-    const SHARE_ACTIONS = [
-      'Export PNG', 'Export JPEG', 'Share / Save',
-      'Save a copy', 'Use as product photo', 'Use in a post',
+  it('SHARE tab includes all 9 share actions, each wired in design-canvas.tsx', () => {
+    const SHARE_ACTIONS: [label: string, handler: string][] = [
+      ['Export PNG', 'onExportPng'],
+      ['Export JPEG', 'onExportJpeg'],
+      ['Share / Save', 'onShare'],
+      ['More export options', 'onOpenExportOptions'],
+      ['Save a copy', 'onSaveCopy'],
+      ['Save version', 'onSaveVersion'],
+      ['Version history', 'onOpenVersionHistory'],
+      ['Use as product photo', 'onUseAsProductPhoto'],
+      ['Use in a post', 'onUseInPost'],
     ];
-    expect(SHARE_ACTIONS).toHaveLength(6);
-    SHARE_ACTIONS.forEach(a => expect(SHARE_ACTIONS).toContain(a));
+    const canvasSrc = readFileSync(resolve(__dirname, '../app/design-canvas.tsx'), 'utf8');
+    const shareTab = canvasSrc.slice(canvasSrc.indexOf('{/* ── SHARE TAB ── */}'), canvasSrc.indexOf('{/* ── PREFS TAB ── */}'));
+    expect(SHARE_ACTIONS).toHaveLength(9);
+    for (const [label, handler] of SHARE_ACTIONS) {
+      expect(shareTab).toMatch(new RegExp(`label: '${label.replace(/[/]/g, '\\/')}',[\\s\\S]{0,240}onPress: ${handler},`));
+    }
+  });
+
+  it('Save version snapshots via createVersion; Version history and export options open real routes', () => {
+    const canvasSrc = readFileSync(resolve(__dirname, '../app/design-canvas.tsx'), 'utf8');
+    expect(canvasSrc).toMatch(/onSaveVersion=\{\(\) => \{ closeSheet\(\); void handleManualSave\(\); \}\}/);
+    expect(canvasSrc).toMatch(/async function handleManualSave\(\)[\s\S]{0,400}await createVersion\(project\.id\);/);
+    expect(canvasSrc).toContain('router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}` as never);');
+    expect(canvasSrc).toContain('router.push(`/design-export?projectId=${encodeURIComponent(project.id)}` as never);');
+    // The old full-screen Export sheet was unreachable (nothing opened it) and is gone.
+    expect(canvasSrc).not.toContain("activeSheet === 'export'");
   });
 
   it('VIDEO tab placeholder button says "Coming soon" — no internal task numbers', () => {

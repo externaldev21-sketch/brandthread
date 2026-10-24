@@ -39,7 +39,7 @@ describe('SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS covers every fullScreenModal route
     // Sanity: this regex must actually find the known fullScreenModal
     // routes, or the test would pass vacuously on a parsing regression.
     expect(screenNames).toEqual(expect.arrayContaining([
-      'camera-capture', 'create-post', 'buyer-story-viewer', 'buyer-story-create',
+      'create-post', 'buyer-story-viewer', 'buyer-story-create',
       'seller-go-live', 'seller-live', 'buyer-live', 'live', 'live-feed',
     ]));
 
@@ -89,7 +89,7 @@ describe('BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS + BuyerTabBar: same helper, same mo
     expect(setMatch).toBeTruthy();
     const setBody = setMatch![1];
     for (const name of [
-      'camera-capture', 'create-post', 'buyer-story-create', 'buyer-story-viewer',
+      'create-post', 'buyer-story-create', 'buyer-story-viewer',
       'buyer-live', 'live-feed', 'live',
     ]) {
       expect(setBody, `'${name}' is a buyer-reachable full-screen route but missing from BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS`)
@@ -130,17 +130,15 @@ describe("buyer-story-create.tsx: LIVE mode item is gated on the REAL role, not 
     const storyCreate = src('../app/buyer-story-create.tsx');
     expect(storyCreate).toContain("import { useRole } from '@/contexts/RoleContext';");
     expect(storyCreate).toMatch(/const \{ role \} = useRole\(\);\s*\n\s*const isSeller = role === 'seller';/);
-    // The actual bug: every seller entry point (camera-capture.tsx,
-    // create-post.tsx) pushes this route with no `accountType` param, so
+    // The actual bug: every seller entry point (create-post.tsx)
+    // pushes this route with no `accountType` param, so
     // deriving isSeller from that param always read a seller as a buyer —
     // LIVE never showed no matter the account.
     expect(storyCreate).not.toMatch(/const isSeller = params\.accountType/);
   });
 
-  it('camera-capture.tsx and create-post.tsx push to buyer-story-create with no accountType param — the real shape a seller actually hits', () => {
-    const cameraCapture = src('../app/camera-capture.tsx');
+  it('create-post.tsx pushes to buyer-story-create with no accountType param — the real shape a seller actually hits', () => {
     const createPost = src('../app/create-post.tsx');
-    expect(cameraCapture).toMatch(/router\.replace\('\/buyer-story-create' as never\)/);
     expect(createPost).toMatch(/router\.replace\('\/buyer-story-create' as never\)/);
   });
 

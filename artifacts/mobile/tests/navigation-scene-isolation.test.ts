@@ -58,7 +58,6 @@ describe('navigation scene isolation', () => {
       'product-bundle-edit',
     ];
     const retainedModals = [
-      'camera-capture',
       'create-post',
       'buyer-story-viewer',
       'buyer-story-create',

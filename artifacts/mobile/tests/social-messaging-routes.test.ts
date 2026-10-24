@@ -35,7 +35,6 @@ const SOCIAL_MESSAGING_FILES = [
   'app/seller-conversation.tsx',
   'app/activity-center.tsx',
   'app/buyer-notifications.tsx',
-  'components/social/StoryTray.tsx',
   'components/social/FollowButton.tsx',
   'components/ThreadShareSheet.tsx',
   'components/ShareProfileSheet.tsx',

@@ -1,70 +1,97 @@
 /**
- * Design Export — /design-export  (modal)
+ * Design Export — /design-export?projectId=…  (card)
+ *
+ * Renders the project's layers into an SVG framed at the chosen size, captures
+ * it at exact output pixels (react-native-svg toDataURL — the same capture the
+ * canvas editor uses), then:
+ *   - web:    downloads the PNG / JPEG file
+ *   - native: saves PNG / JPEG to Photos (falling back to the share sheet when
+ *             Photos access isn't available), or shares a PDF
+ * The status line only says a file was saved/downloaded after it really was.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Dimensions } from 'react-native';
+  Alert, ActivityIndicator, Dimensions, Platform, Image as RNImage,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Rect } from 'react-native-svg';
+import { File, Paths, EncodingType } from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, BLUE, ORANGE, GOLD,
-  FONT, FS, SP, RADIUS, ICON, COMP,
+  CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED,
+  FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadCard, PrimaryButton, SecondaryButton,
-  SectionHeader, StatusBadge,
+  BrandthreadCard, PrimaryButton, SectionHeader, EmptyState,
 } from '@/components/BrandthreadUI';
-import { getProject, exportProject } from '@/services/designService';
+import { renderLayer } from '@/components/DesignLayerCompositor';
+import { getProject } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
+import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
+import { triggerWebImageDownload } from '@/lib/shareCard';
+import {
+  clampJpegQuality, MASTER_JPEG_QUALITY, verifyExportDimensionsNative,
+  verifyExportDimensionsWeb, type MasterDescriptor,
+} from '@/lib/designExportPolicy';
+import {
+  DESIGN_EXPORT_FORMATS, DESIGN_EXPORT_SIZES, exportFileName, fitCanvasViewBox,
+  getExportFormat, resolveExportPixels,
+  type DesignExportFormatId, type DesignExportSizeId,
+} from '@/lib/designExportPresets';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+const PREVIEW_MAX_H = 220;
+const PDF_POINTS_PER_PIXEL = 72 / 300; // PDF page sized as the export at 300 DPI
 
-interface FormatOption {
-  id: string;
-  label: string;
-  desc: string;
-  icon: keyof typeof Feather.glyphMap;
+type ExportStatus = { kind: 'idle' } | { kind: 'done'; message: string } | { kind: 'error'; message: string };
+
+function captureSvgPngBase64(svg: Svg | null, width: number, height: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!svg || typeof svg.toDataURL !== 'function') {
+      reject(new Error('Preview is not ready yet.'));
+      return;
+    }
+    svg.toDataURL((b64: string) => {
+      if (!b64) reject(new Error('Capture returned no image data.'));
+      else resolve(b64);
+    }, { width, height });
+  });
 }
 
-const FORMATS: FormatOption[] = [
-  { id: 'png',       label: 'PNG',              desc: 'Raster, full quality',              icon: 'image' },
-  { id: 'jpg',       label: 'JPG',              desc: 'Compressed, smaller file size',     icon: 'image' },
-  { id: 'tpng',      label: 'Transparent PNG',  desc: 'No background (canvas transparency)', icon: 'layers' },
-  { id: 'pdf',       label: 'PDF',              desc: 'Print-ready layout export',         icon: 'file-text' },
-  { id: 'project',   label: 'Project File',     desc: 'Save editable copy of project',    icon: 'save' },
-];
-
-interface SizeOption {
-  id: string;
-  label: string;
-  desc: string;
+function webJpegDataUrl(pngDataUrl: string, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) { reject(new Error('JPEG encoding is unavailable in this browser.')); return; }
+      context.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    image.onerror = () => reject(new Error('Could not prepare the image for JPEG export.'));
+    image.src = pngDataUrl;
+  });
 }
-
-const SIZES: SizeOption[] = [
-  { id: 'original',  label: 'Original',        desc: 'Canvas dimensions' },
-  { id: 'web',       label: 'Web',             desc: '72 DPI optimized' },
-  { id: 'product',   label: 'Product Page',    desc: '2000 × 2000 px' },
-  { id: 'story',     label: 'Story',           desc: '1080 × 1920' },
-  { id: 'thread',    label: 'Thread Post',     desc: '1080 × 1350' },
-  { id: 'print',     label: 'Print',           desc: '300 DPI, scales to print size' },
-];
 
 export default function DesignExportScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const styles = createStyles(theme);
   const router   = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const insets = useSafeAreaInsets();
   // This screen keeps the persistent seller tab bar (a normal card-pushed
   // screen, not a full-screen flow) but scrollContent's paddingBottom was a
@@ -74,49 +101,174 @@ export default function DesignExportScreen() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
 
   const [project, setProject]       = useState<DesignProject | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [selectedFormat, setSelectedFormat] = useState<string>('png');
-  const [selectedSize, setSelectedSize]     = useState<string>('original');
+  const [loading, setLoading]       = useState(Boolean(projectId));
+  const [selectedFormat, setSelectedFormat] = useState<DesignExportFormatId>('png');
+  const [selectedSize, setSelectedSize]     = useState<DesignExportSizeId>('original');
   const [exporting, setExporting]   = useState(false);
+  const [status, setStatus]         = useState<ExportStatus>({ kind: 'idle' });
+  const svgRef = useRef<Svg>(null);
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
-    getProject(projectId).then(p => { setProject(p); setLoading(false); });
+    let cancelled = false;
+    setLoading(true);
+    getProject(projectId)
+      .then(p => { if (!cancelled) setProject(p); })
+      .catch(() => { if (!cancelled) setProject(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [projectId]);
 
+  const format = getExportFormat(selectedFormat);
+  const canvasW = project?.canvas.width || 1080;
+  const canvasH = project?.canvas.height || 1080;
+  const output = useMemo(
+    () => resolveExportPixels(selectedSize, canvasW, canvasH),
+    [selectedSize, canvasW, canvasH],
+  );
+  const viewBox = useMemo(
+    () => fitCanvasViewBox(canvasW, canvasH, output.width, output.height),
+    [canvasW, canvasH, output.width, output.height],
+  );
+  const previewScale = Math.min((SCREEN_W - SP.md * 2) / output.width, PREVIEW_MAX_H / output.height);
+  const previewW = Math.max(1, Math.round(output.width * previewScale));
+  const previewH = Math.max(1, Math.round(output.height * previewScale));
+  const formatUnavailable = format.nativeOnly && Platform.OS === 'web';
+
   const handleExport = useCallback(async () => {
-    if (!project) {
-      Alert.alert('No project', 'No project loaded to export.');
+    if (!project || exporting) return;
+    if (formatUnavailable) {
+      setStatus({ kind: 'error', message: `${format.label} export is available in the iOS and Android app.` });
       return;
     }
     setExporting(true);
+    setStatus({ kind: 'idle' });
+    const desc: MasterDescriptor = { width: output.width, height: output.height, cropX: 0, cropY: 0, hasCrop: false };
+    const fileName = exportFileName(project.name, selectedSize, format);
+    const dims = `${output.width} × ${output.height}`;
     try {
-      await exportProject(project.id, 'png');
-      Alert.alert('Export complete!', 'File saved to your device.');
-    } catch {
-      Alert.alert('Error', 'Export failed. Please try again.');
+      const pngBase64 = await captureSvgPngBase64(svgRef.current, output.width, output.height);
+
+      if (Platform.OS === 'web') {
+        let dataUrl = `data:image/png;base64,${pngBase64}`;
+        if (format.id === 'jpg') dataUrl = await webJpegDataUrl(dataUrl, clampJpegQuality(MASTER_JPEG_QUALITY));
+        await verifyExportDimensionsWeb(dataUrl, desc);
+        triggerWebImageDownload(dataUrl, fileName);
+        setStatus({ kind: 'done', message: `Downloaded ${fileName} (${dims}).` });
+        return;
+      }
+
+      const pngFile = new File(Paths.cache, `${Date.now()}_${fileName.replace(/\.\w+$/, '.png')}`);
+      pngFile.write(pngBase64, { encoding: EncodingType.Base64 });
+
+      if (format.id === 'pdf') {
+        const page = {
+          width: Math.round(output.width * PDF_POINTS_PER_PIXEL),
+          height: Math.round(output.height * PDF_POINTS_PER_PIXEL),
+        };
+        const { uri: pdfUri } = await Print.printToFileAsync({
+          html: `<html><body style="margin:0"><img src="data:image/png;base64,${pngBase64}" style="display:block;width:100%;height:100%" /></body></html>`,
+          width: page.width,
+          height: page.height,
+        });
+        try { pngFile.delete(); } catch { /* best-effort */ }
+        if (!(await Sharing.isAvailableAsync())) {
+          setStatus({ kind: 'error', message: 'Sharing is not available on this device, so the PDF could not be saved.' });
+          return;
+        }
+        await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: fileName });
+        setStatus({ kind: 'done', message: `PDF (${dims}) ready — saved wherever you chose in the share sheet.` });
+        return;
+      }
+
+      let fileUri = pngFile.uri;
+      if (format.id === 'jpg') {
+        const jpeg = await ImageManipulator.manipulateAsync(
+          fileUri,
+          [], // no resize — the capture is already at exact output size
+          { compress: clampJpegQuality(MASTER_JPEG_QUALITY), format: ImageManipulator.SaveFormat.JPEG },
+        );
+        try { pngFile.delete(); } catch { /* best-effort */ }
+        fileUri = jpeg.uri;
+      }
+      await verifyExportDimensionsNative(fileUri, desc, RNImage.getSize.bind(RNImage));
+
+      const saved = await saveImageToMediaLibrary(fileUri);
+      if (saved === 'saved') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setStatus({ kind: 'done', message: `Saved ${format.label} (${dims}) to Photos.` });
+        return;
+      }
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: format.mimeType,
+          UTI: format.id === 'jpg' ? 'public.jpeg' : 'public.png',
+          dialogTitle: fileName,
+        });
+        setStatus({ kind: 'done', message: `Photos access is off, so the ${format.label} (${dims}) was opened in the share sheet instead.` });
+        return;
+      }
+      setStatus({
+        kind: 'error',
+        message: saved === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow Photos access in Settings to save the export.',
+      });
+    } catch (err) {
+      console.error('[design-export] export failed', err);
+      setStatus({ kind: 'error', message: 'Export failed. Please try again.' });
+      if (Platform.OS !== 'web') Alert.alert('Export failed', "Couldn't create the file. Please try again.");
     } finally {
       setExporting(false);
     }
-  }, [project]);
+  }, [project, exporting, formatUnavailable, format, output, selectedSize]);
 
-  const selectFormat = (id: string) => {
+  const selectFormat = (id: DesignExportFormatId) => {
     Haptics.selectionAsync();
     setSelectedFormat(id);
+    setStatus({ kind: 'idle' });
   };
 
-  const selectSize = (id: string) => {
+  const selectSize = (id: DesignExportSizeId) => {
     Haptics.selectionAsync();
     setSelectedSize(id);
+    setStatus({ kind: 'idle' });
   };
 
   if (loading) {
     return (
-      <View style={[styles.root, { paddingTop: headerTopInset, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={PURPLE} />
+      <View style={styles.root}>
+        <ScreenHeader title="Export" variant="modal" onBack={() => goBackOr(router)} />
+        <View style={styles.centered}>
+          <ActivityIndicator color={PURPLE} />
+        </View>
       </View>
     );
   }
+
+  if (!project) {
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Export" variant="modal" onBack={() => goBackOr(router)} />
+        <View style={styles.centered}>
+          <EmptyState
+            icon="image"
+            title={projectId ? 'Design not found' : 'No design selected'}
+            description={projectId
+              ? 'This project may have been deleted. Pick a design from your gallery to export.'
+              : 'Open a design in Design Studio, then choose More export options from its Share menu.'}
+            action={{ label: 'Open Design Studio', onPress: () => router.replace('/design' as never) }}
+            testID="design-export-empty"
+          />
+        </View>
+      </View>
+    );
+  }
+
+  const bgHex = project.canvas.backgroundHex && project.canvas.backgroundHex !== 'transparent'
+    ? project.canvas.backgroundHex
+    : null;
+  const sortedLayers = [...(project.layers ?? [])]
+    .filter(layer => !layer.isTemplate)
+    .sort((a, b) => a.order - b.order);
 
   return (
     <View style={styles.root}>
@@ -124,93 +276,122 @@ export default function DesignExportScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}>
 
-        {/* Preview thumbnail */}
-        <View style={styles.thumbWrap}>
-          <LinearGradient
-            colors={theme.primaryGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.thumb}
-          >
-            <Text style={styles.thumbLabel}>{project?.name ?? 'Untitled'}</Text>
-            <Text style={styles.thumbSub}>
-              {project ? `${project.canvas.width} × ${project.canvas.height}` : '–'}
-            </Text>
-          </LinearGradient>
+        {/* Live preview — this exact SVG is what gets captured at full size. */}
+        <View style={styles.previewWrap}>
+          <View style={[styles.previewFrame, { width: previewW, height: previewH }]} testID="design-export-preview">
+            <Svg
+              ref={svgRef}
+              width={previewW}
+              height={previewH}
+              viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+            >
+              {format.includeBackground && bgHex && (
+                <Rect
+                  x={viewBox.x} y={viewBox.y} width={viewBox.width} height={viewBox.height}
+                  fill={bgHex} opacity={project.canvas.backgroundOpacity ?? 1}
+                />
+              )}
+              {sortedLayers.map(layer => renderLayer(layer, 1, 1, bgHex ?? CARD))}
+            </Svg>
+          </View>
+          <Text style={styles.previewName} numberOfLines={1}>{project.name}</Text>
+          <Text style={styles.previewSub}>
+            {format.label} · {output.width} × {output.height} px
+          </Text>
         </View>
 
         {/* Format cards */}
         <SectionHeader title="Format" style={styles.sectionHeader} />
-        {FORMATS.map(fmt => (
-          <TouchableOpacity
-            key={fmt.id}
-            onPress={() => selectFormat(fmt.id)}
-            activeOpacity={0.8}
-          >
-            <BrandthreadCard
-              style={[styles.formatCard, selectedFormat === fmt.id && styles.formatCardActive]}
+        {DESIGN_EXPORT_FORMATS.map(fmt => {
+          const active = selectedFormat === fmt.id;
+          const unavailable = fmt.nativeOnly && Platform.OS === 'web';
+          return (
+            <TouchableOpacity
+              key={fmt.id}
+              onPress={() => selectFormat(fmt.id)}
+              activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${fmt.label} format`}
+              testID={`design-export-format-${fmt.id}`}
             >
-              <View style={styles.formatRow}>
-                <View style={[styles.formatIcon, selectedFormat === fmt.id && { backgroundColor: PURPLE_DIM }]}>
-                  <Feather name={fmt.icon} size={18} color={selectedFormat === fmt.id ? PURPLE_LIGHT : MUTED} />
+              <BrandthreadCard style={[styles.formatCard, active && styles.formatCardActive]}>
+                <View style={styles.formatRow}>
+                  <View style={[styles.formatIcon, active && { backgroundColor: PURPLE_DIM }]}>
+                    <Feather name={fmt.id === 'pdf' ? 'file-text' : fmt.id === 'tpng' ? 'layers' : 'image'} size={18} color={active ? PURPLE_LIGHT : MUTED} />
+                  </View>
+                  <View style={styles.formatInfo}>
+                    <Text style={[styles.formatLabel, active && { color: PURPLE_LIGHT }]}>{fmt.label}</Text>
+                    <Text style={styles.formatDesc}>{unavailable ? 'Available in the iOS and Android app' : fmt.desc}</Text>
+                  </View>
+                  {active && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
                 </View>
-                <View style={styles.formatInfo}>
-                  <Text style={[styles.formatLabel, selectedFormat === fmt.id && { color: PURPLE_LIGHT }]}>
-                    {fmt.label}
-                  </Text>
-                  <Text style={styles.formatDesc}>{fmt.desc}</Text>
-                </View>
-                {selectedFormat === fmt.id && (
-                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
-                )}
-              </View>
-            </BrandthreadCard>
-          </TouchableOpacity>
-        ))}
+              </BrandthreadCard>
+            </TouchableOpacity>
+          );
+        })}
 
         {/* Size options */}
         <SectionHeader title="Size" style={styles.sectionHeader} />
-        {SIZES.map(sz => (
-          <TouchableOpacity
-            key={sz.id}
-            onPress={() => selectSize(sz.id)}
-            activeOpacity={0.8}
-          >
-            <BrandthreadCard
-              style={[styles.sizeCard, selectedSize === sz.id && styles.formatCardActive]}
+        {DESIGN_EXPORT_SIZES.map(sz => {
+          const active = selectedSize === sz.id;
+          const px = resolveExportPixels(sz.id, canvasW, canvasH);
+          return (
+            <TouchableOpacity
+              key={sz.id}
+              onPress={() => selectSize(sz.id)}
+              activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${sz.label} size, ${px.width} by ${px.height} pixels`}
+              testID={`design-export-size-${sz.id}`}
             >
-              <View style={styles.sizeRow}>
-                <View style={[styles.radio, selectedSize === sz.id && styles.radioActive]}>
-                  {selectedSize === sz.id && <View style={styles.radioDot} />}
+              <BrandthreadCard style={[styles.sizeCard, active && styles.formatCardActive]}>
+                <View style={styles.sizeRow}>
+                  <View style={[styles.radio, active && styles.radioActive]}>
+                    {active && <View style={styles.radioDot} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.sizeLabel, active && { color: PURPLE_LIGHT }]}>{sz.label}</Text>
+                    <Text style={styles.sizeDesc}>
+                      {px.width} × {px.height} px{sz.note ? ` · ${sz.note}` : ''}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.sizeLabel, selectedSize === sz.id && { color: PURPLE_LIGHT }]}>
-                    {sz.label}
-                  </Text>
-                  <Text style={styles.sizeDesc}>{sz.desc}</Text>
-                </View>
-              </View>
-            </BrandthreadCard>
-          </TouchableOpacity>
-        ))}
+              </BrandthreadCard>
+            </TouchableOpacity>
+          );
+        })}
 
-        {/* Color space note */}
         <BrandthreadCard style={styles.noteCard}>
           <View style={styles.noteRow}>
             <Feather name="info" size={14} color={CYAN} />
             <Text style={styles.noteText}>
-              RGB for digital. CMYK note included in print exports.
+              Sizes with a different shape than your canvas fit the whole design and fill the edges with the canvas background (left clear for Transparent PNG). Garment guides are never exported.
             </Text>
           </View>
         </BrandthreadCard>
 
-        {/* Export button */}
+        {status.kind !== 'idle' && (
+          <View style={styles.statusRow} testID="design-export-status" accessibilityLiveRegion="polite">
+            <Feather
+              name={status.kind === 'done' ? 'check-circle' : 'alert-circle'}
+              size={14}
+              color={status.kind === 'done' ? PURPLE_LIGHT : MUTED}
+            />
+            <Text style={styles.statusText}>{status.message}</Text>
+          </View>
+        )}
+
         <View style={styles.exportWrap}>
-          {exporting ? (
-            <ActivityIndicator color={PURPLE} style={{ marginBottom: SP.sm }} />
-          ) : (
-            <PrimaryButton label="Export" onPress={handleExport} style={styles.exportBtn} />
-          )}
+          <PrimaryButton
+            label={`Export ${format.label}`}
+            onPress={handleExport}
+            loading={exporting}
+            disabled={exporting || formatUnavailable}
+            style={styles.exportBtn}
+            testID="design-export-submit"
+          />
         </View>
       </ScrollView>
     </View>
@@ -218,18 +399,19 @@ export default function DesignExportScreen() {
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  const { accent: PURPLE } = theme;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
   scrollContent: { paddingHorizontal: SP.md },
 
-  thumbWrap: { alignItems: 'center', marginBottom: SP.md, marginTop: SP.sm },
-  thumb: {
-    width: SCREEN_W - SP.md * 2, height: 160,
-    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+  previewWrap: { alignItems: 'center', marginBottom: SP.md, marginTop: SP.sm },
+  previewFrame: {
+    backgroundColor: CARD, borderRadius: RADIUS.xs, overflow: 'hidden',
+    borderWidth: 1, borderColor: BORDER,
   },
-  thumbLabel: { fontSize: FS.lg, fontFamily: FONT.bold, color: '#FFF' },
-  thumbSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  previewName: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginTop: SP.sm },
+  previewSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 
   sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
 
@@ -259,6 +441,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   noteCard: { marginTop: SP.sm },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   noteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md },
+  statusText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
   exportWrap: { marginTop: SP.lg },
   exportBtn: {},

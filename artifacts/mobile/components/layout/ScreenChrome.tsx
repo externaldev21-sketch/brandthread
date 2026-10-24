@@ -40,7 +40,7 @@ const IMMERSIVE_TOP_ROOT_SEGMENTS = new Set([
   '', 'index', 'splash', 'sign-in', 'forgot-password', 'onboarding', 'thread-explainer',
   'account-type', 'manufacturer-onboard',
   // Camera / creation
-  'camera-capture', 'create-post', 'buyer-story-create', 'design-canvas',
+  'create-post', 'buyer-story-create', 'design-canvas',
   // Live
   'live', 'live-feed', 'buyer-live', 'seller-live', 'seller-go-live',
   // Full-screen media viewers
