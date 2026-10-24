@@ -90,6 +90,11 @@ export default function ListingPreviewScreen() {
       const cover = form.photos[0]?.uri ?? '';
       const title = form.title.trim();
       resetListing();
+      if (result.heldForPayouts) {
+        if (Platform.OS !== 'web') Alert.alert('Draft saved', `${title} was saved as a draft. Set up payouts to publish it.`);
+        router.replace('/payout-setup' as never);
+        return;
+      }
       const q = new URLSearchParams({
         id: result.productId,
         kind: result.kind,
