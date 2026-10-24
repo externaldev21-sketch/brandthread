@@ -2119,8 +2119,8 @@ export default function BuyerProductDetailScreen() {
             <IconButton
               name="shopping-bag"
               onPress={() => router.push('/(buyer)/cart' as never)}
-              accessibilityLabel={cartCount > 0 ? `Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open cart'}
-              accessibilityHint="View items in your cart"
+              accessibilityLabel={cartCount > 0 ? `Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open bag'}
+              accessibilityHint="View items in your bag"
               variant="plain"
               color="#FFFFFF"
               style={s.mediaChromeBtn}

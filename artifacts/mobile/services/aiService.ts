@@ -40,6 +40,7 @@ import {
 } from './aiSettingsPolicy';
 import { AiConsentRequiredError, isAiConsentRequiredBody, withAiConsent } from '@/lib/aiConsent';
 import { AI_CREDITS_ALERT_COPY, routeAiCreditsRefusal, type AiCreditsErrorKind } from '../lib/aiCreditsError';
+import { classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,27 @@ function isAIDisabledBody(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Copy for an out-of-credits refusal (the AI credits screen is opened too). */
+export const AI_OUT_OF_CREDITS_MESSAGE = "You're out of AI credits. Add credits to keep chatting.";
+
+/** An AI chat failure that carries the server's status and credit-gate code. */
+export type AIRequestError = Error & { status?: number; code?: AiCreditsErrorKind };
+
+/**
+ * The AI credit gate's refusals (402 insufficient_credits, 429 user_daily_cap,
+ * 503 global_daily_cap) keep their server code so the screen can tell a daily
+ * cap ("resets tomorrow") from burst rate limiting. A 402 also opens the AI
+ * credits screen, the same way lib/api.ts surfaceAiCreditsError does for
+ * every other AI endpoint (this chat endpoint does not go through lib/api.ts).
+ */
+function creditGateError(status: number, text: string): AIRequestError | null {
+  const kind = classifyAiCreditsError(status, text);
+  if (!kind) return null;
+  if (kind === 'insufficient_credits') surfaceAiCreditsError(kind);
+  const message = kind === 'insufficient_credits' ? AI_OUT_OF_CREDITS_MESSAGE : AI_CREDITS_ALERT_COPY[kind].message;
+  return Object.assign(new Error(message), { status, code: kind });
 }
 
 // ─── Session repair ───────────────────────────────────────────────────────────
@@ -518,7 +540,10 @@ function callAIStream(
       if (xhr.readyState === 4 && !settled) {
         settled = true;
         cleanup();
-        if (xhr.status === 403 && isAIDisabledBody(xhr.responseText ?? '')) {
+        const gate = creditGateError(xhr.status, xhr.responseText ?? '');
+        if (gate) {
+          reject(gate);
+        } else if (xhr.status === 403 && isAIDisabledBody(xhr.responseText ?? '')) {
           markAssistantDisabledLocally().finally(() => reject(aiDisabledError()));
         } else if (xhr.status === 403 && isAiConsentRequiredBody(403, xhr.responseText)) {
           reject(new AiConsentRequiredError());

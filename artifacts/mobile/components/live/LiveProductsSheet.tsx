@@ -27,6 +27,8 @@ export interface LiveProductAction {
   onPress: () => void;
   /** Filled (white) instead of the default grey — the pinned item on the host's list. */
   selected?: boolean;
+  /** Can't be tapped (dimmed) — e.g. a sold-out item's Buy. */
+  disabled?: boolean;
 }
 
 export function LiveProductsSheet({
@@ -115,9 +117,14 @@ export function LiveProductsSheet({
           )}
           {shown.map(p => {
             const pinned = p.productId === pinnedProductId;
+            const soldOut = p.remainingUnits === 0;
+            // Buyers can't buy a sold-out piece; the host's own actions
+            // (pin / unpin) still work on it.
             const action: LiveProductAction = actionFor
               ? actionFor(p, pinned)
-              : { label: 'Buy now', onPress: () => onBuy?.(p.productId) };
+              : soldOut
+                ? { label: 'Sold out', onPress: () => {}, disabled: true }
+                : { label: 'Buy now', onPress: () => onBuy?.(p.productId) };
             return (
               <View key={p.productId} style={[styles.row, { borderColor: theme.borderSubtle }]} testID={`live-shop-row-${p.productId}`}>
                 <View style={[styles.thumb, { backgroundColor: theme.cardElevated }]}>
@@ -128,14 +135,16 @@ export function LiveProductsSheet({
                 <View style={styles.rowBody}>
                   <Text style={[styles.name, { color: theme.text }]} numberOfLines={2}>{p.name}</Text>
                   <Text style={[styles.meta, { color: theme.muted }]} numberOfLines={1}>
-                    {p.remainingUnits != null ? `Qty: ${p.remainingUnits}` : 'Buy now'}
+                    {soldOut ? 'Sold out' : p.remainingUnits != null ? `Qty: ${p.remainingUnits}` : 'Buy now'}
                     {p.sizes?.length ? ` · ${p.sizes.length} sizes` : ''}
                   </Text>
                   <Text style={[styles.price, { color: theme.text }, TABULAR_NUMS]}>{formatCents(p.priceCents)}</Text>
                   <Pressable
                     onPress={() => { hapticLight(); action.onPress(); }}
-                    style={[styles.rowBtn, action.selected ? { backgroundColor: theme.text } : { borderWidth: 1, borderColor: theme.border }]}
+                    disabled={action.disabled}
+                    style={[styles.rowBtn, action.selected ? { backgroundColor: theme.text } : { borderWidth: 1, borderColor: theme.border }, action.disabled && { opacity: 0.5 }]}
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: !!action.disabled }}
                     accessibilityLabel={`${action.label}: ${p.name}`}
                     testID={`live-shop-action-${p.productId}`}
                   >

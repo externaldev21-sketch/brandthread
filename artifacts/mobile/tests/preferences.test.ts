@@ -218,6 +218,8 @@ describe('QUICK_MENU_ALL_ACTIONS', () => {
 
   it('none action exists (for empty slots)', () => {
     expect(QUICK_MENU_ALL_ACTIONS.some(a => a.key === 'none')).toBe(true);
+    // Plain label, not a parenthetical placeholder like "(empty)".
+    expect(QUICK_MENU_ALL_ACTIONS.find(a => a.key === 'none')?.label).toBe('Empty');
   });
 });
 

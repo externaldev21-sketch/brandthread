@@ -20,6 +20,12 @@ describe('bg-removal route de-duplication', () => {
     expect(resolveLegacyRoute('/bg-removal')).toBe('/design-bg-removal');
   });
 
+  it('keeps the incoming query string (preview flags, params) on the hop', () => {
+    expect(resolveLegacyRoute('/bg-removal?bt_preview=seller')).toBe('/design-bg-removal?bt_preview=seller');
+    expect(resolveLegacyRoute('/bg-removal', { bt_preview: 'seller', projectId: 'p1' }))
+      .toBe('/design-bg-removal?bt_preview=seller&projectId=p1');
+  });
+
   it('ai-studio.tsx links Background Removal to /design-bg-removal, not the old /bg-removal route', () => {
     const src = readFileSync(resolve(ROOT, 'app/ai-studio.tsx'), 'utf8');
     expect(src).not.toContain("router.push('/bg-removal'");

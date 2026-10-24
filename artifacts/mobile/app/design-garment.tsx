@@ -3,11 +3,11 @@ import { SUCCESS } from '@/lib/theme';
  * Brandthread Design Studio — Garment Design Mode
  * Route: /design-garment?projectId=<id>&garmentType=tshirt&garmentColor=#FFFFFF
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Ellipse, Rect, Line } from 'react-native-svg';
 import { Icon } from '@/components/ui/Icon';
@@ -20,8 +20,10 @@ import {
   FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
-import { getProject, updateProject } from '@/services/designService';
+import { createProject, getProject, updateProject } from '@/services/designService';
+import { showAlert } from '@/lib/actionSheet';
 import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
+import type { GarmentPlacement, GarmentType, GarmentView, PlacementType } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
 import { minHitSlop } from '@/lib/hitSlop';
 
@@ -66,6 +68,14 @@ function garmentLabel(type: string): string {
     joggers: 'Joggers',
   };
   return map[type] ?? GARMENT_TYPES.find(t => t.value === type)?.label ?? type;
+}
+
+// 'Center Chest' <-> 'center_chest' (every zone label maps onto a PlacementType).
+function zoneToPlacementType(zone: string): PlacementType {
+  return zone.toLowerCase().replace(/\s+/g, '_') as PlacementType;
+}
+function placementTypeToZone(type: PlacementType): string | null {
+  return PLACEMENT_ZONES_ALL.find(z => zoneToPlacementType(z) === type) ?? null;
 }
 
 // Approximate placement zone rects as % of garment preview area
@@ -199,58 +209,121 @@ export default function DesignGarmentScreen() {
   const [showSafeArea, setShowSafeArea] = useState(false);
   const [showEmbroidery, setShowEmbroidery] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Set when the seller creates a project from this screen (no projectId param).
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
+  // Skips the type-change reset once while a saved project's state is restored.
+  const restoringRef = useRef(false);
 
-  const projectId = params.projectId ?? '';
+  const projectId = params.projectId ?? createdProjectId ?? '';
   const template = GARMENT_TEMPLATES.find(t => t.garmentType === garmentType)
     ?? GARMENT_TEMPLATES.find(t => t.garmentType === 'tshirt')!;
   const availableViews = template.views;
   const availableZones = PLACEMENT_ZONES_ALL;
 
+  // Restore the saved garment, colour, view and placement zone.
+  useEffect(() => {
+    if (!params.projectId) return;
+    let alive = true;
+    getProject(params.projectId).then((p) => {
+      if (!alive || !p) return;
+      const view = p.garmentView ?? 'front';
+      const saved = p.placements?.find(pl => pl.garmentView === view);
+      restoringRef.current = !params.garmentType && !!p.garmentType && p.garmentType !== garmentType;
+      if (!params.garmentType && p.garmentType) setGarmentType(p.garmentType);
+      if (!params.garmentColor && p.garmentColor) setGarmentColor(p.garmentColor);
+      setCurrentView(view);
+      setSelectedZone(saved ? placementTypeToZone(saved.placementType) : null);
+    }).catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.projectId]);
+
   // Reset view when garment type changes
   useEffect(() => {
+    if (restoringRef.current) {
+      restoringRef.current = false;
+      return;
+    }
     if (!(availableViews as string[]).includes(currentView)) {
       setCurrentView(availableViews[0] ?? 'front');
     }
     setSelectedZone(null);
   }, [garmentType]);
 
-  async function handleSavePlacement() {
-    if (!projectId) {
-      Alert.alert('No project', 'Create a project first.');
-      return;
-    }
+  /**
+   * No project yet: offer to create a garment project from the current
+   * choices, then carry on with the action the seller asked for.
+   */
+  function requireProject(then: (id: string) => void) {
+    if (projectId) { then(projectId); return; }
+    showAlert('No project yet', 'Create a garment project to save this design and open it in the editor.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Create project',
+        onPress: async () => {
+          setCreatingProject(true);
+          try {
+            const project = await createProject('garment', `${garmentLabel(garmentType)} design`, {}, garmentType as GarmentType, garmentColor);
+            setCreatedProjectId(project.id);
+            then(project.id);
+          } catch {
+            showAlert("Couldn't create project", 'Please try again.');
+          } finally {
+            setCreatingProject(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  async function savePlacement(id: string) {
     setSaving(true);
     try {
-      await updateProject(projectId, {
-        garmentType,
+      // Keep placements saved for the other views; replace this view's.
+      const existing = await getProject(id).catch(() => null);
+      const view = currentView as GarmentView;
+      const prev = existing?.placements?.find(pl => pl.garmentView === view);
+      const others = (existing?.placements ?? []).filter(pl => pl.garmentView !== view);
+      const rect = selectedZone ? ZONE_RECTS[selectedZone] : null;
+      const placements: GarmentPlacement[] = selectedZone && rect
+        ? [...others, {
+            id: prev?.id ?? `placement-${view}-${Date.now()}`,
+            placementType: zoneToPlacementType(selectedZone),
+            garmentView: view,
+            x: rect.x, y: rect.y, width: rect.w, height: rect.h,
+            layerIds: prev?.layerIds ?? [],
+          }]
+        : others;
+      await updateProject(id, {
+        garmentType: garmentType as GarmentType,
         garmentColor,
-        updatedAt: new Date().toISOString(),
-      } as any);
+        garmentView: view,
+        placements,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Saved', 'Placement saved to project.');
+      showAlert('Saved', selectedZone
+        ? `${garmentLabel(garmentType)}, colour and ${selectedZone} placement (${viewLabel(view)}) saved to the project.`
+        : `${garmentLabel(garmentType)} and colour saved to the project. Pick a placement zone to save one too.`);
     } catch {
-      Alert.alert('Save failed', 'Could not save this placement. Please try again.');
+      showAlert('Save failed', 'Could not save this placement. Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
-  function openInEditor() {
-    if (!projectId) {
-      Alert.alert('No project', 'Create a project first.');
-      return;
-    }
-    router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any);
+  function handleSavePlacement() {
+    requireProject(savePlacement);
   }
 
   // The canvas takes its garment view from the saved project
   // (project.garmentView), not from the URL, so save the chosen view first —
   // otherwise picking "Back" and opening the editor showed the front.
-  async function openInEditor() {
-    if (projectId) {
-      await updateProject(projectId, { garmentView: currentView } as any).catch(() => {});
-    }
-    router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any);
+  function openInEditor() {
+    requireProject(async (id) => {
+      await updateProject(id, { garmentView: currentView as GarmentView }).catch(() => {});
+      router.push(`/design-canvas?id=${id}&garmentView=${currentView}` as any);
+    });
   }
 
   // Determine if garment is light or dark for text contrast
@@ -435,13 +508,13 @@ export default function DesignGarmentScreen() {
           <TouchableOpacity
             style={gs.savePlacementBtn}
             onPress={handleSavePlacement}
-            disabled={saving}
+            disabled={saving || creatingProject}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityState={{ disabled: saving }}
+            accessibilityState={{ disabled: saving || creatingProject }}
           >
             <Icon name="save" size={ICON.sm} color="#000000" />
-            <Text style={gs.savePlacementText}>{saving ? 'Saving…' : 'Save Placement'}</Text>
+            <Text style={gs.savePlacementText}>{creatingProject ? 'Creating project…' : saving ? 'Saving…' : 'Save Placement'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={gs.openEditorLargeBtn}

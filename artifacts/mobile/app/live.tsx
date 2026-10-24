@@ -2,8 +2,8 @@ import { apiErrorMessage } from '@/lib/safety';
 /**
  * LIVE show viewer — one show full-bleed, swipe up/down to the next live
  * show. Laid out 1:1 with Whatnot's show screen (host + Follow top-left,
- * viewer pill + leave top-right, More/Share/Shop rail, chat, "Say
- * something...", the item being sold with a Buy now pill):
+ * viewer pill + leave top-right, More/Share/Shop rail, chat, "Add a
+ * comment…", the item being sold with a Buy now pill):
  *   https://mobbin.com/flows/ed55f754-472f-46f8-914b-ce7cb7345c7b
  *   https://mobbin.com/flows/5baa5304-2ba7-477e-b909-a09925c508fd
  * Hearts are TikTok LIVE's tap-to-like
@@ -223,7 +223,9 @@ function LivePage({
           <LiveProductCard
             product={pinned}
             onPress={onOpenShop}
-            action={{ label: 'Buy now', onPress: () => onBuy(pinned.productId) }}
+            action={pinned.remainingUnits === 0
+              ? { label: 'Sold out', onPress: () => {}, disabled: true }
+              : { label: 'Buy now', onPress: () => onBuy(pinned.productId) }}
           />
         ))}
       </View>
@@ -475,8 +477,10 @@ export default function LiveScreen() {
               tone="dark"
               title={pager.error ? "Couldn't load live shows" : params.streamId ? 'This show has ended' : "No one's live right now"}
               body={pager.error ? 'Check your connection and try again.' : 'Shows from brands you follow appear on the LIVE tab the moment they start.'}
-              actionLabel="Back"
-              onAction={close}
+              // A failed load can be retried in place; the chevron (top
+              // right) still leaves.
+              actionLabel={pager.error ? 'Try again' : 'Back'}
+              onAction={pager.error ? pager.refresh : close}
             />
           </View>
           {closeButton}

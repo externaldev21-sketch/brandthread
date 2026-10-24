@@ -156,3 +156,21 @@ describe('existing AI capabilities remain wired', () => {
     expect(screen).toContain('session,');
   });
 });
+
+describe('ai-brain feedback and failure handling (audit round 2)', () => {
+  it('shows "Copied" feedback after copying a message', () => {
+    expect(screen).toContain("copied ? 'Copied' : 'Copy'");
+    expect(screen).toContain('setCopiedId(msg.id)');
+  });
+
+  it('maps the daily cap code to reset-tomorrow copy, not burst rate limiting', () => {
+    expect(screen).toContain("e?.code === 'user_daily_cap'");
+    expect(screen).toMatch(/resets tomorrow/);
+  });
+
+  it('catches apply / dismiss / undo failures and shows a friendly error', () => {
+    expect(screen).toContain("Couldn't apply that change");
+    expect(screen).toContain("Couldn't dismiss that suggestion");
+    expect(screen).toContain("Couldn't undo that change");
+  });
+});

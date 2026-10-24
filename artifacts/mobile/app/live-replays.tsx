@@ -125,7 +125,14 @@ export default function LiveReplaysScreen() {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]} testID="live-replays-screen">
       <ScreenHeader title="Replays" />
-      {loading ? (
+      {!sellerId ? (
+        // A link without a seller can't list anyone's replays.
+        <EmptyState
+          icon="video-off"
+          title="Replays not available"
+          description="This link is incomplete. Open replays from the seller’s profile."
+        />
+      ) : loading ? (
         <View style={styles.center}><ActivityIndicator color={theme.muted} /></View>
       ) : error ? (
         <EmptyState

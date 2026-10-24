@@ -25,7 +25,6 @@ import { haptics, haptic } from '@/lib/haptics';
 
 import { showToast } from '@/lib/toast';
 
-import { friendlyError } from '@/lib/friendlyError';
 
 
 import { ScreenHeader } from '@/components/ScreenHeader';

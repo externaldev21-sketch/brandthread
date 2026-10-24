@@ -83,28 +83,38 @@ export function useLivePager(
     }, LIVE_END_ANIMATION_MS);
   }, [loadExtras]);
 
-  // Initial load.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await provider.listLive();
-        if (cancelled) return;
-        const start = initialStreamIndex(list, target);
-        setStreams(list);
-        seedRuntime(list);
-        setInitialIndex(start);
-        setActiveIndex(start);
-        if (list.length === 0) await loadExtras();
-      } catch {
-        if (!cancelled) { setError(true); await loadExtras(); }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  // Initial load, and `refresh()` after a failed one. Each run bumps the
+  // sequence so a slower, older request can never overwrite a newer one.
+  const loadSeq = useRef(0);
+  const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    const current = () => seq === loadSeq.current;
+    setLoading(true);
+    setError(false);
+    try {
+      const list = await provider.listLive();
+      if (!current()) return;
+      const start = initialStreamIndex(list, target);
+      setStreams(list);
+      seedRuntime(list);
+      setInitialIndex(start);
+      setActiveIndex(start);
+      if (list.length === 0) await loadExtras();
+    } catch {
+      if (current()) { setError(true); await loadExtras(); }
+    } finally {
+      if (current()) setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider]);
+  }, [provider, seedRuntime, loadExtras]);
+
+  useEffect(() => {
+    void load();
+    // Unmount / provider swap: invalidate the in-flight load.
+    return () => { loadSeq.current += 1; };
+  }, [load]);
+
+  const refresh = useCallback(() => { void load(); }, [load]);
 
   // Periodic refresh: new streams are appended (never reorder pages under
   // the viewer's thumb); streams that disappeared are removed gracefully.
@@ -202,6 +212,6 @@ export function useLivePager(
   return {
     streams, loading, error, activeIndex, setActiveIndex, initialIndex, runtime, ending,
     endedNotice, clearEndedNotice: () => setEndedNotice(null),
-    upcoming, suggested, sendChat, like, setFollowing, setReminder, removeStream,
+    upcoming, suggested, sendChat, like, setFollowing, setReminder, removeStream, refresh,
   };
 }

@@ -1,6 +1,5 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
-import { showAlert } from '@/lib/actionSheet';
 
 import { friendlyError } from '@/lib/friendlyError';
 

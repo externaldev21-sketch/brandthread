@@ -445,3 +445,35 @@ describe('renderLayer — unknown layer type', () => {
     expect(renderLayer(layer, 1, 1, '#000')).toBeNull();
   });
 });
+
+// ─── Component: background only inside the real canvas rect ──────────────────
+
+describe('DesignLayerCompositor background', () => {
+  async function renderTree(canvas: { width: number; height: number; backgroundHex: string }, layers: unknown[] = []) {
+    const { default: DesignLayerCompositor } = await import('../components/DesignLayerCompositor');
+    const project = { id: 'p', name: 'P', canvas, layers } as never;
+    // Plain function component (no hooks) — call it to get the element tree.
+    const outer = (DesignLayerCompositor as (p: unknown) => AnyEl)({ project, displaySize: 100, borderRadius: 8 });
+    const inner = React.Children.toArray(outer.props.children as React.ReactNode)[0] as AnyEl;
+    const flat = (st: unknown) => Object.assign({}, ...([st].flat(3) as object[]));
+    return { outerStyle: flat(outer.props.style), innerStyle: flat(inner.props.style) };
+  }
+
+  it('does not paint bgHex into the letterbox of a non-square canvas', async () => {
+    const { outerStyle, innerStyle } = await renderTree({ width: 1080, height: 1920, backgroundHex: '#FF0000' });
+    expect(outerStyle).toMatchObject({ width: 100, height: 100 });
+    expect(outerStyle.backgroundColor).toBeUndefined();
+    expect(innerStyle).toMatchObject({ height: 100, backgroundColor: '#FF0000', borderRadius: 8 });
+    expect(innerStyle.width).toBeCloseTo(56.25);
+  });
+
+  it('fits a landscape canvas to the full width', async () => {
+    const { innerStyle } = await renderTree({ width: 2000, height: 1000, backgroundHex: '#000000' });
+    expect(innerStyle).toMatchObject({ width: 100, height: 50, backgroundColor: '#000000' });
+  });
+
+  it('a transparent blank canvas still shows as a white artboard', async () => {
+    const { innerStyle } = await renderTree({ width: 1000, height: 1000, backgroundHex: 'transparent' });
+    expect(innerStyle.backgroundColor).toBe('#FFFFFF');
+  });
+});

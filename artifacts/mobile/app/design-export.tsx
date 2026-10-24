@@ -20,7 +20,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Icon as Feather, type IconName } from '@/components/ui/Icon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
@@ -52,7 +52,7 @@ interface FormatOption {
   id: DesignExportFormat;
   label: string;
   desc: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: IconName;
 }
 
 const FORMATS: FormatOption[] = [

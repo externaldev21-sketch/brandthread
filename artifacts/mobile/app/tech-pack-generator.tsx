@@ -21,6 +21,11 @@ import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { classifyAiCreditsError } from '@/lib/aiCreditsError';
+import { triggerWebDownload } from '@/lib/aiToolMedia';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { SCREEN_GUTTER } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 
 interface Photo {
@@ -30,14 +35,42 @@ interface Photo {
   mime: string;
 }
 
+/** A size column. Values are keyed by the stable id, so renaming or clearing
+ *  a size never merges two columns or leaves data under an empty key. */
+interface SizeCol {
+  id: string;
+  name: string;
+}
+
 interface SizeRow {
+  /** Stable React key — the array index re-binds inputs after a removal. */
+  id: string;
   point: string;
+  /** Measurement per size column id. */
   values: Record<string, string>;
 }
 
 const MAX_PHOTOS = 6;
 const DEFAULT_SIZES = ['S', 'M', 'L'];
 const DEFAULT_POINTS = ['Chest', 'Length', 'Sleeve'];
+
+let idCounter = 0;
+const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
+const defaultSizeCols = (): SizeCol[] => DEFAULT_SIZES.map((name) => ({ id: nextId('size'), name }));
+const defaultRows = (): SizeRow[] => DEFAULT_POINTS.map((point) => ({ id: nextId('row'), point, values: {} }));
+
+/** Empty or duplicate size names can't be sent (the chart is keyed by name). */
+function sizeNamesError(cols: SizeCol[]): string | null {
+  const names = cols.map((c) => c.name.trim());
+  if (names.some((n) => !n)) return 'Give every size a name.';
+  const seen = new Set<string>();
+  for (const n of names) {
+    const key = n.toLowerCase();
+    if (seen.has(key)) return `Size names must be unique — "${n}" is used twice.`;
+    seen.add(key);
+  }
+  return null;
+}
 
 type Step = 'info' | 'photos' | 'sizing' | 'details' | 'result';
 const STEPS: Step[] = ['info', 'photos', 'sizing', 'details', 'result'];
@@ -61,10 +94,9 @@ export default function TechPackGeneratorScreen() {
   const [photos, setPhotos] = useState<Photo[]>([]);
 
   // Step 3: size chart
-  const [sizes, setSizes] = useState<string[]>(DEFAULT_SIZES);
-  const [rows, setRows] = useState<SizeRow[]>(
-    DEFAULT_POINTS.map((point) => ({ point, values: {} }))
-  );
+  const [sizes, setSizes] = useState<SizeCol[]>(defaultSizeCols);
+  const [rows, setRows] = useState<SizeRow[]>(defaultRows);
+  const sizeError = sizeNamesError(sizes);
 
   // Step 4: details
   const [materialsNotes, setMaterialsNotes] = useState('');
@@ -119,52 +151,53 @@ export default function TechPackGeneratorScreen() {
   }
 
   function addSize() {
-    // Size names double as column keys — never add one that already exists
-    // (e.g. after removing a column, `Size ${length + 1}` can repeat).
+    // Never suggest a name that already exists (e.g. after removing a column).
+    const names = new Set(sizes.map((c) => c.name.trim().toLowerCase()));
     let n = sizes.length + 1;
-    while (sizes.includes(`Size ${n}`)) n += 1;
-    const label = `Size ${n}`;
-    setSizes((prev) => [...prev, label]);
+    while (names.has(`size ${n}`)) n += 1;
+    setSizes((prev) => [...prev, { id: nextId('size'), name: `Size ${n}` }]);
   }
-  function removeSize(size: string) {
-    setSizes((prev) => prev.filter((s) => s !== size));
+  function removeSize(id: string) {
+    setSizes((prev) => prev.filter((c) => c.id !== id));
     setRows((prev) =>
       prev.map((r) => {
-        const { [size]: _removed, ...rest } = r.values;
+        const { [id]: _removed, ...rest } = r.values;
         return { ...r, values: rest };
       })
     );
   }
-  function renameSize(oldName: string, newName: string) {
-    setSizes((prev) => prev.map((s) => (s === oldName ? newName : s)));
-    setRows((prev) =>
-      prev.map((r) => {
-        const values = { ...r.values };
-        if (oldName in values) {
-          values[newName] = values[oldName];
-          delete values[oldName];
-        }
-        return { ...r, values };
-      })
-    );
+  function renameSize(id: string, name: string) {
+    setSizes((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
   }
   function addRow() {
-    setRows((prev) => [...prev, { point: '', values: {} }]);
+    setRows((prev) => [...prev, { id: nextId('row'), point: '', values: {} }]);
   }
-  function removeRow(index: number) {
-    setRows((prev) => prev.filter((_, i) => i !== index));
+  function removeRow(id: string) {
+    setRows((prev) => prev.filter((r) => r.id !== id));
   }
-  function updateRowPoint(index: number, point: string) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, point } : r)));
+  function updateRowPoint(id: string, point: string) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, point } : r)));
   }
-  function updateCell(index: number, size: string, value: string) {
+  function updateCell(rowId: string, sizeId: string, value: string) {
     setRows((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, values: { ...r.values, [size]: value } } : r))
+      prev.map((r) => (r.id === rowId ? { ...r, values: { ...r.values, [sizeId]: value } } : r))
     );
+  }
+  function goNextFromSizing() {
+    if (sizeError) {
+      showAlert('Check your sizes', sizeError);
+      return;
+    }
+    goNext();
   }
 
   async function generate() {
     if (loading) return;
+    if (sizeError) {
+      showAlert('Check your sizes', sizeError);
+      setStep('sizing');
+      return;
+    }
     setLoading(true);
     setPdfBase64(null);
     setStep('result');
@@ -185,7 +218,19 @@ export default function TechPackGeneratorScreen() {
         materialsNotes: materialsNotes.trim(),
         printPlacementNotes: printPlacementNotes.trim(),
         careNotes: careNotes.trim(),
-        sizeChart: { sizes, rows: rows.filter((r) => r.point.trim().length > 0) },
+        sizeChart: {
+          sizes: sizes.map((c) => c.name.trim()),
+          rows: rows
+            .filter((r) => r.point.trim().length > 0)
+            .map((r) => ({
+              point: r.point.trim(),
+              values: Object.fromEntries(
+                sizes
+                  .filter((c) => (r.values[c.id] ?? '').trim().length > 0)
+                  .map((c) => [c.name.trim(), r.values[c.id].trim()]),
+              ),
+            })),
+        },
         photos: photoUrls,
       });
       if (result?.pdf_base64) {
@@ -193,7 +238,7 @@ export default function TechPackGeneratorScreen() {
         setPdfFilename(result.filename || 'tech-pack.pdf');
         haptics.success();
       } else {
-        Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
+        showAlert('Generation failed', 'Could not generate the tech pack. Please try again.');
       }
     } catch (error) {
       const rejection = getEntitlementRejection(error);
@@ -209,7 +254,16 @@ export default function TechPackGeneratorScreen() {
         setStep('details');
         return;
       }
-      Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
+      // lib/api.ts already surfaced a credit-gate refusal (402 opens the AI
+      // credits screen; a daily cap shows its own alert) — no second alert.
+      // The result step still offers "Try again".
+      const e = error as { status?: unknown; body?: unknown } | null;
+      const creditsKind = typeof e?.status === 'number'
+        ? classifyAiCreditsError(e.status, typeof e.body === 'string' ? e.body : undefined)
+        : null;
+      if (!creditsKind) {
+        showAlert('Generation failed', friendlyError(error, 'Could not generate the tech pack. Please try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -217,6 +271,16 @@ export default function TechPackGeneratorScreen() {
 
   async function shareTechPack() {
     if (!pdfBase64) return;
+    if (Platform.OS === 'web') {
+      // Web has no share sheet (expo-sharing / the file cache throw there):
+      // download the PDF so it can be attached to an email.
+      try {
+        triggerWebDownload(`data:application/pdf;base64,${pdfBase64}`, pdfFilename);
+      } catch {
+        showAlert('Download failed', 'Could not download the tech pack. Please try again.');
+      }
+      return;
+    }
     try {
       const file = new File(Paths.cache, pdfFilename);
       file.write(pdfBase64, { encoding: 'base64' });
@@ -241,8 +305,8 @@ export default function TechPackGeneratorScreen() {
     setDescription('');
     setColorwaysText('');
     setPhotos([]);
-    setSizes(DEFAULT_SIZES);
-    setRows(DEFAULT_POINTS.map((point) => ({ point, values: {} })));
+    setSizes(defaultSizeCols());
+    setRows(defaultRows());
     setMaterialsNotes('');
     setPrintPlacementNotes('');
     setCareNotes('');
@@ -328,7 +392,7 @@ export default function TechPackGeneratorScreen() {
               {photos.map((p) => (
                 <View key={p.id} style={styles.trayThumbWrap}>
                   <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
+                  <TouchableOpacity
                     style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                     onPress={() => removePhoto(p.id)}
                     activeOpacity={0.8}
@@ -341,7 +405,7 @@ export default function TechPackGeneratorScreen() {
                 </View>
               ))}
               {photos.length < MAX_PHOTOS && (
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
+                <TouchableOpacity
                   onPress={pickPhotos}
                   activeOpacity={0.8}
                   accessibilityRole="button"
@@ -384,13 +448,16 @@ export default function TechPackGeneratorScreen() {
                 <View style={styles.tableHeaderRow}>
                   <View style={[styles.tableCell, styles.tableFirstCol]} />
                   {sizes.map((size) => (
-                    <View key={size} style={styles.tableCell}>
+                    <View key={size.id} style={styles.tableCell}>
                       <TextInput returnKeyType="done"
-                        value={size}
-                        onChangeText={(v) => renameSize(size, v)}
+                        value={size.name}
+                        onChangeText={(v) => renameSize(size.id, v)}
+                        placeholder="Size"
+                        placeholderTextColor={colors.subtle}
+                        accessibilityLabel="Size name"
                         style={[styles.sizeInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove size ${size}`} onPress={() => removeSize(size)} style={{ marginLeft: 4 }}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove size ${size.name || 'column'}`} onPress={() => removeSize(size.id)} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }} style={{ marginLeft: 4 }}>
                         <Icon name="x" size={12} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     </View>
@@ -401,28 +468,28 @@ export default function TechPackGeneratorScreen() {
                 </View>
 
                 {rows.map((row, i) => (
-                  <View key={i} style={styles.tableRow}>
+                  <View key={row.id} style={styles.tableRow}>
                     <View style={[styles.tableCell, styles.tableFirstCol]}>
                       <TextInput returnKeyType="done"
                         value={row.point}
-                        onChangeText={(v) => updateRowPoint(i, v)}
+                        onChangeText={(v) => updateRowPoint(row.id, v)}
                         placeholder="Chest"
                         placeholderTextColor={colors.subtle}
                         style={[styles.pointInput, { color: colors.foreground, borderColor: colors.border }]}
                       />
                     </View>
                     {sizes.map((size) => (
-                      <View key={size} style={styles.tableCell}>
+                      <View key={size.id} style={styles.tableCell}>
                         <TextInput returnKeyType="done"
-                          value={row.values[size] ?? ''}
-                          onChangeText={(v) => updateCell(i, size, v)}
+                          value={row.values[size.id] ?? ''}
+                          onChangeText={(v) => updateCell(row.id, size.id, v)}
                           placeholder="—"
                           placeholderTextColor={colors.subtle}
                           style={[styles.valueInput, { color: colors.foreground, borderColor: colors.border }]}
                         />
                       </View>
                     ))}
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove row ${i + 1}`} onPress={() => removeRow(i)} style={[styles.tableCell, styles.addColBtn]}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove measurement ${row.point.trim() || i + 1}`} onPress={() => removeRow(row.id)} style={[styles.tableCell, styles.addColBtn]}>
                       <Icon name="trash-2" size={13} color={colors.destructive} />
                     </TouchableOpacity>
                   </View>
@@ -435,11 +502,17 @@ export default function TechPackGeneratorScreen() {
               <Text style={{ color: colors.primary, fontFamily: FONT.semibold, fontSize: 12 }}>Add measurement point</Text>
             </TouchableOpacity>
 
+            {sizeError ? (
+              <Text style={[styles.sizeErrorText, { color: colors.destructive }]} accessibilityLiveRegion="polite">
+                {sizeError}
+              </Text>
+            ) : null}
+
             <View style={styles.navRow}>
               <TouchableOpacity onPress={goBack} activeOpacity={0.7} style={styles.secondaryBtn}>
                 <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Back</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={goNext} activeOpacity={0.85} style={[styles.primaryBtn, { flex: 1, backgroundColor: colors.primary }]}>
+              <TouchableOpacity onPress={goNextFromSizing} activeOpacity={0.85} style={[styles.primaryBtn, { flex: 1, backgroundColor: colors.primary }]}>
                 <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Next: details</Text>
                 <Icon name="arrow-right" size={16} color={colors.primaryForeground} />
               </TouchableOpacity>
@@ -514,8 +587,10 @@ export default function TechPackGeneratorScreen() {
               <View style={{ gap: 12, marginTop: 20 }}>
                 {pdfBase64 && (
                   <TouchableOpacity onPress={shareTechPack} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-                    <Icon name="share" size={16} color={colors.primaryForeground} />
-                    <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Send to manufacturer</Text>
+                    <Icon name={Platform.OS === 'web' ? 'download' : 'share'} size={16} color={colors.primaryForeground} />
+                    <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
+                      {Platform.OS === 'web' ? 'Download PDF for your manufacturer' : 'Send to manufacturer'}
+                    </Text>
                   </TouchableOpacity>
                 )}
                 {!pdfBase64 && (
@@ -578,7 +653,7 @@ function Field({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: SCREEN_GUTTER, paddingBottom: 40 },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 6 },
@@ -619,6 +694,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
     borderWidth: 1, borderStyle: 'dashed', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginTop: 12,
   },
+  sizeErrorText: { fontSize: 12, fontFamily: FONT.regular, marginTop: 12 },
   resultCard: {
     borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 40, paddingHorizontal: 20, gap: 8,

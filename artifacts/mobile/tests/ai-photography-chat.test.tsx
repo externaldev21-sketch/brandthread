@@ -289,6 +289,8 @@ describe('AI photography Outfit Swap mobile flow', () => {
     expect(apiMock.photography.generate).toHaveBeenCalledWith(
       ['data:image/jpeg;base64,free-product-base64'],
       'Use an editorial studio background',
+      'photoshoot',
+      { signal: expect.any(AbortSignal) },
     );
     expect(screenText(renderer)).toContain("Here's your studio photo.");
   });
@@ -299,11 +301,17 @@ describe('AI photography Outfit Swap mobile flow', () => {
 
     queuePhotos('hero');
     await press(renderer, 'ai-photography-attach');
-    expect(screenText(renderer)).toContain('Hero locked — upload garment mockups to keep the same scene.');
+    // Not locked until it is sent.
+    expect(screenText(renderer)).not.toContain('Hero locked');
+    expect(screenText(renderer)).toContain('Send to lock this hero photo');
 
     await press(renderer, 'ai-photography-send');
     expect(apiMock.photography.generateOutfitSwap).not.toHaveBeenCalled();
     expect(screenText(renderer)).toContain('Hero photo locked.');
+    expect(screenText(renderer)).toContain('Hero locked — upload garment mockups to keep the same scene.');
+    // The greeting bubble uses Outfit Swap copy in this mode.
+    expect(screenText(renderer)).toContain('Upload one hero photo of the model and scene');
+    expect(screenText(renderer)).not.toContain('Add product photos and references, then describe the style.');
 
     queuePhotos('garment-1', 'garment-2', 'garment-3', 'garment-4');
     await press(renderer, 'ai-photography-attach');
@@ -355,7 +363,77 @@ describe('AI photography Outfit Swap mobile flow', () => {
 
     queuePhotos('second-hero');
     await press(renderer, 'ai-photography-attach');
-    expect(screenText(renderer)).toContain('Hero locked — upload garment mockups to keep the same scene.');
+    expect(screenText(renderer)).toContain('Send to lock this hero photo');
+  });
+
+  it('lets a picked hero be removed or replaced before it is locked', async () => {
+    renderer = await renderScreen();
+    await press(renderer, 'ai-photography-mode-outfit-swap');
+    queuePhotos('hero-a');
+    await press(renderer, 'ai-photography-attach');
+
+    queuePhotos('hero-b');
+    await press(renderer, 'ai-photography-replace-hero');
+    const heroThumbs = () => renderer!.root.findAll(
+      (node) => String(node.type) === 'Image' && String(node.props.source?.uri ?? '').includes('hero-'),
+    ).map((n) => n.props.source.uri);
+    expect(heroThumbs()).toContain('file:///hero-b.jpg');
+    expect(heroThumbs()).not.toContain('file:///hero-a.jpg');
+
+    await press(renderer, 'ai-photography-remove-hero');
+    expect(renderer.root.findAllByProps({ testID: 'ai-photography-hero-unlocked' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'ai-photography-send' }).props.disabled).toBe(true);
+  });
+
+  it('keeps the attached photos after a failed request and retries with them', async () => {
+    apiMock.photography.generate
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce({ b64_json: 'retry-result' });
+    renderer = await renderScreen();
+    queuePhotos('product-1', 'product-2');
+    await press(renderer, 'ai-photography-attach');
+    await press(renderer, 'ai-photography-send');
+
+    expect(screenText(renderer)).toContain('Network error. Check your connection and try again.');
+    // The tray still holds both photos.
+    expect(removeButtons(renderer)).toHaveLength(2);
+
+    const retry = renderer.root.findAll(
+      (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('ai-photography-retry-'),
+    )[0];
+    await act(async () => {
+      retry.props.onPress();
+      await flush();
+    });
+    expect(apiMock.photography.generate).toHaveBeenCalledTimes(2);
+    expect(apiMock.photography.generate.mock.calls[1][0]).toEqual([
+      'data:image/jpeg;base64,product-1-base64',
+      'data:image/jpeg;base64,product-2-base64',
+    ]);
+    expect(screenText(renderer)).toContain("Here's your studio photo.");
+    expect(removeButtons(renderer)).toHaveLength(0);
+  });
+
+  it('shows elapsed time and Cancel aborts the in-flight request, keeping the photos', async () => {
+    let seenSignal: AbortSignal | undefined;
+    apiMock.photography.generate.mockImplementationOnce(
+      (_images: string[], _prompt: string, _mode: string, opts: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+        seenSignal = opts.signal;
+        opts.signal.addEventListener('abort', () => reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })));
+      }),
+    );
+    renderer = await renderScreen();
+    queuePhotos('product-1');
+    await press(renderer, 'ai-photography-attach');
+    await press(renderer, 'ai-photography-send');
+
+    expect(screenText(renderer)).toContain('0:00');
+    await press(renderer, 'ai-photography-cancel');
+
+    expect(seenSignal?.aborted).toBe(true);
+    expect(screenText(renderer)).toContain('Cancelled. Your photos are still attached.');
+    expect(removeButtons(renderer)).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'ai-photography-cancel' })).toHaveLength(0);
   });
 
   it('renders result labels in garment order and keeps partial failures visible', async () => {
@@ -381,6 +459,7 @@ describe('AI photography Outfit Swap mobile flow', () => {
         'data:image/jpeg;base64,garment-3-base64',
       ],
       '',
+      { signal: expect.any(AbortSignal) },
     );
     const rendered = screenText(renderer);
     expect(rendered).toContain('Outfit Swap result 1 of 3 — garment 1 on the locked hero scene.');

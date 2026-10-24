@@ -111,10 +111,9 @@ describe('QA-0149 share profile account resolution', () => {
     expect(resolveShareProfileAccount({ authLoaded: false, userId: undefined, preview: true })).toEqual({ status: 'ready', key: PREVIEW_ACCOUNT_KEY });
   });
 
-  it('share-profile no longer bails out on a missing Clerk user id', () => {
-    const src = read('app/share-profile.tsx');
-    expect(src).not.toContain('if (!authLoaded || !user?.id) return;');
-    expect(src).toContain("if (account.status === 'signedOut') {");
+  it('the standalone share-profile screen was removed (PR #1103), so nothing can wait on it', () => {
+    expect(existsSync(resolve(root, 'app/share-profile.tsx'))).toBe(false);
+    expect(read('app/_layout.tsx')).not.toContain('name="share-profile"');
   });
 });
 

@@ -508,7 +508,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     const newQty = existing.quantity + quantity;
     const cap = cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder);
     if (newQty > cap) {
-      return { success: false, message: `You already have ${existing.quantity} in your bag. Can't add more.`, cart };
+      return { success: false, message: `You already have ${existing.quantity}in your bag. Can't add more.`, cart };
     }
     cart.items[existingIdx] = {
       ...existing,

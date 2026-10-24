@@ -8,7 +8,7 @@
  * the 4 results is its own request, so progress is real: tiles fill in as
  * they finish, and a failed tile shows the server's reason with Retry.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -20,8 +20,9 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import {
-  BrandthreadScreen, BrandthreadHeader, GradientCard,
+  BrandthreadScreen, GradientCard,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   SURFACE, CARD,
   BORDER,
@@ -34,7 +35,9 @@ import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
 import { saveImageToCameraRoll, saveAllToCameraRoll, shareImage } from '@/lib/aiToolMedia';
-import { aiToolErrorMessage } from '@/lib/aiToolErrors';
+// Shared AI-tool copy: a 402 insufficient_credits opens /ai-credits, daily caps get the gate's copy.
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
+import { showAlert } from '@/lib/actionSheet';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -59,6 +62,16 @@ export default function UploadSketchScreen() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [libraryId, setLibraryId] = useState<number | null>(null);
 
+  // One controller per generation run: leaving the results (back, New
+  // sketch) or the screen aborts its requests, and a stale run's results
+  // never land in a newer run's tiles (they reuse the same slot ids).
+  const runRef = useRef<AbortController | null>(null);
+  function cancelRun() {
+    runRef.current?.abort();
+    runRef.current = null;
+  }
+  useEffect(() => () => cancelRun(), []);
+
   const doneSlots = slots.filter(sl => sl.status === 'done' && sl.imageUri);
   const generatingCount = slots.filter(sl => sl.status === 'generating').length;
   const failedCount = slots.filter(sl => sl.status === 'failed').length;
@@ -82,13 +95,17 @@ export default function UploadSketchScreen() {
 
   async function runSlot(id: number) {
     if (!sketchUri) return;
+    if (!runRef.current) runRef.current = new AbortController();
+    const { signal } = runRef.current;
     setSlots(prev => prev.map(sl => sl.id === id ? { ...sl, status: 'generating', error: undefined } : sl));
     try {
-      const result = await generateSketchToDesign({ sketchUri, style, colorPalette: palettePrompt(), count: 1 });
+      const result = await generateSketchToDesign({ sketchUri, style, colorPalette: palettePrompt(), count: 1, signal });
+      if (signal.aborted) return;
       const imageUri = result.imageUris[0];
       if (!imageUri) throw new Error('The AI returned no image. Try again.');
       setSlots(prev => prev.map(sl => sl.id === id ? { ...sl, status: 'done', imageUri } : sl));
     } catch (err) {
+      if (signal.aborted) return;
       setSlots(prev => prev.map(sl => sl.id === id
         ? { ...sl, status: 'failed', error: aiToolErrorMessage(err, 'Generation failed. Try again.') }
         : sl));
@@ -101,6 +118,8 @@ export default function UploadSketchScreen() {
     const fresh: AiResultSlot[] = Array.from({ length: RESULT_COUNT }, (_, i) => ({
       id: i, status: 'generating', sourceUri: sketchUri, label: `Design ${i + 1}`,
     }));
+    cancelRun();
+    runRef.current = new AbortController();
     setSlots(fresh);
     setStep('results');
     fresh.forEach(sl => { void runSlot(sl.id); });
@@ -150,33 +169,8 @@ export default function UploadSketchScreen() {
     }
   }
 
-  async function handleSaveToAssets(uri: string, idx: number) {
-    try {
-      await createBrandAsset({ name: `Cleaned sketch #${idx + 1}`, type: 'graphic', uri, tags: ['ai-generated', 'sketch'] });
-      Alert.alert('Saved', 'Added to Brand Assets.');
-    } catch {
-      Alert.alert('Save failed', 'Could not save to Brand Assets. Please try again.');
-    }
-  }
-
-  async function handleExport(uri: string) {
-    const saved = await saveImageToCameraRoll(uri, 'sketch');
-    if (saved.ok) return;
-    Alert.alert(
-      saved.reason === 'permission' ? 'Permission required' : 'Save failed',
-      saved.reason === 'permission' ? 'Allow photo library access to save this image.' : 'Could not save this image. Please try again.',
-    );
-  }
-
-  async function handleSaveAll() {
-    const imageUris = doneSlots.map(slot => slot.imageUri!);
-    if (imageUris.length === 0) return;
-    const { succeeded, failed } = await saveAllToCameraRoll(imageUris, 'sketch');
-    if (failed === 0) Alert.alert('Saved', `${succeeded} design${succeeded !== 1 ? 's' : ''} saved.`);
-    else Alert.alert('Some saves failed', `${succeeded} of ${imageUris.length} designs saved.`);
-  }
-
   function reset() {
+    cancelRun();
     setStep('upload');
     setSketchUri(null);
     setSlots([]);
@@ -189,10 +183,10 @@ export default function UploadSketchScreen() {
       ? `Generating ${RESULT_COUNT - generatingCount} of ${RESULT_COUNT} done…`
       : failedCount > 0
         ? `${doneSlots.length} of ${RESULT_COUNT} ready · ${failedCount} failed`
-        : `Style: ${style}`;
+        : `Style: ${AI_STYLES.find(st => st.value === style)?.label ?? style}`;
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Cleaned designs" onBack={() => setStep('style')} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Cleaned designs" onBack={() => { cancelRun(); setSlots([]); setStep('style'); }} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -242,8 +236,8 @@ export default function UploadSketchScreen() {
   // ─── Style selection ──────────────────────────────────────────────────────────
   if (step === 'style') {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Choose style" onBack={() => setStep('upload')} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Choose style" onBack={() => setStep('upload')} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={s.content}
@@ -299,8 +293,8 @@ export default function UploadSketchScreen() {
 
   // ─── Upload step ──────────────────────────────────────────────────────────────
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.content}

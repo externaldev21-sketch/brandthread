@@ -5,11 +5,12 @@
  * declines (app/live-cohost-invite.tsx). `&demo=1` shows sample data, no API.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
@@ -45,6 +46,7 @@ export default function LiveCohostScreen() {
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(live);
   const [failed, setFailed] = useState(false);
+  const [cohostsFailed, setCohostsFailed] = useState(false);
   const seq = useRef(0);
 
   const search = useCallback(async (q: string) => {
@@ -67,19 +69,26 @@ export default function LiveCohostScreen() {
     return () => clearTimeout(t);
   }, [query, live, search]);
 
-  useEffect(() => {
-    if (!live) return;
-    api.liveCohost.list(streamId).then((r) => setCohosts(r.cohosts)).catch(() => {});
+  const loadCohosts = useCallback(() => {
+    if (!live) return () => {};
+    let alive = true;
+    setCohostsFailed(false);
+    api.liveCohost.list(streamId)
+      .then((r) => { if (alive) setCohosts(r.cohosts); })
+      .catch(() => { if (alive) setCohostsFailed(true); });
+    return () => { alive = false; };
   }, [api, live, streamId]);
+
+  useEffect(() => loadCohosts(), [loadCohosts]);
 
   async function invite(seller: LiveCohostCandidate) {
     setInvited((prev) => new Set(prev).add(seller.userId));
     if (!live) return;
     try {
       await api.liveCohost.invite(streamId, seller.userId);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setInvited((prev) => { const n = new Set(prev); n.delete(seller.userId); return n; });
-      Alert.alert('Couldn’t invite', friendlyError(e, 'Try again.'));
+      showAlert('Couldn’t invite', friendlyError(e, `Couldn’t invite ${seller.displayName}. Try again.`));
     }
   }
 
@@ -91,7 +100,7 @@ export default function LiveCohostScreen() {
       await api.liveCohost.remove(streamId, person.userId);
     } catch {
       setCohosts(previous);
-      Alert.alert('Couldn’t remove', 'Try again.');
+      showAlert('Couldn’t remove', `${person.displayName} is still on your live. Try again.`);
     }
   }
 
@@ -112,6 +121,12 @@ export default function LiveCohostScreen() {
           accessibilityLabel="Search sellers"
         />
       </View>
+      {cohostsFailed && (
+        <View style={s.errorRow} testID="live-cohost-list-error">
+          <Text style={[s.emptyText, { flex: 1, textAlign: 'left', paddingVertical: 0 }]}>Couldn’t load who’s on your live.</Text>
+          <Button label="Retry" variant="secondary" size="compact" onPress={() => { loadCohosts(); }} />
+        </View>
+      )}
       {cohosts.length > 0 && (
         <>
           <Text style={s.sectionLabel}>On your live</Text>
@@ -144,9 +159,16 @@ export default function LiveCohostScreen() {
           contentContainerStyle={[s.content, { paddingBottom: insets.bottom + SP.xl }]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={s.emptyText}>
-              {!live && !demo ? 'Open Co-host from your live broadcast.' : failed ? 'Couldn’t load sellers.' : 'No sellers found.'}
-            </Text>
+            <View>
+              <Text style={s.emptyText}>
+                {!live && !demo ? 'Open Co-host from your live broadcast.' : failed ? 'Couldn’t load sellers.' : 'No sellers found.'}
+              </Text>
+              {live && failed && (
+                <View style={s.center}>
+                  <Button label="Retry" variant="secondary" size="small" onPress={() => void search(query.trim())} />
+                </View>
+              )}
+            </View>
           }
           renderItem={({ item }) => (
             <ListRow
@@ -187,5 +209,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.meta, marginTop: SP.lg, marginBottom: SP.sm,
   },
   rowBtn: { minWidth: 112 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.lg },
 });

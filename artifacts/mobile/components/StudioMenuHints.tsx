@@ -34,7 +34,7 @@
  * feedback, not decoration) and the coach hand renders static.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   cancelAnimation,
@@ -213,6 +213,12 @@ export function StudioSwipeCoach({ visible, reduceMotion }: StudioSwipeCoachProp
       if (finished) runOnJS(setMounted)(false);
     });
   }, [visible, opacity]);
+
+  // accessibilityLiveRegion below is Android-only; iOS VoiceOver needs an
+  // explicit announcement when the coach appears.
+  useEffect(() => {
+    if (visible && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(COACH_COPY);
+  }, [visible]);
 
   useEffect(() => {
     if (!mounted || reduceMotion) { hand.value = 0; return; }

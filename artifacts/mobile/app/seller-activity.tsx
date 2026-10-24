@@ -47,7 +47,6 @@ import { useApi } from '@/lib/api';
 
 import { ApiError } from '@/lib/networkNotice';
 
-import { showAlert } from '@/lib/actionSheet';
 
 import { friendlyError } from '@/lib/friendlyError';
 

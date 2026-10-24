@@ -20,14 +20,18 @@
  * from the local preview provider instead of the API.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CameraView } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useUser } from '@clerk/expo';
-import { useApi } from '@/lib/api';
+import { API_BASE_URL, useApi } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { liveProductImageUrl } from '@/lib/liveProductOptions';
+import { LiveNotice } from '@/components/live/LiveNotice';
 import { FONT, FS, MEDIA } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -43,7 +47,7 @@ import {
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { loadAgoraModule } from '@/lib/agoraAvailability';
-import { hapticLight, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { getLiveStreamProvider, isLivePreviewDemo } from '@/lib/live/liveProvider';
 import { productsFromTags } from '@/lib/live/apiLiveProvider';
 import type { LiveChatMessage, LiveHost, LiveProduct } from '@/lib/live/types';
@@ -90,6 +94,8 @@ export default function SellerLiveScreen() {
   const [duration, setDuration] = useState(0);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
   const [catalog, setCatalog] = useState<any[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(!preview);
+  const [catalogFailed, setCatalogFailed] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showLiveCodes, setShowLiveCodes] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -122,10 +128,43 @@ export default function SellerLiveScreen() {
   const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCommentTs = useRef<string>(new Date().toISOString());
 
+  // ─── Camera + mic permission (deep links skip seller-go-live's check) ──────
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const checkPermissions = Platform.OS !== 'web' && !preview;
+  const permsKnown = cameraPermission != null && micPermission != null;
+  const permsOk = !checkPermissions || (!!cameraPermission?.granted && !!micPermission?.granted);
+  const permsBlocked = (cameraPermission != null && !cameraPermission.granted && cameraPermission.canAskAgain === false)
+    || (micPermission != null && !micPermission.granted && micPermission.canAskAgain === false);
+  const askedPermsRef = useRef(false);
+  useEffect(() => {
+    if (!checkPermissions || !permsKnown || permsOk || askedPermsRef.current) return;
+    askedPermsRef.current = true;
+    void (async () => {
+      if (!cameraPermission?.granted && cameraPermission?.canAskAgain !== false) await requestCameraPermission();
+      if (!micPermission?.granted && micPermission?.canAskAgain !== false) await requestMicPermission();
+    })();
+  }, [checkPermissions, permsKnown, permsOk]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Broadcast connection state ─────────────────────────────────────────────
+  // 'connecting' until Agora joins; 'reconnecting' on a network blip (Agora
+  // retries on its own); 'lost' when it gives up; 'failed' when the engine
+  // could not start at all. Buyers can't see the host in 'lost' / 'failed'.
+  type BroadcastState = 'connecting' | 'live' | 'reconnecting' | 'lost' | 'failed';
+  const [broadcast, setBroadcast] = useState<BroadcastState>('connecting');
+  const [agoraAttempt, setAgoraAttempt] = useState(0);
+
   // ─── Init Agora (host) ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!AgoraModule || !params.agoraAppId) return undefined;
+    if (!AgoraModule || !params.agoraAppId || !permsOk) return undefined;
     const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = AgoraModule;
+    // Agora's ConnectionStateType: 1 disconnected, 2 connecting, 3 connected, 4 reconnecting, 5 failed.
+    const CS = AgoraModule.ConnectionStateType ?? {};
+    const RECONNECTING = CS.ConnectionStateReconnecting ?? 4;
+    const FAILED = CS.ConnectionStateFailed ?? 5;
+    const CONNECTED = CS.ConnectionStateConnected ?? 3;
+    const DISCONNECTED = CS.ConnectionStateDisconnected ?? 1;
+    setBroadcast('connecting');
     try {
       const engine = createAgoraRtcEngine();
       engine.initialize({ appId: params.agoraAppId });
@@ -143,6 +182,15 @@ export default function SellerLiveScreen() {
       engine.startPreview();
       engine.registerEventHandler({
         onError: (err: any) => console.warn('[Agora]', err),
+        onJoinChannelSuccess: () => setBroadcast('live'),
+        onRejoinChannelSuccess: () => setBroadcast('live'),
+        onConnectionLost: () => setBroadcast('reconnecting'),
+        onConnectionStateChanged: (_conn: unknown, state: number) => {
+          if (state === CONNECTED) setBroadcast('live');
+          else if (state === RECONNECTING) setBroadcast('reconnecting');
+          else if (state === FAILED) setBroadcast('lost');
+          else if (state === DISCONNECTED) setBroadcast(b => (b === 'live' || b === 'reconnecting' ? 'lost' : b));
+        },
       });
       engine.joinChannel(
         params.token || null,
@@ -153,11 +201,17 @@ export default function SellerLiveScreen() {
       engineRef.current = engine;
     } catch (e) {
       console.warn('[Agora init]', e);
+      setBroadcast('failed');
     }
     return () => {
       try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch { /* gone */ }
+      engineRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [permsOk, agoraAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const retryBroadcast = useCallback(() => {
+    setAgoraAttempt(n => n + 1);
+  }, []);
 
   // ─── Running time ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -189,11 +243,33 @@ export default function SellerLiveScreen() {
         setViewerCount(Number(r?.stream?.viewer_count) || 0);
       })
       .catch(() => {});
-    (api as any).products?.list?.()
-      .then((r: any) => { if (alive) setCatalog(Array.isArray(r) ? r : r?.products ?? []); })
-      .catch(() => {});
+    void loadCatalog(() => alive);
     return () => { alive = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The seller's own catalog for "Add to show". Only active listings can be
+  // tagged (the server drops the rest), and stored photo paths resolve to the
+  // public product photo address.
+  async function loadCatalog(isAlive: () => boolean = () => true) {
+    if (preview) return;
+    setCatalogLoading(true);
+    setCatalogFailed(false);
+    try {
+      const r: any = await (api as any).products?.list?.();
+      if (!isAlive()) return;
+      const rows: any[] = Array.isArray(r) ? r : r?.products ?? [];
+      setCatalog(rows
+        .filter(p => !p.status || p.status === 'active')
+        .map(p => ({
+          ...p,
+          imageUrl: p.imageUrl ?? liveProductImageUrl(p.id, Array.isArray(p.images) ? p.images[0] : null, API_BASE_URL),
+        })));
+    } catch {
+      if (isAlive()) setCatalogFailed(true);
+    } finally {
+      if (isAlive()) setCatalogLoading(false);
+    }
+  }
 
   // ─── Realtime: WebSocket room for this stream ───────────────────────────────
   const handleLiveEvent = useCallback((event: LiveSocketEvent) => {
@@ -252,7 +328,7 @@ export default function SellerLiveScreen() {
   }
 
   async function addProduct(product: any) {
-    hapticSelection();
+    haptic('select');
     const updated = [...productTags, {
       productId: product.id, productName: product.name, priceCents: product.priceCents ?? 0, imageUri: product.imageUrl ?? undefined,
     }];
@@ -264,7 +340,7 @@ export default function SellerLiveScreen() {
   }
 
   async function setPinned(productId: string | null) {
-    hapticSelection();
+    haptic('select');
     const prev = productTags;
     setProductTags(tags => tags.map(tag => ({ ...tag, highlighted: productId != null && tag.productId === productId })));
     if (preview) return;
@@ -292,7 +368,7 @@ export default function SellerLiveScreen() {
   }
 
   const flipCamera = useCallback(() => {
-    hapticSelection();
+    haptic('select');
     try { engineRef.current?.switchCamera?.(); } catch { /* single camera */ }
     setFacing(f => (f === 'front' ? 'back' : 'front'));
   }, []);
@@ -322,17 +398,34 @@ export default function SellerLiveScreen() {
     ]);
   }
 
+  function goToSummary() {
+    router.replace({
+      pathname: '/seller-live-summary',
+      params: { streamId: params.streamId, duration: String(duration), title: params.title ?? '' },
+    } as never);
+  }
+
   async function endShow() {
     setEnding(true);
     try {
       if (preview) await getLiveStreamProvider().stop(params.streamId);
       else await (api as any).live.end(params.streamId);
-    } catch { /* the summary still loads what the server has */ }
-    hapticSuccessAction();
-    router.replace({
-      pathname: '/seller-live-summary',
-      params: { streamId: params.streamId, duration: String(duration), title: params.title ?? '' },
-    } as never);
+    } catch (e) {
+      // The show may still be live for buyers: say so, and let the host
+      // retry or leave knowingly.
+      setEnding(false);
+      showAlert(
+        'Couldn’t end your show',
+        `${friendlyError(e, 'Something went wrong ending your show.')} Buyers may still see you as live.`,
+        [
+          { text: 'Keep going', style: 'cancel' },
+          { text: 'Leave anyway', style: 'destructive', onPress: goToSummary },
+          { text: 'Retry', onPress: () => { void endShow(); } },
+        ],
+      );
+      return;
+    }
+    goToSummary();
   }
 
   // ─── Derived ───────────────────────────────────────────────────────────────
@@ -356,7 +449,7 @@ export default function SellerLiveScreen() {
 
   return (
     <View style={styles.root} testID="seller-live-screen">
-      {LocalCameraView && params.agoraAppId ? (
+      {!permsOk ? null : LocalCameraView && params.agoraAppId ? (
         <LocalCameraView canvas={{ uid: 0, renderMode: 1 }} style={StyleSheet.absoluteFill} />
       ) : (
         <CameraView style={StyleSheet.absoluteFill} facing={facing} mute />
@@ -379,6 +472,19 @@ export default function SellerLiveScreen() {
         </View>
       )}
 
+      {AgoraModule && params.agoraAppId && permsOk && (broadcast === 'reconnecting' || broadcast === 'lost') && (
+        <View style={[styles.connBanner, { top: topInset + 50 + (tipsTotalCents != null && tipsTotalCents > 0 ? 36 : 0) }]} testID="seller-live-connection">
+          <Text style={styles.connText}>
+            {broadcast === 'reconnecting' ? 'Reconnecting…' : 'Connection lost. Buyers can’t see you.'}
+          </Text>
+          {broadcast === 'lost' && (
+            <Pressable onPress={retryBroadcast} hitSlop={8} accessibilityRole="button" accessibilityLabel="Reconnect broadcast">
+              <Text style={styles.connAction}>Reconnect</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <CohostTiles cohosts={mod.cohosts} RtcSurfaceView={AgoraModule?.RtcSurfaceView ?? null} top={topInset + 86} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.bottom, { paddingBottom: bottomInset + 8 }]} pointerEvents="box-none">
@@ -386,6 +492,9 @@ export default function SellerLiveScreen() {
           <View style={styles.chatCol} pointerEvents="box-none">
             <PinnedCommentBar comment={mod.pinned} />
             <View style={styles.chatWrap} pointerEvents="box-none">
+              {comments.length === 0 && (
+                <Text style={styles.chatEmpty} testID="seller-live-chat-empty">No comments yet. Say hi to get the chat going.</Text>
+              )}
               <LiveChatList
                 messages={comments}
                 onLongPressMessage={m => {
@@ -396,7 +505,7 @@ export default function SellerLiveScreen() {
             </View>
             <LiveChatInput onSend={sendComment} disabled={ending} />
           </View>
-          <LiveRail productCount={productTags.length} onMore={openMore} onFlip={flipCamera} onOpenShop={() => { hapticLight(); setShowShop(true); }} />
+          <LiveRail productCount={productTags.length} onMore={openMore} onFlip={flipCamera} onOpenShop={() => { haptic('sheet'); setShowShop(true); if (catalogFailed) void loadCatalog(); }} />
         </View>
         {pinned && (
           <LiveProductCard
@@ -414,7 +523,11 @@ export default function SellerLiveScreen() {
           products={shopList}
           pinnedProductId={pinnedId}
           onClose={() => setShowShop(false)}
-          emptyText="No products yet. Add products to your store first."
+          emptyText={catalogLoading
+            ? 'Loading your products…'
+            : catalogFailed
+              ? 'Couldn’t load your products. Close and try again.'
+              : 'No products yet. Add products to your store first.'}
           actionFor={(product, isPinned) => {
             if (!tagged.has(product.productId)) {
               const source = catalog.find(p => p.id === product.productId);
@@ -433,6 +546,42 @@ export default function SellerLiveScreen() {
         onClose={() => setActionComment(null)}
         onAction={(action, c) => { setActionComment(null); void runCommentAction(action, c); }}
       />
+
+      {checkPermissions && permsKnown && !permsOk ? (
+        <View style={[StyleSheet.absoluteFill, styles.blocker, { paddingBottom: bottomInset + 24 }]} testID="seller-live-permissions">
+          <LiveNotice
+            tone="dark"
+            title="Camera & microphone access needed"
+            body="Buyers can’t see or hear you until Brandthread can use your camera and microphone."
+          />
+          <Pressable
+            style={styles.blockerBtn}
+            onPress={permsBlocked
+              ? () => { void Linking.openSettings(); }
+              : async () => { await requestCameraPermission(); await requestMicPermission(); }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.blockerBtnText}>{permsBlocked ? 'Open Settings' : 'Allow camera & microphone'}</Text>
+          </Pressable>
+          <Pressable onPress={confirmEnd} hitSlop={8} accessibilityRole="button" style={styles.blockerLink}>
+            <Text style={styles.blockerLinkText}>End show</Text>
+          </Pressable>
+        </View>
+      ) : broadcast === 'failed' ? (
+        <View style={[StyleSheet.absoluteFill, styles.blocker, { paddingBottom: bottomInset + 24 }]} testID="seller-live-broadcast-failed">
+          <LiveNotice
+            tone="dark"
+            title="Your camera couldn’t start"
+            body="Buyers can’t see you right now. Try again, or end the show."
+          />
+          <Pressable style={styles.blockerBtn} onPress={retryBroadcast} accessibilityRole="button">
+            <Text style={styles.blockerBtnText}>Try again</Text>
+          </Pressable>
+          <Pressable onPress={confirmEnd} hitSlop={8} accessibilityRole="button" style={styles.blockerLink}>
+            <Text style={styles.blockerLinkText}>End show</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -450,5 +599,17 @@ const styles = StyleSheet.create({
   chatAndRail: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   chatCol: { flex: 1, minWidth: 0, gap: 10 },
   chatWrap: { maxHeight: 220, justifyContent: 'flex-end' },
+  chatEmpty: { color: MEDIA.fgMuted, fontFamily: FONT.medium, fontSize: FS.meta, paddingBottom: 6 },
+  connBanner: {
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, height: 30, borderRadius: 15, backgroundColor: MEDIA.chip,
+  },
+  connText: { color: MEDIA.fg, fontFamily: FONT.semibold, fontSize: FS.meta },
+  connAction: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: FS.meta, textDecorationLine: 'underline' },
+  blocker: { backgroundColor: MEDIA.backdrop, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  blockerBtn: { marginTop: 20, height: 48, paddingHorizontal: 28, borderRadius: 24, backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center' },
+  blockerBtnText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: FS.md },
+  blockerLink: { marginTop: 16, paddingVertical: 8 },
+  blockerLinkText: { color: MEDIA.fgMuted, fontFamily: FONT.semibold, fontSize: FS.sm },
   notice: { color: MEDIA.fg, fontFamily: FONT.medium, fontSize: FS.meta, textAlign: 'center' },
 });

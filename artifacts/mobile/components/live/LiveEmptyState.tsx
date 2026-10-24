@@ -38,7 +38,7 @@ export function LiveEmptyState({
         <View style={[styles.heroIcon, { borderColor: theme.border }]}>
           <Feather name="radio" size={26} color={theme.text} />
         </View>
-        <Text style={[styles.heroTitle, { color: theme.text }]}>{error ? 'Couldn’t load lives' : <>No one&apos;s live right now</>}</Text>
+        <Text style={[styles.heroTitle, { color: theme.text }]}>{error ? 'Couldn’t load lives' : 'No one’s live right now'}</Text>
         <Text style={[styles.heroSub, { color: theme.muted }]}>
           {error
             ? 'We couldn’t load live streams. Check your connection and try again.'

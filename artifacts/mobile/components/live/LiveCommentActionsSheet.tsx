@@ -6,7 +6,7 @@
  * (no dimming scrim over the video) and drives the shared sheet engine
  * (`useSheetTransition`) directly: same spring, flick-dismiss and haptics as
  * every `<Sheet>`, on the shared raised surface with the shared grabber and
- * `MenuBlocks` rows.
+ * `MenuBlocks` rows. Ban asks for a destructive confirm before it runs.
  */
 import React, { useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +27,8 @@ import { SHEET_GUTTER, SHEET_RADIUS, SheetGrabber, sheetSurfaceColor, useSheetTr
 import { MenuBlocks } from '@/components/ui/MenuSheet';
 
 import { a11yModalProps } from '@/lib/a11y/modal';
+
+import { confirmAlert } from '@/lib/actionSheet';
 
 export interface CommentActionTarget {
   id: string;
@@ -56,6 +58,17 @@ export function LiveCommentActionsSheet({
   if (!shown || !modalVisible) return null;
 
   const act = (action: CommentAction) => () => onAction(action, shown);
+  // Ban is the one action that can't be taken back from here: it removes the
+  // viewer from the live and strips all of their comments, so it asks first.
+  const confirmBan = () => {
+    const target = shown;
+    void confirmAlert({
+      title: `Ban ${target.display_name}?`,
+      message: 'They’ll be removed from this live and all their comments will be deleted.',
+      confirmLabel: 'Ban',
+      destructive: true,
+    }).then((ok) => { if (ok) onAction('ban', target); });
+  };
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
@@ -87,7 +100,7 @@ export function LiveCommentActionsSheet({
                 [
                   { key: 'remove', icon: 'trash-2', label: 'Remove comment', destructive: true, onPress: act('remove') },
                   { key: 'mute', icon: 'mic-off', label: `Mute ${shown.display_name}`, destructive: true, onPress: act('mute') },
-                  { key: 'ban', icon: 'slash', label: `Ban ${shown.display_name}`, destructive: true, onPress: act('ban') },
+                  { key: 'ban', icon: 'slash', label: `Ban ${shown.display_name}`, destructive: true, onPress: confirmBan },
                 ],
               ]}
             />

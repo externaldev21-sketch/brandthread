@@ -21,11 +21,18 @@ describe('Go live: Create your show (Whatnot)', () => {
     expect(source).toContain("text: 'Upload Photo'");
     expect(source).toContain("text: 'Take Photo'");
     expect(source).toContain("api.productBulk.list({ status: 'active' })");
-    expect(source).toContain('toLiveProductOptions(r)');
+    expect(source).toContain('toLiveProductOptions(r, API_BASE_URL)');
     expect(source).toContain('if (catalog.length === 0) void loadCatalog();');
     expect(source).toContain('isLivePreviewDemo()');
     expect(source).toContain('toggleFeaturedProduct');
     expect(source).toContain('testID="go-live-next"');
+  });
+
+  it('says why Next is disabled and tells a failed product load apart from an empty store', () => {
+    expect(source).toContain("'Add a title to go live.'");
+    expect(source).toContain('testID="go-live-next-hint"');
+    expect(source).toContain('setCatalogFailed(true)');
+    expect(source).toContain('Couldn’t load your products. Close and try again.');
   });
 
   it('uploads the thumbnail and sends it, the title and the products to /api/live/start', () => {
@@ -50,7 +57,8 @@ describe('Go live: camera check (Whatnot pre-show)', () => {
   it('asks for camera + microphone and offers Settings when they were denied for good', () => {
     expect(source).toContain('useCameraPermissions()');
     expect(source).toContain('useMicrophonePermissions()');
-    expect(source).toContain('Allow camera');
+    // One button asks for both, so it says both.
+    expect(source).toContain('Allow camera & microphone');
     expect(source).toContain('Linking.openSettings()');
     expect(source).toContain('canAskAgain === false');
   });

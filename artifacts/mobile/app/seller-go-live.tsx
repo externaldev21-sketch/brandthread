@@ -28,7 +28,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useUser } from '@clerk/expo';
-import { useApi } from '@/lib/api';
+import { API_BASE_URL, useApi } from '@/lib/api';
 import { FONT, FS, MEDIA, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -41,7 +41,7 @@ import { showActionSheet } from '@/components/ui/ActionSheet';
 import { LiveNotice } from '@/components/live/LiveNotice';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { formatCents } from '@/lib/money';
-import { hapticLight, hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { getLiveStreamProvider, isLivePreviewDemo } from '@/lib/live/liveProvider';
 import { useLiveAvailability } from '@/lib/live/useLiveAvailability';
 import { toLiveProductOptions } from '@/lib/liveProductOptions';
@@ -81,12 +81,14 @@ function SellerGoLiveFlow() {
   const [cover, setCover] = useState<{ localUri: string; remoteUrl: string | null; uploading: boolean } | null>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogFailed, setCatalogFailed] = useState(false);
   const [featured, setFeatured] = useState<CatalogProduct[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [notice, setNotice] = useState('');
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
+    setCatalogFailed(false);
     const provider = getLiveStreamProvider();
     try {
       // `?bt_preview=seller&demo=1` has no API: offer the preview shows'
@@ -100,10 +102,11 @@ function SellerGoLiveFlow() {
         setCatalog([...seen.values()]);
       } else {
         const r = await api.productBulk.list({ status: 'active' });
-        setCatalog(toLiveProductOptions(r).map(p => ({ ...p, stock: p.totalStock })));
+        setCatalog(toLiveProductOptions(r, API_BASE_URL).map(p => ({ ...p, stock: p.totalStock })));
       }
     } catch {
       // Keep what we had; opening the picker again retries.
+      setCatalogFailed(true);
     } finally {
       setCatalogLoading(false);
     }
@@ -112,7 +115,7 @@ function SellerGoLiveFlow() {
   useEffect(() => { void loadCatalog(); }, [loadCatalog]);
 
   const toggleFeaturedProduct = useCallback((productId: string) => {
-    hapticSelection();
+    haptic('select');
     setFeatured(prev => {
       if (prev.some(p => p.id === productId)) return prev.filter(p => p.id !== productId);
       const product = catalog.find(p => p.id === productId);
@@ -179,6 +182,8 @@ function SellerGoLiveFlow() {
   }
 
   const canNext = !!title.trim() && !cover?.uploading;
+  // Why Next is disabled, shown right above it.
+  const nextHint = !title.trim() ? 'Add a title to go live.' : cover?.uploading ? 'Uploading your thumbnail…' : '';
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }} testID="go-live-setup">
       <ScreenHeader title="Create your show" backAccessibilityLabel="Close" />
@@ -239,7 +244,7 @@ function SellerGoLiveFlow() {
           </View>
         ))}
         <Pressable
-          onPress={() => { hapticLight(); setShowPicker(true); if (catalog.length === 0) void loadCatalog(); }}
+          onPress={() => { haptic('sheet'); setShowPicker(true); if (catalog.length === 0) void loadCatalog(); }}
           style={[styles.addRow, { borderColor: theme.border }]}
           accessibilityRole="button"
           testID="go-live-add-products"
@@ -254,12 +259,13 @@ function SellerGoLiveFlow() {
         {notice ? <Text style={[styles.help, { color: theme.muted, textAlign: 'center' }]}>{notice}</Text> : null}
       </ScrollView>
       <StickyFooter>
+        {nextHint ? <Text style={[styles.help, styles.nextHint, { color: theme.muted }]} testID="go-live-next-hint">{nextHint}</Text> : null}
         <View style={styles.footerRow}>
           <Pressable onPress={() => goBackOr(router)} style={[styles.footerBtn, { borderColor: theme.border, borderWidth: 1 }]} accessibilityRole="button">
             <Text style={[styles.footerText, { color: theme.text }]}>Cancel</Text>
           </Pressable>
           <Pressable
-            onPress={() => { hapticPrimaryAction(); setStep('camera'); }}
+            onPress={() => setStep('camera')}
             disabled={!canNext}
             style={[styles.footerBtn, { backgroundColor: theme.text, opacity: canNext ? 1 : 0.4 }]}
             accessibilityRole="button"
@@ -277,7 +283,11 @@ function SellerGoLiveFlow() {
           products={catalog.map(toLiveProduct)}
           pinnedProductId={null}
           onClose={() => setShowPicker(false)}
-          emptyText={catalogLoading ? 'Loading your products…' : 'No products yet. Add products to your store first.'}
+          emptyText={catalogLoading
+            ? 'Loading your products…'
+            : catalogFailed
+              ? 'Couldn’t load your products. Close and try again.'
+              : 'No products yet. Add products to your store first.'}
           actionFor={product => {
             const added = featured.some(f => f.id === product.productId);
             return { label: added ? 'Added' : 'Add', selected: added, onPress: () => toggleFeaturedProduct(product.productId) };
@@ -324,7 +334,7 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const flipCamera = useCallback(() => {
-    hapticSelection();
+    haptic('select');
     setFacing(v => {
       const next = v === 'front' ? 'back' : 'front';
       if (next === 'front') setTorch(false);
@@ -336,7 +346,6 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
 
   async function handleStart() {
     if (starting || !canBroadcastHere) return;
-    hapticPrimaryAction();
     setStarting(true);
     setError('');
     try {
@@ -400,7 +409,7 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
           onPress={blocked ? () => { void Linking.openSettings(); } : async () => { await requestCameraPermission(); await requestMicPermission(); }}
           accessibilityRole="button"
         >
-          <Text style={styles.startText}>{blocked ? 'Open Settings' : 'Allow camera'}</Text>
+          <Text style={styles.startText}>{blocked ? 'Open Settings' : 'Allow camera & microphone'}</Text>
         </Pressable>
       </View>
     );
@@ -445,10 +454,10 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
 
       <View style={[styles.camRail, { bottom: insets.bottom + 96 }]}>
         {facing === 'back' && (
-          <RailButton icon={torch ? 'zap' : 'zap-off'} label="Flash" onPress={() => { hapticSelection(); setTorch(v => !v); }} />
+          <RailButton icon={torch ? 'zap' : 'zap-off'} label="Flash" onPress={() => { haptic('select'); setTorch(v => !v); }} />
         )}
         <RailButton icon="refresh-cw" label="Flip" onPress={flipCamera} testID="go-live-flip" />
-        <RailButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Mic on' : 'Mic off'} onPress={() => { hapticSelection(); setMicOn(v => !v); }} testID="go-live-mic" />
+        <RailButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Mic on' : 'Mic off'} onPress={() => { haptic('select'); setMicOn(v => !v); }} testID="go-live-mic" />
         <RailButton icon="shopping-bag" label="Shop" badge={featured.length} onPress={() => setShowShop(true)} testID="go-live-shop" />
       </View>
 
@@ -521,6 +530,7 @@ const styles = StyleSheet.create({
   schedule: { alignItems: 'center', paddingVertical: SP.lg },
   scheduleText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   footerRow: { flexDirection: 'row', gap: 12 },
+  nextHint: { textAlign: 'center', marginTop: 0, marginBottom: SP.sm },
   footerBtn: { flex: 1, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
   footerText: { fontFamily: FONT.bold, fontSize: FS.base },
 

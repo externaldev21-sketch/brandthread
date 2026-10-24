@@ -8,26 +8,24 @@ import {
   ScrollView,
   TextInput,
   Platform,
-  Modal,
-  FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useColors } from '@/hooks/useColors';
-import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { Icon } from '@/components/ui/Icon';
 import { Feather } from '@expo/vector-icons';
 import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
-import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
-import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
-import { getProducts, updateProduct } from '@/services/productService';
-import { Product, ProductMedia } from '@/services/productTypes';
+import { Product } from '@/services/productTypes';
+import { AddToProductSheet } from '@/components/ai/AddToProductSheet';
+import { addGeneratedImageToProduct, saveGeneratedImage } from '@/lib/generatedImageActions';
+import { classifyAiCreditsError } from '@/lib/aiCreditsError';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { SCREEN_GUTTER } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { crispPx } from '@/lib/crispPixel';
 
@@ -53,81 +51,43 @@ export default function LifestyleImagesScreen() {
   const [resultB64, setResultB64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
-  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
-  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
-
-  function writeResultToTempFile(): string | null {
-    if (!resultB64) return null;
-    const file = new File(Paths.cache, `lifestyle-${Date.now()}.png`);
-    file.write(resultB64, { encoding: 'base64' });
-    return file.uri;
-  }
+  const [addingToProduct, setAddingToProduct] = useState(false);
 
   async function handleSaveToPhotos() {
     if (!resultB64 || saving) return;
     setSaving(true);
     try {
-      const fileUri = writeResultToTempFile();
-      if (!fileUri) return;
-      const outcome = await saveImageToMediaLibrary(fileUri);
-      if (outcome === 'saved') {
+      const outcome = await saveGeneratedImage(resultB64, 'lifestyle');
+      if (outcome.ok) {
         haptics.success();
-        Alert.alert('Saved', 'Saved to Photos.');
-      } else if (outcome === 'denied') {
-        Alert.alert('Permission required', 'Allow photo library access to save this image.');
+        showAlert('Saved', outcome.message);
       } else {
-        Alert.alert(outcome === 'unavailable' ? 'Unavailable' : 'Save failed',
-          outcome === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Could not save this image. Please try again.');
+        showAlert(outcome.title, outcome.message);
       }
-    } catch {
-      Alert.alert('Save failed', 'Could not save this image. Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleAddToProduct() {
-    if (!resultB64) return;
-    setLoadingPickerProducts(true);
-    try {
-      const all = await getProducts();
-      const active = all.filter(p => p.status !== 'archived');
-      if (active.length === 0) {
-        Alert.alert('No products', 'Create a product first, then add this photo to its media gallery.');
-        return;
-      }
-      setPickerProducts(active);
-      setShowProductPicker(true);
-    } catch {
-      Alert.alert("Couldn't load products", 'Try again.');
-    } finally {
-      setLoadingPickerProducts(false);
-    }
+  function handleAddToProduct() {
+    if (!resultB64 || addingToProduct) return;
+    // The sheet opens right away and loads the products itself (spinner).
+    setShowProductPicker(true);
   }
 
   async function confirmAddToProduct(product: Product) {
     setShowProductPicker(false);
-    const fileUri = writeResultToTempFile();
-    if (!fileUri) return;
+    if (!resultB64) return;
+    setAddingToProduct(true);
     try {
-      const existing = product.media ?? [];
-      const newMedia: ProductMedia = {
-        id: `lifestyle-${Date.now()}`,
-        type: 'image',
-        uri: fileUri,
-        isCover: false,
-        sortOrder: existing.length,
-        createdAt: new Date().toISOString(),
-      };
-      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
-      if (updated) {
-        haptics.success();
-        Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
-      } else {
-        Alert.alert("Couldn't update product", 'Try again.');
-      }
-    } catch {
-      Alert.alert("Couldn't add to product", 'Try again.');
+      // Uploads the image and stores the uploaded URL (not a cache file).
+      await addGeneratedImageToProduct(api, product, resultB64, 'lifestyle');
+      haptics.success();
+      showAlert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
+    } catch (err) {
+      showAlert("Couldn't add to product", friendlyError(err, 'The photo did not upload. Try again.'));
+    } finally {
+      setAddingToProduct(false);
     }
   }
 
@@ -188,10 +148,19 @@ export default function LifestyleImagesScreen() {
       if (result?.b64_json) {
         setResultB64(result.b64_json);
       } else {
-        Alert.alert('Generation failed', 'Could not generate the lifestyle photo. Please try again.');
+        showAlert('Generation failed', 'Could not generate the lifestyle photo. Please try again.');
       }
-    } catch {
-      Alert.alert('Generation failed', 'Could not generate the lifestyle photo. Please try again.');
+    } catch (err) {
+      // lib/api.ts already surfaced a credit-gate refusal (402 opens the AI
+      // credits screen; a daily cap shows its own alert), so don't stack a
+      // second alert on top. The result step still offers "Try again".
+      const e = err as { status?: unknown; body?: unknown } | null;
+      const creditsKind = typeof e?.status === 'number'
+        ? classifyAiCreditsError(e.status, typeof e.body === 'string' ? e.body : undefined)
+        : null;
+      if (!creditsKind) {
+        showAlert('Generation failed', friendlyError(err, 'Could not generate the lifestyle photo. Please try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -211,7 +180,7 @@ export default function LifestyleImagesScreen() {
         {photos.map((p) => (
           <View key={p.id} style={styles.trayThumbWrap}>
             <CachedImage source={{ uri: p.uri }} style={styles.trayThumb} contentFit="cover" />
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
+            <TouchableOpacity
               style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
               onPress={() => removePhoto(group, p.id)}
               activeOpacity={0.8}
@@ -224,7 +193,7 @@ export default function LifestyleImagesScreen() {
           </View>
         ))}
         {photos.length < MAX_PHOTOS && (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
+          <TouchableOpacity
             onPress={() => pickPhotos(group)}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -379,10 +348,10 @@ export default function LifestyleImagesScreen() {
                         {saving ? 'Saving…' : 'Save to photos'}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={handleAddToProduct} disabled={loadingPickerProducts} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+                    <TouchableOpacity onPress={handleAddToProduct} disabled={addingToProduct} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
                       <Icon name="package" size={16} color={colors.foreground} />
                       <Text style={[styles.primaryBtnText, { color: colors.foreground }]}>
-                        {loadingPickerProducts ? 'Loading products…' : 'Add to product'}
+                        {addingToProduct ? 'Adding to product…' : 'Add to product'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={generate} activeOpacity={0.85} style={styles.secondaryBtn}>
@@ -405,55 +374,18 @@ export default function LifestyleImagesScreen() {
         )}
       </ScrollView>
 
-      <Modal
+      <AddToProductSheet
         visible={showProductPicker}
-        animationType="slide"
-        presentationStyle="formSheet"
-        onRequestClose={() => setShowProductPicker(false)}
-      >
-        <ModalSafeArea>
-        <View style={[styles.pickerRoot, { backgroundColor: colors.background }]}>
-          <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground, paddingHorizontal: 20, marginTop: 8 }]}>
-            The photo will be added to the product's media gallery.
-          </Text>
-          {loadingPickerProducts ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
-          ) : (
-            <FlatList
-              data={pickerProducts}
-              keyExtractor={p => p.id}
-              contentContainerStyle={{ padding: 20 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.pickerRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
-                  {item.media?.[0]?.uri ? (
-                    <CachedImage source={{ uri: item.media[0].uri }} style={styles.pickerThumb} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }]}>
-                      <Icon name="package" size={20} color={colors.mutedForeground} />
-                    </View>
-                  )}
-                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: FONT.semibold, fontSize: 15 }} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              )}
-            />
-          )}
-        </View>
-        </ModalSafeArea>
-      </Modal>
+        onClose={() => setShowProductPicker(false)}
+        onPick={confirmAddToProduct}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  pickerRoot: { flex: 1 },
-  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  pickerThumb: { width: 44, height: 44, borderRadius: 8 },
+  scrollContent: { padding: SCREEN_GUTTER, paddingBottom: 40 },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },

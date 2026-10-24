@@ -6,8 +6,10 @@ import { MEDIA } from '@/lib/theme';
  * action, rows with a real thumbnail + name + blend-mode letter + visibility
  * checkbox, a pinned non-draggable "Background colour" row at the bottom,
  * swipe-left-to-reveal Lock/Duplicate/Delete per row, drag-to-reorder via the
- * handle, and tapping the ALREADY-selected row opens a context menu
- * (Rename/Select/Copy/Alpha Lock/Mask).
+ * handle, and tapping the ALREADY-selected row — or long-pressing any row —
+ * opens a context menu (Rename/Select/Copy/Alpha Lock/Mask/Delete), so every
+ * row action is reachable without the swipe gesture (which can't be found
+ * with a mouse on web).
  *
  * "New group" / collapsible groups are deliberately NOT implemented here —
  * DesignLayer has no parentId/children relationship and DesignLayerData has
@@ -181,6 +183,12 @@ export default function LayersPanel(props: LayersPanelProps) {
     }
   }
 
+  function handleRowLongPress(layer: DesignLayer) {
+    if (openSwipeId) closeSwipe(openSwipeId);
+    if (selectedLayerId !== layer.id) onSelect(layer.id);
+    setMenuFor(layer.id);
+  }
+
   return (
     <View style={s.panel} testID="layers-panel">
       <View style={s.header}>
@@ -262,7 +270,17 @@ export default function LayersPanel(props: LayersPanelProps) {
                     )}
                   </View>
 
-                  <Pressable style={s.rowMain} onPress={() => handleRowPress(layer)}>
+                  <Pressable
+                    style={s.rowMain}
+                    onPress={() => handleRowPress(layer)}
+                    onLongPress={() => handleRowLongPress(layer)}
+                    delayLongPress={350}
+                    accessibilityRole="button"
+                    accessibilityLabel={layer.name}
+                    accessibilityHint={isSelected ? 'Opens layer options' : 'Selects this layer. Long-press for layer options'}
+                    accessibilityState={{ selected: isSelected, expanded: menuFor === layer.id }}
+                    testID={`layer-row-main-${layer.id}`}
+                  >
                     {editingId === layer.id ? (
                       <TextInput
                         value={editingName}
@@ -337,6 +355,15 @@ export default function LayersPanel(props: LayersPanelProps) {
                     accessibilityRole="button"
                   >
                     <Text style={s.menuItemText}>Mask{layer.clippingMask ? '  ✓' : ''}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.menuItem}
+                    onPress={() => { setMenuFor(null); onDeleteLayer(layer.id); }}
+                    testID={`layer-menu-delete-${layer.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${layer.name}`}
+                  >
+                    <Text style={s.menuItemText}>Delete</Text>
                   </TouchableOpacity>
 
                   <View style={s.blendRow}>
@@ -423,7 +450,9 @@ const s = StyleSheet.create({
   swipeBtnText: { fontFamily: FONT.medium, fontSize: FS.xs, color: FG, includeFontPadding: false },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.sm, height: ROW_HEIGHT, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE,
+    // Same side inset as the header (SP.lg) so the visibility checkbox lines
+    // up under "Done" instead of sitting 9pt from the panel edge.
+    paddingHorizontal: SP.lg, height: ROW_HEIGHT, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE,
     backgroundColor: CARD_ELEVATED,
   },
   // Procreate's own selected-row emphasis is a solid fill (blue in stock
@@ -432,7 +461,7 @@ const s = StyleSheet.create({
   rowSelected: { backgroundColor: FG },
   rowDragging: { opacity: 0.5 },
   backgroundRow: { borderBottomWidth: 0 },
-  dropLine: { height: 2, backgroundColor: FG, marginHorizontal: SP.sm },
+  dropLine: { height: 2, backgroundColor: FG, marginHorizontal: SP.lg },
   dragHandle: { width: 18, alignItems: 'center' },
   thumb: {
     width: 40, height: 40, borderRadius: RADIUS.xs, backgroundColor: SURFACE,
@@ -458,7 +487,7 @@ const s = StyleSheet.create({
   contextMenu: {
     padding: SP.sm, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, gap: 2,
   },
-  menuItem: { paddingVertical: 8, paddingHorizontal: SP.sm },
+  menuItem: { paddingVertical: 8, paddingHorizontal: SP.lg - SP.sm },
   menuItemText: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, includeFontPadding: false },
   blendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.xs },
   blendChip: {

@@ -226,6 +226,10 @@ test('Swipe-left on a brush row reveals real Duplicate/Delete actions that actua
   }
   expect(copyId).not.toBeNull();
   await page.locator(`[data-testid="brush-delete-${copyId}"]`).click();
+  // Brush delete now asks for confirmation (confirmAlert → web alert host):
+  // button 0 is Cancel, button 1 is the destructive Delete.
+  await expect(page.locator('[data-testid="web-alert"]')).toBeVisible();
+  await page.locator('[data-testid="web-alert-button-1"]').click();
   await page.waitForTimeout(300);
 
   await expect(page.getByText('Soft Brush Copy', { exact: true })).toHaveCount(0);

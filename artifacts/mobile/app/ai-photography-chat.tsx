@@ -25,6 +25,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { FONT, FS } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { minHitSlop } from '@/lib/hitSlop';
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
 
 interface UploadedPhoto {
   id: string;
@@ -46,7 +47,13 @@ interface Message {
   retryGarment?: UploadedPhoto;
   garmentIndex?: number;
   retryPrompt?: string;
+  /** Whole-request failure: what Retry re-sends (the tray keeps these photos too). */
+  retryRequest?: RetryRequest;
 }
+
+type RetryRequest =
+  | { kind: 'free'; photos: UploadedPhoto[]; prompt: string }
+  | { kind: 'outfitSwap'; garments: UploadedPhoto[]; prompt: string };
 
 const MAX_PHOTOS = 4;
 const MAX_GARMENTS = 4;
@@ -57,6 +64,14 @@ const INITIAL_MSG: Message = {
   content: "Add product photos and references, then describe the style.",
 };
 
+/** The greeting bubble's copy for each mode (the thread is shared). */
+const INITIAL_COPY: Record<PhotographyMode, string> = {
+  free: INITIAL_MSG.content,
+  outfitSwap: 'Upload one hero photo of the model and scene, then add garment mockups to swap in.',
+};
+
+const isAbortError = (err: unknown) => (err as { name?: string } | null)?.name === 'AbortError';
+
 export default function AIPhotographyChatScreen() {
   const colors = useColors();
   const api = useApi();
@@ -66,20 +81,51 @@ export default function AIPhotographyChatScreen() {
   const [input, setInput] = useState('');
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [heroPhoto, setHeroPhoto] = useState<UploadedPhoto | null>(null);
+  /** The hero is only "locked" once it has been sent into the thread. */
+  const [heroLocked, setHeroLocked] = useState(false);
   const [garments, setGarments] = useState<UploadedPhoto[]>([]);
   const [loading, setLoading] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
+  // In-flight generation: Cancel aborts the request; elapsed time shows progress.
+  const abortRef = useRef<AbortController | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  useEffect(() => {
+    if (!loading) return;
+    setElapsedSec(0);
+    const started = Date.now();
+    const timer = setInterval(() => setElapsedSec(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [loading]);
+
+  // Leaving the screen cancels a generation that is still running.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  function beginRequest(): AbortSignal {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    return controller.signal;
+  }
+
+  function cancelGeneration() {
+    abortRef.current?.abort();
+  }
 
 
   useEffect(() => {
     if (!outfitSwapEnabled && mode === 'outfitSwap') setMode('free');
   }, [mode, outfitSwapEnabled]);
 
-  async function pickPhotos() {
-    const remaining = mode === 'outfitSwap'
-      ? (heroPhoto ? MAX_GARMENTS - garments.length : MAX_GARMENTS + 1)
-      : MAX_PHOTOS - photos.length;
+  async function pickPhotos(opts: { replaceHero?: boolean } = {}) {
+    const replaceHero = !!opts.replaceHero && mode === 'outfitSwap' && !heroLocked;
+    const remaining = replaceHero
+      ? 1
+      : mode === 'outfitSwap'
+        ? (heroPhoto ? MAX_GARMENTS - garments.length : MAX_GARMENTS + 1)
+        : MAX_PHOTOS - photos.length;
     if (remaining <= 0) return;
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -106,7 +152,9 @@ export default function AIPhotographyChatScreen() {
         base64: a.base64 as string,
         mime: a.mimeType ?? 'image/jpeg',
       }));
-    if (mode === 'outfitSwap') {
+    if (replaceHero) {
+      if (picked[0]) setHeroPhoto(picked[0]);
+    } else if (mode === 'outfitSwap') {
       if (!heroPhoto && picked.length > 0) {
         setHeroPhoto(picked[0]);
         setGarments((prev) => [...prev, ...picked.slice(1, MAX_GARMENTS + 1)]);
@@ -126,6 +174,12 @@ export default function AIPhotographyChatScreen() {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   }
 
+  /** Before it is locked, a picked hero can simply be removed. */
+  function removeHero() {
+    if (heroLocked || loading) return;
+    setHeroPhoto(null);
+  }
+
   function resetOutfitSwap() {
     Alert.alert(
       'Start a new Outfit Swap?',
@@ -137,6 +191,7 @@ export default function AIPhotographyChatScreen() {
           style: 'destructive',
           onPress: () => {
             setHeroPhoto(null);
+            setHeroLocked(false);
             setGarments([]);
             setMessages((prev) => [{
               id: `${Date.now()}-new-outfit-swap`,
@@ -163,12 +218,15 @@ export default function AIPhotographyChatScreen() {
     };
     setMessages((prev) => [userMsg, ...prev]);
     setInput('');
-    setPhotos([]);
-    setLoading(true);
+    await runFree({ kind: 'free', photos: attached, prompt: text.trim() });
+  }
 
+  /** One free-mode generation. The tray is only cleared once it succeeds. */
+  async function runFree(req: Extract<RetryRequest, { kind: 'free' }>) {
+    const signal = beginRequest();
     try {
-      const dataUrls = attached.map((p) => `data:${p.mime};base64,${p.base64}`);
-      const result = await api.photography.generate(dataUrls, text.trim());
+      const dataUrls = req.photos.map((p) => `data:${p.mime};base64,${p.base64}`);
+      const result = await api.photography.generate(dataUrls, req.prompt, 'photoshoot', { signal });
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -177,19 +235,46 @@ export default function AIPhotographyChatScreen() {
           : "I couldn't generate that photo. Please try again with different photos.",
         image: result?.b64_json,
         error: !result?.b64_json,
+        retryRequest: result?.b64_json ? undefined : req,
       };
       setMessages((prev) => [aiMsg, ...prev]);
-    } catch (err: any) {
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "Couldn't create that photo. Please try again.",
-        error: true,
-      };
-      setMessages((prev) => [aiMsg, ...prev]);
+      if (result?.b64_json) {
+        const sent = new Set(req.photos.map((p) => p.id));
+        setPhotos((prev) => prev.filter((p) => !sent.has(p.id)));
+      }
+    } catch (err: unknown) {
+      setMessages((prev) => [failureMessage(err, req), ...prev]);
     } finally {
-      setLoading(false);
+      endRequest(signal);
     }
+  }
+
+  function endRequest(signal: AbortSignal) {
+    if (abortRef.current?.signal === signal) abortRef.current = null;
+    setLoading(false);
+  }
+
+  function failureMessage(err: unknown, req: RetryRequest): Message {
+    const cancelled = isAbortError(err);
+    return {
+      id: `${Date.now()}-${req.kind}-error`,
+      role: 'assistant',
+      content: cancelled
+        ? 'Cancelled. Your photos are still attached.'
+        : aiToolErrorMessage(err, "Couldn't create that photo. Please try again."),
+      error: !cancelled,
+      retryRequest: req,
+    };
+  }
+
+  /** Retry a whole-request failure with the same photos and prompt. */
+  async function retryRequest(message: Message) {
+    const req = message.retryRequest;
+    if (!req || loading) return;
+    if (req.kind === 'outfitSwap' && !heroPhoto) return;
+    setMessages((prev) => prev.filter((m) => m.id !== message.id));
+    if (req.kind === 'free') await runFree(req);
+    else await runOutfitSwap(req);
   }
 
   async function sendOutfitSwap(text: string) {
@@ -212,6 +297,7 @@ export default function AIPhotographyChatScreen() {
       };
       setMessages((prev) => [aiMsg, userMsg, ...prev]);
       setInput('');
+      setHeroLocked(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return;
     }
@@ -227,13 +313,19 @@ export default function AIPhotographyChatScreen() {
     };
     setMessages((prev) => [userMsg, ...prev]);
     setInput('');
-    setGarments([]);
-    setLoading(true);
+    setHeroLocked(true);
+    await runOutfitSwap({ kind: 'outfitSwap', garments: attachedGarments, prompt: text.trim() });
+  }
 
+  /** One Outfit Swap request. The garment tray is only cleared once it succeeds. */
+  async function runOutfitSwap(req: Extract<RetryRequest, { kind: 'outfitSwap' }>) {
+    if (!heroPhoto) return;
+    const attachedGarments = req.garments;
+    const signal = beginRequest();
     try {
       const heroDataUrl = `data:${heroPhoto.mime};base64,${heroPhoto.base64}`;
       const garmentDataUrls = attachedGarments.map((p) => `data:${p.mime};base64,${p.base64}`);
-      const result = await api.photography.generateOutfitSwap(heroDataUrl, garmentDataUrls, text.trim());
+      const result = await api.photography.generateOutfitSwap(heroDataUrl, garmentDataUrls, req.prompt, { signal });
       const resultMessages: Message[] = (result?.results ?? []).map((item: { b64_json?: string; garmentIndex?: number }, index: number) => {
         const garmentIndex = item.garmentIndex ?? index + 1;
         return {
@@ -246,7 +338,7 @@ export default function AIPhotographyChatScreen() {
           error: !item.b64_json,
           garmentIndex,
           retryGarment: attachedGarments[garmentIndex - 1],
-          retryPrompt: text.trim(),
+          retryPrompt: req.prompt,
         };
       });
       if (resultMessages.length === 0 && !result?.errors?.length) {
@@ -262,20 +354,18 @@ export default function AIPhotographyChatScreen() {
             error: true,
             garmentIndex,
             retryGarment: attachedGarments[garmentIndex - 1],
-            retryPrompt: text.trim(),
+            retryPrompt: req.prompt,
           });
         });
       }
       setMessages((prev) => [...resultMessages, ...prev]);
-    } catch (err: any) {
-      setMessages((prev) => [{
-        id: `${Date.now()}-outfit-error`,
-        role: 'assistant',
-        content: "Couldn't create that photo. Please try again.",
-        error: true,
-      }, ...prev]);
+      // The request went through (per-garment failures keep their own Retry).
+      const sent = new Set(attachedGarments.map((p) => p.id));
+      setGarments((prev) => prev.filter((p) => !sent.has(p.id)));
+    } catch (err: unknown) {
+      setMessages((prev) => [failureMessage(err, req), ...prev]);
     } finally {
-      setLoading(false);
+      endRequest(signal);
     }
   }
 
@@ -355,8 +445,6 @@ export default function AIPhotographyChatScreen() {
             accessibilityState={{ selected: mode === 'free', disabled: loading }}
             testID="ai-photography-mode-free"
             hitSlop={MODE_CHIP_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityState={{ selected: mode === 'free' }}
             style={[styles.modeChip, { borderColor: colors.border }, mode === 'free' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
             <Icon name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
@@ -372,8 +460,6 @@ export default function AIPhotographyChatScreen() {
             accessibilityState={{ selected: mode === 'outfitSwap', disabled: loading }}
             testID="ai-photography-mode-outfit-swap"
             hitSlop={MODE_CHIP_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityState={{ selected: mode === 'outfitSwap' }}
             style={[styles.modeChip, { borderColor: colors.border }, mode === 'outfitSwap' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
             <Icon name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
@@ -388,9 +474,11 @@ export default function AIPhotographyChatScreen() {
         <View style={[styles.outfitNotice, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <Icon name="lock" size={14} color={colors.primary} />
           <Text style={[styles.outfitNoticeText, { color: colors.mutedForeground }]}>
-            {heroPhoto
+            {heroPhoto && heroLocked
               ? 'Hero locked — upload garment mockups to keep the same scene.'
-              : 'Upload one hero photo first. The model, pose, framing, and background stay locked.'}
+              : heroPhoto
+                ? 'Send to lock this hero photo, or add garment mockups and send to swap.'
+                : 'Upload one hero photo first. The model, pose, framing, and background stay locked.'}
           </Text>
         </View>
       )}
@@ -408,7 +496,7 @@ export default function AIPhotographyChatScreen() {
               ? 'Upload one photo of the model and scene, then add garments to swap in.'
               : "Add product photos and references, then describe the style."}
             actionLabel={addPhotosDisabled ? undefined : 'Add photos'}
-            onAction={addPhotosDisabled ? undefined : pickPhotos}
+            onAction={addPhotosDisabled ? undefined : () => { void pickPhotos(); }}
             testID="ai-photography-empty"
           />
         </View>
@@ -433,6 +521,22 @@ export default function AIPhotographyChatScreen() {
                   {mode === 'outfitSwap' ? 'Generating your outfit swaps…' : 'Generating your studio photo…'}
                 </Text>
               </View>
+              <Text
+                style={[styles.elapsedText, { color: colors.mutedForeground }]}
+                accessibilityLiveRegion="polite"
+                testID="ai-photography-elapsed"
+              >
+                {formatElapsed(elapsedSec)} · this can take up to a minute or two
+              </Text>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                size="compact"
+                onPress={cancelGeneration}
+                style={styles.retryBtn}
+                accessibilityLabel="Cancel generation"
+                testID="ai-photography-cancel"
+              />
             </View>
           ) : null
         }
@@ -456,7 +560,7 @@ export default function AIPhotographyChatScreen() {
               </View>
             )}
             <Text style={[styles.bubbleText, { color: msg.role === 'user' ? colors.primaryForeground : colors.foreground }]}>
-              {msg.content}
+              {msg.id === INITIAL_MSG.id ? INITIAL_COPY[mode] : msg.content}
             </Text>
             {msg.image && (
               <View>
@@ -481,13 +585,59 @@ export default function AIPhotographyChatScreen() {
                 accessibilityLabel={`Retry garment ${msg.garmentIndex ?? ''}`}
               />
             )}
+            {msg.retryRequest && (
+              <Button
+                label="Retry"
+                icon="refresh-cw"
+                variant="secondary"
+                size="compact"
+                disabled={loading || (msg.retryRequest.kind === 'outfitSwap' && !heroPhoto)}
+                onPress={() => { void retryRequest(msg); }}
+                style={styles.retryBtn}
+                accessibilityLabel="Retry this photo"
+                testID={`ai-photography-retry-${msg.id}`}
+              />
+            )}
           </View>
         )}
       />
       )}
 
       {/* Photo tray */}
-      {mode === 'outfitSwap' && heroPhoto && (
+      {mode === 'outfitSwap' && heroPhoto && !heroLocked && (
+        <View style={[styles.lockedHeroTray, { backgroundColor: colors.card, borderColor: colors.border }]} testID="ai-photography-hero-unlocked">
+          <CachedImage source={{ uri: heroPhoto.uri }} style={styles.trayThumb} contentFit="cover" />
+          <View style={styles.lockedHeroCopy}>
+            <Text style={[styles.lockedHeroTitle, { color: colors.foreground }]}>Hero photo</Text>
+            <Text style={[styles.lockedHeroSub, { color: colors.mutedForeground }]}>Locks when you send</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.resetHeroBtn, { borderColor: colors.border }]}
+            onPress={() => { void pickPhotos({ replaceHero: true }); }}
+            disabled={loading}
+            activeOpacity={0.8}
+            hitSlop={HERO_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Replace hero photo"
+            testID="ai-photography-replace-hero"
+          >
+            <Icon name="refresh-cw" size={13} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.resetHeroBtn, styles.heroBtnGap, { borderColor: colors.border }]}
+            onPress={removeHero}
+            disabled={loading}
+            activeOpacity={0.8}
+            hitSlop={HERO_BTN_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Remove hero photo"
+            testID="ai-photography-remove-hero"
+          >
+            <Icon name="x" size={13} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+      )}
+      {mode === 'outfitSwap' && heroPhoto && heroLocked && (
         <View style={[styles.lockedHeroTray, { backgroundColor: colors.card, borderColor: colors.primary }]}>
           <CachedImage source={{ uri: heroPhoto.uri }} style={styles.trayThumb} contentFit="cover" />
           <View style={styles.lockedHeroCopy}>
@@ -519,6 +669,7 @@ export default function AIPhotographyChatScreen() {
               <TouchableOpacity
                 style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                 onPress={() => removePhoto(p.id)}
+                disabled={loading}
                 activeOpacity={0.8}
                 testID={`ai-photography-remove-${p.id}`}
                 hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
@@ -545,7 +696,7 @@ export default function AIPhotographyChatScreen() {
         placeholder={mode === 'outfitSwap' ? 'Add outfit notes (optional)...' : 'Describe the shot you want...'}
         leftAccessory={
           <TouchableOpacity
-            onPress={pickPhotos}
+            onPress={() => { void pickPhotos(); }}
             activeOpacity={0.8}
             disabled={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false)) || loading}
             style={styles.attachBtn}
@@ -572,6 +723,13 @@ export default function AIPhotographyChatScreen() {
 // button at 40×40 — hitSlop pads both to 44pt without changing the layout.
 const MODE_CHIP_HIT_SLOP = minHitSlop({ height: 34 });
 const ATTACH_BTN_HIT_SLOP = minHitSlop({ width: 40, height: 40 });
+const HERO_BTN_HIT_SLOP = minHitSlop({ width: 32, height: 32 });
+
+function formatElapsed(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -596,16 +754,15 @@ const styles = StyleSheet.create({
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: FS.sm, fontFamily: FONT.regular },
+  elapsedText: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 6 },
   retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: radius.sm, borderWidth: 1 },
-  retryBtnText: { fontSize: FS.meta, fontFamily: FONT.semibold },
-  retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 56, height: 56, borderRadius: 8 },
   lockedHeroTray: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   lockedHeroCopy: { flex: 1, marginLeft: 10 },
   lockedHeroTitle: { fontSize: FS.meta, fontFamily: FONT.semibold },
   lockedHeroSub: { fontSize: FS.meta, fontFamily: FONT.regular, marginTop: 2 },
+  heroBtnGap: { marginLeft: 12 },
   resetHeroBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   trayRemove: {
     position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9,

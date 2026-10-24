@@ -77,11 +77,10 @@ describe('services never fabricate a success outside demo', () => {
     );
   });
 
-  it('designService.exportProject throws instead of returning a mock:// export', () => {
+  it('designService has no mock:// export: design export renders real files on device', () => {
     const s = src('../../services/designService.ts');
-    const fn = s.slice(s.indexOf('export async function exportProject'));
-    expect(fn.indexOf("if (!isPreviewDemoMode()) throw")).toBeGreaterThan(0);
-    expect(fn.indexOf("if (!isPreviewDemoMode()) throw")).toBeLessThan(fn.indexOf('mock://export'));
+    expect(s).not.toContain('export async function exportProject');
+    expect(s).not.toContain('mock://export');
   });
 });
 

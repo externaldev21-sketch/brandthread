@@ -4,6 +4,7 @@ export {
   editImages,
   type ImageQuality,
   type ImageGenerationOptions,
+  type ImageEditSize,
 } from "./client";
 export {
   DEFAULT_OPENAI_IMAGE_MODEL,

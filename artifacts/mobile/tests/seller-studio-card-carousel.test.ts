@@ -162,7 +162,8 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
 
   it('sets a one-shot "no animation" override immediately before pushing', () => {
     expect(studio).toContain("import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';");
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
+    // commitAndOpen hands the chosen card to routeOrUpsell (plan gate + push).
+    const fnBody = studio.slice(studio.indexOf('const routeOrUpsell = useCallback'), studio.indexOf('}, [planError, hasPlan, retryPlan, router, pathname]);'));
     const setIdx = fnBody.indexOf('setNextPushAnimationNone();');
     const pushIdx = fnBody.indexOf('router.push(item.route as never);');
     expect(setIdx).toBeGreaterThan(-1);
@@ -170,7 +171,7 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
   });
 
   it('a Growth-gated, unpaid item shows the upsell modal instead of navigating, and never sets the animation override for that path', () => {
-    const fnBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
+    const fnBody = studio.slice(studio.indexOf('const routeOrUpsell = useCallback'), studio.indexOf('}, [planError, hasPlan, retryPlan, router, pathname]);'));
     const gateIdx = fnBody.indexOf('!hasPlan(\'growth\')');
     const upsellIdx = fnBody.indexOf('setUpsellFeature(item.label);');
     const returnIdx = fnBody.indexOf('return;', upsellIdx);
@@ -179,6 +180,16 @@ describe('Studio card carousel: release/tap opens instantly — no closing anima
     expect(upsellIdx).toBeGreaterThan(gateIdx);
     expect(returnIdx).toBeGreaterThan(upsellIdx);
     expect(overrideIdx).toBeGreaterThan(returnIdx);
+  });
+
+  it('a Growth card opened while the plan is still loading waits for the plan instead of upselling', () => {
+    const commitBody = studio.slice(studio.indexOf('const commitAndOpen = useCallback'), studio.indexOf('}, [translateY, traceProgress, zoomScale, enterFade, labelExit, planLoading'));
+    expect(commitBody).toContain('if (GROWTH_PLAN_ENFORCEMENT_ENABLED && item.growthOnly && planLoading) {');
+    expect(commitBody).toContain('setPendingPlanItem(item);');
+    expect(commitBody).not.toContain('setUpsellFeature(');
+    const gateBody = studio.slice(studio.indexOf('const routeOrUpsell = useCallback'), studio.indexOf('}, [planError, hasPlan, retryPlan, router, pathname]);'));
+    expect(gateBody).not.toContain('planLoading');
+    expect(studio).toContain('if (planLoading || !pendingPlanItem) return;');
   });
 });
 

@@ -6,8 +6,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
-  Alert, Image, Modal,
+  Image, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -17,7 +19,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  RED, RED_DIM,
+  RED, RED_DIM, OVERLAY,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
@@ -40,7 +42,29 @@ import { useApi } from '@/hooks/useApi';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 function errorText(err: unknown, fallback: string): string {
-  return err instanceof Error && err.message ? err.message : fallback;
+  return friendlyError(err, fallback);
+}
+
+/** Normalises "c0c0c0" / "#c0c0c0" → "#C0C0C0"; null when not a 6-digit hex. */
+function normalizeBrandHex(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  const color = (t.startsWith('#') ? t : '#' + t).toUpperCase();
+  return /^#[0-9A-F]{6}$/.test(color) ? color : null;
+}
+
+// In-app text prompt (Alert.prompt is iOS-only, so Brand Color / Font /
+// Rename did nothing on Android and web). `onSubmit` returns an error string
+// to keep the sheet open with inline feedback, or null when done.
+interface TextPromptRequest {
+  title: string;
+  message: string;
+  placeholder?: string;
+  initialValue?: string;
+  submitLabel: string;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  testID: string;
+  onSubmit: (value: string) => Promise<string | null>;
 }
 
 function formatDate(iso: string): string {
@@ -64,6 +88,7 @@ export default function DesignBrandAssetsScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [prompt, setPrompt] = useState<TextPromptRequest | null>(null);
 
   // ── Load assets ────────────────────────────────────────────────────────────
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -94,14 +119,20 @@ export default function DesignBrandAssetsScreen() {
 
   // ── Add asset ──────────────────────────────────────────────────────────────
   async function handleAddAsset() {
-    Alert.alert('Add Brand Asset', 'Choose asset type:', [
+    showAlert('Add Brand Asset', 'Choose asset type:', [
       {
         text: 'Image / Logo / Graphic',
         onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          let result: ImagePicker.ImagePickerResult;
+          try {
+            result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          } catch (err) {
+            showAlert('Could not open photos', friendlyError(err, 'Your photo library could not be opened. Check photo access in Settings and try again.'));
+            return;
+          }
           if (result.canceled || !result.assets?.[0]) return;
           const picked = result.assets[0];
-          Alert.alert('Asset Type', 'What is this image?', [
+          showAlert('Asset Type', 'What is this image?', [
             { text: 'Logo',    onPress: () => saveImageAsset(picked, 'logo') },
             { text: 'Icon',    onPress: () => saveImageAsset(picked, 'icon') },
             { text: 'Graphic', onPress: () => saveImageAsset(picked, 'graphic') },
@@ -114,33 +145,48 @@ export default function DesignBrandAssetsScreen() {
       {
         text: 'Brand Color',
         onPress: () => {
-          Alert.prompt('Brand Color', 'Enter hex color (e.g. #C0C0C0):', async (hex) => {
-            if (!hex?.trim()) return;
-            const color = (hex.trim().startsWith('#') ? hex.trim() : '#' + hex.trim()).toUpperCase();
-            if (!/^#[0-9A-F]{6}$/.test(color)) {
-              Alert.alert('Invalid color', 'Enter a 6-digit hex color like #0EA5E9.');
-              return;
-            }
-            try {
-              const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
-              setAssets(prev => [newAsset, ...prev]);
-            } catch (err) {
-              Alert.alert('Could not save color', errorText(err, 'Please try again.'));
-            }
+          setPrompt({
+            title: 'Brand Color',
+            message: 'Enter a 6-digit hex color, e.g. #C0C0C0.',
+            placeholder: '#C0C0C0',
+            submitLabel: 'Save color',
+            autoCapitalize: 'characters',
+            testID: 'brand-color-prompt',
+            onSubmit: async (hex) => {
+              const color = normalizeBrandHex(hex);
+              if (!color) return 'Enter a 6-digit hex color like #C0C0C0.';
+              try {
+                const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });
+                setAssets(prev => [newAsset, ...prev]);
+                return null;
+              } catch (err) {
+                return errorText(err, 'Could not save this color. Please try again.');
+              }
+            },
           });
         },
       },
       {
         text: 'Font',
         onPress: () => {
-          Alert.prompt('Font Name', 'Enter font family name:', async (name) => {
-            if (!name?.trim()) return;
-            try {
-              const newAsset = await addBrandAsset({ name: name.trim(), type: 'font', fontFamily: name.trim(), tags: [] });
-              setAssets(prev => [newAsset, ...prev]);
-            } catch (err) {
-              Alert.alert('Could not save font', errorText(err, 'Please try again.'));
-            }
+          setPrompt({
+            title: 'Font',
+            message: 'Enter the font family name.',
+            placeholder: 'e.g. Helvetica Neue',
+            submitLabel: 'Save font',
+            autoCapitalize: 'words',
+            testID: 'brand-font-prompt',
+            onSubmit: async (raw) => {
+              const name = raw.trim();
+              if (!name) return 'Enter a font name.';
+              try {
+                const newAsset = await addBrandAsset({ name, type: 'font', fontFamily: name, tags: [] });
+                setAssets(prev => [newAsset, ...prev]);
+                return null;
+              } catch (err) {
+                return errorText(err, 'Could not save this font. Please try again.');
+              }
+            },
           });
         },
       },
@@ -163,7 +209,7 @@ export default function DesignBrandAssetsScreen() {
       setAssets(prev => [newAsset, ...prev]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
-      Alert.alert('Upload failed', errorText(err, 'Could not upload this image. Check your connection and try again.'));
+      showAlert('Upload failed', errorText(err, 'Could not upload this image. Check your connection and try again.'));
     } finally {
       setUploading(false);
     }
@@ -172,27 +218,42 @@ export default function DesignBrandAssetsScreen() {
   // ── Asset long press ───────────────────────────────────────────────────────
   function handleLongPress(asset: BrandAsset) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(asset.name, '', [
+    showAlert(asset.name, '', [
       {
         text: 'Rename',
         onPress: () => {
-          Alert.prompt('Rename', 'New name:', async (name) => {
-            if (!name?.trim()) return;
-            try {
-              await renameBrandAsset(asset.id, name.trim());
-              setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name: name.trim() } : a));
-            } catch (err) {
-              Alert.alert('Could not rename', errorText(err, 'Please try again.'));
-            }
-          }, 'plain-text', asset.name);
+          setPrompt({
+            title: 'Rename',
+            message: 'Enter a new name for this asset.',
+            initialValue: asset.name,
+            submitLabel: 'Rename',
+            testID: 'brand-rename-prompt',
+            onSubmit: async (raw) => {
+              const name = raw.trim();
+              if (!name) return 'Enter a name.';
+              try {
+                await renameBrandAsset(asset.id, name);
+                setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, name } : a));
+                return null;
+              } catch (err) {
+                return errorText(err, 'Could not rename this asset. Please try again.');
+              }
+            },
+          });
         },
       },
       {
         text: 'Add to Project',
         onPress: async () => {
-          const projects = await getProjects();
+          let projects;
+          try {
+            projects = await getProjects();
+          } catch (err) {
+            showAlert('Could not load projects', errorText(err, 'Your design projects could not be loaded. Please try again.'));
+            return;
+          }
           if (projects.length === 0) {
-            Alert.alert('No Projects', 'Create a design project first to add assets.', [
+            showAlert('No Projects', 'Create a design project first to add assets.', [
               { text: 'Go to Design Studio', onPress: () => router.push('/design' as never) },
               { text: 'Cancel', style: 'cancel' },
             ]);
@@ -203,7 +264,7 @@ export default function DesignBrandAssetsScreen() {
             onPress: () => router.push((`/design-canvas?id=${p.id}&addAssetId=${asset.id}`) as never),
           }));
           buttons.push({ text: 'Cancel', style: 'cancel' });
-          Alert.alert('Add to Project', 'Choose a design project:', buttons);
+          showAlert('Add to Project', 'Choose a design project:', buttons);
         },
       },
       {
@@ -213,7 +274,7 @@ export default function DesignBrandAssetsScreen() {
           try {
             await Share.share({ message: asset.name, url: uri });
           } catch {
-            Alert.alert('Share', 'Could not share this asset.');
+            showAlert('Share', 'Could not share this asset.');
           }
         },
       },
@@ -221,7 +282,7 @@ export default function DesignBrandAssetsScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Delete Asset', `Delete "${asset.name}"?`, [
+          showAlert('Delete Asset', `Delete "${asset.name}"?`, [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Delete', style: 'destructive',
@@ -230,7 +291,7 @@ export default function DesignBrandAssetsScreen() {
                   await deleteBrandAsset(asset.id);
                   setAssets(prev => prev.filter(a => a.id !== asset.id));
                 } catch (err) {
-                  Alert.alert('Could not delete', errorText(err, 'Please try again.'));
+                  showAlert('Could not delete', errorText(err, 'Please try again.'));
                 }
               },
             },
@@ -328,12 +389,21 @@ export default function DesignBrandAssetsScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={{ flex: 1 }}>
-          <EmptyState
-            icon="star"
-            title="No assets yet"
-            description="Save logos, colors, graphics, and reusable assets."
-            action={{ label: 'Add your first asset', onPress: handleAddAsset, icon: 'plus' }}
-          />
+          {assets.length > 0 ? (
+            <EmptyState
+              icon="search"
+              title="No matching assets"
+              description="Nothing matches this search or filter."
+              action={{ label: 'Show all assets', onPress: () => { setSearch(''); setActiveTab('all'); } }}
+            />
+          ) : (
+            <EmptyState
+              icon="star"
+              title="No assets yet"
+              description="Save logos, colors, graphics, and reusable assets."
+              action={{ label: 'Add your first asset', onPress: handleAddAsset, icon: 'plus' }}
+            />
+          )}
         </View>
       ) : (
         <FlatList
@@ -356,14 +426,100 @@ export default function DesignBrandAssetsScreen() {
           disabled={uploading}
           activeOpacity={0.85}
           hitSlop={FAB_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel="Upload asset"
         >
           <Icon name="upload" size={ICON.md} color={theme.onAccent} />
           <Text style={bas.fabText}>{uploading ? 'Uploading…' : 'Upload asset'}</Text>
         </TouchableOpacity>
       )}
+
+      <TextPromptModal request={prompt} onClose={() => setPrompt(null)} />
     </View>
   );
 }
+
+// ─── Text prompt modal ─────────────────────────────────────────────────────────
+function TextPromptModal({ request, onClose }: { request: TextPromptRequest | null; onClose: () => void }) {
+  const { theme } = useAppTheme();
+  const ps = createPromptStyles(theme);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setValue(request?.initialValue ?? '');
+    setError(null);
+    setBusy(false);
+  }, [request]);
+
+  async function submit() {
+    if (!request || busy) return;
+    setBusy(true);
+    const err = await request.onSubmit(value);
+    setBusy(false);
+    if (err) setError(err);
+    else onClose();
+  }
+
+  return (
+    <Modal visible={!!request} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={ps.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
+        {request && (
+          <View style={ps.card} testID={request.testID}>
+            <Text style={ps.title}>{request.title}</Text>
+            <Text style={ps.message}>{request.message}</Text>
+            <TextInput
+              style={ps.input}
+              value={value}
+              onChangeText={t => { setValue(t); if (error) setError(null); }}
+              placeholder={request.placeholder}
+              placeholderTextColor={SUBTLE}
+              autoCapitalize={request.autoCapitalize ?? 'sentences'}
+              autoCorrect={false}
+              autoFocus
+              onSubmitEditing={submit}
+              returnKeyType="done"
+              accessibilityLabel={request.title}
+              testID={`${request.testID}-input`}
+            />
+            {error && <Text style={ps.error} accessibilityLiveRegion="polite">{error}</Text>}
+            <View style={ps.actions}>
+              <TouchableOpacity style={ps.btn} onPress={onClose} accessibilityRole="button" testID={`${request.testID}-cancel`}>
+                <Text style={ps.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[ps.btn, ps.primary]}
+                onPress={submit}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
+                testID={`${request.testID}-submit`}
+              >
+                {busy ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={ps.primaryText}>{request.submitLabel}</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const createPromptStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  backdrop:    { flex: 1, backgroundColor: OVERLAY, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
+  card:        { width: '100%', maxWidth: 360, backgroundColor: SURFACE, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: SP.sm },
+  title:       { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  message:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  input:       { minHeight: 44, borderRadius: radius.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, color: FG, paddingHorizontal: SP.sm, fontSize: FS.base, fontFamily: FONT.regular },
+  error:       { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
+  actions:     { flexDirection: 'row', justifyContent: 'flex-end', gap: SP.sm, marginTop: SP.xs },
+  btn:         { minHeight: 44, minWidth: 88, paddingHorizontal: SP.md, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  primary:     { backgroundColor: theme.accent },
+  cancelText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  primaryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
+});
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function isLightColor(hex: string): boolean {

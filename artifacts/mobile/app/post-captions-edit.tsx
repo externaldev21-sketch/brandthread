@@ -6,12 +6,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { confirmAlert } from '@/lib/actionSheet';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import type { CaptionTrack } from '@/lib/captions';
@@ -25,11 +26,14 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-type Phase = 'loading' | 'none' | 'pending' | 'ready' | 'failed' | 'unavailable' | 'missing';
+// 'error' = the captions fetch itself failed (network / 5xx), distinct from
+// 'none' (the request worked and the post genuinely has no track yet).
+type Phase = 'loading' | 'none' | 'pending' | 'ready' | 'failed' | 'unavailable' | 'missing' | 'error';
 
 export default function PostCaptionsEditScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const api = useApi();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -40,6 +44,9 @@ export default function PostCaptionsEditScreen() {
   const [error, setError] = useState<string | null>(null);
   const [unavailableCopy, setUnavailableCopy] = useState<CaptionsUnavailableCopy>(() => captionsUnavailableCopy(null));
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set right before a deliberate exit (after a save or a confirmed discard)
+  // so the unsaved-edits guard lets that navigation through.
+  const allowLeaveRef = useRef(false);
   // Full-screen editor with a bottom Save bar: keep the floating tab bar off it.
   useHideTabBar();
 
@@ -62,10 +69,12 @@ export default function PostCaptionsEditScreen() {
         setUnavailableCopy(captionsUnavailableCopy(e));
         setPhase('unavailable');
       } else {
-        setPhase('none');
+        setPhase('error');
       }
     }
   }, [api, postId, applyTrack]);
+
+  const retryLoad = () => { setPhase('loading'); void load(); };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -100,6 +109,7 @@ export default function PostCaptionsEditScreen() {
     try {
       const updated = await api.posts.updateCaptions(postId, track.language, texts);
       applyTrack(updated);
+      allowLeaveRef.current = true;
       goBackOr(router);
     } catch (e: any) {
       setError(e?.message?.includes('Edit segment') ? e.message : 'Could not save captions. Try again.');
@@ -110,9 +120,44 @@ export default function PostCaptionsEditScreen() {
 
   const dirty = track ? texts.some((t, i) => t !== track.segments[i]?.text) : false;
 
+  const confirmDiscard = useCallback(
+    () => confirmAlert({
+      title: 'Discard caption edits?',
+      message: 'Your changes to these captions will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    }),
+    [],
+  );
+
+  // Unsaved edits: ask before any back (header, gesture, hardware back).
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!dirty || saving || allowLeaveRef.current) return;
+      e.preventDefault();
+      void confirmDiscard().then((ok) => {
+        if (!ok) return;
+        allowLeaveRef.current = true;
+        navigation.dispatch(e.data.action);
+      });
+    });
+    return unsubscribe;
+  }, [navigation, dirty, saving, confirmDiscard]);
+
+  // Guard the header back directly too, in case 'beforeRemove' is not raised
+  // for this pop (same pattern as edit-profile).
+  const handleBack = async () => {
+    if (dirty && !saving && !allowLeaveRef.current) {
+      if (!(await confirmDiscard())) return;
+      allowLeaveRef.current = true;
+    }
+    goBackOr(router);
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]} testID="post-captions-edit">
-      <ScreenHeader title="Captions" />
+      <ScreenHeader title="Captions" onBack={() => { void handleBack(); }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {phase === 'loading' || phase === 'pending' ? (
           <View style={styles.center}>
@@ -152,6 +197,12 @@ export default function PostCaptionsEditScreen() {
           <View style={styles.center}>
             <Text style={[styles.title, { color: theme.text }]}>Post not found</Text>
             <Text style={[styles.message, { color: theme.muted }]}>Open captions from one of your video posts.</Text>
+          </View>
+        ) : phase === 'error' ? (
+          <View style={styles.center} testID="captions-load-error">
+            <Text style={[styles.title, { color: theme.text }]}>Couldn't load captions</Text>
+            <Text style={[styles.message, { color: theme.muted }]}>Check your connection and try again.</Text>
+            <Button label="Try again" onPress={retryLoad} style={{ marginTop: SP.md }} testID="retry-load-captions" />
           </View>
         ) : phase === 'unavailable' ? (
           <View style={styles.center}>

@@ -33,8 +33,6 @@ interface IntegrationDef {
   route?: string;
   /** Connect/Disconnect is a Stripe Connect onboarding link, not the generic flow. */
   isStripe?: boolean;
-  /** Status comes from the Shopify fulfillment endpoint, not the generic integrations list. */
-  isShopifyFulfillment?: boolean;
 }
 
 // Only integrations with a real, working connect flow ship here — no
@@ -42,7 +40,6 @@ interface IntegrationDef {
 const INTEGRATION_DEFS: IntegrationDef[] = [
   { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', description: 'Email and SMS marketing', route: '/integrations/klaviyo' },
   { key: 'stripe', label: 'Stripe', icon: 'credit-card', description: 'Payments and payouts', isStripe: true },
-  { key: 'shopify-fulfillment', label: 'Shopify fulfillment', icon: 'truck', description: 'Send paid orders to your Shopify fulfillment app', route: '/integrations/shopify-fulfillment', isShopifyFulfillment: true },
 ];
 
 export default function IntegrationsScreen() {
@@ -51,7 +48,6 @@ export default function IntegrationsScreen() {
   const api = useApi();
   const [connectedKeys, setConnectedKeys] = useState<Set<string>>(new Set());
   const [stripeStatus, setStripeStatus] = useState<ConnectStatus | null>(null);
-  const [shopifyFulfillmentOn, setShopifyFulfillmentOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -60,22 +56,19 @@ export default function IntegrationsScreen() {
     setLoading(true);
     setLoadError(false);
     try {
-      const [integrationsData, connectData, shopifyData] = await Promise.all([
+      const [integrationsData, connectData] = await Promise.all([
         api.seller.integrationStatus() as any,
         api.seller.connect.status().catch(() => null),
-        api.shopify.status().catch(() => null),
       ]);
       const integrations: Array<{ key: string }> = integrationsData.integrations ?? [];
       setConnectedKeys(new Set(integrations.map(i => i.key)));
       setStripeStatus(normalizeConnectStatus(connectData));
-      setShopifyFulfillmentOn(Boolean(shopifyData?.connected && shopifyData?.fulfillmentEnabled));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         // No session yet (e.g. a fresh/demo preview) — that just means
         // nothing is connected, not that the list failed to load.
         setConnectedKeys(new Set());
         setStripeStatus(null);
-        setShopifyFulfillmentOn(false);
       } else {
         setLoadError(true);
       }
@@ -110,12 +103,6 @@ export default function IntegrationsScreen() {
     } finally {
       setToggling(null);
     }
-  }
-
-  function isConnected(item: IntegrationDef): boolean {
-    if (item.isStripe) return isStripeFullyConnected(stripeStatus);
-    if (item.isShopifyFulfillment) return shopifyFulfillmentOn;
-    return connectedKeys.has(item.key);
   }
 
   async function handleConnect(item: IntegrationDef) {
@@ -179,7 +166,7 @@ export default function IntegrationsScreen() {
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {INTEGRATION_DEFS.map((item, i) => {
-                const connected = isConnected(item);
+                const connected = item.isStripe ? isStripeFullyConnected(stripeStatus) : connectedKeys.has(item.key);
                 const isToggling = toggling === item.key;
                 return (
                   <TouchableOpacity
@@ -222,7 +209,7 @@ export default function IntegrationsScreen() {
           {/* Connected count summary */}
           {!loading && !loadError && (
             <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
-              {INTEGRATION_DEFS.filter(isConnected).length} of {INTEGRATION_DEFS.length} integrations connected
+              {connectedCount} of {INTEGRATION_DEFS.length} integrations connected
             </Text>
           )}
         </View>

@@ -30,7 +30,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStickyState } from '@/lib/stickyState';
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
-import { showAlert } from '@/lib/actionSheet';
 
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 

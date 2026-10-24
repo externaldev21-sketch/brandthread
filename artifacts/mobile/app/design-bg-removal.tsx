@@ -39,7 +39,7 @@ import { saveImageToCameraRoll } from '@/lib/aiToolMedia';
 import { pickImageOnWeb, fileToPickedImage } from '@/lib/webFilePicker';
 import { makeDemoCutout } from '@/lib/demoCutout';
 import { saveResult } from '@/services/bgRemovalService';
-import { surfaceAiCreditsError } from '@/lib/aiCreditsError';
+import { AI_CREDITS_ALERT_COPY, classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
 import { BG, FG, MUTED, BORDER, RED, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 
@@ -90,7 +90,7 @@ function DropZone({ onPress }: { onPress: () => void }) {
   const t2 = useAnimatedStyle(() => ({ opacity: 1 - twinkle.value * 0.75, transform: [{ scale: 1.1 - twinkle.value * 0.5 }] }));
 
   return (
-    <Pressable onPress={onPress} style={s.fill} accessibilityRole="button" accessibilityLabel="Upload from library" testID="bg-removal-dropzone">
+    <Pressable onPress={onPress} style={s.fill} accessibilityRole="button" accessibilityLabel="Tap to choose a photo" testID="bg-removal-dropzone">
       <View style={s.dropInner}>
         <LinearGradient colors={['#141416', '#050506', '#101012']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <Animated.View pointerEvents="none" style={[s.sheen, sheenStyle]}>
@@ -107,6 +107,7 @@ function DropZone({ onPress }: { onPress: () => void }) {
             <Icon name="upload" size={ICON.xl} color={FG} />
           </View>
         </View>
+        <Text style={s.dropCaption}>Tap to choose a photo</Text>
       </View>
     </Pressable>
   );
@@ -287,10 +288,14 @@ export default function DesignBgRemovalScreen() {
       if (controller.signal.aborted) return;
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({ error: 'Unknown error' }));
-        if (resp.status === 402 && body?.code === 'insufficient_credits') {
+        const creditsKind = classifyAiCreditsError(resp.status, JSON.stringify(body ?? {}));
+        if (creditsKind === 'insufficient_credits') {
           surfaceAiCreditsError('insufficient_credits');
           return fail('Not enough AI credits. Add credits to keep removing backgrounds.');
         }
+        // Per-user daily cap (429 user_daily_cap) and global cap (503) get
+        // the credit gate's own copy, not the generic rate-limit line.
+        if (creditsKind) return fail(AI_CREDITS_ALERT_COPY[creditsKind].message);
         return fail(
           resp.status === 429 ? 'Too many requests. Please wait a minute and try again.'
           : resp.status >= 500 ? 'The service is temporarily unavailable. Please try again shortly.'
@@ -619,6 +624,7 @@ const s = StyleSheet.create({
   sheen: { position: 'absolute', top: -120, bottom: -120, width: 120 },
   twinkle: { position: 'absolute' },
   dropCenter: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  dropCaption: { marginTop: SP.sm, fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, textAlign: 'center' },
   dropRing: { position: 'absolute', width: 84, height: 84, borderRadius: 42, borderWidth: 1, borderColor: SILVER },
   dropIcon: {
     width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center',

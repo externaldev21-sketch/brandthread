@@ -25,13 +25,16 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, COMP,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit, createBrandAsset, getBrandAssets } from '@/services/designService';
 import { saveImageToCameraRoll, shareImage } from '@/lib/aiToolMedia';
-import { aiToolErrorMessage } from '@/lib/aiToolErrors';
+// Shared AI-tool copy: a 402 insufficient_credits opens /ai-credits, daily caps get the gate's copy.
+import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
+import { showAlert } from '@/lib/actionSheet';
 import type { AIGenerationResult } from '@/services/designTypes';
 import { radius } from '@/constants/radii';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const EXAMPLE_PROMPTS = [
   'Make the background black',
@@ -150,7 +153,7 @@ export default function DesignPromptEditScreen() {
       });
       setResult(res);
     } catch (err) {
-      Alert.alert('Edit failed', aiToolErrorMessage(err, 'Generation failed. Please try again.'));
+      showAlert('Edit failed', aiToolErrorMessage(err, 'Could not apply this edit. Please try again.'));
     } finally {
       setIsGenerating(false);
     }
@@ -178,8 +181,8 @@ export default function DesignPromptEditScreen() {
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}

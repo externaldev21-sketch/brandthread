@@ -56,6 +56,8 @@ import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkout
 
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
+import { friendlyError } from '@/lib/friendlyError';
+import { showAlert } from '@/lib/actionSheet';
 
 import { PressableScale } from '@/components/BrandthreadUI';
 
@@ -135,6 +137,9 @@ function BuyerLiveNativeScreen() {
   const [stream, setStream]               = useState<any>(null);
   const [loading, setLoading]             = useState(true);
   const [ended, setEnded]                 = useState(false);
+  // Couldn't load / join this live (anything but 403) — shown instead of
+  // the live UI, which would otherwise render with no stream behind it.
+  const [loadError, setLoadError]         = useState<string | null>(null);
   // From the server's `ended` broadcast; null until we know.
   const [replayStatus, setReplayStatus]   = useState<'ready' | 'pending' | 'unavailable' | null>(null);
   const [comments, setComments]           = useState<Comment[]>([]);
@@ -299,10 +304,16 @@ function BuyerLiveNativeScreen() {
   });
 
   async function init() {
+    // A link without a stream id can't be loaded — the not-available state.
+    if (!params.streamId) { setLoading(false); return; }
+    setLoadError(null);
+    setLoading(true);
     try {
       // Get stream details
       const streamData = await (api as any).live.get(params.streamId) as any;
       const s = streamData.stream;
+      // Keep the ended stream's details: the ended state links its replays.
+      if (s) setStream(s);
       if (!s || s.status !== 'live') { setEnded(true); setLoading(false); return; }
       setStream(s);
       hostUidRef.current = typeof s.agora_uid === 'number' ? s.agora_uid : null;
@@ -317,9 +328,12 @@ function BuyerLiveNativeScreen() {
 
       connectVideo(joinData);
     } catch (e: any) {
-      Alert.alert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
-      if (e?.status === 403) { goBackOr(router); }
-      else if (AgoraModule) setVideoState('failed');
+      if (e?.status === 403) {
+        showAlert('Couldn’t join the live', apiErrorMessage(e, 'Try again.'));
+        goBackOr(router);
+      } else {
+        setLoadError(friendlyError(e, 'We couldn’t load this live. Try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -681,7 +695,37 @@ function BuyerLiveNativeScreen() {
     );
   }
 
+  if (!params.streamId) {
+    return (
+      <View style={[s.root, s.center]} testID="buyer-live-unavailable">
+        <Icon name="video-off" size={32} color={MUTED} />
+        <Text style={[s.endedTitle, { color: FG, marginTop: 12 }]}>Live not available</Text>
+        <Text style={[s.endedSub, { color: MUTED }]}>This link is incomplete. Open the live again from the seller’s profile or your notifications.</Text>
+        <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: theme.accent }]} accessibilityRole="button">
+          <Text style={[s.backBtnText, { color: theme.onAccent }]}>Back</Text>
+        </PressableScale>
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[s.root, s.center]} testID="buyer-live-error">
+        <Icon name="wifi-off" size={32} color={MUTED} />
+        <Text style={[s.endedTitle, { color: FG, marginTop: 12 }]}>Couldn’t load this live</Text>
+        <Text style={[s.endedSub, { color: MUTED }]}>{loadError}</Text>
+        <PressableScale onPress={() => { void init(); }} style={[s.backBtn, { backgroundColor: theme.accent }]} accessibilityRole="button" testID="buyer-live-retry">
+          <Text style={[s.backBtnText, { color: theme.onAccent }]}>Try again</Text>
+        </PressableScale>
+        <PressableScale onPress={() => goBackOr(router)} style={{ marginTop: 12, padding: 8 }} accessibilityRole="button">
+          <Text style={[s.endedSub, { color: MUTED }]}>Back</Text>
+        </PressableScale>
+      </View>
+    );
+  }
+
   if (ended) {
+    const endedSellerId: string | undefined = stream?.seller_id;
     return (
       <View style={[s.root, s.center]}>
         <View style={[s.endedIcon, { backgroundColor: `${LIVE_RED}20` }]}>
@@ -690,9 +734,21 @@ function BuyerLiveNativeScreen() {
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
         {replayStatus !== 'unavailable' && (
           <Text style={[s.endedSub, { color: MUTED }]}>
-            {replayStatus === 'ready' ? 'The replay is in the feed.' : 'The replay will appear in the feed shortly.'}
+            {replayStatus === 'ready'
+              ? 'The replay is saved on the seller’s profile.'
+              : 'The replay will be saved on the seller’s profile shortly.'}
           </Text>
         )}
+        {replayStatus !== 'unavailable' && endedSellerId ? (
+          <PressableScale
+            onPress={() => router.replace(`/live-replays?sellerId=${encodeURIComponent(endedSellerId)}` as never)}
+            style={{ marginTop: 12, padding: 8 }}
+            accessibilityRole="button"
+            testID="buyer-live-replays"
+          >
+            <Text style={[s.endedSub, { color: FG }]}>See replays</Text>
+          </PressableScale>
+        ) : null}
         <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
           <Text style={s.backBtnText}>Back to feed</Text>
         </PressableScale>
@@ -801,7 +857,7 @@ function BuyerLiveNativeScreen() {
 
       {/* Product tags strip */}
       {productTags.length + cohostTags.length > 0 && (
-        <View style={s.productStrip}>
+        <View style={[s.productStrip, { bottom: 155 + insets.bottom }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.productStripInner}>
             {[...productTags, ...cohostTags.filter(c => !productTags.some(t => t.productId === c.productId))].map(tag => (
               <PressableScale

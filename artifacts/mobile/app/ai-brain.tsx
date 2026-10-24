@@ -70,6 +70,8 @@ import {
   AI_DAILY_CAP_MESSAGE,
   AI_NO_CREDITS_MESSAGE,
   syncAISettingsFromServer,
+  AI_OUT_OF_CREDITS_MESSAGE,
+  type AIRequestError,
 } from '@/services/aiService';
 import {
   AI_DISABLED_MESSAGE,
@@ -79,6 +81,8 @@ import {
   normalizeAISettings,
 } from '@/services/aiSettingsPolicy';
 import { getStoreContext } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
   FONT,
@@ -97,7 +101,11 @@ function humanizeAiError(err: unknown): string {
     if (err.code === 'insufficient_credits') return AI_NO_CREDITS_MESSAGE;
     if (err.code === 'global_daily_cap') return err.message;
   }
-  const msg = (err as Error | undefined)?.message ?? '';
+  const e = (err ?? null) as AIRequestError | null;
+  const msg = typeof e?.message === 'string' ? e.message : '';
+  if (e?.code === 'user_daily_cap') return "You've reached today's AI limit. It resets tomorrow.";
+  if (e?.code === 'global_daily_cap') return 'Brandthread AI is at capacity right now. Try again later.';
+  if (e?.code === 'insufficient_credits') return AI_OUT_OF_CREDITS_MESSAGE;
   if (msg === AI_DISABLED_MESSAGE) return AI_DISABLED_MESSAGE;
   if (/sign in to use brandthread ai|authentication error/i.test(msg)) {
     return 'Sign in to use Brandthread AI.';
@@ -108,7 +116,7 @@ function humanizeAiError(err: unknown): string {
   // The credit gate refuses with 402 (services/aiService.ts surfaces it as
   // "AI request failed (402)."). Retrying can't fix that, so say so.
   if (/\(402\)/.test(msg)) {
-    return "You're out of AI credits. Add credits to keep chatting.";
+    return AI_OUT_OF_CREDITS_MESSAGE;
   }
   // Covers "AI service is not configured…", "AI request failed (…)." and any other
   // network / provider / unavailable error.
@@ -225,6 +233,8 @@ interface MessageBubbleProps {
   msg: AIMessage;
   onLongPress: (msg: AIMessage) => void;
   onCopy: (msg: AIMessage) => void;
+  /** True for a moment after this message was copied ("Copied" feedback). */
+  copied?: boolean;
   onRetry: (originalText: string) => void;
   onApply: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
@@ -237,6 +247,7 @@ function MessageBubble({
   msg,
   onLongPress,
   onCopy,
+  copied,
   onRetry,
   onApply,
   onDismiss,
@@ -326,10 +337,11 @@ function MessageBubble({
               onPress={() => onCopy(msg)}
               hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
               accessibilityRole="button"
-              accessibilityLabel="Copy message"
+              accessibilityLabel={copied ? 'Copied' : 'Copy message'}
+              accessibilityLiveRegion="polite"
             >
-              <Icon name="copy" size={13} color={colors.subtle} />
-              <Text style={styles.msgActionText}>Copy</Text>
+              <Icon name={copied ? 'check' : 'copy'} size={13} color={colors.subtle} />
+              <Text style={styles.msgActionText}>{copied ? 'Copied' : 'Copy'}</Text>
             </TouchableOpacity>
             {precedingUserText ? (
               <TouchableOpacity
@@ -656,7 +668,12 @@ export default function AiBrainScreen() {
           );
           setSession(result.session);
         } catch (err: unknown) {
-          if (isAIDisabledError(err)) handleDisabledError(text);
+          if (isAIDisabledError(err)) {
+            handleDisabledError(text);
+          } else {
+            setErrorMsg(humanizeAiError(err));
+            setInputText(text);
+          }
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -694,7 +711,12 @@ export default function AiBrainScreen() {
           );
           setSession(result.session);
         } catch (err: unknown) {
-          if (isAIDisabledError(err)) handleDisabledError(text);
+          if (isAIDisabledError(err)) {
+            handleDisabledError(text);
+          } else {
+            setErrorMsg(humanizeAiError(err));
+            setInputText(text);
+          }
         } finally {
           setIsGenerating(false);
           setStreamingText('');
@@ -782,21 +804,39 @@ export default function AiBrainScreen() {
 
   // ─── Copy ───────────────────────────────────────────────────────────────────
 
-  const handleCopy = useCallback((msg: AIMessage) => {
+  // Copy feedback: the message's Copy action reads "Copied" for a moment.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
+
+  const copyMessage = useCallback(async (msg: AIMessage) => {
     if (!msg.content) return;
-    Clipboard.setStringAsync(msg.content);
+    try {
+      await Clipboard.setStringAsync(msg.content);
+    } catch {
+      showAlert("Couldn't copy", 'Select the text and copy it instead.');
+      return;
+    }
+    haptics.light();
+    setCopiedId(msg.id);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopiedId(null), 1600);
   }, []);
+
+  const handleCopy = useCallback((msg: AIMessage) => {
+    void copyMessage(msg);
+  }, [copyMessage]);
 
   // ─── Long press (copy) ──────────────────────────────────────────────────────
 
   const handleLongPress = useCallback((msg: AIMessage) => {
     if (!msg.content) return;
     haptics.rigid();
-    Alert.alert('Message', undefined, [
-      { text: 'Copy', onPress: () => Clipboard.setStringAsync(msg.content) },
+    showAlert('Message', undefined, [
+      { text: 'Copy', onPress: () => { void copyMessage(msg); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, []);
+  }, [copyMessage]);
 
   // ─── Retry ──────────────────────────────────────────────────────────────────
 
@@ -817,8 +857,13 @@ export default function AiBrainScreen() {
       if (!msg?.actionCard) return;
 
       const doApply = async () => {
-        const updated = await applyAction(session, msgId, true, userId, storeContext);
-        setSession({ ...updated });
+        try {
+          const updated = await applyAction(session, msgId, true, userId, storeContext);
+          setSession({ ...updated });
+        } catch (err) {
+          // The card stays pending (the session is only replaced on success).
+          showAlert("Couldn't apply that change", friendlyError(err, 'Your change was not saved. Try again.'));
+        }
       };
 
       // Confirm-before-action toggles from AI Settings decide whether this
@@ -826,16 +871,16 @@ export default function AiBrainScreen() {
       const reason = actionConfirmationReason(msg.actionCard, aiSettings ?? normalizeAISettings(undefined));
       if (reason) {
         const copy = confirmationCopy(reason, msg.actionCard.title);
-        Alert.alert(
+        showAlert(
           copy.heading,
           copy.message,
           [
             { text: 'Go back', style: 'cancel' },
-            { text: 'Apply change', style: reason === 'destructive' ? 'destructive' : 'default', onPress: doApply },
+            { text: 'Apply change', style: reason === 'destructive' ? 'destructive' : 'default', onPress: () => { void doApply(); } },
           ],
         );
       } else {
-        doApply();
+        void doApply();
       }
     },
     [session, userId, storeContext, aiSettings],
@@ -844,8 +889,12 @@ export default function AiBrainScreen() {
   const handleDismiss = useCallback(
     async (msgId: string) => {
       if (!session) return;
-      const updated = await applyAction(session, msgId, false, userId, storeContext);
-      setSession({ ...updated });
+      try {
+        const updated = await applyAction(session, msgId, false, userId, storeContext);
+        setSession({ ...updated });
+      } catch (err) {
+        showAlert("Couldn't dismiss that suggestion", friendlyError(err, 'Try again in a moment.'));
+      }
     },
     [session, userId, storeContext],
   );
@@ -853,8 +902,13 @@ export default function AiBrainScreen() {
   const handleUndo = useCallback(
     async (msgId: string) => {
       if (!session) return;
-      const updated = await undoAction(session, msgId, userId, storeContext);
-      setSession({ ...updated });
+      try {
+        const updated = await undoAction(session, msgId, userId, storeContext);
+        setSession({ ...updated });
+      } catch (err) {
+        // The card keeps showing "Applied" with Undo, so the person can try again.
+        showAlert("Couldn't undo that change", friendlyError(err, 'Try again in a moment.'));
+      }
     },
     [session, userId, storeContext],
   );
@@ -899,6 +953,7 @@ export default function AiBrainScreen() {
         msg={item}
         onLongPress={handleLongPress}
         onCopy={handleCopy}
+        copied={copiedId === item.id}
         onRetry={handleRetry}
         onApply={handleApply}
         onDismiss={handleDismiss}
@@ -906,7 +961,7 @@ export default function AiBrainScreen() {
         precedingUserText={precedingUserTextMap.get(item.id)}
       />
     ),
-    [handleLongPress, handleCopy, handleRetry, handleApply, handleDismiss, handleUndo, precedingUserTextMap],
+    [handleLongPress, handleCopy, copiedId, handleRetry, handleApply, handleDismiss, handleUndo, precedingUserTextMap],
   );
 
   const label = contextLabel(parsedContext);

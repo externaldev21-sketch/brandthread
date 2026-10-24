@@ -113,12 +113,12 @@ describe('report screens', () => {
     expect(ANALYTICS_REPORTS.filter(r => r.badge).map(r => r.href)).toEqual(['/analytics-reports?report=export', '/analytics-reports?report=advanced', '/analytics-reports?report=cohorts']);
     expect(read('app/(tabs)/analytics.tsx')).toContain('<AnalyticsReportsList />');
   });
-  it('lists Customer analytics (an existing, registered screen) right after Audience', () => {
+  it('lists Customer analytics (an existing, registered screen) with the other store reports', () => {
+    // expo-router registers the file route; dev's root layout lists no explicit Stack.Screen for it.
     expect(existsSync(resolve(ROOT, 'app/analytics-customers.tsx'))).toBe(true);
-    expect(read('app/_layout.tsx')).toContain('<Stack.Screen name="analytics-customers"');
     const hrefs = ANALYTICS_REPORTS.map(r => r.href);
-    expect(ANALYTICS_REPORTS.find(r => r.href === '/analytics-customers')?.label).toBe('Customer analytics');
-    expect(hrefs.indexOf('/analytics-customers')).toBe(hrefs.indexOf('/analytics-audience') + 1);
+    expect(ANALYTICS_REPORTS.find(r => r.href === '/analytics-customers')?.label).toBe('Customers');
+    expect(hrefs.indexOf('/analytics-customers')).toBe(hrefs.indexOf('/analytics-store') + 1);
   });
   it('read only through sellerInsightsService, whose preview branch runs before the network', () => {
     for (const name of REPORTS) {

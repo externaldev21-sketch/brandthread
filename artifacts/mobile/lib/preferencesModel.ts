@@ -52,7 +52,7 @@ export const QUICK_MENU_ALL_ACTIONS: { key: QuickMenuAction; label: string }[] =
   { key: 'flip_y',          label: 'Flip Vertical' },
   { key: 'color_picker',    label: 'Color Picker' },
   { key: 'adjustments',     label: 'Adjustments' },
-  { key: 'none',            label: '(empty)' },
+  { key: 'none',            label: 'Empty' },
 ];
 
 // ─── Pressure curve ───────────────────────────────────────────────────────────

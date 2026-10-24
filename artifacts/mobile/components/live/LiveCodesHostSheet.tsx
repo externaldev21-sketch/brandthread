@@ -3,9 +3,13 @@
  * broadcast. Uses the existing discount-codes API (POST /api/discount-codes
  * with `liveStreamId`) — viewers get the code in the live's bag sheet and, in
  * real time, over the live socket.
+ *
+ * Like LiveCommentActionsSheet it sits over the host's broadcast, so the
+ * tap-away layer behind it is transparent (no scrim over the video) and
+ * tapping it closes the sheet.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
@@ -39,15 +43,24 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [codes, setCodes] = useState<Array<LiveCode & { usesCount?: number; status?: string }>>([]);
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const load = useCallback(async () => {
     try {
       const all = await api.discountCodes.list();
+      if (!mountedRef.current) return;
       setCodes((Array.isArray(all) ? all : []).filter((c: any) => c.liveStreamId === streamId));
-    } catch { /* list stays as is */ }
+      setListState('ready');
+    } catch {
+      // Keep any codes already shown; say the refresh failed and offer Retry.
+      if (mountedRef.current) setListState('error');
+    }
   }, [api, streamId]);
 
   useEffect(() => { void load(); }, [load]);
+  const retryLoad = () => { setListState('loading'); void load(); };
   const now = useNowTick(codes.some(c => !!c.expiresAt));
 
   async function create() {
@@ -60,15 +73,17 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
         ...(durationMinutes ? { durationMinutes } : {}),
       });
       await load();
-    } catch (e: any) {
-      setError(friendlyError(e, 'Could not create the code. Try again.'));
+    } catch (e: unknown) {
+      if (mountedRef.current) setError(friendlyError(e, 'Could not create the code. Try again.'));
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
   }
 
   return (
-    <View style={styles.wrap} pointerEvents="box-none" testID="live-codes-host-sheet">
+    <View style={styles.wrap} testID="live-codes-host-sheet">
+      {/* Transparent tap-away layer — no translucent scrim over the broadcast. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close live codes" testID="live-codes-backdrop" />
       <View style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.border, paddingBottom: insets.bottom + SP.md }]}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Live codes</Text>
@@ -99,6 +114,16 @@ export function LiveCodesHostSheet({ streamId, onClose }: { streamId: string; on
         {error ? <Text style={[styles.error, { color: theme.text }]}>{error}</Text> : null}
         <Button label="Create live code" onPress={create} loading={saving} fullWidth />
 
+        {listState === 'loading' && codes.length === 0 ? (
+          <ActivityIndicator style={styles.listState} color={theme.muted} />
+        ) : listState === 'error' ? (
+          <View style={styles.listStateRow} testID="live-codes-load-error">
+            <Text style={[styles.meta, { color: theme.muted, flex: 1, marginTop: 0 }]}>Couldn’t load your live codes.</Text>
+            <Button label="Retry" variant="secondary" size="compact" onPress={retryLoad} />
+          </View>
+        ) : codes.length === 0 ? (
+          <Text style={[styles.meta, styles.listState, { color: theme.muted }]} testID="live-codes-empty">No codes yet. Create one and buyers get it right away.</Text>
+        ) : null}
         {codes.length > 0 && (
           <ScrollView style={styles.list} contentContainerStyle={{ gap: SP.sm }}>
             {codes.map(c => {
@@ -135,6 +160,8 @@ const styles = StyleSheet.create({
   label: { fontFamily: FONT.medium, fontSize: FS.xs, marginTop: SP.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   error: { fontFamily: FONT.regular, fontSize: FS.sm },
+  listState: { marginTop: SP.sm, textAlign: 'center' },
+  listStateRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
   list: { marginTop: SP.sm, maxHeight: 180 },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm },
   code: { fontFamily: FONT.semibold, fontSize: FS.sm },

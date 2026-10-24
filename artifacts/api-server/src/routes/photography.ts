@@ -11,6 +11,7 @@ import {
   generateWithVisualQa,
   ImageQualityError,
   ImageQualityUnavailableError,
+  type ImageEditSize,
   type ImageOperation,
 } from "@workspace/integrations-openai-ai-server/image";
 import type { AiTool } from "../lib/aiImageProviders/config";
@@ -84,9 +85,27 @@ function resolveGeneratorOrRespond(
   }
 }
 
-// POST /api/photography/generate  { images: string[] (base64/data-url), prompt?: string }
+/**
+ * Maps the seller's aspect-ratio choice to the nearest output size the image
+ * edit endpoint supports: square stays square, portrait ratios (4:5, 3:4,
+ * 2:3, 9:16) get the portrait canvas, landscape ratios (16:9, 3:2, 4:3) the
+ * landscape one. Anything unrecognised keeps the provider default.
+ */
+export function photoshootSizeForRatio(ratio: unknown): ImageEditSize | undefined {
+  if (typeof ratio !== "string") return undefined;
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(ratio.trim());
+  if (!match) return undefined;
+  const w = Number(match[1]);
+  const h = Number(match[2]);
+  if (!w || !h) return undefined;
+  if (w === h) return "1024x1024";
+  return w < h ? "1024x1536" : "1536x1024";
+}
+
+// POST /api/photography/generate  { images: string[] (base64/data-url), prompt?: string, ratio?: "1:1" | "4:5" | "9:16" | ... }
 router.post("/generate", async (req, res) => {
-  const { images, prompt } = req.body ?? {};
+  const { images, prompt, ratio } = req.body ?? {};
+  const size = photoshootSizeForRatio(ratio);
   if (!Array.isArray(images) || images.length === 0) {
     res.status(400).json({ error: "At least one reference or product photo is required." });
     return;
@@ -154,7 +173,7 @@ router.post("/generate", async (req, res) => {
       generate: (retryPrompt) =>
         generator
           ? generator({ productImages: tmpFiles, referenceImages: [], prompt: retryPrompt }).then((r) => r.imageBuffer)
-          : editImages(tmpFiles, retryPrompt),
+          : editImages(tmpFiles, retryPrompt, undefined, size ? { size } : undefined),
     });
     res.json({ b64_json: buffer.toString("base64") });
   } catch (err) {

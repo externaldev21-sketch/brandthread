@@ -60,6 +60,7 @@ import {
   nearestPromoTierCents, promoProductId,
 } from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { friendlyError } from '@/lib/friendlyError';
 import {
   estimateReach,
   BUDGET_STEPS,
@@ -301,6 +302,8 @@ export default function CreateAdScreen() {
   // Products (loaded up-front since this is now a single page)
   const [products,        setProducts]        = useState<Array<{ id: string; name: string }>>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  // A failed load must not read as "you have no products" — show it with a retry.
+  const [productsError,   setProductsError]   = useState<string | null>(null);
 
   // Prevent double-handling the paymentReturn redirect param
   const paymentReturnConsumed = useRef(false);
@@ -383,13 +386,24 @@ export default function CreateAdScreen() {
   }, [params.paymentReturn, params.id]);
 
   // ── Load products up-front (needed by the CTA section) ──────────────────
+  const productsMounted = useRef(true);
+  useEffect(() => () => { productsMounted.current = false; }, []);
+  const loadProducts = useCallback(() => {
+    setLoadingProducts(true);
+    setProductsError(null);
+    api.products.list()
+      .then((rows: unknown) => {
+        if (productsMounted.current) setProducts((rows as any[]).map((p: any) => ({ id: p.id, name: p.name })));
+      })
+      .catch((err: unknown) => {
+        if (productsMounted.current) setProductsError(friendlyError(err, "Couldn't load your products."));
+      })
+      .finally(() => { if (productsMounted.current) setLoadingProducts(false); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (products.length > 0) return;
-    setLoadingProducts(true);
-    api.products.list()
-      .then((rows: unknown) => setProducts((rows as any[]).map((p: any) => ({ id: p.id, name: p.name }))))
-      .catch(() => {})
-      .finally(() => setLoadingProducts(false));
+    loadProducts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -922,6 +936,20 @@ export default function CreateAdScreen() {
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Select product</Text>
               {loadingProducts ? (
                 <ActivityIndicator color={theme.accentLight} style={{ margin: SP.md }} />
+              ) : productsError ? (
+                <View style={[styles.infoBox, { backgroundColor: colors.elevated, borderColor: colors.border }]} testID="products-load-error">
+                  <Icon name="alert-circle" size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.infoBoxText, { color: colors.mutedForeground }]}>{productsError}</Text>
+                  <TouchableOpacity
+                    onPress={loadProducts}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading products"
+                    testID="products-retry"
+                  >
+                    <Text style={[styles.infoBoxText, { flex: 0, color: colors.foreground, fontFamily: FONT.semibold }]}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <View style={{ gap: SP.sm }}>
                   {products.map((p) => {
@@ -958,7 +986,7 @@ export default function CreateAdScreen() {
         <Section title="Audience & reach" colors={colors}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
             <Icon name="users" size={16} color={colors.foreground} />
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
                 Who this will reach, estimated from your budget. Brandthread doesn't yet support choosing an audience by
@@ -1095,7 +1123,7 @@ const styles = StyleSheet.create({
   reachCard:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md },
   reachLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 2 },
   reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
-  reachDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 16 },
+  reachDisclaimer: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 18 },
   stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm },
   metaAdsLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.sm, minHeight: 44 },
   metaAdsLinkText: { fontSize: FS.xs, fontFamily: FONT.semibold },

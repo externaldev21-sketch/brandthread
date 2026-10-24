@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { shareLink } from '@/lib/shareActions';
 import { buildPostUrl } from '@/lib/shareLinks';
@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -27,6 +28,9 @@ import { formatMoney } from '@/lib/format';
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 
 
+type DateRange = '7d' | '14d' | '30d' | 'All';
+const DATE_RANGES: DateRange[] = ['7d', '14d', '30d', 'All'];
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const formatNumber = formatCompactCount;
@@ -35,11 +39,29 @@ function formatRevenue(n: number): string {
   return formatMoney(Math.round(n * 100));
 }
 
+function formatPeakHour(hour: number): string {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}:00 ${period}`;
+}
+
 function postTypeGradient(type: string, primary: string, colors: ReturnType<typeof useColors>): [string, string] {
   if (type === 'video' || type === 'behind_scenes') return [primary, colors.background];
   if (type === 'slideshow') return [colors.info, colors.background];
   if (type === 'announcement') return [colors.success, `${colors.success}2E`];
   return [colors.warning, colors.background];
+}
+
+function retentionBarColor(pct: number, colors: ReturnType<typeof useColors>): string {
+  if (pct > 0.7) return colors.success;
+  if (pct > 0.4) return colors.warning;
+  return colors.destructive;
+}
+
+function countryInitials(country: string): string {
+  const words = country.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return country.slice(0, 2).toUpperCase();
 }
 
 // ─── Section Title ─────────────────────────────────────────────────────────────
@@ -50,11 +72,69 @@ function SectionTitle({ title }: { title: string }) {
   return <Text style={styles.sectionTitle}>{title}</Text>;
 }
 
+// ─── Engagement Bar ────────────────────────────────────────────────────────────
+
+interface EngagementBarProps {
+  label: string;
+  value: number;
+  maxValue: number;
+}
+
+function EngagementBar({ label, value, maxValue }: EngagementBarProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const pct = maxValue > 0 ? value / maxValue : 0;
+  return (
+    <View style={styles.engRow}>
+      <Text style={styles.engLabel}>{label}</Text>
+      <View style={styles.engBarBg}>
+        <LinearGradient
+          colors={[colors.primary, colors.info]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.engBarFill, { width: `${Math.max(pct * 100, 1)}%` }]}
+        />
+      </View>
+      <Text style={styles.engValue}>{formatNumber(value)}</Text>
+    </View>
+  );
+}
+
+// ─── Country Bar ───────────────────────────────────────────────────────────────
+
+interface CountryBarProps {
+  country: string;
+  pct: number;
+}
+
+function CountryBar({ country, pct }: CountryBarProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.countryRow}>
+      <View style={styles.countryInitialsCircle}>
+        <Text style={styles.countryInitialsText}>{countryInitials(country)}</Text>
+      </View>
+      <Text style={styles.countryName}>{country}</Text>
+      <View style={styles.engBarBg}>
+        <LinearGradient
+          colors={[colors.primary, colors.info]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.engBarFill, { width: `${Math.max(pct * 100, 1)}%` }]}
+        />
+      </View>
+      <Text style={styles.countryPct}>{(pct * 100).toFixed(0)}%</Text>
+    </View>
+  );
+}
+
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function PostAnalyticsScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
 
@@ -76,6 +156,15 @@ export default function PostAnalyticsScreen() {
   }, [api, postId]);
 
   useEffect(() => { loadPost(); }, [loadPost]);
+
+  const [activeRange, setActiveRange] = useState<DateRange>('7d');
+
+  const cycleRange = useCallback(() => {
+    setActiveRange(prev => {
+      const idx = DATE_RANGES.indexOf(prev);
+      return DATE_RANGES[(idx + 1) % DATE_RANGES.length];
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -291,6 +380,26 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
   // ── Header ──
   // No divider under the header (app-wide header rule).
+  header: {
+    backgroundColor: colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 16,
+    fontFamily: FONT.semibold,
+    textAlign: 'center',
+  },
   rangePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -397,6 +506,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontSize: FS.meta,
     fontFamily: FONT.medium,
   },
+  heroChange: {
+    color: colors.success,
+    fontSize: 11,
+    marginTop: 2,
+  },
 
   // ── Section Title ──
   sectionTitle: {
@@ -415,6 +529,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderRadius: 12,
     padding: 14,
     gap: 12,
+  },
+  unavailableTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: FONT.bold,
   },
   unavailableText: {
     flex: 1,
