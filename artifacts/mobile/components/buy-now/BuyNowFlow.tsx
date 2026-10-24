@@ -214,7 +214,8 @@ export function BuyNowFlow({
         order={orderData}
         onTrackOrder={(orderId) => {
           onClose();
-          router.push(`/buyer-order-detail?id=${encodeURIComponent(orderId)}` as never);
+          // "Track order": open the order on its tracking section (if any yet).
+          router.push(`/buyer-order-detail?id=${encodeURIComponent(orderId)}&focus=tracking` as never);
         }}
         onContinue={onClose}
       />
