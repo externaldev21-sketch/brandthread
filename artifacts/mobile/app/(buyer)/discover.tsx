@@ -153,6 +153,7 @@ export default function DiscoverScreen() {
   const [drops, setDrops, hadDrops] = useStickyState<DiscoverDrop[]>(DISCOVER_KEYS.drops, []);
   const [dropsLoading, setDropsLoading] = useState(!hadDrops);
   const dropsFetched = useRef(false);
+  const [dropsError, setDropsError] = useState(false);
 
   // Header rails above the grid — lifted here so the first reveal can wait
   // for them instead of letting each one push the grid down as it lands.
@@ -237,6 +238,9 @@ export default function DiscoverScreen() {
     dropsFetched.current = true;
     try {
       setDrops(await composeDiscoverDrops({ api }));
+      setDropsError(false);
+    } catch {
+      setDropsError(true);
     } finally {
       setDropsLoading(false);
     }
@@ -523,7 +527,11 @@ export default function DiscoverScreen() {
               <ListSkeleton rows={4} />
             </ResponsiveContainer>
           ) : (
-            <EmptyState title="No drops yet" message="Upcoming drops from sellers will show up here." />
+            <EmptyState
+              title={dropsError ? "Couldn't load drops" : 'No drops yet'}
+              message={dropsError ? 'Check your connection and try again.' : 'Upcoming drops from sellers will show up here.'}
+              action={dropsError ? { label: 'Try again', onPress: () => { void fetchDrops(); } } : undefined}
+            />
           )}
         />
       )}

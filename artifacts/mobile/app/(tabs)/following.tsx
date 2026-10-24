@@ -1,8 +1,11 @@
 /**
  * Brandthread — Following / Drops
- * Shows brands the buyer follows, with their latest drops and real countdown timers.
- * Loads real active drops from /api/public/drops.
- * Never shows mock/invented brands — shows real empty state when there are no drops.
+ * Shows active drops from the sellers the viewer follows, with real countdown
+ * timers. Loads real active drops from /api/public/drops and filters them to
+ * followed owners (/api/social/following — both keyed by Clerk id). A viewer
+ * who follows nobody (or whose follow list can't be read) sees every public
+ * drop under "Latest drops" instead.
+ * Never shows mock/invented brands — shows real empty/error states.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { plural } from '@/lib/plural';
@@ -33,6 +36,7 @@ import { TEXT_SECONDARY } from '@/lib/theme';
 
 interface DropItem {
   id: string;
+  ownerId?: string;
   name: string;
   type: 'pre-order' | 'pre-made';
   status: string;
@@ -275,6 +279,8 @@ export default function FollowingScreen() {
               <PressableScale
                 key={brand.id}
                 style={s.avatarItem}
+                accessibilityRole="button"
+                accessibilityLabel={`Open drop from ${(brand.handle ?? '').replace('@', '')}`}
                 onPress={() => {
                   const drop = drops.find(d => d.id === brand.id);
                   if (drop) {

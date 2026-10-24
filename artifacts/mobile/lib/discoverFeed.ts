@@ -129,6 +129,10 @@ export interface ComposeDiscoverFeedOptions {
   isSignedIn: boolean;
   filter: 'forYou' | 'fits';
   limit?: number;
+  /** Throw when every source it tried failed and nothing (not even preview
+   *  backfill) filled the grid, so the caller can show an error + retry
+   *  instead of the "Nothing to show yet" empty state. */
+  throwWhenUnreachable?: boolean;
 }
 
 export interface DiscoverPage {
@@ -269,15 +273,20 @@ export async function composeDiscoverDrops({ api }: { api: any }): Promise<Disco
   let drops: DiscoverDrop[] = [];
   try {
     const rows = await api.publicDrops.list('upcoming');
+    // /api/public/drops returns `heroImageUrl` + a `seller` {brandName,
+    // displayName} join; the flat fields are accepted too. A row still
+    // missing its brand or image is dropped rather than rendered with a
+    // placeholder ("Brand", blank thumbnail).
     drops = (Array.isArray(rows) ? rows : []).map((r: any) => ({
       id: r.id,
       name: r.name ?? r.title ?? 'Drop',
-      brandName: r.brandName ?? r.sellerDisplayName ?? 'Brand',
-      imageUri: r.imageUri ?? (r.images ?? [])[0],
+      brandName: r.brandName ?? r.sellerDisplayName ?? r.seller?.brandName ?? r.seller?.displayName ?? '',
+      imageUri: r.imageUri ?? r.heroImageUrl ?? (r.images ?? [])[0],
       releaseAt: r.releaseAt ?? null,
       live: !!r.live,
-    }));
-  } catch {
+    })).filter((d: DiscoverDrop) => !!d.brandName?.trim() && !!d.imageUri);
+  } catch (error) {
+    if (!isPreviewCatalogEnabled()) throw error;
     // Preview backfill below.
   }
   if (drops.length === 0 && isPreviewCatalogEnabled()) drops = getPreviewDrops();

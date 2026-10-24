@@ -41,7 +41,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
 import { ShopByCategoryRail } from '@/components/discover/DiscoverShopRails';
@@ -63,6 +63,7 @@ import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { profileVideosHref } from '@/lib/profileNavigation';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { FilterSheet } from '@/components/search/FilterSheet';
 import { countActiveFilters, filtersToApiOptions, type SearchFacets, type SearchFilters } from '@/lib/searchFilters';
@@ -200,6 +201,7 @@ export default function BuyerSearchScreen() {
   const { isSignedIn } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const previewMode = isBuyerDevPreview();
+  const demoMode = previewMode && isPreviewDemoMode();
 
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -434,9 +436,14 @@ export default function BuyerSearchScreen() {
     push({ pathname: '/thread-product-detail' as any, params: { productId, src: 'search' } } as never);
   }
 
+  // A video result's authorId is the post's userId (server: posts.userId) —
+  // the same id the creator player loads (/api/public/users/:id/videos) and
+  // checks the exact post against, so it opens straight on the tapped video.
   function goToVideo(video: VideoResult) {
     hapticPrimaryAction();
-    router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
+    router.push(profileVideosHref({
+      source: 'creator', id: video.authorId, startPostId: video.postId, title: video.authorName, exactPost: true,
+    }) as never);
   }
 
   function handleProductPress(r: ProductResult) {

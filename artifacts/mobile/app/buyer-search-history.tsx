@@ -15,6 +15,8 @@ import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, TEXT_DISABLED } from '@/lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SPACING } from '@/constants/spacing';
 import { TYPE_SCALE } from '@/constants/typography';
 import { haptics } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -26,6 +28,7 @@ export default function BuyerSearchHistoryScreen() {
   const api = useApi();
   const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [terms, setTerms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +119,7 @@ export default function BuyerSearchHistoryScreen() {
         <FlatList
           data={terms}
           refreshControl={pull.refreshControl}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
           keyExtractor={(term) => term}
           renderItem={({ item }) => (
             <RecentSearchRow term={item} onPress={() => submitTerm(item)} onRemove={() => removeTerm(item)} />

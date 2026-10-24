@@ -51,6 +51,15 @@ type ScreenState =
   | { kind: 'error' }
   | { kind: 'ready'; data: PublicCollectionDto };
 
+/** Where a saved item opens: product → PDP, post → the post player. Any
+ *  other type (store, nested collection, future kinds) has no target here. */
+function itemHref(item: PublicCollectionItem): string | null {
+  if (!item.targetId) return null;
+  if (item.type === 'product') return `/product-detail?id=${encodeURIComponent(item.targetId)}`;
+  if (item.type === 'post') return `/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}`;
+  return null;
+}
+
 async function fetchPublicCollection(collectionId: string): Promise<PublicCollectionDto> {
   const apiBase =
     process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -83,6 +92,8 @@ export default function PublicCollectionScreen() {
     }
   });
   const [reloadKey, setReloadKey] = useState(0);
+
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!collectionId) { setState({ kind: 'not_found' }); return; }
@@ -152,10 +163,12 @@ export default function PublicCollectionScreen() {
         )}
 
         <Text style={styles.title}>{collection.name}</Text>
-        <Text style={styles.subtitle}>By {collection.ownerName} · {collection.itemCount} saved</Text>
+        <Text style={styles.subtitle}>
+          {collection.ownerName?.trim() ? `By ${collection.ownerName.trim()} · ` : ''}{collection.itemCount} saved
+        </Text>
 
         {items.length === 0 ? (
-          <Text style={styles.messageDesc}>Nothing saved here yet.</Text>
+          <Text style={[styles.messageDesc, { marginTop: SP.lg }]}>Nothing saved here yet.</Text>
         ) : (
           <FlatList
             data={items}
@@ -164,17 +177,32 @@ export default function PublicCollectionScreen() {
             scrollEnabled={false}
             columnWrapperStyle={{ gap: GAP }}
             contentContainerStyle={{ gap: GAP, marginTop: SP.lg }}
-            renderItem={({ item }) => (
+            renderItem={({ item }) => {
+              const href = itemHref(item);
+              const tile = (
               <View style={[styles.tile, tileSize]}>
                 <ProductPhoto uri={item.image} brand={item.brand} name={item.title} style={[styles.tileImage, tileImageSize]} />
                 <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
                 {item.priceCents != null ? <Text style={styles.tilePrice}>{formatMoney(item.priceCents)}</Text> : null}
               </View>
-            )}
+              );
+              // Unknown types stay a plain, non-interactive tile (no button role).
+              if (!href) return tile;
+              return (
+                <TouchableOpacity
+                  onPress={() => router.push(href as never)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.type === 'product' ? `Open ${item.title}` : `Open post ${item.title}`}
+                >
+                  {tile}
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
 
-        <TouchableOpacity style={[styles.primaryBtn, { marginTop: SP.xl }]} onPress={() => router.replace('/' as never)}>
+        <TouchableOpacity style={[styles.primaryBtn, { marginTop: SP.xl }]} onPress={() => router.replace('/' as never)} accessibilityRole="button">
           <Text style={styles.primaryBtnText}>Open in Brandthread</Text>
         </TouchableOpacity>
       </ResponsiveContainer>

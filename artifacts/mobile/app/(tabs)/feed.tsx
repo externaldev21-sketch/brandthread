@@ -2491,6 +2491,12 @@ function FeedScreenContent({
   const previewTopInset = useHeaderTopInset();
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
+  // Seeded fashion-preview posts (and their first-frame poster) only under the
+  // explicit web preview demo opt-in (`?bt_preview=…&demo=1`). Latched at
+  // mount: Expo Router drops the query on in-app navigation, and the seeded
+  // feed must not vanish mid-session. Dev builds on a fresh account see the
+  // real (possibly empty) feed.
+  const [previewFeedEnabled] = useState(() => isPreviewDemoMode());
   const isCreatorFeed = !!creatorFeed;
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
@@ -2805,6 +2811,7 @@ function FeedScreenContent({
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
     setFeedLoadingMore(false);
+    setFeedError(false);
     if (initial) {
       setFeedLoading(true);
       // No skeleton ever covers this — instead, show whatever we last saw
@@ -3095,7 +3102,7 @@ function FeedScreenContent({
     });
   }, [sellerFeedPosts]);
 
-  // Development buyer review prepends ten clearly labeled fashion previews.
+  // Demo preview (`&demo=1`) prepends ten clearly labeled fashion previews.
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
@@ -3120,7 +3127,7 @@ function FeedScreenContent({
     // so a live card never has to fit inside the feed's own search bar/tabs/
     // tab bar chrome.
     return regular;
-  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases]);
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases, previewFeedEnabled]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -3276,7 +3283,7 @@ function FeedScreenContent({
     const previewEligible = __DEV__ && isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
     if (!previewEligible) return null;
     return FASHION_PREVIEW_POSTER_SOURCES[0] ?? (FASHION_PREVIEW_POSTER_URIS[0] ? { uri: FASHION_PREVIEW_POSTER_URIS[0] } : null);
-  }, [firstContentItem, isCreatorFeed, buyerMode, showFashionPreview, feedTab]);
+  }, [firstContentItem, isCreatorFeed, buyerMode, showFashionPreview, feedTab, previewFeedEnabled]);
 
   // First-paint overlay lifecycle: visible the instant this screen mounts
   // (no dependency on the FlatList mounting, cell measurement, or the video

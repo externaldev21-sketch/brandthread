@@ -126,7 +126,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/seller-live-summary.tsx', // Approved end-of-show hero and Done footer, not a page-title header.
   // The approved Bag redesign uses its shared BagHeader, not ScreenHeader.
   'app/(buyer)/cart.tsx',
-  'app/(buyer)/discover-feed.tsx',
   'app/(buyer)/discover.tsx',
   'app/(buyer)/feed.tsx',
   'app/(buyer)/inbox.tsx',
