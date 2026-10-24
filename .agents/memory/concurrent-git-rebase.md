@@ -21,6 +21,8 @@ An automatic workspace checkpoint can commit a conflict worktree and remove `MER
 
 **How to apply:** After any pause in a shared Git operation, recheck HEAD's parents, upstream ancestry, unmerged entries, and operation metadata before continuing. If the upstream branch is not an ancestor, resume with a merge rather than treating the clean checkpoint as completion.
 
+Run final merge validation against a stable pre-batch baseline or the complete affected components, not only working-tree differences from HEAD. A checkpoint can commit unvalidated source, making a HEAD-only check examine nothing even while errors remain.
+
 For explicitly ordered PR batches, drive the sequence from the complete authoritative list, not a numeric range or reconstructed subset. Check complete preceding coverage before starting the designated final merge.
 
 **Why:** A specially designated final PR can have a lower number than preceding entries. An incomplete loop can merge it prematurely; an end-only audit discovers the mistake after the no-history-rewrite constraint prevents same-branch repair.
