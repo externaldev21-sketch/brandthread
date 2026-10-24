@@ -163,6 +163,38 @@ export async function rearmLowStockAlert(ownerId: string, productId: string): Pr
   ));
 }
 
+/** Minimum gap between two saved items alerts of the same kind, per buyer per product. */
+export const SAVED_ALERT_DEDUPE_HOURS = 48;
+const SAVED_ALERT_DEDUPE_MS = SAVED_ALERT_DEDUPE_HOURS * 60 * 60 * 1000;
+
+export function isPriceDrop(input: { previousPriceCents: number; newPriceCents: number }): boolean {
+  return Number.isFinite(input.previousPriceCents)
+    && Number.isFinite(input.newPriceCents)
+    && input.newPriceCents > 0
+    && input.newPriceCents < input.previousPriceCents;
+}
+
+export function isOutsideSavedAlertWindow(lastAlertedAt: Date | null | undefined, now: Date = new Date()): boolean {
+  if (!lastAlertedAt) return true;
+  return now.getTime() - lastAlertedAt.getTime() >= SAVED_ALERT_DEDUPE_MS;
+}
+
+export function formatAlertPrice(priceCents: number): string {
+  return `$${(priceCents / 100).toFixed(2)}`;
+}
+
+export function savedAlertCopy(
+  input: { kind: "restock"; productName: string } | { kind: "price_drop"; productName: string; priceCents: number },
+): { title: string; body: string } {
+  if (input.kind === "restock") {
+    return { title: `Back in stock: ${input.productName}`, body: "An item you saved is available again." };
+  }
+  return {
+    title: `Price drop: ${input.productName} now ${formatAlertPrice(input.priceCents)}`,
+    body: "An item you saved is now available at a lower price.",
+  };
+}
+
 /** Buyer-facing restock alert for savers and waitlist members. */
 export function notifyBackInStock(input: Parameters<typeof notifyBackInStockWork>[0]): Promise<void> {
   return trackStockNotificationWork(notifyBackInStockWork(input));

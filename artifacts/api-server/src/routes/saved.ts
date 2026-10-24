@@ -130,7 +130,12 @@ router.post("/", validateInput({ body: saveItemBody }), async (req, res) => {
         sellerId: savedPost.userId,
       }).catch(() => undefined);
     }
-    return res.status(201).json((await adaptSavedRows([row]))[0]);
+    const [item] = await adaptSavedRows([row]);
+    // Saved while sold out: the next restock should alert this buyer.
+    if (item.soldOut) {
+      await db.update(savedItems).set({ wasOutOfStock: true }).where(eq(savedItems.id, row.id));
+    }
+    return res.status(201).json(item);
   } catch (err: any) {
     if ((err?.code ?? err?.cause?.code) === "23505") {
       // Already saved — fetch + return existing row

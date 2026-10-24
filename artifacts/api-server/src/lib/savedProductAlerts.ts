@@ -211,11 +211,12 @@ async function claimRecipients(product: LiveProduct, kind: SavedProductAlertKind
     await db.update(savedItems).set({ backInStockAt: now, wasOutOfStock: false }).where(isProductRow);
     const cutoff = new Date(now.getTime() - BACK_IN_STOCK_COOLDOWN_MS);
     const claimed = await db.update(savedItems)
-      .set({ backInStockNotifiedAt: now })
+      .set({ backInStockNotifiedAt: now, restockAlertedAt: now })
       .where(and(
         isProductRow,
         eq(savedItems.notifyOnBackInStock, true),
         sql`(${savedItems.backInStockNotifiedAt} IS NULL OR ${savedItems.backInStockNotifiedAt} < ${cutoff})`,
+        sql`(${savedItems.restockAlertedAt} IS NULL OR ${savedItems.restockAlertedAt} <= now() - interval '48 hours')`,
       ))
       .returning({ userId: savedItems.userId });
     return claimed.map((r) => r.userId);
@@ -227,10 +228,11 @@ async function claimRecipients(product: LiveProduct, kind: SavedProductAlertKind
     .where(and(isProductRow, sql`${savedItems.savedPriceCents} IS NULL AND ${savedItems.lastNotifiedPriceCents} IS NULL`));
   const reference = sql`LEAST(${savedItems.savedPriceCents}, ${savedItems.lastNotifiedPriceCents})`;
   const claimed = await db.update(savedItems)
-    .set({ lastNotifiedPriceCents: priceCents })
+    .set({ lastNotifiedPriceCents: priceCents, priceDropAlertedAt: new Date() })
     .where(and(
       isProductRow,
       eq(savedItems.notifyOnPriceDrop, true),
+      sql`(${savedItems.priceDropAlertedAt} IS NULL OR ${savedItems.priceDropAlertedAt} <= now() - interval '48 hours')`,
       sql`${reference} - ${priceCents} >= ${PRICE_DROP_MIN_CENTS}`,
       sql`(${reference} - ${priceCents}) * 100 >= ${reference} * ${PRICE_DROP_MIN_PERCENT}`,
     ))

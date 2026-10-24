@@ -91,6 +91,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
       { key: 'payouts', title: 'Payouts', audience: false, example: 'Your payout of $420.00 was sent.', role: 'seller' },
       { key: 'reviews', title: 'Reviews', audience: false, example: 'username left a 5-star review.', role: 'seller' },
       { key: 'promotions', title: 'Promotions and offers', audience: false, example: 'A brand you follow just dropped something new.' },
+      { key: 'saved_alerts', title: 'Saved items alerts', audience: false, example: 'Restocks and price drops', role: 'buyer' },
     ],
   },
 ];

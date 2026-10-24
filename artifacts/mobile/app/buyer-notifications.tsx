@@ -107,6 +107,7 @@ function notifIcon(type: Notification['type']): string {
     case 'price_drop': return 'trending-down';
     case 'digest': return 'layers';
     case 'order_anniversary': return 'calendar';
+    case 'back_in_stock': return 'refresh-cw';
     case 'saved_product_update': return 'bookmark';
     case 'new_friend_message': return 'message-circle';
     case 'new_order_message': return 'package';
@@ -163,6 +164,11 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
   }
   if (notif.targetId && notif.targetType === 'buyer_order') {
     router.push(('/buyer-order-detail?id=' + encodeURIComponent(notif.targetId) + (notif.type === 'review_request' ? '&review=1' : '')) as any);
+    return;
+  }
+  // Saved items alerts open the saved product, matching push taps.
+  if (notif.targetId && notif.targetType === 'product' && (notif.type === 'price_drop' || notif.type === 'back_in_stock')) {
+    router.push(('/buyer-product-detail?productId=' + encodeURIComponent(notif.targetId)) as any);
     return;
   }
   switch (notif.type) {

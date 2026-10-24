@@ -1563,11 +1563,17 @@ export const savedItems = pgTable('saved_items', {
   notifyOnBackInStock: boolean('notify_on_back_in_stock').notNull().default(true),
   // Last back-in-stock alert sent to this saver — cooldown guard (lib/savedProductAlerts.ts).
   backInStockNotifiedAt: timestamp('back_in_stock_notified_at'),
+  // Saved items alerts dedupe (migration 270): when this buyer was last sent a
+  // restock / price-drop alert for this product. At most one of each per 48h.
+  restockAlertedAt:   timestamp('restock_alerted_at', { withTimezone: true }),
+  priceDropAlertedAt: timestamp('price_drop_alerted_at', { withTimezone: true }),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   productTargetIdx: index('saved_items_product_target_idx').on(table.targetId)
     .where(sql`${table.itemType} = 'product'`),
   collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
+  // Saved items alerts fan out by product (migration 270).
+  targetIdx: index('saved_items_target_id_idx').on(table.targetId),
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
   typeCreatedAtIndex: index('saved_items_type_created_at_idx').on(table.itemType, table.createdAt),
 }));
@@ -1679,12 +1685,8 @@ export const notificationsFeed = pgTable('notifications_feed', {
   liveStartedUnique: uniqueIndex('notifications_feed_live_started_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'live_started' AND ${table.targetId} IS NOT NULL`),
-  priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
-    .on(table.userId, table.type, table.targetId)
-    .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),
-  backInStockUnique: uniqueIndex('notifications_feed_back_in_stock_unique')
-    .on(table.userId, table.type, table.targetId)
-    .where(sql`${table.type} = 'back_in_stock' AND ${table.targetId} IS NOT NULL`),
+  // price_drop / back_in_stock have no lifetime unique index: saved items
+  // alerts may repeat after 48 hours, deduped on saved_items (migration 270).
   lowStockUnique: uniqueIndex('notifications_feed_low_stock_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'low_stock' AND ${table.targetId} IS NOT NULL`),

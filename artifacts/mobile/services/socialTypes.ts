@@ -557,7 +557,7 @@ export type NotificationType =
   | 'review_request'
   | 'return_update' | 'refund_update' | 'dispute_update'
   | 'product_restocked' | 'drop_live' | 'drop_early_access' | 'live_reminder' | 'live_started' | 'preorder_closing'
-  | 'price_drop' | 'saved_product_update'
+  | 'price_drop' | 'back_in_stock' | 'saved_product_update'
   | 'bag_restock' | 'size_back'
   | 'new_friend_message' | 'new_seller_reply' | 'new_order_message' | 'message_request'
   | 'digest' | 'order_anniversary'
