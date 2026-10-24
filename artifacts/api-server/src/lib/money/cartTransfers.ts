@@ -22,7 +22,7 @@
  */
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { db, orders, users } from "@workspace/db";
+import { checkoutSessions, db, orders, users } from "@workspace/db";
 import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
 import { orderHeldCents, postLedgerTransaction } from "./ledger";
@@ -193,7 +193,7 @@ export async function sweepTransferOrders(options: { stripe?: StripeTransfers | 
   return count;
 }
 
-type StripeIntents = Pick<Stripe, "paymentIntents">;
+type StripeIntents = Pick<Stripe, "paymentIntents"> & Partial<Pick<Stripe, "checkout">>;
 
 /** Builds the cart's orders for a paid intent (routes/webhooks.ts handleCartPaymentSucceeded). */
 export type CartPaidHandler = (intent: Stripe.PaymentIntent, providerEventId: string, paidAt: Date) => Promise<void>;
@@ -212,6 +212,9 @@ async function defaultCartPaidHandler(): Promise<CartPaidHandler> {
  * endpoint was missing payment_intent.succeeded), so the sweep builds the
  * orders itself. handleCartPaymentSucceeded is idempotent per seller group,
  * so a late webhook afterwards changes nothing.
+ * A hosted Checkout hold (no PaymentIntent yet) is
+ * checked against its Checkout Session the same way: a completed session
+ * keeps its units, an open one is expired first.
  */
 export async function expireStockReservations(
   options: { stripe?: StripeIntents | null; now?: Date; onPaid?: CartPaidHandler } = {},
@@ -243,6 +246,20 @@ export async function expireStockReservations(
       } catch (error) {
         logger.error({ err: error, paymentIntentId }, "Could not cancel an abandoned checkout; its stock stays reserved for now");
         continue;
+      }
+    } else if (!paymentIntentId && stripeClient?.checkout) {
+      const [row] = await db.select({ stripeSessionId: checkoutSessions.stripeSessionId }).from(checkoutSessions)
+        .where(eq(checkoutSessions.id, checkoutSessionId)).limit(1);
+      const hostedSessionId = row?.stripeSessionId?.startsWith("cs_") ? row.stripeSessionId : null;
+      if (hostedSessionId) {
+        try {
+          const session = await stripeClient.checkout.sessions.retrieve(hostedSessionId);
+          if (session.status === "complete") continue;
+          if (session.status === "open") await stripeClient.checkout.sessions.expire(hostedSessionId);
+        } catch (error) {
+          logger.error({ err: error, hostedSessionId }, "Could not close an abandoned hosted checkout; its stock stays reserved for now");
+          continue;
+        }
       }
     }
     released += await db.transaction((tx) => releaseStockReservation(tx, checkoutSessionId));

@@ -37,11 +37,34 @@ import { releaseFirstOrderDiscountForCheckout } from "../firstOrderDiscount";
 /** How long a checkout may sit between "Pay" and Stripe's answer before its units go back. */
 export const STOCK_RESERVATION_TTL_MS = 30 * 60_000;
 
+/**
+ * Hosted Stripe Checkout (routes/buyer.ts, routes/guest-checkout.ts) holds
+ * stock from session creation. Stripe's shortest allowed `expires_at` is 30
+ * minutes, so the session closes a minute after that and the hold outlives it
+ * by two more: by the time the sweep gives the units back, Stripe can no
+ * longer take a payment for them.
+ */
+export const HOSTED_CHECKOUT_SESSION_TTL_MS = 31 * 60_000;
+export const HOSTED_STOCK_RESERVATION_TTL_MS = HOSTED_CHECKOUT_SESSION_TTL_MS + 2 * 60_000;
+
+/** The one error code every buy path answers with when a unit was claimed first. */
+export const SOLD_OUT_CODE = "SOLD_OUT";
+
 export class StockReservationError extends Error {
   constructor(message: string, readonly variantId: string, readonly productName: string | null) {
     super(message);
     this.name = "StockReservationError";
   }
+}
+
+/** 409 body for a lost race; the app shows "Just sold out" and drops the line from the bag. */
+export function soldOutResponse(error: StockReservationError) {
+  return {
+    error: error.message,
+    code: SOLD_OUT_CODE,
+    variantId: error.variantId,
+    productName: error.productName,
+  };
 }
 
 export type ReservationLine = { variantId: string; quantity: number; productName?: string | null };
@@ -74,7 +97,7 @@ export async function reserveStock(
     const ok = await reserveStockAtomic(tx, line.variantId, line.quantity);
     if (!ok) {
       throw new StockReservationError(
-        `${line.productName ?? "An item"} doesn't have enough stock left`,
+        `${line.productName ?? "An item"} just sold out`,
         line.variantId,
         line.productName ?? null,
       );

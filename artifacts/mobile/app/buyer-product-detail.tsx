@@ -178,6 +178,7 @@ import { FriendsSavedLine } from '@/components/products/FriendsSavedLine';
 import { PriceHistoryChart } from '@/components/products/PriceHistoryChart';
 import { sharedPhoto, startClose as startSharedPhotoClose } from '@/lib/sharedPhoto';
 import { ApiError } from '@/lib/networkNotice';
+import { JUST_SOLD_OUT_LABEL, isJustSoldOut, useJustSoldOutVersion } from '@/lib/justSoldOut';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -1077,6 +1078,12 @@ export default function BuyerProductDetailScreen() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+  // Checkout took a just-sold-out line out of the bag: re-render the CTA and recount the bag.
+  const soldOutVersion = useJustSoldOutVersion();
+  useEffect(() => {
+    if (!soldOutVersion) return;
+    void getCart().then(cart => setCartCount(cart.items.reduce((sum, item) => sum + item.quantity, 0))).catch(() => {});
+  }, [soldOutVersion]);
 
   // ── Buyer demand signals ─────────────────────────────────────────────────
   // Populated from server-supplied fields on publicProducts.get() response only.
@@ -1415,7 +1422,9 @@ export default function BuyerProductDetailScreen() {
   const sizeChartTable = (product as { sizeChart?: SizeChart | null }).sizeChart ?? null;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
   const allSelected = allOptionsSelected(product, selections);
-  const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
+  // Another buyer took the last unit while this one was checking out (lib/justSoldOut.ts).
+  const justSoldOut = isJustSoldOut(variant?.id);
+  const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 && !justSoldOut : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
   const stockLine = variant ? variantStockLine(variant, stockInfo) : null;
   const paymentUnavailable = sellerPaymentReady === false;
@@ -1869,21 +1878,21 @@ export default function BuyerProductDetailScreen() {
                   plain in-stock and sold-out are grey. Threshold and
                   de-duplication with <StockCounter>: lib/stockLine.ts. */}
               <View style={[s.stockDot, {
-                backgroundColor: stockLine.kind === 'low' ? FG : stockLine.kind === 'in' ? MUTED : SUBTLE,
+                backgroundColor: justSoldOut ? SUBTLE : stockLine.kind === 'low' ? FG : stockLine.kind === 'in' ? MUTED : SUBTLE,
               }]} />
               <Text style={[
                 s.stockText,
-                stockLine.kind === 'low'
+                !justSoldOut && stockLine.kind === 'low'
                   ? { color: FG, fontFamily: FONT.bold }
                   : { color: MUTED },
               ]}>
-                {stockLine.text}
+                {justSoldOut ? `${JUST_SOLD_OUT_LABEL}. Someone grabbed the last one` : stockLine.text}
               </Text>
             </View>
           )}
 
           {/* Waitlist — shown when selected variant is OOS and not pre-order */}
-          {allSelected && variant && !variant.isAvailable && !product.isPreOrder && (
+          {allSelected && variant && (!variant.isAvailable || justSoldOut) && !product.isPreOrder && (
             <TouchableOpacity
               style={[wl.btn, waitlistJoined && wl.joined]}
               onPress={waitlistJoined ? handleLeaveWaitlist : handleJoinWaitlist}
@@ -2225,7 +2234,7 @@ export default function BuyerProductDetailScreen() {
           <Button
             label={
               paymentUnavailable ? 'Payments unavailable'
-                : allSelected && !inStock ? 'Sold out'
+                : allSelected && !inStock ? (justSoldOut ? JUST_SOLD_OUT_LABEL : 'Sold out')
                 : 'Buy now'
             }
             onPress={handleBuyNow}

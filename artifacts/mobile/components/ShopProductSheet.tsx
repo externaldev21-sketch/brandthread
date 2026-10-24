@@ -47,9 +47,8 @@ import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 
 import { formatCents } from '@/lib/money';
-
 import { processingTimeLine, sellerAcceptsReturns } from '@/lib/productTrust';
-
+import { JUST_SOLD_OUT_LABEL, isJustSoldOut, useJustSoldOutVersion } from '@/lib/justSoldOut';
 import { SizeRecommendationBadge, RecommendedTag, useSizeBadgeModel } from '@/components/SizeRecommendationBadge';
 
 import { ON_DARK, OVERLAY, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
@@ -670,11 +669,11 @@ export function ShopProductSheet({
         const only = p.variants[0];
         const autoSel = Object.fromEntries(only.optionValues.map(ov => [ov.optionId, ov.valueId]));
         setSelections(autoSel);
-        setPhase(only.isAvailable ? 'ready' : 'sold_out');
+        setPhase(only.isAvailable && !isJustSoldOut(only.id) ? 'ready' : 'sold_out');
         return;
       }
 
-      const hasAnyStock = p.variants.some(v => v.isAvailable);
+      const hasAnyStock = p.variants.some(v => v.isAvailable && !isJustSoldOut(v.id));
       setPhase(hasAnyStock ? 'ready' : 'sold_out');
     } catch {
       setPhase('error');
@@ -686,6 +685,19 @@ export function ShopProductSheet({
 
   // Variant → price
   const variant = product ? findVariant(product, selections) : null;
+
+  // A buyer lost the last unit at checkout (lib/justSoldOut.ts): flip the
+  // open sheet to its sold-out state instead of offering it again.
+  const soldOutVersion = useJustSoldOutVersion();
+  const productJustSoldOut = !!product && product.variants.some(v => isJustSoldOut(v.id));
+  useEffect(() => {
+    if (!product || !soldOutVersion) return;
+    const claimed = variant
+      ? isJustSoldOut(variant.id)
+      : product.variants.every(v => !v.isAvailable || isJustSoldOut(v.id));
+    if (claimed && (phase === 'ready' || phase === 'added')) setPhase('sold_out');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soldOutVersion, product, variant?.id]);
   const variantPrice = variant?.priceCents ?? product?.priceCents ?? 0;
   const variantCompare = variant?.compareAtPriceCents ?? product?.compareAtPriceCents;
   const hasDiscount = variantCompare != null && variantCompare > variantPrice;
@@ -1345,7 +1357,9 @@ export function ShopProductSheet({
           <View>
             <View style={[ss.statusBanner, { backgroundColor: `${theme.warning}22` }]}>
               <Icon name="clock" size={14} color={theme.warning} />
-              <Text style={[ss.statusText, { color: theme.warning }]}>Sold out — check back soon</Text>
+              <Text style={[ss.statusText, { color: theme.warning }]}>
+                {productJustSoldOut ? `${JUST_SOLD_OUT_LABEL}. Someone grabbed the last one` : 'Sold out — check back soon'}
+              </Text>
             </View>
             <TouchableOpacity onPress={handleViewDetail} style={[ss.addBtn, { marginHorizontal: 16, marginBottom: 8 }]}>
               <Icon name="eye" size={17} color={theme.text} />

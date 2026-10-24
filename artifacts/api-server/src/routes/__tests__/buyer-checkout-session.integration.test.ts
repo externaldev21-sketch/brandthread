@@ -327,7 +327,7 @@ describe("POST /api/buyer/checkout/session", () => {
     expect(fakeStripe.sessionCreates).toHaveLength(0);
   });
 
-  it("rejects a cart quantity greater than available stock with 400", async () => {
+  it("rejects a cart quantity greater than available stock with 409 SOLD_OUT", async () => {
     await db
       .update(productVariants)
       .set({ stock: 1 })
@@ -335,8 +335,8 @@ describe("POST /api/buyer/checkout/session", () => {
 
     const result = await postCheckout(checkoutBody());
 
-    expect(result.status).toBe(400);
-    expect(result.body.error).toMatch(/insufficient stock/i);
+    expect(result.status).toBe(409);
+    expect(result.body).toMatchObject({ code: "SOLD_OUT", variantId });
     expect(fakeStripe.sessionCreates).toHaveLength(0);
   });
 

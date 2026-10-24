@@ -423,6 +423,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await markFeaturedSlotCheckoutFailed(cs);
         } else {
           await releaseCheckoutLoyaltyRedemption(cs);
+          await releaseCheckoutStockHold(cs);
         }
         break;
       }
@@ -756,6 +757,20 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
   if (checkout.threadCashToken) {
     await releaseThreadCashRedemption(db, checkout.buyerId, checkout.threadCashToken, checkout.id);
   }
+}
+
+/** A hosted Checkout Session expired or its delayed payment failed: its held units go back on sale. */
+async function releaseCheckoutStockHold(session: any) {
+  const csRef = session.metadata?.["csRef"];
+  const [checkout] = await db
+    .select({ id: checkoutSessions.id })
+    .from(checkoutSessions)
+    .where(csRef
+      ? eq(checkoutSessions.id, csRef)
+      : eq(checkoutSessions.stripeSessionId, session.id))
+    .limit(1);
+  if (!checkout) return;
+  await db.transaction((tx) => releaseStockReservation(tx, checkout.id));
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -1148,15 +1163,14 @@ export async function handleCheckoutPaid(
   let createdOrderId: string | null = null;
 
   await db.transaction(async (tx) => {
-    // One-page checkout reserved these units when the buyer tapped Pay
-    // (lib/money/stockReservation.ts — a hold on top of the shared seam
-    // below, needed because that reservation happens before this order
-    // exists, while the PaymentIntent is still in flight). A still-held
+    // Every buyer checkout (one-page and hosted) reserved these units before
+    // payment (lib/money/stockReservation.ts — a hold on top of the shared
+    // seam below, needed because that reservation happens before this order
+    // exists, while the payment is still in flight). A still-held
     // reservation becomes this order's stock: no second check or decrement.
-    // An expired (released) one falls through to the normal path below.
-    const stockAlreadyReserved = chargeModel === "transfer"
-      ? (await commitStockReservation(tx, csRecord.id)) > 0
-      : false;
+    // An expired (released) one, or a checkout from before holds existed,
+    // falls through to the normal path below.
+    const stockAlreadyReserved = (await commitStockReservation(tx, csRecord.id)) > 0;
 
     // Step 1-2: Atomically reserve stock for every line, all-or-nothing —
     // see lib/stockReservation.ts for the lock/check/decrement guarantees.

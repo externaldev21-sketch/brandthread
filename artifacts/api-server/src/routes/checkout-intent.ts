@@ -53,7 +53,7 @@ import {
 import { destinationApplicationFeeCents } from "../lib/money/fees";
 import { paymentIntentMethodParams, paymentMethodTypesFor } from "../lib/payments/bnpl";
 import { bnplMethodsForCart } from "../lib/payments/sellerPaymentSettings";
-import { StockReservationError, releaseStockReservation, reserveStock } from "../lib/money/stockReservation";
+import { StockReservationError, releaseStockReservation, reserveStock, soldOutResponse } from "../lib/money/stockReservation";
 import { AuctionError, recordAuctionCheckout } from "../lib/liveAuctions";
 import { applyGiftCardToGroup, trimGiftCardsForMinimumCharge } from "../lib/giftCards/checkout";
 import { GiftCardError, claimCard, giftCentsForCheckouts, reserveForCheckout } from "../lib/giftCards/service";
@@ -344,7 +344,7 @@ function sendError(res: Response, error: unknown): boolean {
     return true;
   }
   if (error instanceof StockReservationError) {
-    res.status(409).json({ error: error.message, code: "OUT_OF_STOCK", variantId: error.variantId });
+    res.status(409).json(soldOutResponse(error));
     return true;
   }
   if (error instanceof ThreadCashError || error instanceof LoyaltyRedemptionError) {

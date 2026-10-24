@@ -211,7 +211,7 @@ export async function priceCartGroup(input: {
     if (!row) throw new CartCheckoutError(404, "ITEM_NOT_FOUND", "An item in your bag is no longer available.");
     if (row.status !== "active") throw new CartCheckoutError(400, "ITEM_UNAVAILABLE", `${row.productName} is no longer available.`);
     if (row.stock < item.quantity) {
-      throw new CartCheckoutError(409, "OUT_OF_STOCK", `${row.productName} doesn't have enough stock left.`, { variantId: row.variantId });
+      throw new CartCheckoutError(409, "SOLD_OUT", `${row.productName} just sold out`, { variantId: row.variantId, productName: row.productName });
     }
     if ((await emptyMysteryBoxVariants(db, [row.variantId])).length > 0) {
       throw new CartCheckoutError(409, "MYSTERY_BOX_EMPTY", `${row.productName} is sold out.`, { variantId: row.variantId });

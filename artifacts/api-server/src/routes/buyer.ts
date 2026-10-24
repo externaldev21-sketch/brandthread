@@ -20,6 +20,10 @@ import { buildBuyerDelivery, deliveryColumns, loadBuyerDelivery } from "../lib/d
 import { recordDelivery } from "../lib/delivery/deliveryState";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { capApplicationFee, checkoutFeeBasis } from "../lib/money/loyaltyFunding";
+import {
+  HOSTED_CHECKOUT_SESSION_TTL_MS, HOSTED_STOCK_RESERVATION_TTL_MS, SOLD_OUT_CODE,
+  StockReservationError, releaseStockReservation, reserveStock, soldOutResponse,
+} from "../lib/money/stockReservation";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { flatRateShipping } from "../lib/defaultShipping";
 import { resolveWithLiveRates } from "../lib/intl/liveShippingRates";
@@ -725,7 +729,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         return;
       }
       if (row.stock < qty) {
-        res.status(400).json({ error: `Insufficient stock for ${row.productName}` });
+        res.status(409).json({
+          error: `${row.productName} just sold out`,
+          code: SOLD_OUT_CODE,
+          variantId: row.variantId,
+          productName: row.productName,
+        });
         return;
       }
       if ((await emptyMysteryBoxVariants(db, [row.variantId])).length > 0) {
@@ -971,7 +980,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           return;
         }
 
-        // Expired or cancelled — buyer must restart checkout with a new key
+        // Expired or cancelled — buyer must restart checkout with a new key.
+        // Its stock hold goes back now rather than waiting for the sweep.
+        await db.transaction((tx) => releaseStockReservation(tx, existingCS.id));
         if (existingCS.loyaltyToken) {
           await db.transaction((tx) => releaseLoyaltyRedemption(
             tx,
@@ -1277,17 +1288,29 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       ...giftColumns(req.body.gift),
       ...(dutiesQuote.dutiesCents > 0 ? { dutiesCents: dutiesQuote.dutiesCents, dutiesQuoteId: dutiesQuote.quoteId } : {}),
     };
+    // ── Claim the stock before Stripe can take a payment for it ──────────
+    // The checkout row and its stock hold commit together. Two buyers racing
+    // for the last unit serialize on the variant row (lib/stockReservation.ts
+    // `reserveStockAtomic`): the second gets SOLD_OUT here, before any Stripe
+    // session exists, so it can never be charged. The hold is committed by
+    // the paid webhook, released by checkout.session.expired, or swept once
+    // it outlives the session (lib/money/cartTransfers.ts).
+    const claimedAt = new Date();
     let checkoutRecord: { id: string } | undefined;
     try {
-      [checkoutRecord] = await db.transaction(async (tx) => {
+      checkoutRecord = await db.transaction(async (tx) => {
         // A capped code is held for this checkout atomically with its row.
         if (discountApplication) {
           await reserveDiscountCapacity(tx, { discountCodeId: discountApplication.discount.id, customerKey: buyerId });
         }
-        return tx
+        const [row] = await tx
           .insert(checkoutSessions)
           .values(insertValues)
           .returning({ id: checkoutSessions.id });
+        await reserveStock(tx, row.id, cartItems.map((item) => ({
+          variantId: item.variantId, quantity: item.quantity, productName: item.productName,
+        })), { now: claimedAt, ttlMs: HOSTED_STOCK_RESERVATION_TTL_MS });
+        return row;
       });
     } catch (insertError: any) {
       // Another identical request won the unique idempotency key while this one
@@ -1395,6 +1418,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       {
         mode: "payment",
         line_items: lineItems,
+        // Closes before the stock hold lapses, so a released unit can't be paid for.
+        expires_at: Math.floor((claimedAt.valueOf() + HOSTED_CHECKOUT_SESSION_TTL_MS) / 1000),
         // Stripe remains the final authority for tax. This replaces the old
         // client-side state-rate table and keeps the charged tax aligned with
         // the seller's Stripe Tax configuration.
@@ -1502,6 +1527,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     }
     if (err instanceof DiscountValidationError) {
       res.status(400).json({ error: err.message, code: err.code, ...err.details });
+      return;
+    }
+    if (err instanceof StockReservationError) {
+      res.status(409).json(soldOutResponse(err));
       return;
     }
     // Stripe card errors (e.g. card_declined) → 402 with a buyer-friendly message.
