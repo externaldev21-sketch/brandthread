@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
-  Modal, TextInput, ActivityIndicator, Platform, Animated,
+  Modal, TextInput, ActivityIndicator, Platform, Animated, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -150,6 +150,7 @@ type ComposePerson = {
   initials: string;
   color: string;
   accountType: AccountType;
+  avatarUri?: string;
 };
 
 type ComposeSection = { key: string; title: string; data: ComposePerson[] };
@@ -342,6 +343,13 @@ export default function InboxScreen() {
   const [storyTrayRows, setStoryTrayRows] = useState<StoryTrayRow[]>([]);
   const [myStoryId, setMyStoryId] = useState<string | null>(null);
   const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
+  // Avatar photos that failed to load fall back to the initials circle
+  // instead of leaving an empty black disc in the tray.
+  const [failedAvatarUris, setFailedAvatarUris] = useState<ReadonlySet<string>>(() => new Set());
+  const markAvatarFailed = useCallback((uri: string) => {
+    setFailedAvatarUris(prev => (prev.has(uri) ? prev : new Set(prev).add(uri)));
+  }, []);
+  const avatarOk = (uri?: string | null): uri is string => !!uri && !failedAvatarUris.has(uri);
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
@@ -599,8 +607,17 @@ export default function InboxScreen() {
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
-  const requestConvs = conversations
-    .filter(conv => conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id))
+  const allRequestConvs = conversations
+    .filter(conv => conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id));
+  // The header search filters Requests too (name, handle, last message);
+  // the pill badge still counts every pending request.
+  const requestConvs = allRequestConvs
+    .filter(conv => {
+      if (!messagesSearchLower) return true;
+      const participant = getParticipant(conv);
+      return [participant?.name, participant?.handle, conv.lastMessage]
+        .filter(Boolean).join(' ').toLowerCase().includes(messagesSearchLower);
+    })
     .sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
 
   // ── Handlers ────────────────────────────────────────────────────────────────
@@ -787,15 +804,11 @@ export default function InboxScreen() {
     }
   }
 
-  // Swipe actions on a Messages-tab row: delete removes it from the inbox
-  // (there is no true delete-conversation endpoint, so this archives it,
-  // matching the existing long-press "Archive" behavior), mute silences the
-  // other participant (reusing the existing user-mute feature), and mark
-  // read clears the unread badge without opening the thread.
-  async function swipeDeleteConversation(conv: Conversation) {
-    await swipeArchiveConversation(conv);
-  }
-
+  // Swipe actions on a Messages-tab row: Archive removes it from the inbox
+  // (there is no true delete-conversation endpoint — the label says what it
+  // does), mute silences the other participant (reusing the existing
+  // user-mute feature), and mark read clears the unread badge without
+  // opening the thread.
   async function swipeMuteConversation(conv: Conversation) {
     const participant = getParticipant(conv);
     if (!participant) return;
@@ -916,8 +929,11 @@ export default function InboxScreen() {
       // (I follow them and they follow me) — that's what this app's UI
       // treats as a "friend" (there is no separate friend-request table).
       const mutualIds = new Set(followerList.filter(f => f.isFollowingBack).map(f => f.userId));
-      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string }): ComposePerson => ({
+      // Follow/suggestion rows don't all declare a photo field; carry one
+      // through when the server sends it (avatarUrl or avatarUri).
+      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string; avatarUrl?: string | null; avatarUri?: string | null }): ComposePerson => ({
         userId: u.userId, name: u.name, handle: u.handle, initials: u.initials, color: u.color, accountType: 'buyer',
+        avatarUri: u.avatarUri ?? u.avatarUrl ?? undefined,
       });
       const friendsList = followerList.filter(f => mutualIds.has(f.userId)).map(toPerson);
       const followersOnly = followerList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
@@ -985,7 +1001,13 @@ export default function InboxScreen() {
     const directoryIds = new Set(composeDirectory.map(p => p.userId));
     const morePeople: ComposePerson[] = composeResults
       .filter(r => !directoryIds.has(r.userId))
-      .map(r => ({ userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType }));
+      .map(r => {
+        const photo = (r as ProfileSearchResult & { avatarUrl?: string | null; avatarUri?: string | null });
+        return {
+          userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType,
+          avatarUri: photo.avatarUri ?? photo.avatarUrl ?? undefined,
+        };
+      });
     return [
       { key: 'in-network', title: 'In your network', data: inDirectory },
       { key: 'more-people', title: 'More people', data: morePeople },
@@ -1103,13 +1125,13 @@ export default function InboxScreen() {
         accessibilityLabel: `Mute ${participant.name}`,
       },
       {
-        key: 'delete',
-        label: 'Delete',
-        icon: 'trash-2',
+        key: 'archive',
+        label: 'Archive',
+        icon: 'archive',
         color: theme.cardElevated,
-        textColor: theme.error,
-        onPress: () => swipeDeleteConversation(conv),
-        accessibilityLabel: `Delete conversation with ${participant.name}`,
+        textColor: theme.muted,
+        onPress: () => swipeArchiveConversation(conv),
+        accessibilityLabel: `Archive conversation with ${participant.name}`,
       },
     ];
 
@@ -1427,7 +1449,13 @@ export default function InboxScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
-      {requestConvs.length === 0 ? (
+      {requestConvs.length === 0 && messagesSearchLower ? (
+        <EmptyState
+          icon="search"
+          title="No matches"
+          description={`No requests match "${messagesSearchQuery.trim()}"`}
+        />
+      ) : requestConvs.length === 0 ? (
         <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here." />
       ) : (
         <>
@@ -1435,17 +1463,20 @@ export default function InboxScreen() {
             <Text style={[s.requestsHeaderText, { color: theme.muted }]}>
               Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
             </Text>
-            <PressableScale
-              style={s.requestsDeleteAllPressable}
-              onPress={deleteAllRequests}
-              rippleEnabled={NO_RIPPLE}
-              accessibilityRole="button"
-              accessibilityLabel="Delete all requests"
-              testID="inbox-requests-delete-all"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={[s.requestsDeleteAll, { color: theme.muted }]}>Delete all</Text>
-            </PressableScale>
+            {/* Hidden while searching: it would only delete the filtered rows. */}
+            {!messagesSearchLower && (
+              <PressableScale
+                style={s.requestsDeleteAllPressable}
+                onPress={deleteAllRequests}
+                rippleEnabled={NO_RIPPLE}
+                accessibilityRole="button"
+                accessibilityLabel="Delete all requests"
+                testID="inbox-requests-delete-all"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[s.requestsDeleteAll, { color: theme.muted }]}>Delete all</Text>
+              </PressableScale>
+            )}
           </View>
           {requestConvs.map((conv, index) => (
             <React.Fragment key={conv.id}>{renderRequestRow({ item: conv, index })}</React.Fragment>
@@ -1577,10 +1608,10 @@ export default function InboxScreen() {
                     {myStoryId ? (
                       <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
                     ) : null}
-                    {myAvatarUri ? (
-                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
+                    {avatarOk(myAvatarUri) ? (
+                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(myAvatarUri)} />
                     ) : (
-                      <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
+                      <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated === theme.background ? `${theme.text}1F` : theme.cardElevated }]}>
                         <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
                       </View>
                     )}
@@ -1625,8 +1656,8 @@ export default function InboxScreen() {
                     <View key={row.authorId} style={s.activeRailItem}>
                       {noteBubble}
                       <LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>
-                        {row.avatarUri ? (
-                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                        {avatarOk(row.avatarUri) ? (
+                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(row.avatarUri!)} />
                         ) : (
                           <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                             <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1656,8 +1687,8 @@ export default function InboxScreen() {
                           { borderColor: row.seen ? theme.border : theme.text },
                         ]}
                       />
-                      {row.avatarUri ? (
-                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                      {avatarOk(row.avatarUri) ? (
+                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} onError={() => markAvatarFailed(row.avatarUri!)} />
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
@@ -1692,7 +1723,7 @@ export default function InboxScreen() {
         <InboxPillRow
           value={activeTab}
           onChange={setActiveTab}
-          requestsCount={requestConvs.length}
+          requestsCount={allRequestConvs.length}
           theme={theme}
           gutter={gutter}
         />
@@ -1746,6 +1777,7 @@ export default function InboxScreen() {
         onRequestClose={closeCompose}
       >
         <View style={s.composeBackdrop}>
+          <Pressable style={s.sheetDismissLayer} onPress={closeCompose} accessibilityRole="button" accessibilityLabel="Close" />
           <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
             <SheetHandle />
             <View style={s.composeHeader}>
@@ -1800,8 +1832,12 @@ export default function InboxScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Message ${item.name}`}
                   >
-                    <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
-                      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm }}>{item.initials}</Text>
+                    <View style={[s.composeAvatar, { backgroundColor: item.color || theme.cardElevated }]}>
+                      {avatarOk(item.avatarUri) ? (
+                        <Image source={{ uri: item.avatarUri }} style={s.composeAvatarImage} onError={() => markAvatarFailed(item.avatarUri!)} />
+                      ) : (
+                        <Text style={[s.avatarInitials, { fontSize: FS.sm }]}>{item.initials}</Text>
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
@@ -1826,6 +1862,7 @@ export default function InboxScreen() {
         onRequestClose={closeNoteCompose}
       >
         <View style={s.composeBackdrop}>
+          <Pressable style={s.sheetDismissLayer} onPress={closeNoteCompose} accessibilityRole="button" accessibilityLabel="Close" />
           <Glass
             variant="regular"
             tint="dark"
@@ -1930,8 +1967,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     paddingVertical: SP.sm, minHeight: 52,
   },
   composeAvatar: {
-    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  composeAvatarImage: { width: 40, height: 40 },
+  // Full-screen tap-to-close layer behind a sheet. A plain Pressable, not
+  // PressableScale (which styles an inner view and would collapse to 0×0).
+  sheetDismissLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   // Instagram-DM-style stories tray (below search, above the tabs) — chrome
   // (sizes/spacing) unchanged from the old "active people" rail this

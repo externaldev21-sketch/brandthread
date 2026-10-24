@@ -644,3 +644,24 @@ export const PREVIEW_AUTO_REPLY_DELAY_MS = 1100;
 export function previewAutoReplyDelayMs(): number {
   return PREVIEW_AUTO_REPLY_DELAY_MS + Math.random() * 900;
 }
+
+/** Chat details > Nicknames, in preview mode: there's no backend to PATCH,
+ *  so update the participant in whichever session cache holds the thread
+ *  (seeded/runtime buyer side, or the seller-side cache) so the thread and
+ *  details screens show it for the rest of the session. */
+export function setPreviewConversationNickname(id: string, targetUserId: string, nickname: string): void {
+  const value = nickname.trim() || undefined;
+  const withNickname = (c: Conversation): Conversation => ({
+    ...c,
+    participants: c.participants.map(p => (p.userId === targetUserId ? { ...p, nickname: value } : p)),
+  });
+  const runtime = runtimeConversations.get(id);
+  if (runtime) runtimeConversations.set(id, withNickname(runtime));
+  if (cachedConversations?.some(c => c.id === id)) {
+    cachedConversations = cachedConversations.map(c => (c.id === id ? withNickname(c) : c));
+  }
+  const sellerList = getSellerPreviewConversations();
+  if (sellerList.some(c => c.id === id)) {
+    cachedSellerConversations = sellerList.map(c => (c.id === id ? withNickname(c) : c));
+  }
+}

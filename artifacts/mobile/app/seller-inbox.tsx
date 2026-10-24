@@ -41,6 +41,7 @@ import { BLOCK_EXPLAINER } from '@/lib/safety';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 import { radius } from '@/constants/radii';
+import { Snackbar } from '@/components/ui/Snackbar';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -162,6 +163,16 @@ export default function SellerInboxScreen() {
   const { userId } = useAuth();
   const myId = userId ?? '';
   const { showUndo } = useUndoToast();
+  // Short confirmation line for swipe actions (same Snackbar the buyer inbox
+  // uses for "Conversation archived" / "Muted X").
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showSnackbar = useCallback((message: string) => {
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
+    setSnackbarMessage(message);
+    snackbarTimer.current = setTimeout(() => setSnackbarMessage(null), 2500);
+  }, []);
+  useEffect(() => () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); }, []);
 
   const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
   // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
@@ -407,6 +418,7 @@ export default function SellerInboxScreen() {
         userId: other.userId, name: other.name, handle: other.handle,
         initials: other.initials, color: other.color,
       });
+      showSnackbar(`Muted ${other.name || other.handle || 'buyer'}`);
     } catch {
       Alert.alert('Couldn’t mute', 'Please try again.');
     }
@@ -414,9 +426,13 @@ export default function SellerInboxScreen() {
 
   async function swipeArchiveConversation(c: ConvView) {
     setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: true } : row)));
-    if (isSellerPreviewConversationId(c.id)) return;
+    if (isSellerPreviewConversationId(c.id)) {
+      showSnackbar('Conversation archived');
+      return;
+    }
     try {
       await archiveConversation(c.id);
+      showSnackbar('Conversation archived');
     } catch {
       setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: false } : row)));
       Alert.alert('Couldn’t archive', 'Please try again.');
@@ -529,13 +545,13 @@ export default function SellerInboxScreen() {
         accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
       },
       {
-        key: 'delete',
-        label: 'Delete',
-        icon: 'trash-2',
+        key: 'archive',
+        label: 'Archive',
+        icon: 'archive',
         color: theme.cardElevated,
-        textColor: theme.error,
+        textColor: theme.muted,
         onPress: () => swipeArchiveConversation(item),
-        accessibilityLabel: `Delete conversation with ${other.name || other.handle || 'buyer'}`,
+        accessibilityLabel: `Archive conversation with ${other.name || other.handle || 'buyer'}`,
       },
     ];
 
@@ -671,10 +687,17 @@ export default function SellerInboxScreen() {
     .sort((a, b) => ((b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)) || ((b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0))),
   [convs, queryLower, pendingDeleteIds]);
 
-  const requestConvs = useMemo(() => convs
+  const allRequestConvs = useMemo(() => convs
     .filter((c) => c.isRequest === true && !c.isArchived && !pendingDeleteIds.has(c.id))
     .sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0)),
   [convs, pendingDeleteIds]);
+  // The search bar filters Requests too; the pill badge counts every request.
+  const requestConvs = useMemo(() => allRequestConvs.filter((c) => {
+    if (!queryLower) return true;
+    const other = otherParticipant(c);
+    return [other?.name, other?.handle, c.lastMessage]
+      .filter(Boolean).join(' ').toLowerCase().includes(queryLower);
+  }), [allRequestConvs, queryLower]);
 
   // Header subtitle reflects the Inbox tab's own unread total now that
   // Requests has its own badge on the pill row below — a pending request's
@@ -712,7 +735,7 @@ export default function SellerInboxScreen() {
       )}
 
       {!isLoading && (
-        <InboxPillRow value={activeTab} onChange={setActiveTab} requestsCount={requestConvs.length} theme={theme} />
+        <InboxPillRow value={activeTab} onChange={setActiveTab} requestsCount={allRequestConvs.length} theme={theme} />
       )}
 
       {isLoading ? (
@@ -720,7 +743,23 @@ export default function SellerInboxScreen() {
           <ListSkeleton rows={6} />
         </View>
       ) : activeTab === 'requests' ? (
-        requestConvs.length === 0 ? (
+        loadError && allRequestConvs.length === 0 ? (
+          <View style={s.centerFill}>
+            <ErrorState
+              message="Couldn't load your messages."
+              onRetry={onRefresh}
+              retryLabel="Try again"
+            />
+          </View>
+        ) : requestConvs.length === 0 && queryLower ? (
+          <View style={s.centerFill}>
+            <EmptyState
+              icon="search"
+              title="No matches"
+              message="Try a different name or handle."
+            />
+          </View>
+        ) : requestConvs.length === 0 ? (
           <View style={s.centerFill}>
             <EmptyState
               icon="mail"
@@ -746,15 +785,18 @@ export default function SellerInboxScreen() {
                 <Text style={s.requestsHeaderText}>
                   Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
                 </Text>
-                <PressableScale
-                  onPress={deleteAllRequests}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete all requests"
-                  testID="seller-inbox-requests-delete-all"
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text style={s.requestsDeleteAll}>Delete all</Text>
-                </PressableScale>
+                {/* Hidden while searching: it would only delete the filtered rows. */}
+                {!queryLower && (
+                  <PressableScale
+                    onPress={deleteAllRequests}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete all requests"
+                    testID="seller-inbox-requests-delete-all"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={s.requestsDeleteAll}>Delete all</Text>
+                  </PressableScale>
+                )}
               </View>
             }
           />
@@ -795,6 +837,11 @@ export default function SellerInboxScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <Snackbar
+        visible={!!snackbarMessage}
+        message={snackbarMessage ?? ''}
+        onDismiss={() => setSnackbarMessage(null)}
+      />
       <FirstRunTip
         id="seller-inbox"
         variant="gesture"

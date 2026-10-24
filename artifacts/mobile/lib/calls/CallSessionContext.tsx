@@ -41,9 +41,8 @@ interface CallSessionContextValue {
    * call. `GlobalCallOverlay` renders `CallEndedView` for as long as
    * `session.status === 'ended'` regardless of `minimized` (an ended call
    * isn't something you minimize back into — it's over), so this is the one
-   * way the ended + rating screen actually goes away, whether the person
-   * taps its close "X" immediately or a rating auto-dismisses it a beat
-   * later. A no-op for any other status.
+   * way the call-ended screen actually goes away (its close "X").
+   * A no-op for any other status.
    */
   clearEndedCall(): void;
   toggleMute(): void;

@@ -27,7 +27,7 @@ describe('app/seller-inbox.tsx: Requests tab', () => {
   it('has an Inbox/Requests pill row with a live unread-count badge', () => {
     expect(inboxSrc).toContain("type InboxTab = 'inbox' | 'requests';");
     expect(inboxSrc).toContain('function InboxPillRow(');
-    expect(inboxSrc).toContain('requestsCount={requestConvs.length}');
+    expect(inboxSrc).toContain('requestsCount={allRequestConvs.length}');
   });
 
   it('filters the Requests tab to isRequest conversations only, excluding archived and pending-delete rows', () => {
@@ -77,7 +77,7 @@ describe('app/seller-conversation.tsx: request mode', () => {
   });
 
   it('replaces the composer with the Accept/Delete/Block panel for the recipient only', () => {
-    expect(convSrc).toContain('{isRequestMode && !isRequestSender && other ? (');
+    expect(convSrc).toContain('{loadFailed && !conv ? null : isRequestMode && !isRequestSender && other ? (');
     expect(convSrc).toContain('<SellerRequestActionPanel');
   });
 
@@ -109,7 +109,9 @@ describe('app/seller-conversation.tsx: request mode', () => {
 
   it('surfaces REQUEST_NOT_ACCEPTED (and every other structured send error) through apiErrorMessage, never a raw fallback', () => {
     expect(convSrc).toContain("if (apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {");
-    expect(convSrc).toContain("Alert.alert('Not sent', apiErrorMessage(e, 'Message not sent. Tap to retry.'));");
+    // Shown in an inline banner with a real Retry button (an Alert can't retry).
+    expect(convSrc).toContain("setSendError(apiErrorMessage(e, 'Message not sent.'));");
+    expect(convSrc).toContain('testID="seller-conversation-send-retry"');
     // The old ad-hoc raw.includes('MODERATED'/'BLOCKED') string-matching is
     // gone — every structured code now goes through the one shared helper.
     expect(convSrc).not.toContain("raw.includes('MODERATED')");

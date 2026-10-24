@@ -15,9 +15,9 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi, type SellerQuickReply } from '@/lib/api';
-import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
+import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { Glass } from '@/components/ui/Glass';
-import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
+import { dbStatusToOrderStatus, orderStatusBadgeLabel, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import MediaViewer from '@/components/chat/MediaViewer';
 import VideoMessageViewer from '@/components/chat/VideoMessageViewer';
@@ -179,6 +179,18 @@ function humanOrderStatus(status: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
+/** A still image to show on a video bubble: an explicit thumbnail/poster
+ *  when the attachment carries one, or the uri itself only when it is
+ *  already an image (seeded previews). Never the video file — an image
+ *  source pointed at an .mp4 renders blank; the bubble's dark fill and play
+ *  icon stand in instead. */
+function videoPosterUri(att: MsgAttachment): string | undefined {
+  const explicit = att.meta?.thumbnailUri || att.meta?.posterUri;
+  if (explicit) return explicit;
+  if (att.uri && /\.(jpe?g|png|webp|gif|heic)(\?|#|$)/i.test(att.uri)) return att.uri;
+  return undefined;
+}
+
 function attachmentIcon(type: MsgAttachment['type']): keyof typeof Feather.glyphMap {
   switch (type) {
     case 'product': return 'shopping-bag';
@@ -252,7 +264,9 @@ export default function SellerConversationScreen() {
   const { user } = useUser();
   const myId = user?.id ?? '';
   // bt_force_upload: item 74 verification aid only — see the effect below.
-  const { id, bt_force_upload } = useLocalSearchParams<{ id?: string; bt_force_upload?: string }>();
+  // focusMessageId: set by app/conversation-search.tsx when a result is
+  // tapped — scroll to that message and briefly highlight it.
+  const { id, bt_force_upload, focusMessageId } = useLocalSearchParams<{ id?: string; bt_force_upload?: string; focusMessageId?: string }>();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   // The dev-web ?bt_preview=seller bypass never signs in through Clerk (see
   // lib/devPreview.ts), so `myId` is '' in that mode — getSellerPreviewMessages
@@ -271,7 +285,19 @@ export default function SellerConversationScreen() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  // The initial conversation fetch failed — shows an error with Retry
+  // instead of a placeholder "Buyer" thread with a live composer.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // Last send failure, shown as an inline banner above the composer with a
+  // real Retry (the failed text/attachment is restored into the composer).
+  const [sendError, setSendError] = useState<string | null>(null);
+  // Search-result focus (focusMessageId): the highlighted row, and a lock
+  // that stops the automatic scroll-to-end from yanking the list away.
+  const [highlightMsgId, setHighlightMsgId] = useState<string | null>(null);
+  const focusHandledRef = useRef<string | null>(null);
+  const focusLockRef = useRef(false);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [viewerUri, setViewerUri]               = useState<string | null>(null);
@@ -392,6 +418,7 @@ export default function SellerConversationScreen() {
       if (generationRef.current !== generation) return;
       const convView = c as ConvView;
       setConv(convView);
+      setLoadFailed(false);
       const safety = (c as { messaging?: DmMessagingState }).messaging;
       setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
       // Mark the thread as read once we know it isn't a pending request —
@@ -408,6 +435,7 @@ export default function SellerConversationScreen() {
       }
     } catch (e) {
       console.error('Failed to load conversation', e);
+      if (generationRef.current === generation) setLoadFailed(true);
     } finally {
       if (generationRef.current === generation) setIsLoading(false);
     }
@@ -502,10 +530,10 @@ export default function SellerConversationScreen() {
   }
 
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !focusLockRef.current && !focusMessageId) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
     }
-  }, [messages.length]);
+  }, [messages.length, focusMessageId]);
 
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
@@ -546,7 +574,7 @@ export default function SellerConversationScreen() {
   }, [threadCashSendEnabled, other?.userId, id, api]);
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // in the header, matching buyer-conversation.tsx.
-  const displayName = other?.nickname || other?.name || 'Buyer';
+  const displayName = other?.nickname || other?.name || (loadFailed && !conv ? 'Conversation' : 'Buyer');
   // Chat details > Theme: a conversation-level property — same background
   // and bubble colors for both participants. Null = the app's existing
   // default monochrome look, completely unchanged.
@@ -582,6 +610,23 @@ export default function SellerConversationScreen() {
 
   const { startCall, simulateIncomingCall } = useCallSession();
   const callLog = useCallLog(id ?? '');
+
+  useEffect(() => {
+    if (!focusMessageId || isLoading || focusHandledRef.current === focusMessageId) return;
+    const index = groupByDate(messages, callLog)
+      .findIndex((row) => row.type === 'message' && row.msg.id === focusMessageId);
+    if (index < 0) return;
+    focusHandledRef.current = focusMessageId;
+    focusLockRef.current = true;
+    setHighlightMsgId(focusMessageId);
+    setTimeout(() => flatListRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 150);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightMsgId(null), 1500);
+  }, [focusMessageId, isLoading, messages, callLog]);
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
   const myName = user?.fullName || user?.username || 'You';
   const myInitials = (myName[0] ?? '?').toUpperCase();
 
@@ -950,7 +995,7 @@ export default function SellerConversationScreen() {
           accessibilityLabel="Play video"
           onPress={() => { if (att.uri && !att.meta?.uploading) setViewerVideoUri(att.uri); }}
         >
-          {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
+          {videoPosterUri(att) ? <CachedImage source={{ uri: videoPosterUri(att)! }} style={s.videoThumbImg} recyclingKey={videoPosterUri(att)!} /> : null}
           <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </PressableScale>
@@ -1114,6 +1159,8 @@ export default function SellerConversationScreen() {
       return;
     }
 
+    setSendError(null);
+    focusLockRef.current = false;
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
@@ -1138,7 +1185,7 @@ export default function SellerConversationScreen() {
       if (apiErrorCode(e) === 'REQUEST_NOT_ACCEPTED') {
         setConv((prev) => (prev ? { ...prev, isRequest: true } : prev));
       }
-      Alert.alert('Not sent', apiErrorMessage(e, 'Message not sent. Tap to retry.'));
+      setSendError(apiErrorMessage(e, 'Message not sent.'));
       setText(t);
       setPendingAttachment(att);
       setReplyTo(replyingTo);
@@ -1222,7 +1269,15 @@ export default function SellerConversationScreen() {
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const row = renderRow(info);
+    if (info.item.type === 'message' && info.item.msg.id === highlightMsgId) {
+      return <View style={s.focusHighlight} testID="seller-conversation-focused-message">{row}</View>;
+    }
+    return row;
+  }
+
+  function renderRow({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       return (
         <View style={s.dateWrap}>
@@ -1329,7 +1384,7 @@ export default function SellerConversationScreen() {
       const footerIcon = !isProduct && trackingUrl ? 'external-link' : 'chevron-right';
       const accessibilityLabel = isProduct
         ? `${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`
-        : `${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${footerLabel}`;
+        : `${att.title ?? 'Order'}${uiStatus ? `, ${humanOrderStatus(orderStatusBadgeLabel(uiStatus))}` : ''}, ${footerLabel}`;
       return (
         <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
           {!isOwn && (
@@ -1348,7 +1403,7 @@ export default function SellerConversationScreen() {
             title={att.title || (isProduct ? 'Product' : 'Order')}
             priceLabel={isProduct ? att.subtitle : undefined}
             statusBadge={!isProduct && uiStatus ? (
-              <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+              <View style={s.orderBadge}><Text style={s.orderBadgeText}>{humanOrderStatus(orderStatusBadgeLabel(uiStatus))}</Text></View>
             ) : (!isProduct && !uiStatus && att.subtitle ? (
               <Text style={[s.attachSubtitle, { marginTop: 0 }]} numberOfLines={1}>{att.subtitle}</Text>
             ) : undefined)}
@@ -1646,7 +1701,8 @@ export default function SellerConversationScreen() {
             centered/adjacent to the name. s.header's justifyContent:
             'space-between' pushes this group to the far right. */}
         <View style={s.headerIconGroup}>
-          {id && (
+          {/* No calling someone whose message request hasn't been accepted. */}
+          {id && !isRequestMode && (
             <>
               <PressableScale
                 style={s.headerCallBtn}
@@ -1768,6 +1824,24 @@ export default function SellerConversationScreen() {
             <SkeletonBlock width="35%" height={32} radius={RADIUS.lg} />
           </View>
         </View>
+      ) : loadFailed && !conv ? (
+        <View style={s.loadErrorWrap} testID="seller-conversation-load-error">
+          <Text style={s.loadErrorText}>Couldn’t load this conversation</Text>
+          <PressableScale
+            style={s.loadErrorRetry}
+            onPress={() => {
+              const generation = ++generationRef.current;
+              setIsLoading(true);
+              setLoadFailed(false);
+              void loadAll(generation);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading conversation"
+            testID="seller-conversation-load-retry"
+          >
+            <Text style={s.loadErrorRetryText}>Retry</Text>
+          </PressableScale>
+        </View>
       ) : (
         <FlatList
           ref={flatListRef}
@@ -1782,7 +1856,19 @@ export default function SellerConversationScreen() {
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() => {
+            if (!focusLockRef.current && !focusMessageId) flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          onScrollToIndexFailed={(info) => {
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 120);
+          }}
+          extraData={highlightMsgId}
+          ListEmptyComponent={
+            <View style={s.emptyThread} testID="seller-conversation-empty">
+              <Text style={s.emptyThreadText}>No messages yet</Text>
+            </View>
+          }
         />
       )}
 
@@ -1806,7 +1892,24 @@ export default function SellerConversationScreen() {
           accept/block/delete bottom panel for the RECIPIENT only (see
           SellerRequestActionPanel below); the sender keeps the ordinary
           composer plus the "Sent as a request" banner above. */}
-      {isRequestMode && !isRequestSender && other ? (
+      {sendError && !(loadFailed && !conv) ? (
+        <View style={s.sendErrorBanner} testID="seller-conversation-send-error">
+          <Feather name="alert-circle" size={ICON.sm} color={MUTED} />
+          <Text style={s.sendErrorText} numberOfLines={2}>{sendError}</Text>
+          <PressableScale
+            onPress={() => { void handleSend(); }}
+            disabled={isSending}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Retry sending message"
+            testID="seller-conversation-send-retry"
+          >
+            <Text style={s.sendErrorRetryText}>Retry</Text>
+          </PressableScale>
+        </View>
+      ) : null}
+
+      {loadFailed && !conv ? null : isRequestMode && !isRequestSender && other ? (
         <SellerRequestActionPanel
           name={other.name}
           bottomInset={insets.bottom}
@@ -2281,7 +2384,7 @@ export default function SellerConversationScreen() {
                     <View style={{ flex: 1, marginLeft: SP.sm }}>
                       <Text style={s.attachTitle} numberOfLines={1}>{row.orderNumber}</Text>
                       <View style={s.orderMsgCardBadgeRow}>
-                        <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+                        <View style={s.orderBadge}><Text style={s.orderBadgeText}>{humanOrderStatus(orderStatusBadgeLabel(uiStatus))}</Text></View>
                         <Text style={s.buyerContextOrderMeta}>
                           {'  ·  '}{dateLabel}{row.itemCount ? ` · ${row.itemCount} item${row.itemCount === 1 ? '' : 's'}` : ''}
                         </Text>
@@ -2564,11 +2667,32 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   orderNumber: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   orderProduct: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
+  // Monochrome status chip (white text, hairline border) — the shared
+  // StatusBadge's colored variants (orange "SHIPPED") are off-palette here.
   orderBadge: {
-    backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm, paddingVertical: SP.xs,
+    backgroundColor: 'transparent', borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: `${FG}40`,
+    paddingHorizontal: SP.sm, paddingVertical: 2, alignSelf: 'flex-start',
   },
-  orderBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
+  orderBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+  emptyThread: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xxl },
+  emptyThreadText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  focusHighlight: { backgroundColor: `${FG}1F`, borderRadius: RADIUS.md },
+  loadErrorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.xl },
+  loadErrorText: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
+  loadErrorRetry: {
+    height: 44, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  loadErrorRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  sendErrorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    marginHorizontal: SP.md, marginBottom: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md,
+    borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+  },
+  sendErrorText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.regular, color: FG },
+  sendErrorRetryText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: FG },
 
   listContent: { paddingVertical: SP.sm, paddingBottom: SP.md },
   dateWrap: { alignItems: 'center', marginVertical: SP.md },
@@ -2775,7 +2899,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   photoMoreText:   { color: '#fff', fontSize: FS.lg, fontFamily: FONT.bold },
 
   // Video thumb
-  videoThumb:       { borderRadius: RADIUS.md, overflow: 'hidden', width: 200, height: 130, position: 'relative' },
+  videoThumb:       { borderRadius: RADIUS.md, overflow: 'hidden', width: 200, height: 130, position: 'relative', backgroundColor: '#000000' },
   videoThumbImg:    { width: '100%', height: '100%' },
   videoPlayOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   videoDurBadge:    { position: 'absolute', bottom: SP.xs, right: SP.xs, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: SP.xs, paddingVertical: 2 },

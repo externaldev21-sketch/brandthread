@@ -12,23 +12,22 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] The load-error state said "Pull to refresh" and had no button. It now reads "Couldn't load your messages" with a **Try again** action.
 - [FIXED] Off-scale type: the "typing…" line was 14 and is now `FS.sm`. Suggested-person reason and the Requests explainer were at the 11pt badge floor and are now `FS.meta`. Fixed off-token gaps of 8 and 12.
 - [FIXED] The search field's focus fill was hard-coded `rgba(255,255,255,0.10)`. It is now derived from the theme text colour.
-- Search only filters the Inbox tab. Typing a name while on Requests changes nothing.
-- The "Delete" swipe action actually archives the thread, and the snackbar says "Conversation archived". The label and the action disagree.
-- "Your story" shows an empty black circle when the account photo fails to load. There is no initials fallback once `hasImage` is true.
+- [FIXED] Search now filters the Requests tab too (name, handle, last message). "Delete all" is hidden while searching, so it can't delete only the filtered rows.
+- [FIXED] The swipe action that archives is now labelled **Archive** (archive icon, silver, "Archive conversation with X"). Behaviour is unchanged and the snackbar says "Conversation archived".
+- [FIXED] "Your story" and the story tray now fall back to initials when a photo fails to load.
 
 **Message requests — buyer** (`app/(buyer)/inbox.tsx`, Requests tab)
 - [FIXED] Requests weren't sorted by recency (Thu, Tue, Wed). They are now newest first.
 - [FIXED] Request rows had no accessibility role or label. They now read "Open message request from X".
 - [FIXED] The empty-state sentence was missing its full stop.
-- Search doesn't apply to requests (see above).
+- [FIXED] Search now applies to requests. No hits shows "No matches".
 - Block and Delete are only reachable by swiping. Screen-reader users get no `accessibilityActions` for them (shared `InboxSwipeRow`).
 
 **New message / compose** (`app/(buyer)/inbox.tsx` compose sheet, `components/community-inbox/InboxComposeMenu.tsx`)
 - [FIXED] Empty-directory copy "No one to show yet" is now "Search for someone to message". "No one found" is now `No one matches "<query>"`.
 - [FIXED] The start-conversation failure alert was "Try again." and is now "Please try again.", matching every other alert on the screen.
-- People rows always show grey initials. They ignore the person's photo and colour, unlike every other people list.
-- Tapping the dimmed area above the sheet does nothing. The backdrop is a plain View; only the X or a swipe closes it.
-- The compose menu itself (New message / Create group / Join a group / Cancel) is fine.
+- [FIXED] People rows show the person's photo, or white initials on their own colour. Photos appear only when the API returns an avatar field (`avatarUrl`/`avatarUri`), which the follow and search types don't declare today.
+- [FIXED] Tapping the dimmed area closes the compose sheet and the note sheet.
 
 **Messages inbox + requests — seller** (`app/seller-inbox.tsx`)
 - [FIXED] The selected Inbox/Requests pill was invisible on the default theme. Same fix as the buyer inbox.
@@ -37,10 +36,10 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] The error copy said "Pull to refresh" next to a Retry button. It now says "Couldn't load your messages." with **Try again**.
 - [FIXED] Inbox and Requests are now sorted by recency, pinned first.
 - [FIXED] Inbox rows announce unread state and the long-press hint. The Requests explainer moved off the 11pt badge floor to `FS.meta`.
-- The Mute swipe gives no confirmation; the buyer inbox shows "Muted X".
-- The "Delete" swipe archives (same mismatch as the buyer inbox).
-- The Requests tab shows "No message requests" even when loading failed.
-- Search doesn't filter the Requests tab.
+- [FIXED] Mute now confirms with "Muted X".
+- [FIXED] The swipe action is labelled **Archive** and confirms "Conversation archived".
+- [FIXED] The Requests tab shows the error state with **Try again** when loading failed.
+- [FIXED] Search filters the Requests tab too. "Delete all" is hidden while searching.
 - `totalUnread` is computed but never shown. Its comment refers to a header subtitle that doesn't exist.
 
 **Chat thread — buyer** (`app/buyer-conversation.tsx`)
@@ -55,22 +54,22 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] The online status line was mint green (`theme.success`). It is now monochrome muted.
 - [FIXED] Off-scale type: bubble time 10 → `FS.xs`, header name 16 → `FS.base`, date separator 12 → `FS.meta`, message text 15 → `FS.base`, AI tag 10 → `FS.xs`. "Unread Messages" → "Unread messages".
 - [FIXED] Added labels and roles to photo grid cells, the failed-send retry row, reaction chips (with selected state), media-sheet options and attachment-picker tabs and rows.
-- Post and profile attachment cards without a `postId`, and all profile cards, are dead taps.
-- The order context badge shows the raw DB status string (e.g. lowercase "shipped").
-- The header online dot is still `theme.success` green.
-- A failed Follow from the "follow back" snackbar is silently swallowed.
+- [FIXED] Attachment cards with no target now render as plain, non-tappable cards: no button role, no press feedback, no chevron.
+- [FIXED] The order badge is formatted ("Shipped", "Out for delivery"), not the raw DB string.
+- [FIXED] The header online dot is silver, not green.
+- [FIXED] A failed Follow from the follow-back snackbar now shows "Couldn’t follow. Please try again."
 - The header icon group uses `gap: 20` and bubbles use `paddingHorizontal: 12`. Both are off the spacing scale, but fixing them would rework the layout.
 
 **Message request thread** (`app/buyer-conversation.tsx`, `app/seller-conversation.tsx` request panel)
 - [FIXED] The Block / Delete / Accept buttons collapsed to their text width (`flex: 1` on `PressableScale` never reached the row). Accept rendered as a tiny white box with its label clipped. Each button now gets an equal third.
 - [FIXED] "View profile" on a buyer-sent request opened `/seller-profile` for a buyer account. Buyers now open their buyer profile.
 - [FIXED] The request explainer moved off the 11pt floor (`FS.meta`, line height 17), in both screens.
-- The call and video icons still show on an unaccepted request, so you can ring someone whose request you haven't accepted.
+- [FIXED] Call and video are hidden until the request is accepted, in both the buyer and seller threads.
 
 **Brandthread Agent chat** (`app/buyer-conversation.tsx`, agent mode)
 - [FIXED] When the agent API failed, the app made up a canned "agent" reply in a real conversation, i.e. fake data outside demo mode. Now the unsent bubble is removed, the text is put back in the composer, and "Message not sent" is shown. Preview threads keep their scripted demo.
 - [FIXED] Agent info and deep-link cards had no role or label.
-- The header ⓘ button is labelled "About Brandthread Agent" but opens the generic Archive / **Block Brandthread Agent** / Report sheet. That lets you archive or block the always-pinned official account, and there is no "About" content.
+- [FIXED] ⓘ opens an About sheet: logo, "Brandthread Agent", "Official AI assistant, available 24/7", **Report** and Close. Archive and Block can no longer be reached for the official account.
 
 **Chat thread — seller** (`app/seller-conversation.tsx`, including the quick-replies, product-picker, attach and buyer-context sheets)
 - [FIXED] All five sheets ("Add to message", "Attach to message", quick replies, product picker, buyer context) had a collapsed backdrop. On "Add to message" the sheet rendered at the **top** of the screen with no dim. Nothing closed on an outside tap. They now dock at the bottom, dim, and close on an outside tap.
@@ -80,12 +79,12 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] Added labels and roles to photo cells, reaction chips and sheet close buttons. Close buttons got hitSlop.
 - [FIXED] Copy: "No products found" → "No active products to share yet". "No other orders from X yet" → "No orders from X yet". An empty quick-reply list now explains how to add one. The Thread Cash "sent, but the chat message failed" line is now plain English.
 - [FIXED] Off-scale values: bubble time 10 → `FS.xs`, reaction count 11 → `FS.xs`, reply quote and spacer padding moved onto `SP`.
-- A failed initial load has no error state. It shows a "Buyer" header, an empty list and a live composer.
-- An empty thread renders blank, with no empty state.
-- The send-failure fallback alert says "Tap to retry", but an alert can't retry. `tests/seller-message-requests.test.ts` pins that string.
+- [FIXED] A failed initial load shows "Couldn't load this conversation" with **Retry**. The composer and request panel are hidden, and the header reads "Conversation". While loading, the existing message skeleton shows (kept instead of a spinner).
+- [FIXED] A loaded thread with no messages shows a quiet "No messages yet".
+- [FIXED] The dead "Tap to retry" alert is now an inline banner above the composer with a **Retry** button that resends the failed text or attachment. Voice and Thread Cash failures still use their own alerts.
 - In preview, voice send and the disappearing-messages quick toggle hit the API and show failure alerts.
-- Video bubbles use the video URI as an image source, so the thumbnail can be blank.
-- The order card's "SHIPPED" badge is orange. That comes from the shared order-status palette and is off black/white/silver.
+- [FIXED] Video bubbles use a real thumbnail or poster when there is one, otherwise a black placeholder with play icon and duration; the video file is never used as an image. Real uploads don't store a thumbnail yet, so they show the placeholder.
+- [FIXED] Order status badges in the seller chat are monochrome (white text, hairline border, no fill) and read "Shipped".
 
 **Chat cards** (`components/chat/ChatAttachmentCard.tsx`, `components/chat/SystemLine.tsx`)
 - [FIXED] Product and order cards were invisible on the default theme: the card fill and the icon placeholder were both pure black on black.
@@ -114,9 +113,9 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] Opened without a colour or initials, the big avatar was a blank white circle. It now falls back to the identity colour and the first initial.
 - [FIXED] The Options sheet listed Cancel first; it is now last. Mute-duration rows and the disappearing-messages switch got labels.
 - [FIXED] Sub-floor type: the "New" pill was 10, and action labels and row subtitles were at 11. They are now `FS.xs` / `FS.meta`.
-- The "New" pill on Theme never goes away.
-- Profile and "Something isn't working" silently do nothing when the participant id is missing.
-- "Something isn't working" files a *profile report*, not a bug report.
+- [FIXED] The "New" pill on Theme clears after the theme picker is first opened, and stays hidden from then on.
+- [FIXED] "Something isn't working" now works with or without a participant id. Profile still needs one.
+- [FIXED] "Something isn't working" now files a real bug ticket: a "What happened?" sheet that posts to the support tickets endpoint (`category: 'bug'`) with the conversation attached. It confirms only after the server accepts it.
 - In preview, Block calls the real API.
 
 **Chat theme picker** (`components/chat/ThemePickerSheet.tsx`, `components/chat/ThemePreviewScreen.tsx`)
@@ -128,22 +127,21 @@ How this was checked: I read the code for every screen below and rendered it in 
 
 **Conversation settings sheet** (`components/chat/ConversationSettingsSheet.tsx`)
 - [FIXED] The confirm Cancel/Block/Unblock/Unfollow buttons and the backdrop had no role or label.
-- No screen imports this component. It's dead code.
-- If it is revived, its confirm buttons use `flex: 1` on `PressableScale` and will collapse the same way the request panel did.
+- [FIXED] Deleted: no screen imported it.
 
 **Search in conversation** (`app/conversation-search.tsx`)
 - [FIXED] Searches fired on each keystroke could resolve out of order and show stale results. A sequence guard now drops older responses.
 - [FIXED] A network failure showed "No messages found". It now shows "Couldn't search this chat…".
 - [FIXED] The input got a label and a search return key. The empty-state text got side padding.
-- Tapping a result does nothing; it doesn't jump to that message.
-- No clear (×) button in the field.
-- Matches aren't highlighted in results.
+- [FIXED] Tapping a result returns to the thread, scrolls to that message and briefly highlights it. Only messages already loaded in the thread can be reached.
+- [FIXED] Added a clear (×) button.
+- [FIXED] Matches are highlighted (bold, full-contrast) in results.
 
 **Nicknames** (`app/conversation-nicknames.tsx`)
 - [FIXED] The input had no accessibility label.
 - [FIXED] On web the input showed the browser focus outline. `WEB_INPUT_RESET` is now applied.
-- In preview, Save shows success but doesn't keep the nickname.
-- Save stays enabled when nothing changed.
+- [FIXED] In preview, the saved nickname now sticks: the thread shows it next time it opens. Details reads the name from route params, so it shows the new name after reopening from the thread.
+- [FIXED] Save is disabled when the nickname is unchanged.
 
 **Privacy & safety** (`app/conversation-privacy-safety.tsx`)
 - [FIXED] Rows had no button role.
@@ -163,17 +161,17 @@ How this was checked: I read the code for every screen below and rendered it in 
 - [FIXED] The background was off-palette navy `#0A0A14` and is now black. Camera-off initials went from 22 to `FS.xl`.
 - [FIXED] Back (which hangs up), Mute, Camera, End and Share got roles, labels and on/off state.
 - [FIXED] The web notice said "open Brandthread on iOS or Android" twice (body plus footnote). The body copy now says something different.
-- The call-quality rating on the call-ended screen confirms the tap, but nothing saves it.
+- [FIXED] The call-quality rating is removed. The API has no endpoint to store it, so the thumbs only ever showed a fake confirmation.
 
 **Community chat** (`app/community-chat.tsx`, `components/community-chat/*`)
 - [FIXED] Screen readers couldn't hear message text: the bubble label replaced it with "Message from X". It now includes the text (or "Photo" / "N photos").
 - [FIXED] Sub-floor and off-scale type: timestamps 10 → `FS.xs`, message text 15 → `FS.base`, avatar initials 11 → `FS.xs`, "Reconnecting…" → `FS.meta`.
-- Outside live mode, Report group and Report message just show "Thanks, we'll take a look" and send nothing.
-- Avatar initials use the theme text colour on the identity colour, where every other avatar uses white.
+- [FIXED] Report group and Report message now go through the real report flow (`POST /api/reports`, `community` / `community_message` targets) and confirm only after the server accepts. In demo there's no backend, so they show the real error instead of a fake "Thanks".
+- [FIXED] Checked and correct: avatar initials already render white, because `theme.text` is `#FFFFFF` in every theme preset. A literal colour would fail the theme-colour lint.
 
 **Community inbox row** (`components/community-inbox/CommunityInboxRow.tsx`, `components/inbox/*`)
 - [FIXED] Group rows showed "45d" while the DM rows beside them show a weekday or date. They now use the same format.
 - [FIXED] The preview text was a raw 14; it is now `FS.sm`, matching DM rows. The row label now says when a group is muted.
-- With a row swiped open, tapping it opens the chat without closing the row first (`InboxSwipeRow`).
-- More than one row can be swiped open at once.
-- `components/inbox/FollowerAvatarCard.tsx` isn't imported anywhere. It's dead code.
+- [FIXED] Tapping an open row now closes it first instead of opening the chat.
+- [FIXED] Only one row can be open at a time; opening another closes the first.
+- [FIXED] Deleted `FollowerAvatarCard.tsx` (not imported anywhere) and removed it from the colour-lint allowlist.

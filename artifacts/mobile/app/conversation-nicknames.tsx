@@ -13,7 +13,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
-import { isPreviewConversationId } from '@/lib/previewInbox';
+import { isPreviewConversationId, isSellerPreviewConversationId, setPreviewConversationNickname } from '@/lib/previewInbox';
 import { setConversationNickname } from '@/services/socialService';
 import { apiErrorMessage } from '@/lib/safety';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -28,15 +28,20 @@ export default function ConversationNicknamesScreen() {
     id: string; role?: string; participantUserId: string; participantName: string; participantNickname?: string;
   }>();
 
-  const [nickname, setNickname] = useState(params.participantNickname ?? '');
+  const initialNickname = params.participantNickname ?? '';
+  const [nickname, setNickname] = useState(initialNickname);
   const [saving, setSaving] = useState(false);
-  const isPreview = isPreviewConversationId(params.id);
+  const isPreview = isPreviewConversationId(params.id) || isSellerPreviewConversationId(params.id);
+  const unchanged = nickname.trim() === initialNickname.trim();
 
   async function save() {
+    if (unchanged) return;
     hapticPrimaryAction();
     setSaving(true);
     try {
-      if (!isPreview) {
+      if (isPreview) {
+        setPreviewConversationNickname(params.id, params.participantUserId, nickname);
+      } else {
         if (params.role === 'seller') {
           await api.conversations.setNickname(params.id, params.participantUserId, nickname);
         } else {
@@ -79,6 +84,7 @@ export default function ConversationNicknamesScreen() {
           label="Save"
           onPress={save}
           loading={saving}
+          disabled={unchanged}
           fullWidth
           style={{ marginTop: SP.lg }}
           testID="conversation-nicknames-save"

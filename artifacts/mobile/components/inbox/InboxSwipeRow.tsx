@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -6,6 +6,10 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP } from '@/lib/theme';
 
 const ACTION_WIDTH = 72;
+
+// Only one row may be swiped open at a time (Instagram/TikTok inbox
+// convention): opening a row closes whichever row was open before.
+let closeOpenRow: (() => void) | null = null;
 
 export interface InboxSwipeAction {
   key: string;
@@ -32,10 +36,17 @@ interface InboxSwipeRowProps {
 export default function InboxSwipeRow({ children, actions, rowId, disabled = false }: InboxSwipeRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
   const panelWidth = ACTION_WIDTH * Math.max(actions.length, 1);
+  // Stable identity for the module-level registry (reset itself is
+  // recreated every render).
+  const resetRef = useRef<() => void>(() => {});
+  const closer = useRef(() => resetRef.current()).current;
 
   const reset = () => {
     openRef.current = false;
+    setIsOpen(false);
+    if (closeOpenRow === closer) closeOpenRow = null;
     Animated.spring(translateX, {
       toValue: 0,
       useNativeDriver: true,
@@ -45,7 +56,10 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
   };
 
   const open = () => {
+    if (closeOpenRow && closeOpenRow !== closer) closeOpenRow();
+    closeOpenRow = closer;
     openRef.current = true;
+    setIsOpen(true);
     Animated.spring(translateX, {
       toValue: -panelWidth,
       useNativeDriver: true,
@@ -53,6 +67,10 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
       stiffness: 220,
     }).start();
   };
+
+  resetRef.current = reset;
+  // Unmounting while open must not leave a dangling closer behind.
+  useEffect(() => () => { if (closeOpenRow === closer) closeOpenRow = null; }, [closer]);
 
   const runAction = async (action: InboxSwipeAction) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -105,6 +123,17 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
         {...panResponder.panHandlers}
       >
         {children}
+        {/* While open, a tap on the row closes it first instead of opening
+            the conversation underneath. */}
+        {isOpen && (
+          <Pressable
+            style={styles.tapToClose}
+            onPress={reset}
+            accessibilityRole="button"
+            accessibilityLabel="Close actions"
+            testID={`inbox-swipe-close-${rowId}`}
+          />
+        )}
       </Animated.View>
     </View>
   );
@@ -131,6 +160,10 @@ const styles = StyleSheet.create({
   foreground: {
     zIndex: 1,
     elevation: 1,
+  },
+  tapToClose: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2,
   },
   action: {
     alignItems: 'center',

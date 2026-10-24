@@ -15,7 +15,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
-import { isPreviewConversationId, getPreviewMessages } from '@/lib/previewInbox';
+import { isPreviewConversationId, getPreviewMessages, isSellerPreviewConversationId, getSellerPreviewMessages } from '@/lib/previewInbox';
 import { searchConversationMessages } from '@/services/socialService';
 import type { Message } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -36,7 +36,9 @@ export default function ConversationSearchScreen() {
   const [failed, setFailed] = useState(false);
   // Searches fire per keystroke; only the newest one may write results.
   const searchSeq = useRef(0);
-  const isPreview = isPreviewConversationId(params.id);
+  const isSellerPreview = isSellerPreviewConversationId(params.id);
+  const isPreview = isPreviewConversationId(params.id) || isSellerPreview;
+  const isSeller = params.role === 'seller' || isSellerPreview;
 
   async function runSearch(q: string) {
     setQuery(q);
@@ -48,9 +50,9 @@ export default function ConversationSearchScreen() {
     try {
       let next: Message[];
       if (isPreview) {
-        const all = getPreviewMessages(params.id);
+        const all = isSellerPreview ? getSellerPreviewMessages(params.id) : getPreviewMessages(params.id);
         next = all.filter((m) => (m.text ?? '').toLowerCase().includes(trimmed.toLowerCase()));
-      } else if (params.role === 'seller') {
+      } else if (isSeller) {
         next = await api.conversations.searchMessages(params.id, trimmed) as Message[];
       } else {
         next = await searchConversationMessages(params.id, trimmed);
@@ -61,6 +63,20 @@ export default function ConversationSearchScreen() {
     } finally {
       if (seq === searchSeq.current) setLoading(false);
     }
+  }
+
+  // Back to the thread, scrolled to the tapped message (the thread screens
+  // read `focusMessageId`). dismissTo pops to the thread already on the stack
+  // instead of pushing a second copy of it.
+  function openResult(message: Message) {
+    hapticPrimaryAction();
+    const base = isSeller ? '/seller-conversation' : '/buyer-conversation';
+    const href = `${base}?id=${encodeURIComponent(params.id)}&focusMessageId=${encodeURIComponent(message.id)}`;
+    router.dismissTo(href as never);
+  }
+
+  function clearSearch() {
+    void runSearch('');
   }
 
   return (
@@ -88,6 +104,19 @@ export default function ConversationSearchScreen() {
             accessibilityLabel="Search in this chat"
             testID="conversation-search-input"
           />
+          {query.length > 0 && (
+            <PressableScale
+              rippleEnabled={false}
+              noMinHeight
+              onPress={clearSearch}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              testID="conversation-search-clear"
+            >
+              <Feather name="x" size={ICON.sm} color={theme.muted} />
+            </PressableScale>
+          )}
         </View>
       </View>
 
@@ -107,15 +136,44 @@ export default function ConversationSearchScreen() {
             <Text style={[s.empty, { color: theme.muted }]}>Search this conversation’s messages</Text>
           )}
           renderItem={({ item }) => (
-            <View style={[s.resultRow, { borderBottomColor: theme.border }]} testID="conversation-search-result">
+            <PressableScale
+              rippleEnabled={false}
+              onPress={() => openResult(item)}
+              style={[s.resultRow, { borderBottomColor: theme.border }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.fromName}: ${item.text ?? ''}. Show in chat`}
+              testID="conversation-search-result"
+            >
               <Text style={[s.resultFrom, { color: theme.text }]}>{item.fromName}</Text>
-              <Text style={[s.resultText, { color: theme.muted }]} numberOfLines={2}>{item.text}</Text>
-            </View>
+              <Text style={[s.resultText, { color: theme.muted }]} numberOfLines={2}>
+                {highlightParts(item.text ?? '', query.trim()).map((part, i) => (
+                  part.match
+                    ? <Text key={i} style={[s.resultMatch, { color: theme.text }]}>{part.text}</Text>
+                    : part.text
+                ))}
+              </Text>
+            </PressableScale>
           )}
         />
       )}
     </View>
   );
+}
+
+/** Splits `text` into matched / unmatched runs of `query` (case-insensitive). */
+function highlightParts(text: string, query: string): Array<{ text: string; match: boolean }> {
+  if (!query) return [{ text, match: false }];
+  const parts: Array<{ text: string; match: boolean }> = [];
+  const haystack = text.toLowerCase();
+  const needle = query.toLowerCase();
+  let from = 0;
+  for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, from)) {
+    if (at > from) parts.push({ text: text.slice(from, at), match: false });
+    parts.push({ text: text.slice(at, at + needle.length), match: true });
+    from = at + needle.length;
+  }
+  if (from < text.length) parts.push({ text: text.slice(from), match: false });
+  return parts;
 }
 
 const makeStyles = () => StyleSheet.create({
@@ -129,4 +187,5 @@ const makeStyles = () => StyleSheet.create({
   resultRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
   resultFrom: { fontFamily: FONT.semibold, fontSize: FS.sm },
   resultText: { fontFamily: FONT.regular, fontSize: FS.sm },
+  resultMatch: { fontFamily: FONT.semibold },
 });

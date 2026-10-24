@@ -169,6 +169,14 @@ function mergeCallLogRows(rows: ListRow[], callLog: CallLogEntry[]): ListRow[] {
   return merged;
 }
 
+/** Raw order status ("shipped", "out_for_delivery") → display label
+ *  ("Shipped", "Out for delivery"). Deliberately not dbStatusToOrderStatus:
+ *  that maps any status it doesn't know to "cancelled". */
+function formatOrderStatus(status: string): string {
+  const words = status.trim().replace(/[_-]+/g, ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow[] {
   const rows: ListRow[] = [];
   let lastDate = '';
@@ -257,6 +265,9 @@ export default function BuyerConversationScreen() {
     contextSellerName?: string;
     // Item 74 verification aid ONLY — see the effect below that reads it.
     bt_force_upload?: string;
+    /** Set by conversation-search: scroll to and briefly highlight this
+     *  message instead of landing at the bottom of the thread. */
+    focusMessageId?: string;
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
@@ -301,6 +312,8 @@ export default function BuyerConversationScreen() {
   const [copiedToast, setCopiedToast] = useState(false);
   const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [agentAboutVisible, setAgentAboutVisible] = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
@@ -328,6 +341,13 @@ export default function BuyerConversationScreen() {
   const [unreadDividerId, setUnreadDividerId] = useState<string | null>(null);
   const hasComputedUnreadRef = useRef(false);
   const hasScrolledToUnreadRef = useRef(false);
+  // Search-result jump (params.focusMessageId): while a focus target is
+  // pending or just shown, the automatic "stick to the bottom" scrolls stand
+  // down so they can't yank the list away from the found message.
+  const focusPendingRef = useRef<string | null>(null);
+  const focusHoldRef = useRef(false);
+  const focusHoldLenRef = useRef(0);
+  const [highlightMsgId, setHighlightMsgId] = useState<string | null>(null);
 
   const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
 
@@ -550,6 +570,9 @@ export default function BuyerConversationScreen() {
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).
   useEffect(() => {
+    // A new message after a search jump (sent or received) releases the hold.
+    if (focusHoldRef.current && messages.length > focusHoldLenRef.current) focusHoldRef.current = false;
+    if (focusHoldRef.current || focusPendingRef.current) return;
     if (messages.length > 0 && (!unreadDividerId || hasScrolledToUnreadRef.current)) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
     }
@@ -1195,39 +1218,54 @@ export default function BuyerConversationScreen() {
     // for them — they're standalone rows, not content that belongs inside a
     // chat bubble (see the "Standalone product/order card" comment on
     // renderItem's own product/order branch for why).
-    // Default: post / profile card
-    return (
-      <PressableScale rippleEnabled={false}
-        style={s.attachCard}
-        activeOpacity={att.type === 'post' ? 0.7 : 1}
-        onPress={() => {
-          if (att.type === 'post') {
-            const postId = att.meta?.postId;
-            if (postId) {
-              const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
-              const qs = [
-                'postId=' + encodeURIComponent(postId),
-                'postAuthorName=' + encodeURIComponent(postAuthorName),
-                'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
-                'postAuthorColor=' + encodeURIComponent(participant?.color ?? theme.accent),
-                'postCaption=' + encodeURIComponent(att.title ?? ''),
-                'postMediaColor1=' + encodeURIComponent(theme.accentDim),
-                'postMediaColor2=' + encodeURIComponent(theme.background),
-                'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
-              ].join('&');
-              router.push(('/buyer-post-viewer?' + qs) as never);
-            }
-          }
-        }}
-      >
+    // Default: post / profile card. Only a post with a postId has somewhere
+    // to go — everything else renders as a plain, non-interactive card (no
+    // press feedback, no chevron, no button role) instead of a dead tap.
+    const postId = att.type === 'post' ? att.meta?.postId : undefined;
+    const cardBody = (
+      <>
         <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={theme.accent} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {att.type === 'post' && (
-          <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
-        )}
+      </>
+    );
+    if (!postId) {
+      return (
+        <View
+          style={s.attachCard}
+          accessible
+          accessibilityLabel={[att.title, att.subtitle].filter(Boolean).join(', ') || (att.type === 'profile' ? 'Profile' : 'Post')}
+          testID="conversation-attachment-static"
+        >
+          {cardBody}
+        </View>
+      );
+    }
+    return (
+      <PressableScale rippleEnabled={false}
+        style={s.attachCard}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Open post${att.title ? `: ${att.title}` : ''}`}
+        onPress={() => {
+          const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
+          const qs = [
+            'postId=' + encodeURIComponent(postId),
+            'postAuthorName=' + encodeURIComponent(postAuthorName),
+            'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
+            'postAuthorColor=' + encodeURIComponent(participant?.color ?? theme.accent),
+            'postCaption=' + encodeURIComponent(att.title ?? ''),
+            'postMediaColor1=' + encodeURIComponent(theme.accentDim),
+            'postMediaColor2=' + encodeURIComponent(theme.background),
+            'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
+          ].join('&');
+          router.push(('/buyer-post-viewer?' + qs) as never);
+        }}
+      >
+        {cardBody}
+        <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
       </PressableScale>
     );
   }
@@ -1474,8 +1512,21 @@ export default function BuyerConversationScreen() {
 
   // ── Header options ──────────────────────────────────────────────────────────
 
-  function openOptions() {
+  function reportParticipant() {
     if (!participant) return;
+    router.push(reportHref({
+      targetType: 'profile',
+      targetId: participant.userId,
+      label: participant.name,
+      ownerId: participant.userId,
+      ownerName: participant.name,
+    }) as never);
+  }
+
+  function openOptions() {
+    // The official, always-pinned Brandthread Agent thread has no Archive or
+    // Block — its header ⓘ opens the About sheet instead (agentAboutVisible).
+    if (!participant || isAgentConv) return;
     // Alert.alert() with a button array is a silent no-op on web (see
     // components/ui/ActionSheet.tsx's header comment) — this left the
     // header "..." menu completely dead in the web preview. showActionSheet
@@ -1521,18 +1572,7 @@ export default function BuyerConversationScreen() {
               }
             },
           },
-      {
-        text: `Report ${participant.name}`,
-        onPress: () => {
-          router.push(reportHref({
-            targetType: 'profile',
-            targetId: participant.userId,
-            label: participant.name,
-            ownerId: participant.userId,
-            ownerName: participant.name,
-          }) as never);
-        },
-      },
+      { text: `Report ${participant.name}`, onPress: reportParticipant },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -1618,7 +1658,19 @@ export default function BuyerConversationScreen() {
 
   // ── Render list item ────────────────────────────────────────────────────────
 
-  function renderItem({ item }: ListRenderItemInfo<ListRow>) {
+  function renderItem(info: ListRenderItemInfo<ListRow>) {
+    const content = renderRowContent(info);
+    if (info.item.type === 'message' && info.item.msg.id === highlightMsgId) {
+      return (
+        <View style={[s.focusedMsg, { backgroundColor: `${theme.text}1F` }]} testID="conversation-focused-message">
+          {content}
+        </View>
+      );
+    }
+    return content;
+  }
+
+  function renderRowContent({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
       // Plain small gray centered text, like Instagram/Threads — no pill.
       return (
@@ -2072,6 +2124,30 @@ export default function BuyerConversationScreen() {
   const visibleMessages = messages.filter(m => !m.deletedForMe);
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
+  // New focusMessageId (first open, or another search result) → queue it.
+  useEffect(() => {
+    if (!params.focusMessageId) return;
+    focusPendingRef.current = params.focusMessageId;
+    focusHoldRef.current = true;
+    hasScrolledToUnreadRef.current = true;
+  }, [params.focusMessageId]);
+
+  useEffect(() => {
+    const target = focusPendingRef.current;
+    if (!target) return;
+    const idx = listData.findIndex(r => r.type === 'message' && r.msg.id === target);
+    if (idx < 0) return;
+    focusPendingRef.current = null;
+    focusHoldLenRef.current = messages.length;
+    const scrollTimer = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      setHighlightMsgId(target);
+    }, 200);
+    const clearTimer = setTimeout(() => setHighlightMsgId(null), 1800);
+    return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listData.length, params.focusMessageId]);
+
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
     const idx = listData.findIndex(r => r.type === 'unread');
@@ -2252,8 +2328,9 @@ export default function BuyerConversationScreen() {
             'space-between' pushes this group to the far right. */}
         <View style={s.headerIconGroup}>
           {/* An AI account can't take a call — no voice/video icons for it,
-              just the info icon below. */}
-          {conv && !isAgentConv && (
+              just the info icon below. Nor can someone whose message
+              request hasn't been accepted yet. */}
+          {conv && !isAgentConv && !isRequestMode && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
@@ -2265,7 +2342,7 @@ export default function BuyerConversationScreen() {
               <Feather name="phone" size={ICON.lg} color={theme.muted} />
             </PressableScale>
           )}
-          {conv && !isAgentConv && (
+          {conv && !isAgentConv && !isRequestMode && (
             <PressableScale rippleEnabled={false}
               style={s.roundBtn}
               onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
@@ -2279,7 +2356,7 @@ export default function BuyerConversationScreen() {
           )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
+            onPress={() => { hapticPrimaryAction(); if (isAgentConv) setAgentAboutVisible(true); else openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-options"
             accessibilityRole="button"
@@ -2351,7 +2428,7 @@ export default function BuyerConversationScreen() {
           </View>
           {conv.contextOrderStatus ? (
             <View style={s.orderStatusBadge}>
-              <Text style={s.orderStatusText}>{conv.contextOrderStatus}</Text>
+              <Text style={s.orderStatusText}>{formatOrderStatus(conv.contextOrderStatus)}</Text>
             </View>
           ) : null}
         </PressableScale>
@@ -2438,11 +2515,18 @@ export default function BuyerConversationScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
+          if (focusHoldRef.current) return;
           if (!unreadDividerId || hasScrolledToUnreadRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
           }
         }}
-        onScrollToIndexFailed={() => {
+        onScrollToIndexFailed={(info) => {
+          if (focusHoldRef.current) {
+            // Row not measured yet — jump near it by estimate, then retry.
+            flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 }), 100);
+            return;
+          }
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
         }}
         // Windowing kept at RN defaults (10/21) — the history stays performant
@@ -2697,6 +2781,51 @@ export default function BuyerConversationScreen() {
         </ModalSafeArea>
       </Modal>
 
+      {/* ── About Brandthread Agent (official account: no Archive/Block) ─── */}
+      <Modal
+        visible={agentAboutVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAgentAboutVisible(false)}
+      >
+        <ModalSafeArea>
+          <Pressable style={s.modalBackdrop} onPress={() => setAgentAboutVisible(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <SheetRise style={s.mediaSheet}>
+            <View style={s.mediaSheetHandle} />
+            <View style={s.agentAboutHeader} testID="conversation-agent-about">
+              <View style={[s.agentAboutLogo, { borderColor: theme.border }]}>
+                <BrandthreadLogo size={28} />
+              </View>
+              <Text style={s.agentAboutName}>Brandthread Agent</Text>
+              <Text style={s.mediaSheetDesc}>Official AI assistant, available 24/7</Text>
+            </View>
+            <PressableScale
+              rippleEnabled={false}
+              style={s.mediaSheetOption}
+              onPress={() => { setAgentAboutVisible(false); reportParticipant(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Report Brandthread Agent"
+              testID="conversation-agent-about-report"
+            >
+              <View style={s.mediaSheetIcon}><Feather name="flag" size={ICON.md} color={theme.accent} /></View>
+              <Text style={s.mediaSheetLabel}>Report</Text>
+            </PressableScale>
+            <PressableScale
+              rippleEnabled={false}
+              style={s.mediaSheetOption}
+              onPress={() => setAgentAboutVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              testID="conversation-agent-about-close"
+            >
+              <View style={s.mediaSheetIcon}><Feather name="x" size={ICON.md} color={theme.accent} /></View>
+              <Text style={s.mediaSheetLabel}>Close</Text>
+            </PressableScale>
+            <View style={{ height: SP.lg }} />
+          </SheetRise>
+        </ModalSafeArea>
+      </Modal>
+
       <Modal
         visible={showAttachmentPicker}
         transparent
@@ -2765,7 +2894,7 @@ export default function BuyerConversationScreen() {
                   <View style={{ flex: 1, marginLeft: SP.sm }}>
                     <Text style={s.productOptionName} numberOfLines={1}>{conv.contextOrderNumber ?? 'Your order'}</Text>
                     {conv.contextOrderStatus ? (
-                      <Text style={s.productOptionMeta} numberOfLines={1}>{conv.contextOrderStatus}</Text>
+                      <Text style={s.productOptionMeta} numberOfLines={1}>{formatOrderStatus(conv.contextOrderStatus)}</Text>
                     ) : null}
                   </View>
                   <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
@@ -2939,12 +3068,19 @@ export default function BuyerConversationScreen() {
             setThreadCashMutual(null);
             const status = await api.social.status(sellerUserId);
             setThreadCashMutual(status.isMutual);
-          } catch {
-            // Following can still fail (rate limit, blocked, etc.) — the
-            // coin's own disabled state already reflects reality either way.
+          } catch (e) {
+            // Following can still fail (rate limit, blocked, etc.) — say so
+            // instead of silently leaving the person thinking it worked.
+            setErrorNotice(apiErrorMessage(e, 'Couldn’t follow. Please try again.'));
           }
         }}
         onDismiss={() => setThreadCashNotice(null)}
+      />
+
+      <Snackbar
+        visible={errorNotice != null}
+        message={errorNotice ?? ''}
+        onDismiss={() => setErrorNotice(null)}
       />
     </KeyboardAvoidingView>
   );
@@ -3244,7 +3380,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: theme.success,
+    backgroundColor: theme.muted,
     borderWidth: 2,
     borderColor: theme.background,
   },
@@ -3768,6 +3904,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
+  focusedMsg:       { borderRadius: RADIUS.md },
+  agentAboutHeader: { alignItems: 'center', gap: SP.xs, paddingBottom: SP.md },
+  agentAboutLogo:   { width: 56, height: 56, borderRadius: 28, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs },
+  agentAboutName:   { fontSize: FS.md, fontFamily: FONT.semibold, color: theme.text },
 
   // Photo grid
   photoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },
