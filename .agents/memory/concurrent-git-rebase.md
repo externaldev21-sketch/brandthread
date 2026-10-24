@@ -71,3 +71,9 @@ After stacked merges, scan source content for conflict markers as well as checki
 **Why:** A partially reconciled component retained embedded markers after the index was resolved; later merges carried them forward without listing that file as an unresolved conflict.
 
 **How to apply:** Before final compilation and restart, check tracked runtime sources for marker lines. A clean Git merge status alone does not establish syntactically valid source.
+
+When reviewed branches change a preference's persistence model, preserve previously saved choices as well as the new write path.
+
+**Why:** Independent follow-back dismissal implementations used separate records and relationship flags; reading only the new flag would make previously dismissed prompts return.
+
+**How to apply:** Retain legacy and preview reads until saved preferences are explicitly reconciled into the canonical representation.
