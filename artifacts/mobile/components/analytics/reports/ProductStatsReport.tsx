@@ -78,7 +78,7 @@ export default function ProductStatsReport() {
                   title={p.name}
                   subtitle={`${formatCompactCount(p.views)} views · ${p.addToCarts} carts · ${p.purchases} sold`}
                   value={formatMoney(p.revenueCents)}
-                  valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conv.`}
+                  valueLabel={p.viewToPurchasePct === null ? undefined : `${p.viewToPurchasePct}% conversion`}
                   onPress={() => router.push(`/product-detail?id=${encodeURIComponent(p.productId)}&tab=analytics` as never)}
                 />
               </View>

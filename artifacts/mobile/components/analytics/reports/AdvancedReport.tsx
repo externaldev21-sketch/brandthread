@@ -1,4 +1,3 @@
-import { proUpgradeHref } from '@/lib/proPerks';
 /**
  * Advanced analytics (Pro) — average order value, conversion, repeat buyers,
  * refunds, sales by channel and top customers. Gated by the seller's real
@@ -9,14 +8,13 @@ import { proUpgradeHref } from '@/lib/proPerks';
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Icon as Feather } from '@/components/ui/Icon';
-import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { fmtDate, formatMoney } from '@/lib/format';
-import { EmptyState, PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ProLockedState } from '@/components/analytics/ProLockedState';
 import { AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow } from '@/components/analytics/AnalyticsKit';
 import { InsightFrame, useReportBottomInset } from '@/components/analytics/InsightFrame';
 import { InsightLineChart, KpiGrid, RankedRow, ShareBarRow, formatAxisMoney } from '@/components/analytics/InsightCharts';
@@ -33,23 +31,15 @@ function useIsPro(): { isPro: boolean; checking: boolean } {
 }
 
 function ProGate() {
-  const colors = useColors();
-  const router = useRouter();
   const bottom = useReportBottomInset();
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title="Advanced analytics" />
       <View style={{ flex: 1, paddingHorizontal: SP.md, paddingBottom: bottom, justifyContent: 'center' }}>
-        <View style={{ alignItems: 'center', gap: SP.sm }}>
-          <View style={{ width: 56, height: 56, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="lock" size={22} color={colors.foreground} />
-          </View>
-          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center' }}>Included with Growth</Text>
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginBottom: SP.md }}>
-            Average order value, conversion, repeat buyers, refunds, sales by channel and top customers.
-          </Text>
-          <View style={{ width: '100%' }}><PrimaryButton label="See plans" onPress={() => router.push(proUpgradeHref('analytics-advanced') as never)} /></View>
-        </View>
+        <ProLockedState
+          source="analytics-advanced"
+          description="Upgrade to Growth to see average order value, conversion, repeat buyers, refunds, sales by channel and top customers."
+        />
       </View>
     </View>
   );

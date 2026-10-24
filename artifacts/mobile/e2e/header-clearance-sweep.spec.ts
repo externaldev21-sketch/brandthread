@@ -378,7 +378,7 @@ test.describe('Header + bottom-clearance sweep @ 393x852', () => {
   test('headers: bare back arrow + title (no subtitle, no divider) where a subtitle used to be', async () => {
     for (const [name, target, title] of [
       ['analytics', '/(tabs)/analytics', 'Analytics'],
-      ['analytics-content', '/analytics-content', 'Content Analytics'],
+      ['analytics-content', '/analytics-content', 'Threads and videos'],
       ['analytics-sales', '/analytics-sales', 'Sales Analytics'],
       ['analytics-store', '/analytics-store', 'Store Analytics'],
       ['customers', '/customers', 'Customers'],

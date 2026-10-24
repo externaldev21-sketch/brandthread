@@ -40,7 +40,7 @@ export default function ContentReport() {
   const hasData = !!data && (data.totals.views > 0 || data.posts.length > 0 || data.totals.followerGrowth > 0);
   const posts = data ? sortPosts(data.posts, sort).slice(0, 20) : [];
   return (
-    <InsightFrame title="Content Analytics" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={() => { void reload(); void shopClicks.reload(); }} range={range} onRangeChange={setRange}>
+    <InsightFrame title="Threads and videos" loading={loading && !data} error={error && !data} onRetry={reload} onRefresh={() => Promise.all([reload(), shopClicks.reload()])} range={range} onRangeChange={setRange}>
       {!data ? null : !hasData ? (
         <EmptyState
           icon="video"

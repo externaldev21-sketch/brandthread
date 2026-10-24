@@ -41,12 +41,23 @@ export function useReportBottomInset(): number {
 export function InsightFrame({
   title, loading, error, onRetry, onRefresh, range, onRangeChange, actions, children,
 }: {
-  title: string; loading: boolean; error: boolean; onRetry: () => void; onRefresh?: () => void;
+  title: string; loading: boolean; error: boolean; onRetry: () => void;
+  /** Pull-to-refresh; the spinner shows until the returned promise settles. */
+  onRefresh?: () => unknown;
   range?: InsightRange; onRangeChange?: (r: InsightRange) => void; actions?: ScreenHeaderAction[]; children: React.ReactNode;
 }) {
   const colors = useColors();
   const { theme } = useAppTheme();
   const bottom = useReportBottomInset();
+  const [refreshing, setRefreshing] = React.useState(false);
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => { mounted.current = false; }, []);
+  const handleRefresh = React.useCallback(async () => {
+    if (!onRefresh) return;
+    setRefreshing(true);
+    try { await onRefresh(); } catch { /* the report's own error state covers it */ }
+    finally { if (mounted.current) setRefreshing(false); }
+  }, [onRefresh]);
   return (
     <View style={{ flex: 1 }}>
       <ScreenHeader title={title} actions={actions} />
@@ -59,7 +70,7 @@ export function InsightFrame({
           style={s.scroll}
           contentContainerStyle={[s.content, { paddingBottom: bottom }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
+          refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} /> : undefined}
         >
           {range && onRangeChange && (
             <SellerDashboardRangePills range={range} onRangeChange={onRangeChange} theme={theme} />

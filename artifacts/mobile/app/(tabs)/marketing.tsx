@@ -162,8 +162,8 @@ export default function MarketingScreen() {
           separation (Dev's standing "no grey boxes" rule). */}
       <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
         {[
-          { label: 'Email subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
-          { label: 'SMS subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
+          { label: 'Email subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '—', icon: 'mail' as const },
+          { label: 'SMS subscribers', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '—', icon: 'message-square' as const },
         ].map((s, i) => (
           <View key={s.label} style={[styles.statChip, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border }]}>
             <Icon name={s.icon} size={14} color={colors.primary} />
@@ -192,7 +192,8 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Campaigns"
         action={campaigns.length > 0 ? 'New' : undefined}
-              onAction={() => { router.push('/design-campaign' as never); }}
+        actionAccessibilityLabel="New campaign"
+        onAction={() => { router.push('/design-campaign' as never); }}
       />
       {campaignsError ? (
         <View style={styles.emptyFlat}>
@@ -248,7 +249,8 @@ export default function MarketingScreen() {
       <SectionHeader
         title="Discount codes"
         action={discounts.length > 0 ? 'New' : undefined}
-              onAction={() => { router.push('/discounts' as never); }}
+        actionAccessibilityLabel="New discount code"
+        onAction={() => { router.push('/discounts' as never); }}
       />
       {discountsError ? (
         <View style={styles.emptyFlat}>

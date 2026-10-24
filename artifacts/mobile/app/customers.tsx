@@ -165,7 +165,7 @@ export default function CustomersScreen() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        actions={[{ icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View customer analytics' }]}
+        actions={[{ icon: 'bar-chart-2', onPress: () => router.push('/analytics-customers' as never), accessibilityLabel: 'View customer analytics' }]}
       />
       <View style={{ flex: 1 }}>
       <FlashList

@@ -42,7 +42,7 @@ import { GOAL_METRICS, GOAL_PERIODS, createGoal, deleteGoal, getGoals, goalLabel
 import { formatMoney } from '@/lib/format';
 
 const STATUS_TEXT: Record<Goal['status'], string> = {
-  achieved: 'Reached', on_track: 'On track', behind: 'Behind pace', not_started: 'Just started',
+  achieved: 'Reached', on_track: 'On track', behind: 'Behind pace', not_started: 'Not started',
 };
 const PERIOD_TEXT: Record<GoalPeriod, string> = { week: 'this week', month: 'this month', quarter: 'this quarter', year: 'this year' };
 const fmt = (n: number, m: GoalMetric) => (m === 'revenue' ? formatMoney(n) : n.toLocaleString());

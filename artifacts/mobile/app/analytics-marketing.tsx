@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState, getPushNotificationResults } from '@/services/analyticsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { campaignDetailHref } from '@/lib/campaignDetailHref';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState, PushNotificationResults } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -48,13 +49,17 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
   const router = useRouter();
   const typeColor = c.type === 'email' ? colors.primary : c.type === 'sms' ? colors.success : c.type === 'push' ? colors.info : colors.warning;
   const typeIcon: keyof typeof Feather.glyphMap = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
+  // Email and push sends have a results screen; other channels have no detail
+  // route yet, so their rows stay put rather than opening an unrelated screen.
+  const detailHref = campaignDetailHref(c);
   return (
     <TouchableOpacity
-      onPress={() => { Haptics.selectionAsync(); router.navigate('/(tabs)/marketing' as never); }}
+      onPress={detailHref ? () => { Haptics.selectionAsync(); router.push(detailHref as never); } : undefined}
+      disabled={!detailHref}
       style={s.rowItem}
       activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityLabel={`${c.name}, ${formatCents(c.revenueCents)} revenue`}
+      accessibilityRole={detailHref ? 'button' : undefined}
+      accessibilityLabel={`${c.name}, ${c.recipients.toLocaleString()} recipients`}
     >
       <View style={[s.rowIcon, { backgroundColor: typeColor + '22' }]}>
         <Feather name={typeIcon} size={14} color={typeColor} />
@@ -172,13 +177,14 @@ export default function AnalyticsMarketingScreen() {
             <Text style={s.heroLabel}>Marketing Revenue</Text>
             <Text style={s.heroValue}>{data.marketingRevenue.formatted}</Text>
             {typeof data.marketingRevenue.changePct === 'number' && (() => {
-              const change = data.marketingRevenue.changePct as number;
-              const up = change >= 0;
-              const tone = up ? colors.success : colors.destructive;
+              const change = Math.round((data.marketingRevenue.changePct as number) * 10) / 10;
+              const flat = change === 0;
+              const up = change > 0;
+              const tone = flat ? colors.mutedForeground : up ? colors.success : colors.destructive;
               return (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.xs }}>
-                  <Feather name={up ? 'trending-up' : 'trending-down'} size={12} color={tone} />
-                  <Text style={[s.heroChange, { color: tone }]}>{up ? '+' : '−'}{Math.abs(change).toFixed(1)}% vs previous period</Text>
+                  <Feather name={flat ? 'minus' : up ? 'trending-up' : 'trending-down'} size={12} color={tone} />
+                  <Text style={[s.heroChange, { color: tone }]}>{flat ? '' : up ? '+' : '−'}{Math.abs(change).toFixed(1)}% vs previous period</Text>
                 </View>
               );
             })()}

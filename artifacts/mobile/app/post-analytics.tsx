@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { shareLink } from '@/lib/shareActions';
+import { buildPostUrl } from '@/lib/shareLinks';
 import {
   View,
   Text,
@@ -8,7 +10,7 @@ import {
   ScrollView,
   useWindowDimensions,
   Animated,
-  ActivityIndicator, Platform } from 'react-native';
+  ActivityIndicator, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -204,21 +206,25 @@ export default function PostAnalyticsScreen() {
   const caption = post.caption?.trim();
   // Watch time only means something for video; a photo post never records it.
   const showWatchTime = metrics.retention.tracked || post.mediaType === 'video' || post.mediaType === 'behind_scenes';
+  // Photo posts show their own image; a video file can't be an <Image>, so
+  // video posts keep the type gradient.
+  const showImageThumb = !!post.mediaUrl && !showWatchTime && post.mediaType !== 'video';
+  const shareUrl = buildPostUrl(post.id);
 
   return (
     <View style={styles.root}>
       <ScreenHeader
         title="Post Analytics"
         onBack={() => goBackOr(router)}
-        rightElement={
-          <View style={styles.rangePill}>
-            <Text style={styles.rangePillText}>Live</Text>
-          </View>
-        }
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.previewCard}>
-          <LinearGradient colors={gradColors} style={styles.previewThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          {/* The type gradient stays underneath, so a failed image still shows it. */}
+          <LinearGradient colors={gradColors} style={[styles.previewThumb, { overflow: 'hidden' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            {showImageThumb && (
+              <Image source={{ uri: post.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+            )}
+          </LinearGradient>
           <View style={styles.previewMeta}>
             <Text style={[styles.previewCaption, !caption && { color: colors.mutedForeground }]} numberOfLines={2}>{caption || 'No caption'}</Text>
             <View style={styles.previewBadgeRow}>
@@ -258,15 +264,6 @@ export default function PostAnalyticsScreen() {
             value={formatMoney(metrics.conversions.revenueCents)}
             detail="From non-cancelled attributed orders"
           />
-          <AnalyticsRow
-            label="Average watch time"
-            value={metrics.retention.tracked
-              ? `${(metrics.retention.averageWatchTimeSeconds ?? 0).toFixed(1)}s`
-              : 'Not tracked'}
-            detail={metrics.retention.tracked
-              ? `${formatNumber(metrics.retention.sampleCount)} watch samples`
-              : 'Shown after valid watch-time events are recorded'}
-          />
           {showWatchTime && (
             <AnalyticsRow
               label="Average watch time"
@@ -299,13 +296,21 @@ export default function PostAnalyticsScreen() {
           >
             <LinearGradient colors={colors.gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
               <Icon name="zap" size={18} color={colors.primaryForeground} />
-              <Text style={styles.quickActionText}>Boost Post</Text>
+              <Text style={[styles.quickActionText, { color: colors.primaryForeground }]}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => goBackOr(router)}>
-             <Icon name="arrow-left" size={18} color={colors.primaryForeground} />
-            <Text style={styles.quickActionText}>Back</Text>
-          </TouchableOpacity>
+          {shareUrl && (
+            <TouchableOpacity
+              style={styles.quickActionShare}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Share post"
+              onPress={() => { void shareLink(shareUrl, caption ? `${caption} ${shareUrl}` : shareUrl); }}
+            >
+              <Icon name="share" size={18} color={colors.text} />
+              <Text style={styles.quickActionText}>Share Post</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>

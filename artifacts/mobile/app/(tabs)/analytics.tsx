@@ -20,19 +20,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LiveSummaryRows } from '@/components/live/LiveSummaryRows';
 import type { LiveAnalyticsListItem } from '@/lib/live/liveAnalytics';
 import { useAuth } from '@clerk/expo';
-import { GRID_MAX_WIDTH, SP, FONT, FS, RADIUS } from '@/lib/theme';
+import { GRID_MAX_WIDTH, SP, FONT } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
-import {
-  getSalesAnalytics, getFilterState, saveFilterState,
-} from '@/services/analyticsService';
-import {
-  AnalyticsFilterState, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
-} from '@/services/analyticsTypes';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
@@ -44,7 +38,7 @@ import { SellerDashboardRangePills } from '@/components/SellerDashboardRangePill
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
 import { analyticsSummary } from '@/lib/analyticsSummary';
-import { DEFAULT_INSIGHT_RANGE, INSIGHT_RANGES, type InsightRange } from '@/services/sellerInsightsService';
+import { DEFAULT_INSIGHT_RANGE, type InsightRange } from '@/services/sellerInsightsService';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
@@ -250,7 +244,7 @@ export default function AnalyticsScreen() {
 
               {/* ── Revenue chart for the selected range ──────────────────── */}
               <Card padded>
-                <SectionTitle>Revenue</SectionTitle>
+                <SectionTitle>{CHART_TITLE[range]}</SectionTitle>
                 <AnalyticsBarChart points={chartPoints} color={colors.primary} formatValue={formatChartDollars} emptyLabel="No revenue data yet" height={chartEmpty ? EMPTY_CHART_HEIGHT : CHART_HEIGHT} />
               </Card>
             </>
@@ -291,8 +285,4 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   statCell: { flex: 1, minWidth: 0 },
   errorWrap: { paddingVertical: SP.xl },
 
-  advancedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 52, paddingHorizontal: SP.md },
-  advancedLabel: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
-  proChip: { backgroundColor: colors.foreground, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 3 },
-  proChipText: { fontSize: 11, fontFamily: FONT.bold, color: colors.background },
 });

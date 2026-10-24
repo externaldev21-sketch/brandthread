@@ -7,7 +7,7 @@
 
 export type DateRangeKey =
   | 'today' | 'yesterday' | '7d' | '30d' | '90d'
-  | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
+  | 'this_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
 
 export type ComparisonKey =
   | 'previous_period' | 'previous_month' | 'previous_year' | 'none';
@@ -95,6 +95,8 @@ export interface SalesBreakdownRow {
 
 export interface SalesAnalytics {
   grossSales:      AnalyticsMetric;
+  /** Counted orders in the period (GET /api/analytics/revenue orderCount). */
+  orders?:         AnalyticsMetric;
   discounts:       AnalyticsMetric;
   returns:         AnalyticsMetric;
   refunds:         AnalyticsMetric;

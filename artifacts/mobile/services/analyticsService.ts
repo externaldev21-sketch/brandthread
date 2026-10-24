@@ -74,8 +74,11 @@ function periodFor(filter?: AnalyticsFilterState): string {
     case 'today': return 'today';
     case '7d': return 'last7';
     case '90d': return 'last90';
+    case 'this_week': return 'thisWeek';
     case 'this_month': return 'thisMonth';
     case 'last_month': return 'lastMonth';
+    case 'this_year': return 'thisYear';
+    case 'all': return 'all';
     default: return 'last30';
   }
 }
