@@ -229,6 +229,19 @@ export function adaptApiOrder(raw: any): Order {
       createdAt:         raw.shippedAt,
     });
   }
+  if (raw.deliveredAt) {
+    timeline.push({
+      id:                `tl-delivered-${raw.id}`,
+      type:              'delivered',
+      message:           raw.deliveryConfirmedBy === 'seller' ? 'Marked delivered by you'
+        : raw.deliveryConfirmedBy === 'buyer' ? 'Delivery confirmed by the buyer'
+        : 'Delivered (carrier confirmed)',
+      isCustomerVisible: true,
+      isSystemEvent:     true,
+      isSellerNote:      false,
+      createdAt:         raw.deliveredAt,
+    });
+  }
 
   // Build cancellation object and timeline event from API fields
   const cancellationReasonKey = raw.cancellationReason as string | undefined;
@@ -345,6 +358,8 @@ export function adaptApiOrder(raw: any): Order {
     deliveredAt:            raw.deliveredAt ?? null,
     autoRefundedAt:         raw.autoRefundedAt ?? null,
     disputePausedAt:        raw.disputePausedAt ?? null,
+    deliveryConfirmedBy:    raw.deliveryConfirmedBy ?? null,
+    sellerCanMarkDelivered: raw.sellerCanMarkDelivered === true,
     isManufacturerFulfilled: false,
     currency: 'USD',
     tags:     [],

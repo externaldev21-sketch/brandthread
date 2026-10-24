@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import crypto from "node:crypto";
 import { db, orders, orderItems, orderRefunds, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks, orderTrackingEvents } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
@@ -22,7 +22,9 @@ import { withRiskView } from "../lib/risk/orderRisk";
 import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservation";
 import { nextOrderNumber } from "../lib/orderNumber";
 import { notifyStockRestored } from "../lib/stockNotifications";
-import { shipItems } from "../lib/delivery/deliveryState";
+import { recordDelivery, shipItems } from "../lib/delivery/deliveryState";
+import { buyerEmailOf, notifyBuyerOrderShipped } from "../lib/orderNotifications";
+import { sellerMayMarkDelivered, validateTrackingNumber } from "../lib/shippingTracking";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 import { z } from "@workspace/api-zod";
@@ -63,15 +65,7 @@ async function notifyOrderShipped(
   idempotencyKey = `order-shipped/${order.id}`,
   trackingUpdate = false,
 ): Promise<void> {
-  let recipient = order.guestEmail;
-  if (order.buyerId) {
-    const [buyer] = await db
-      .select({ email: users.email })
-      .from(users)
-      .where(eq(users.clerkId, order.buyerId))
-      .limit(1);
-    recipient = buyer?.email ?? recipient;
-  }
+  const recipient = await buyerEmailOf(order);
   if (!recipient) {
     logger.warn({ orderId: order.id }, "Shipping email skipped because recipient is missing");
     return;
@@ -82,6 +76,7 @@ async function notifyOrderShipped(
     orderNumber: order.orderNumber,
     carrier: order.carrier,
     trackingNumber: order.trackingNumber,
+    trackingUrl: order.trackingNumber ? carrierTrackingUrl(order.carrier, order.trackingNumber) : null,
     trackingUpdate,
     store: await loadStoreBrandingForOrderSafe(order.id),
     idempotencyKey,
@@ -483,7 +478,9 @@ router.get("/:id", async (req, res) => {
     : [];
   const trackingUrl = order.trackingNumber ? carrierTrackingUrl(order.carrier, order.trackingNumber) : null;
 
-  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, trackingEvents, trackingUrl, sourceLive, ...giftResponse(order) });
+  res.json({ ...withRiskView(order), items, customer, shopifyFulfillment, trackingEvents, trackingUrl, sourceLive, ...giftResponse(order),
+    sellerCanMarkDelivered: sellerMayMarkDelivered(order, items).ok,
+  });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts
@@ -703,8 +700,6 @@ router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderI
     ? ` Reason: ${reason.replace(/_/g, " ")}.`
     : "";
   const notifMap: Record<string, { type: string; title: string; body: string } | undefined> = {
-    shipped:   { type: "order_shipped",   title: "Your order has shipped!", body: `Order #${transitioned.orderNumber} is on its way.` },
-    delivered: { type: "order_delivered", title: "Your order was delivered!", body: `Order #${transitioned.orderNumber} has been delivered.` },
     cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.${cancellationReasonLabel}` },
   };
   const notif = quietShip ? undefined : notifMap[status];
@@ -844,7 +839,7 @@ router.post("/:id/refund", requireRole("manager"), async (req, res) => {
 });
 
 // PATCH /api/orders/:id/tracking — fulfillment (staff+)
-router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
+async function handleTrackingUpdate(req: Request<{ id: string }>, res: Response) {
   const ownerId = (req as any).clerkUserId as string;
   const {
     trackingNumber: rawTrackingNumber,
@@ -1125,6 +1120,63 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   if (statusTransition || trackingStatusTransition || trackingChange) void notifyOrderLiveActivity(updated.id);
 
   res.json(updated);
+}
+router.patch("/:id/tracking", requireRole("staff"), handleTrackingUpdate);
+
+// POST /api/orders/:id/ship — seller "Mark as shipped" (staff+). Same effect
+// as adding tracking (ships the order, alerts the buyer, releases held
+// funds), but the carrier and tracking number are required and the number
+// must match the carrier's format.
+router.post("/:id/ship", requireRole("staff"), async (req, res) => {
+  const check = validateTrackingNumber(req.body?.carrier, req.body?.trackingNumber);
+  if (!check.ok) {
+    res.status(400).json({ error: check.error, field: check.field, code: "INVALID_TRACKING" }); return;
+  }
+  const ownerId = (req as any).clerkUserId as string;
+  const [current] = await db.select({ status: orders.status }).from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (!orderStatusMachine.isState(current.status) || !orderStatusMachine.can(current.status, "shipped") || current.status === "label_purchasing") {
+    res.status(409).json({
+      error: current.status === "shipped" || current.status === "delivered"
+        ? "This order has already shipped."
+        : `An order that is ${current.status.replace(/_/g, " ")} cannot be marked shipped.`,
+      code: "ILLEGAL_STATUS_TRANSITION",
+    });
+    return;
+  }
+  req.body = { carrier: check.carrier, trackingNumber: check.trackingNumber };
+  await handleTrackingUpdate(req, res);
+});
+
+// POST /api/orders/:id/mark-delivered — seller fallback (staff+). Only for
+// a shipment no carrier status can arrive for (see sellerMayMarkDelivered);
+// otherwise the carrier's scan or the buyer confirms delivery.
+router.post("/:id/mark-delivered", requireRole("staff"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [order] = await db.select().from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+  if (!order) { res.status(404).json({ error: "Not found" }); return; }
+  if (order.status === "delivered") { res.json(order); return; }
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  const check = sellerMayMarkDelivered(order, items);
+  if (!check.ok) { res.status(409).json({ error: check.error, code: check.code }); return; }
+  orderStatusMachine.assert("shipped", "delivered");
+
+  const result = await recordDelivery({ orderId: order.id, source: "seller" });
+  if (result.blocked === "cancelled") {
+    res.status(409).json({ error: "This order was cancelled or refunded.", code: "ALREADY_REFUNDED" }); return;
+  }
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Marked order #${order.orderNumber} as delivered`,
+      "order", order.id, { status: "delivered", confirmedBy: "seller" },
+    );
+  }
+  const [fresh] = await db.select().from(orders).where(eq(orders.id, order.id)).limit(1);
+  res.json(fresh);
 });
 
 // PATCH /api/orders/:id/items-tracking — ship part of an order (staff+)

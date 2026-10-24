@@ -17,6 +17,7 @@ import {
 import { orderHeldCents } from "../lib/money/ledger";
 import { labelEligibility, labelEligibilityFromRow } from "../lib/money/labelEligibility";
 import { logger } from "../lib/logger";
+import { notifyBuyerOrderShipped } from "../lib/orderNotifications";
 import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
 import { shipItems } from "../lib/delivery/deliveryState";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";

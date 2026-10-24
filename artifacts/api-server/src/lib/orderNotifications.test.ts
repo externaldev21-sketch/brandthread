@@ -12,6 +12,7 @@ vi.mock("./safety", () => ({
 vi.mock("./orderItemImages", () => ({
   orderThumbnailPath: vi.fn(async (orderId: string) => (orderId === "o1" ? "/objects/uploads/tee" : null)),
 }));
+vi.mock("@workspace/db", () => ({ db: {}, users: {} }));
 vi.mock("./activityEvents", () => ({
   actorFieldsFromProfile: (p: any) => ({ actorId: p.userId, actorName: p.name, actorInitials: "JR", actorColor: "#3F3F46" }),
 }));
@@ -21,6 +22,8 @@ import {
   newOrderCopy,
   notifyBuyerOrderCancelled,
   notifyBuyerOrderConfirmed,
+  notifyBuyerOrderShipped,
+  orderShippedCopy,
   notifySellerOrderCancelledByBuyer,
   notifySellerReturnRequested,
 } from "./orderNotifications";
@@ -42,6 +45,27 @@ describe("order lifecycle notifications", () => {
       body: "$89 · Order #BT-00012. We'll tell you when it ships.",
       targetId: "o1", targetType: "buyer_order", targetImageUrl: "https://img/x.jpg",
     })]);
+  });
+
+  it("tells the buyer their order shipped, with carrier and tracking, opening the buyer order screen", async () => {
+    await notifyBuyerOrderShipped({ buyerId: "b1", orderId: "o1", orderNumber: "BT-00012", carrier: "UPS", trackingNumber: "1Z999AA10123456784" });
+    expect(published).toEqual([expect.objectContaining({
+      userId: "b1", category: "orders", pushCategory: "order", type: "order_shipped",
+      title: "Your order has shipped",
+      body: "Order #BT-00012 is on its way via UPS. Tracking number: 1Z999AA10123456784.",
+      targetId: "o1", targetType: "buyer_order",
+    })]);
+  });
+
+  it("words partial and tracking-less shipments plainly", () => {
+    expect(orderShippedCopy({ orderNumber: "BT-1" })).toEqual({ title: "Your order has shipped", body: "Order #BT-1 is on its way." });
+    expect(orderShippedCopy({ orderNumber: "BT-1", carrier: "USPS", trackingNumber: "EA123456789US", partial: true })).toEqual({
+      title: "Part of your order has shipped",
+      body: "Some items in order #BT-1 are on their way via USPS. Tracking number: EA123456789US.",
+    });
+    for (const copy of [orderShippedCopy({ orderNumber: "BT-1" }), orderShippedCopy({ orderNumber: "BT-1", partial: true })]) {
+      expect(copy.title).not.toMatch(/!/);
+    }
   });
 
   it("tells the buyer about their own cancellation and the refund", async () => {

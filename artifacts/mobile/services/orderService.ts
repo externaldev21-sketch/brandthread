@@ -627,11 +627,15 @@ export async function getOrderStats(): Promise<{
 
 // ─── Public API — Buyer ───────────────────────────────────────────────────────
 
-// Map DB order status → UI OrderStatus (UI uses a broader set of values)
-function mapBuyerOrderStatus(dbStatus: string): OrderStatus {
+// Map DB order status → UI OrderStatus (UI uses a broader set of values).
+// `fulfilled` (packed) and `label_purchasing` are pre-shipment states the
+// server really uses; they read as ready to ship, never as a new order.
+export function mapBuyerOrderStatus(dbStatus: string): OrderStatus {
   switch (dbStatus) {
     case 'pending':       return 'new';
     case 'processing':    return 'processing';
+    case 'fulfilled':
+    case 'label_purchasing':
     case 'ready_to_ship': return 'ready_to_ship';
     case 'shipped':       return 'shipped';
     case 'delivered':     return 'delivered';

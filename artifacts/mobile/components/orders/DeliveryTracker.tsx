@@ -97,7 +97,9 @@ export function DeliveryTrackerCard({
       {storeName ? <Text style={s.store} numberOfLines={1}>{storeName}</Text> : null}
       <Text style={s.headline}>{headline}</Text>
       {delivered && delivery.deliveryConfirmedBy ? (
-        <Text style={s.sub}>{delivery.deliveryConfirmedBy === 'buyer' ? 'Confirmed by you' : 'Confirmed by the carrier'}</Text>
+        <Text style={s.sub}>{delivery.deliveryConfirmedBy === 'buyer' ? 'Confirmed by you'
+          : delivery.deliveryConfirmedBy === 'seller' ? 'Marked delivered by the seller'
+          : 'Confirmed by the carrier'}</Text>
       ) : null}
       {!shipped && delivery.isPreorder && delivery.promisedShipDate ? (
         <Text style={s.sub}>Seller ships by {formatLocalDate(delivery.promisedShipDate)}</Text>
