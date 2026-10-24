@@ -48,7 +48,7 @@ export class ClerkLoadErrorBoundary extends Component<PropsWithChildren, State> 
     if (!this.state.hasError) return this.props.children;
     return (
       <View style={styles.root}>
-        <BrandthreadLogo size={96} tintColor="#F7F7FA" />
+        <BrandthreadLogo size={96} />
         <Text style={styles.title}>Couldn’t connect</Text>
         <Text style={styles.body}>
           We couldn’t reach the sign-in service. Check your connection and try again.

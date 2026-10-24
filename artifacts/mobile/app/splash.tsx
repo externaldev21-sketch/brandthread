@@ -40,7 +40,7 @@ export default function SplashScreen() {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <BrandthreadLogo size={150} tintColor={theme.accentLight} />
+        <BrandthreadLogo size={150} />
       </Animated.View>
     </View>
   );

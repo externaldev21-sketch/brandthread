@@ -47,9 +47,8 @@ for (const [name, themeFile] of themes) {
     'PNG24:' + icon]);
 
   // Android adaptive foreground: keep the official mark well inside the
-  // 66% safe zone.  Its source alpha is retained while the mark is white.
+  // 66% safe zone. Retain the approved chrome artwork and source alpha.
   run([logo, '-resize', '620x620', '-colorspace', 'sRGB',
-    '-channel', 'RGB', '-evaluate', 'set', '100%', '+channel',
     '-gravity', 'center', '-background', 'none', '-extent', '1024x1024',
     'PNG32:' + foreground]);
 }

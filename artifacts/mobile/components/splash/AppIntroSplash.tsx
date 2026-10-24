@@ -32,7 +32,6 @@ import { DEFAULT_THEME, peekPersistedTheme, type AppThemePreset } from '@/contex
 import { consumeFirstLaunch } from '@/lib/introSplash';
 import { hapticLight } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
-const LAUNCH_FOREGROUND = '#FFFFFF'; // theme-exempt: brand launch logo on the fixed dark launch plane
 const LAUNCH_BACKGROUND = '#000000'; // theme-exempt: brand launch plane stays opaque before account theme restoration
 
 const LOGO_BOX = 132;
@@ -252,13 +251,13 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
         )}
         <View style={styles.logoBox}>
           <Animated.View style={[styles.streak, echoFar]}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
+            <BrandthreadLogo size={LOGO_BOX} opacity={0.5} />
           </Animated.View>
           <Animated.View style={[styles.streak, echoNear]}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
+            <BrandthreadLogo size={LOGO_BOX} opacity={0.5} />
           </Animated.View>
           <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={LAUNCH_FOREGROUND} />
+            <BrandthreadLogo size={LOGO_BOX} />
           </Animated.View>
           {(phase === 'shine' || phase === 'hold' || phase === 'wordmark' || phase === 'reveal') &&
             !reducedMotion && (

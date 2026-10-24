@@ -13,7 +13,7 @@ export default function BootScreen() {
   const { theme } = useAppTheme();
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <BrandthreadLogo size={150} tintColor={theme.accentLight} />
+      <BrandthreadLogo size={150} />
     </View>
   );
 }
