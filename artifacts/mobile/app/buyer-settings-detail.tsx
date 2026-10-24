@@ -1,47 +1,31 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 import { reportNetworkError } from '@/lib/networkNotice';
-import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow, OptionSheet } from '@/components/ui';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
 import { useInternalDevMenuGesture } from '@/lib/internalDevMenu';
-const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
-import { isBuyerDevPreview } from '@/lib/devPreview';
-import {
-  COMMENT_AUDIENCE_OPTIONS, CommentAudience, DEFAULT_INTERACTION_SETTINGS, InteractionSettings,
-  InteractionSettingsPatch, REMIX_AUDIENCE_OPTIONS, RemixAudience, activeSnoozeUntil, applyInteractionPatch,
-  commentAudienceLabel, peopleCountLabel, remixAudienceLabel, snoozeLabel,
-} from '@/lib/interactionSettings';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { useDisplayPrefs } from '@/contexts/DisplayPrefsContext';
 import { DisplayPrefs, TEXT_SIZE_OPTIONS, TextSize, textSizeLabel } from '@/lib/displayPrefs';
-import { TRANSLATION_LANGUAGES, translationLanguageName } from '@/lib/translation';
+
+const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = {
   label: string; sub?: string; icon?: IconName; toggle?: ToggleKey; value?: string; action?: () => void;
-  /** A switch backed by the server (account interaction settings), not the local buyer settings. */
+  /** A switch backed by the server (account display preferences), not the local buyer settings. */
   remoteToggle?: { value: boolean; onChange: (value: boolean) => void };
   secretTap?: () => void;
-};
-
-/** Server-backed values for the story, comments and sharing sections (GET /api/interaction-settings, blocks). */
-type Remote = {
-  interaction: InteractionSettings;
-  storyHiddenCount: number;
-  blockedCount: number;
-  pendingTagCount: number;
-  setInteraction: (patch: InteractionSettingsPatch) => void;
-  pickCommentAudience: () => void;
-  pickRemixAudience: () => void;
 };
 
 /** Account display preferences (GET/PATCH /api/display-preferences; local only in the signed-out preview). */
@@ -49,225 +33,104 @@ type Display = {
   prefs: DisplayPrefs;
   set: (patch: Partial<DisplayPrefs>) => void;
   pickTextSize: () => void;
-  pickTranslationLanguage: () => void;
 };
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>, remote?: Remote, display?: Display, extra?: { onVersionTap?: () => void }) => Item[] };
+type Config = { title: string; items: (s: BuyerSettingsState, router: ReturnType<typeof useRouter>, display: Display, extra: { onVersionTap?: () => void }) => Item[] };
 
-/** Sections whose rows show server-backed values. */
-const REMOTE_SECTIONS = new Set(['story', 'comments', 'sharing', 'tags', 'suggested']);
-
+/**
+ * The settings pages Settings and activity / Accounts Center link to. Every
+ * row is a control that really works, or opens the screen that does it.
+ * Read receipts, activity status and message requests live on Privacy (the
+ * server-backed switches), so Messages only links there.
+ */
 const CONFIG: Record<string, Config> = {
-  // Item 110: rows open the real Your Activity / search history screens.
-  // Time spent was listed here but is not tracked, so it is not promised.
-  activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: (_s, router) => [
-    { label: 'Likes', icon: 'heart', action: () => router?.push('/buyer-your-activity' as never) }, { label: 'Comments', icon: 'message-square', action: () => router?.push('/buyer-your-activity' as never) }, { label: 'Story replies', icon: 'corner-up-left' }, { label: 'Search history', icon: 'search', action: () => router?.push('/buyer-search-history' as never) }, { label: 'Links you visited', icon: 'link' }, { label: 'Recently deleted', icon: 'trash-2' },
-  ]},
-  archive: { title: 'Archive', items: () => [{ label: 'Posts archive', icon: 'grid' }, { label: 'Stories archive', icon: 'clock' }, { label: 'Live archive', icon: 'video' }] },
-  qr: { title: 'QR code', intro: 'Your unique profile code. Share it so people can find you on Brandthread.', items: (_s, router) => [{ label: 'Share QR code', icon: 'share-2', action: () => router?.push('/buyer-qr-code' as never) }] },
-  'close-friends': { title: 'Close Friends', intro: 'Only people you add can see Close Friends stories and posts.', items: (_s, router) => [{ label: 'Manage close friends', icon: 'user-plus', action: () => router?.push('/buyer-close-friends' as never) }] },
-  story: { title: 'Story and live', items: (s, router, r) => [{ label: 'Allow story replies', icon: 'message-circle', value: s.storyReplies }, { label: 'Allow sharing to messages', toggle: 'storySharing' }, ...(r ? [{ label: 'Hide story from people', icon: 'eye-off' as const, value: peopleCountLabel(r.storyHiddenCount), action: () => router?.push('/buyer-story-hidden' as never) }] : []), { label: 'Close Friends', icon: 'star', action: () => router?.push('/buyer-close-friends' as never) }] },
-  messages: { title: 'Messages and story replies', items: s => [{ label: 'Message requests', toggle: 'messageRequests' }, { label: 'Read receipts', toggle: 'readReceipts' }, { label: 'Show activity status', toggle: 'activityStatus' }, { label: 'Who can add you to groups', value: s.groupAdds }, { label: 'Story replies', value: s.storyReplies }] },
-  tags: { title: 'Tags and mentions', items: (s, router, r) => [{ label: 'Who can mention you', value: s.allowMentions }, { label: 'Who can tag you', value: s.allowTags }, ...(r ? [{ label: 'Manually approve tags', remoteToggle: { value: r.interaction.manualTagApproval, onChange: (v: boolean) => r.setInteraction({ manualTagApproval: v }) } }, { label: 'Pending tags', value: String(r.pendingTagCount), action: () => router?.push('/buyer-pending-tags' as never) }] : [])] },
-  comments: { title: 'Comments', items: (_s, router, r) => [...(r ? [{ label: 'Allow comments from', value: commentAudienceLabel(r.interaction.commentAudience), action: r.pickCommentAudience }, { label: 'Block comments from', value: peopleCountLabel(r.blockedCount), action: () => router?.push('/buyer-blocked' as never) }] : []), { label: 'Hide offensive comments', icon: 'shield', action: () => router?.push('/hidden-words' as never) }, { label: 'Filter specific words', icon: 'filter', action: () => router?.push('/hidden-words-custom' as never) }] },
-  sharing: { title: 'Sharing and remixes', items: (s, _router, r) => [{ label: 'Allow people to share your posts to stories', toggle: 'storySharing' }, ...(r ? [{ label: 'Allow reposts', remoteToggle: { value: r.interaction.allowReposts, onChange: (v: boolean) => r.setInteraction({ allowReposts: v }) } }, { label: 'Allow remixes of videos', value: remixAudienceLabel(r.interaction.remixAudience), action: r.pickRemixAudience }, { label: 'Allow downloads of your content', remoteToggle: { value: r.interaction.allowDownloads, onChange: (v: boolean) => r.setInteraction({ allowDownloads: v }) } }] : [])] },
-  'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: s => [{ label: 'Hide offensive comments', toggle: 'hiddenWords' }, { label: 'Advanced comment filtering', toggle: 'hiddenWords' }, { label: 'Custom words and phrases', value: 'Manage list' }] },
-  muted: { title: 'Muted accounts', items: () => [{ label: 'No muted accounts', sub: 'People you mute will appear here.', icon: 'volume-x' }] },
-  restricted: { title: 'Restricted accounts', items: () => [{ label: 'No restricted accounts', sub: 'Restricted people cannot see when you are online or when you read their messages.', icon: 'user-x' }] },
-  favorites: { title: 'Favorites', intro: 'Follow sellers and brands to see more from them in Discover.', items: () => [] },
-  content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
-  suggested: { title: 'Suggested content', items: (s, _router, r) => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, ...(r ? [{ label: 'Snooze suggested posts', sub: 'Show only accounts you follow in your feed for 30 days', value: snoozeLabel(r.interaction.suggestedSnoozedUntil), action: () => r.setInteraction({ snoozeSuggested: !activeSnoozeUntil(r.interaction.suggestedSnoozedUntil) }) }] : []), { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
-  payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
-  notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: (s, router) => [
-    { label: 'New drops', sub: 'Drops from sellers you follow', toggle: 'dropAlerts' },
-    { label: 'Messages', sub: 'New direct messages and replies', toggle: 'messageNotifications' },
-    { label: 'Order updates', sub: 'Shipping, delivery, returns, and refunds', toggle: 'orderUpdates' },
-    { label: 'Friend activity', sub: 'Requests, follows, and social activity', toggle: 'friendActivity' },
-    { label: 'Email & in-app', sub: 'Choose what reaches your inbox and your activity feed', icon: 'mail', action: () => router?.push('/notification-channels' as never) },
-  ] },
-  accessibility: { title: 'Accessibility', items: (s, _router, _r, d) => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, ...(d ? [{ label: 'Text size', value: textSizeLabel(d.prefs.textSize), action: d.pickTextSize }, { label: 'High contrast icons', remoteToggle: { value: d.prefs.highContrastIcons, onChange: (v: boolean) => d.set({ highContrastIcons: v }) } }] : [])] },
-  language: { title: 'Language', items: (s, _router, _r, d) => [{ label: 'App language', value: s.language }, ...(d ? [{ label: 'Translation language', value: translationLanguageName(d.prefs.translationLanguage), action: d.pickTranslationLanguage }, { label: 'Auto-translate captions', remoteToggle: { value: d.prefs.autoTranslateCaptions, onChange: (v: boolean) => d.set({ autoTranslateCaptions: v }) } }] : [])] },
-  media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
-  appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
-  'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
-  about: { title: 'About Brandthread', items: (_s, router, _remote, _display, extra) => [{ label: 'App version', value: APP_VERSION_LABEL, secretTap: extra?.onVersionTap }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Privacy policy', icon: 'lock', action: () => router?.push('/privacy' as never) }, { label: 'Refund policy', icon: 'rotate-ccw', action: () => router?.push('/refund-policy' as never) }, { label: 'Seller agreement', icon: 'briefcase', action: () => router?.push('/seller-agreement' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
-};
-
-// ─── Sections that only had device-only or dead rows (QA audit) ─────────────
-// Read receipts, activity status, message requests, personalized
-// recommendations, sensitive content, hide-like-counts, comment filtering,
-// autofill and "reset" rows were saved on this device only (or did nothing)
-// and the server never applied them. Each section now lists only controls
-// that really work, each opening the screen that does it.
-Object.assign(CONFIG, {
-  messages: { title: 'Messages and story replies', items: (_s, router) => [
-    { label: 'Who can message you', icon: 'message-circle', action: () => router?.push('/buyer-privacy-settings' as never) },
-    { label: 'Blocked accounts', icon: 'slash', action: () => router?.push('/buyer-blocked' as never) },
+  messages: { title: 'Messages', items: (_s, router) => [
+    { label: 'Who can message you', icon: 'message-circle', action: () => router.push('/buyer-privacy-settings' as never) },
+    { label: 'Blocked accounts', icon: 'slash', action: () => router.push('/buyer-blocked' as never) },
   ] },
   content: { title: 'Content preferences', items: (_s, router) => [
-    { label: 'Hidden words', sub: 'Hide posts and comments with words you choose', icon: 'filter', action: () => router?.push('/muted-words' as never) },
-    { label: 'Muted accounts', icon: 'volume-x', action: () => router?.push('/buyer-muted' as never) },
+    { label: 'Hidden words', sub: 'Hide posts and comments with words you choose', icon: 'filter', action: () => router.push('/muted-words' as never) },
+    { label: 'Muted accounts', icon: 'volume-x', action: () => router.push('/buyer-muted' as never) },
   ] },
-  suggested: { title: 'Suggested content', items: (_s, router) => [
-    { label: 'Hidden words', sub: 'Hide posts and comments with words you choose', icon: 'filter', action: () => router?.push('/muted-words' as never) },
+  accessibility: { title: 'Accessibility', items: (_s, _router, d) => [
+    { label: 'Reduce motion', toggle: 'reduceMotion' },
+    { label: 'Always show captions', toggle: 'captions' },
+    { label: 'Text size', value: textSizeLabel(d.prefs.textSize), action: d.pickTextSize },
+    { label: 'High contrast icons', remoteToggle: { value: d.prefs.highContrastIcons, onChange: (v: boolean) => d.set({ highContrastIcons: v }) } },
   ] },
-  'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: (_s, router) => [
-    { label: 'Custom words and phrases', icon: 'filter', action: () => router?.push('/muted-words' as never) },
+  about: { title: 'About Brandthread', items: (_s, router, _d, extra) => [
+    { label: 'App version', value: APP_VERSION_LABEL, secretTap: extra.onVersionTap },
+    { label: 'Terms of service', icon: 'file-text', action: () => router.push('/terms' as never) },
+    { label: 'Community guidelines', icon: 'users', action: () => router.push('/community-guidelines' as never) },
+    { label: 'Privacy policy', icon: 'shield', action: () => router.push('/privacy' as never) },
   ] },
-  payments: { title: 'Addresses and payments', items: (_s, router) => [
-    { label: 'Shipping addresses', icon: 'map-pin', action: () => router?.push('/buyer-addresses' as never) },
-    { label: 'Payment methods', icon: 'credit-card', action: () => router?.push('/buyer-payment-methods' as never) },
-  ] },
-  'privacy-center': { title: 'Privacy Center', items: (_s, router) => [
-    { label: 'Privacy policy', icon: 'file-text', action: () => router?.push('/privacy' as never) },
-    { label: 'Download my data', icon: 'download', action: () => router?.push('/buyer-download-data' as never) },
-  ] },
-  about: { title: 'About Brandthread', items: (_s, router, _remote, _display, extra) => [
-    { label: 'App version', value: APP_VERSION_LABEL, secretTap: extra?.onVersionTap },
-    { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) },
-    { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) },
-    { label: 'Privacy policy', icon: 'shield', action: () => router?.push('/privacy' as never) },
-  ] },
-} satisfies Partial<Record<string, Config>>);
+};
 
 export default function BuyerSettingsDetail() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { section = 'content' } = useLocalSearchParams<{ section?: string }>();
   const router = useRouter(); const insets = useSafeAreaInsets();
-  const api = useApi();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [interaction, setInteractionState] = useState<InteractionSettings | null>(null);
-  const [storyHiddenCount, setStoryHiddenCount] = useState(0);
-  const [blockedCount, setBlockedCount] = useState(0);
-  const [pendingTagCount, setPendingTagCount] = useState(0);
-  const [audienceSheet, setAudienceSheet] = useState(false);
-  const [remixSheet, setRemixSheet] = useState(false);
   const [textSizeSheet, setTextSizeSheet] = useState(false);
-  const [translationSheet, setTranslationSheet] = useState(false);
   const displayPrefs = useDisplayPrefs();
   const updateDisplayPrefs = displayPrefs.update;
   const display = useMemo<Display>(() => ({
     prefs: displayPrefs.prefs,
-    set: (patch) => { updateDisplayPrefs(patch).catch(() => Alert.alert('Could not update setting', 'Try again.')); },
+    set: (patch) => { updateDisplayPrefs(patch).catch((err) => showAlert('Couldn’t update setting', friendlyError(err, 'Try again.'))); },
     pickTextSize: () => setTextSizeSheet(true),
-    pickTranslationLanguage: () => setTranslationSheet(true),
   }), [displayPrefs.prefs, updateDisplayPrefs]);
-  const cfg = CONFIG[section] ?? CONFIG.content;
-  const previewOnly = isBuyerDevPreview();
+  const cfg: Config | undefined = Object.prototype.hasOwnProperty.call(CONFIG, section) ? CONFIG[section] : undefined;
   const load = useCallback(async () => {
     setLoadError(false);
     try {
-      if (REMOTE_SECTIONS.has(section)) {
-        if (previewOnly) {
-          // Signed-out web preview: never call protected APIs; a fresh account's values, edited locally.
-          setInteractionState(prev => prev ?? { ...DEFAULT_INTERACTION_SETTINGS });
-        } else {
-          const [remote, blocks] = await Promise.all([
-            api.interactionSettings.get(),
-            section === 'comments' ? api.social.blocks() : Promise.resolve(null),
-          ]);
-          setInteractionState(remote.settings);
-          setStoryHiddenCount(remote.storyHiddenCount);
-          setPendingTagCount(remote.pendingTagCount ?? 0);
-          if (blocks) setBlockedCount(blocks.length);
-        }
-      }
-      const local = await loadBuyerSettings();
-      if (section === 'notifications') {
-        const remote = await api.notificationPrefs.get();
-        local.dropAlerts = remote.categories.new_drops ?? true;
-        local.messageNotifications = remote.categories.messages ?? true;
-        local.orderUpdates = remote.categories.order_updates ?? true;
-        local.friendActivity = remote.categories.friend_activity ?? true;
-        await patchBuyerSettings(local);
-      }
-      setSettings(local);
+      setSettings(await loadBuyerSettings());
     } catch (error) {
       setLoadError(true);
       reportNetworkError(error, () => load());
     } finally {
       setLoading(false);
     }
-  }, [api, section, previewOnly]);
-  // Reloads on focus so counts edited on the hidden-story or blocked screens are current.
+  }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  const setInteraction = useCallback(async (patch: InteractionSettingsPatch) => {
-    const prior = interaction;
-    if (!prior) return;
-    setInteractionState(applyInteractionPatch(prior, patch));
-    if (previewOnly) return;
-    try {
-      const { settings: saved } = await api.interactionSettings.update(patch);
-      setInteractionState(saved);
-    } catch {
-      setInteractionState(prior);
-      Alert.alert('Could not update setting', 'Try again.');
-    }
-  }, [api, interaction, previewOnly]);
-  const remote = useMemo<Remote | undefined>(() => interaction ? {
-    interaction, storyHiddenCount, blockedCount, pendingTagCount, setInteraction,
-    pickCommentAudience: () => setAudienceSheet(true),
-    pickRemixAudience: () => setRemixSheet(true),
-  } : undefined, [interaction, storyHiddenCount, blockedCount, pendingTagCount, setInteraction]);
   const toggle = useCallback(async (key: ToggleKey, value: boolean) => {
     const prior = settings;
     if (prior) setSettings({ ...prior, [key]: value });
     try {
-      if (section === 'notifications') {
-        const category = {
-          dropAlerts: 'new_drops',
-          messageNotifications: 'messages',
-          orderUpdates: 'order_updates',
-          friendActivity: 'friend_activity',
-        }[key as string];
-        if (category) await api.notificationPrefs.update({ categories: { [category]: value } });
-      }
       const next = await patchBuyerSettings({ [key]: value } as Partial<BuyerSettingsState>);
       setSettings(next);
-    } catch {
+    } catch (err) {
       setSettings(prior);
-      Alert.alert('Could not update setting', 'Try again.');
+      showAlert('Couldn’t update setting', friendlyError(err, 'Try again.'));
     }
-  }, [api, section, settings]);
+  }, [settings]);
   const onVersionTap = useInternalDevMenuGesture();
-  const [sensitivePicker, setSensitivePicker] = useState(false);
-  const resetRecommendations = useCallback(() => {
-    if (previewOnly) {
-      Alert.alert('Sign in to reset recommendations', 'Your recommendations follow your account.');
-      return;
-    }
-    Alert.alert('Reset recommendations?', 'Your feed will learn from what you watch next.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => {
-        void api.meSettings.resetRecommendations()
-          .then(() => Alert.alert('Recommendations reset'))
-          .catch(() => Alert.alert("Couldn't reset recommendations", 'Try again.'));
-      } },
-    ]);
-  }, [api, previewOnly]);
-  const items = useMemo(() => settings ? cfg.items(settings, router, remote, display, { onVersionTap }).map(item =>
-    item.label === 'Sensitive content' ? { ...item, action: () => setSensitivePicker(true) }
-      : /^Reset (suggested content|recommendations)$/.test(item.label) ? { ...item, action: resetRecommendations } : item
-  ) : [], [cfg, settings, router, remote, display, onVersionTap, resetRecommendations]);
+  const items = useMemo(() => settings && cfg ? cfg.items(settings, router, display, { onVersionTap }) : [], [cfg, settings, router, display, onVersionTap]);
+
+  if (!cfg) {
+    // Unknown ?section= (old or mistyped deep link): say so instead of showing another page.
+    return <View style={styles.page}>
+      <ScreenHeader title="Settings" variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
+      <ErrorState message="This settings page doesn’t exist." retryLabel="Back to settings" onRetry={() => goBackOr(router, '/buyer-settings')} />
+    </View>;
+  }
 
   return <View style={styles.page}>
     <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
-      {!loading && loadError && !settings ? <ErrorState message="Couldn't load your settings." onRetry={() => { setLoading(true); load(); }} /> : null}
+      {!loading && loadError && !settings ? <ErrorState message="Couldn’t load your settings." onRetry={() => { setLoading(true); load(); }} /> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
-        const isActionable = !!item.toggle || !!item.remoteToggle || !!item.action;
+        // Value-only rows (App version) are read-only: plain text, no press state, no dimming.
         const row = <ListRow
             icon={item.icon}
             title={item.label}
-            subtitle={section === 'notifications' ? undefined : item.sub}
+            subtitle={item.sub}
             value={!item.toggle && !item.remoteToggle ? item.value : undefined}
             chevron={!item.toggle && !item.remoteToggle && !!item.action}
-            toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : item.remoteToggle}
-            onPress={isActionable && item.action ? item.action : undefined}
-            disabled={!isActionable}
+            toggle={item.toggle ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : item.remoteToggle}
+            onPress={item.action}
           />;
         return <React.Fragment key={`${item.label}-${i}`}>
           {item.secretTap ? <Pressable onPress={item.secretTap} accessible={false}>{row}</Pressable> : row}
@@ -275,22 +138,6 @@ export default function BuyerSettingsDetail() {
         </React.Fragment>;
       })}</Card> : null}
     </ScrollView>
-    {interaction ? <OptionSheet
-      visible={audienceSheet}
-      onClose={() => setAudienceSheet(false)}
-      title="Allow comments from"
-      options={COMMENT_AUDIENCE_OPTIONS}
-      selectedId={interaction.commentAudience}
-      onSelect={(id) => { setAudienceSheet(false); void setInteraction({ commentAudience: id as CommentAudience }); }}
-    /> : null}
-    {interaction ? <OptionSheet
-      visible={remixSheet}
-      onClose={() => setRemixSheet(false)}
-      title="Allow remixes of videos"
-      options={REMIX_AUDIENCE_OPTIONS}
-      selectedId={interaction.remixAudience}
-      onSelect={(id) => { setRemixSheet(false); void setInteraction({ remixAudience: id as RemixAudience }); }}
-    /> : null}
     <OptionSheet
       visible={textSizeSheet}
       onClose={() => setTextSizeSheet(false)}
@@ -299,35 +146,11 @@ export default function BuyerSettingsDetail() {
       selectedId={display.prefs.textSize}
       onSelect={(id) => { setTextSizeSheet(false); display.set({ textSize: id as TextSize }); }}
     />
-    <OptionSheet
-      visible={translationSheet}
-      onClose={() => setTranslationSheet(false)}
-      title="Translation language"
-      options={TRANSLATION_LANGUAGES.map(l => ({ id: l.code, label: l.name, description: l.nativeName }))}
-      selectedId={display.prefs.translationLanguage}
-      onSelect={(id) => { setTranslationSheet(false); display.set({ translationLanguage: id }); }}
-    />
-    {settings ? <OptionSheet
-      visible={sensitivePicker}
-      onClose={() => setSensitivePicker(false)}
-      title="Sensitive content"
-      options={[
-        { id: 'less', label: 'Less', description: 'See less sensitive content' },
-        { id: 'standard', label: 'Standard', description: 'The default for most people' },
-        { id: 'more', label: 'More', description: 'See more sensitive content' },
-      ]}
-      selectedId={settings.sensitiveContent}
-      onSelect={(id) => {
-        setSensitivePicker(false);
-        void patchBuyerSettings({ sensitiveContent: id as BuyerSettingsState['sensitiveContent'] })
-          .then(setSettings).catch(() => Alert.alert('Could not update setting', 'Try again.'));
-      }}
-    /> : null}
   </View>;
 }
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
-  intro: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19, marginBottom: SP.md },
+  intro: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginBottom: SP.md },
   card: { padding: 0, paddingHorizontal: SP.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });

@@ -8,8 +8,8 @@
  * + title, a search field, then one flat scrolling list under small grey
  * section headers in Instagram's order — Your account, How you use
  * Brandthread, Who can see your content, How others can interact with you,
- * What you see, Your app and media, Your orders and payments, For
- * professionals, More info and support — and Log out in red under Login.
+ * What you see, Your app & media, Your orders & payments, For
+ * professionals, More info & support — and Log out in red under Login.
  * Rows: leading icon, title, optional quiet value, chevron. Accounts Center is
  * the only row with a second line, as on Instagram.
  *
@@ -59,6 +59,8 @@ import { useJoinedCommunities } from '@/lib/communities/useCommunityClient';
 import { collectAppDiagnostics, formatAppVersion } from '@/lib/appDiagnostics';
 import { useDisplayCurrency } from '@/lib/displayCurrency';
 import { useApi } from '@/lib/api';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 const APP_VERSION_LABEL = formatAppVersion(collectAppDiagnostics());
 
@@ -100,11 +102,12 @@ export default function BuyerSettingsScreen() {
     try {
       await signOut();
       router.replace('/sign-in' as never);
-    } catch {
-      // stay signed in; the sheet closes below
+    } catch (err) {
+      // Still signed in: close the sheet and say so instead of failing silently.
+      setSignOutVisible(false);
+      showAlert('Couldn’t log out', friendlyError(err, 'Something went wrong. Try again.'));
     } finally {
       setSigningOut(false);
-      setSignOutVisible(false);
     }
   }
 

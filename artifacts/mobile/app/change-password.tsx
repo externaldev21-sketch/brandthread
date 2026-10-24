@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SecurityBody, SecurityField, SecurityIntro, SecurityErrorBox, SecuritySuccess } from '@/components/security/SecurityFormKit';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { mapSecurityError, validatePasswordChange } from '@/lib/accountSecurityErrors';
+import { SP } from '@/lib/theme';
 
 export default function ChangePassword() {
   const router = useRouter();
@@ -113,7 +114,7 @@ export default function ChangePassword() {
         onSubmitEditing={save}
       />
 
-      <Card style={{ padding: 0, marginTop: 20, paddingHorizontal: 16 }}>
+      <Card style={{ padding: 0, marginTop: 20, paddingHorizontal: SP.md }}>
         <ListRow
           icon="smartphone"
           title="Sign out other devices"
@@ -131,7 +132,7 @@ export default function ChangePassword() {
         onPress={save}
         loading={saving}
         fullWidth
-        style={{ marginTop: 16 }}
+        style={{ marginTop: SP.md }}
       />
       {hasPassword ? (
         <Button
@@ -139,7 +140,7 @@ export default function ChangePassword() {
           variant="tertiary"
           size="small"
           onPress={() => router.push('/forgot-password' as never)}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: SP.sm }}
         />
       ) : null}
         </>)}

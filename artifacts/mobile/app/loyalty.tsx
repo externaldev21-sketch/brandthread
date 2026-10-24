@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator } from 'react-native';
+  StyleSheet, ActivityIndicator } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,9 +16,14 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { formatMoney } from '@/lib/format';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { REFERRAL_GET_CENTS, REFERRAL_JOIN_POINTS, REFERRAL_MIN_ORDER_CENTS } from '@/lib/referralCopy';
+import {
+  LOYALTY_MIN_REDEEM_POINTS, LOYALTY_SIGNUP_POINTS, checkRedeemPoints, loyaltyPointsToCents,
+} from '@/lib/loyaltyTerms';
 
 type PointEntry = {
   id: string;
@@ -56,12 +61,11 @@ export default function LoyaltyScreen() {
   const [balance,     setBalance]     = useState(0);
   const [history,     setHistory]     = useState<PointEntry[]>([]);
   const [redeemPts,   setRedeemPts]   = useState('');
-  const [redeeming,   setRedeeming]   = useState(false);
   // A failed fetch must never render as a genuine "0 points" balance — track
   // it separately so a real outage shows a retry row instead of a fake zero.
   const [loadError,   setLoadError]   = useState(false);
 
-  const valueCents = Math.floor(balance);   // 100 pts = $1.00 = 100 cents
+  const valueCents = loyaltyPointsToCents(balance);   // 100 pts = $1.00 (lib/loyaltyTerms.ts)
 
   const load = useCallback(() => {
     setLoading(true);
@@ -98,23 +102,19 @@ export default function LoyaltyScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function handleRedeem() {
-    const pts = parseInt(redeemPts, 10);
-    if (!pts || pts < 100) {
-      Alert.alert('Minimum 100 points', 'You need at least 100 points to redeem ($1.00 off).'); return;
-    }
-    if (pts > balance) {
-      Alert.alert('Not enough points', `You only have ${balance.toLocaleString()} points.`); return;
-    }
+  // The entered points drive everything below: the "= $X off" preview, the
+  // button's enabled state, the helper line, and the points handed to the cart.
+  const redeemCheck = checkRedeemPoints(redeemPts, balance);
+  const canRedeem = redeemCheck.ok;
+
+  function handleRedeem() {
+    if (!redeemCheck.ok) return;
     // Redemptions are deliberately created in the cart, where they are
     // persisted with the checkout session and applied to Stripe immediately.
     // Never mint a detached code here: it could be lost before checkout.
-    router.navigate({ pathname: '/(buyer)/cart', params: { redeemPoints: String(pts) } } as never);
+    // The cart prefills its points field with this number.
+    router.navigate({ pathname: '/(buyer)/cart', params: { redeemPoints: String(redeemCheck.points) } } as never);
   }
-
-  // Never more than the balance, and never a number formatCents can't take
-  // (it throws above Number.MAX_SAFE_INTEGER — a long paste crashed the screen).
-  const previewDiscount = Math.min(parseInt(redeemPts, 10) || 0, balance);
 
   if (loading) {
     return (
@@ -142,7 +142,7 @@ export default function LoyaltyScreen() {
     <View style={s.root}>
       <ScreenHeader title="Rewards" />
 
-      <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
 
         {/* Balance hero */}
         <View style={[s.heroCard, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -163,8 +163,8 @@ export default function LoyaltyScreen() {
         <Text style={s.sectionLabel}>HOW TO EARN</Text>
         {[
           { icon: 'shopping-bag' as const, title: '1 point per $1 spent',  sub: 'Automatically earned on every completed purchase' },
-          { icon: 'users'        as const, title: '500 pts per referral',  sub: 'When a friend joins with your invite. You also get $5 Thread Cash after their first order of $10 or more' },
-          { icon: 'gift'         as const, title: '100 pts on sign-up',    sub: 'One-time welcome bonus for new members' },
+          { icon: 'users'        as const, title: `${REFERRAL_JOIN_POINTS} pts per referral`,  sub: `When a friend joins with your invite. You also get ${formatMoney(REFERRAL_GET_CENTS)} Thread Cash after their first order of ${formatMoney(REFERRAL_MIN_ORDER_CENTS)} or more` },
+          { icon: 'gift'         as const, title: `${LOYALTY_SIGNUP_POINTS} pts on sign-up`,    sub: 'One-time welcome bonus for new members' },
         ].map((item, i) => (
           <View key={i} style={s.earnCard}>
             <View style={[s.earnIconWrap, { backgroundColor: theme.accentDim }]}>
@@ -180,41 +180,40 @@ export default function LoyaltyScreen() {
         {/* Redeem */}
         <Text style={[s.sectionLabel, { marginTop: SP.lg }]}>REDEEM POINTS</Text>
         <View style={s.redeemCard}>
-          <Text style={s.redeemLabel}>Points to redeem (min 100)</Text>
+          <Text style={s.redeemLabel}>Points to redeem (min {LOYALTY_MIN_REDEEM_POINTS})</Text>
           <View style={s.redeemRow}>
             <TextInput returnKeyType="done"
               style={s.redeemInput}
               value={redeemPts}
               onChangeText={(v) => setRedeemPts(v.replace(/\D/g, '').slice(0, 7))}
-              placeholder="100"
+              placeholder={String(LOYALTY_MIN_REDEEM_POINTS)}
               placeholderTextColor={theme.muted}
               keyboardType="number-pad"
               maxLength={7}
             />
-            {previewDiscount >= 100 && (
+            {redeemCheck.ok && (
               <View style={s.discountPreview}>
-                <Text style={s.discountPreviewText}>= {formatCents(previewDiscount)} off</Text>
+                <Text style={s.discountPreviewText} testID="loyalty-redeem-preview">= {formatCents(redeemCheck.discountCents)} off</Text>
               </View>
             )}
           </View>
           <TouchableOpacity
-            style={[s.redeemBtn, { backgroundColor: theme.accent }, (redeeming || balance < 100) && { backgroundColor: FILL_ELEVATED }]}
+            style={[s.redeemBtn, { backgroundColor: theme.accent }, !canRedeem && { backgroundColor: FILL_ELEVATED }]}
             onPress={handleRedeem}
-            disabled={redeeming || balance < 100}
+            disabled={!canRedeem}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Use points in cart"
-            accessibilityState={{ disabled: redeeming || balance < 100 }}
+            accessibilityLabel={redeemCheck.ok ? `Use ${redeemCheck.points.toLocaleString()} points in cart` : 'Use points in cart'}
+            accessibilityState={{ disabled: !canRedeem }}
+            testID="loyalty-redeem-button"
           >
-             {redeeming
-               ? <ActivityIndicator color={TEXT_DISABLED} size="small" />
-               : <Text style={[s.redeemBtnText, { color: theme.onAccent }, balance < 100 && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
-            }
+            <Text style={[s.redeemBtnText, { color: theme.onAccent }, !canRedeem && { color: TEXT_DISABLED }]}>Use points in Cart</Text>
           </TouchableOpacity>
-          <Text style={s.redeemDisabledNote}>Choose your points in your cart when you’re ready to check out.</Text>
-          {balance < 100 && (
-            <Text style={s.redeemDisabledNote}>You need at least 100 points to redeem.</Text>
-          )}
+          <Text style={s.redeemDisabledNote} testID="loyalty-redeem-helper">
+            {redeemCheck.ok
+              ? `${redeemCheck.points.toLocaleString()} points will be ready to apply in your cart.`
+              : redeemCheck.message ?? `Enter at least ${LOYALTY_MIN_REDEEM_POINTS} points to use in your cart.`}
+          </Text>
         </View>
 
         {/* History */}
@@ -262,15 +261,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const SUCCESS_DIM = `${SUCCESS}20`;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-
   heroCard:       { margin: SP.md, padding: SP.xl, borderWidth: 1, borderRadius: RADIUS.xl, alignItems: 'center' },
   heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: SP.xs },
   heroBalance:    { fontVariant: ['tabular-nums'],  fontSize: FS.h1, fontFamily: FONT.bold, color: FG, lineHeight: 42 },
   heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
-  heroValuePill:  { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
+  heroValuePill:  { borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
   heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },
   heroEmpty:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
 
@@ -288,11 +283,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8, flexShrink: 0 },
   discountPreviewText:{ fontSize: FS.sm, fontFamily: FONT.bold, color: SUCCESS },
   redeemBtn:          { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14, minHeight: 48 },
-   redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold },
+  redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold },
   redeemDisabledNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xs },
 
   historyRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginHorizontal: SP.md, marginBottom: SP.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, padding: SP.md },
-  historyIcon:  { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  historyIcon:  { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 1 },
   historyNote:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: 2 },
   historyDate:  { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },

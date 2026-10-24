@@ -11,7 +11,6 @@ import {
   interpolate,
   runOnJS,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -19,6 +18,7 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import {
   SHEET_CLOSE_MS, SHEET_EASING, SHEET_OFFSCREEN_Y, SHEET_RUBBER_BAND_LIMIT, SHEET_SPRING,
 } from '@/constants/motion';
@@ -74,8 +74,9 @@ export function useSheetTransition(
   // which is 0 before first layout) with the SHEET_OFFSCREEN_Y floor, so a
   // very short window still gets comfortable offscreen clearance.
   const closeDistance = opts?.closeDistance ?? Math.max(Dimensions.get('window').height, SHEET_OFFSCREEN_Y);
-  const systemReduceMotion = useReducedMotion();
-  const reduceMotion = !!opts?.reduceMotion || systemReduceMotion;
+  // Buyer "Reduce motion" setting OR the OS setting (hooks/useReduceMotion).
+  const appReduceMotion = useReduceMotion();
+  const reduceMotion = !!opts?.reduceMotion || appReduceMotion;
   const haptics = opts?.haptics !== false;
   const detents = opts?.detents;
   const halfOffset = detents

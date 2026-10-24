@@ -7,7 +7,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  * under the `&demo=1` dev preview. Buyers' own Thread Cash: the seller cash-out
  * ledger is thread-cash-history.tsx.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -49,9 +49,15 @@ export default function ThreadCashLedgerScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
+  const [moreError, setMoreError] = useState(false);
+  // Only the latest filter's response may land: a slow answer for the old
+  // pill must never paint its rows under the new one.
+  const requestSeq = useRef(0);
 
   const load = useCallback(async (kind: ThreadCashLedgerKind | null) => {
+    const seq = ++requestSeq.current;
     setError(false);
+    setMoreError(false);
     // Dev web preview has no signed-in user: never call the protected API.
     if (isBuyerDevPreview() || isSellerDevPreview()) {
       setData(isPreviewDemoMode() ? demoLedger(kind) : EMPTY);
@@ -59,11 +65,17 @@ export default function ThreadCashLedgerScreen() {
       return;
     }
     try {
-      setData(await api.threadCash.ledger({ kind: kind ?? undefined }));
+      const next = await api.threadCash.ledger({ kind: kind ?? undefined });
+      if (seq !== requestSeq.current) return;
+      setData(next);
     } catch {
+      if (seq !== requestSeq.current) return;
+      // Drop the previous filter's rows (the balance stays) so nothing reads
+      // as this filter's activity, and show a retry for this filter.
+      setData((prev) => (prev ? { ...prev, rows: [], hasMore: false } : prev));
       setError(true);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }, [api]);
 
@@ -72,17 +84,28 @@ export default function ThreadCashLedgerScreen() {
   const loadMore = useCallback(async () => {
     if (!data?.hasMore || loadingMore) return;
     setLoadingMore(true);
+    setMoreError(false);
+    const seq = requestSeq.current;
     try {
       const next = await api.threadCash.ledger({ kind: filter ?? undefined, offset: data.rows.length });
+      if (seq !== requestSeq.current) return;
       setData({ ...data, rows: [...data.rows, ...next.rows], hasMore: next.hasMore });
     } catch {
-      // The rows already shown stay; the next tap retries.
+      // The rows already shown stay; an inline retry row replaces the button.
+      if (seq === requestSeq.current) setMoreError(true);
     } finally {
       setLoadingMore(false);
     }
   }, [api, data, filter, loadingMore]);
 
-  const pick = (kind: ThreadCashLedgerKind | null) => { setFilter(kind); setLoading(true); };
+  const pick = (kind: ThreadCashLedgerKind | null) => {
+    if (kind === filter) return;
+    setFilter(kind);
+    setLoading(true);
+    setError(false);
+    // Clear the old filter's rows right away; the balance hero stays.
+    setData((prev) => (prev ? { ...prev, rows: [], hasMore: false } : prev));
+  };
   const soon = data?.expiringSoon;
   const groups = useMemo(() => groupLedgerByMonth(data?.rows ?? []), [data?.rows]);
 
@@ -144,8 +167,14 @@ export default function ThreadCashLedgerScreen() {
           <View style={{ padding: SP.md, gap: SP.sm }}>
             {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} width="100%" height={56} radius={RADIUS.sm} />)}
           </View>
-        ) : error && !data ? (
-          <View style={{ padding: SP.md }}><RetryRow label="Couldn't load your ledger" onRetry={() => void load(filter)} /></View>
+        ) : error ? (
+          <View style={{ padding: SP.md }}>
+            <RetryRow
+              label={filter ? "Couldn't load this filter" : "Couldn't load your ledger"}
+              onRetry={() => { setLoading(true); void load(filter); }}
+              testID="thread-cash-ledger-retry"
+            />
+          </View>
         ) : (
           <>
             {soon && soon.buckets.length > 0 ? (
@@ -176,7 +205,11 @@ export default function ThreadCashLedgerScreen() {
                 {g.rows.map((row, i) => renderRow(row, i === g.rows.length - 1))}
               </View>
             ))}
-            {data?.hasMore ? (
+            {data?.hasMore && moreError && !loadingMore ? (
+              <View style={{ paddingHorizontal: SP.md, marginTop: SP.sm }}>
+                <RetryRow label="Couldn't load more" onRetry={() => void loadMore()} testID="thread-cash-ledger-more-retry" />
+              </View>
+            ) : data?.hasMore ? (
               <Pressable onPress={() => void loadMore()} style={styles.more} accessibilityRole="button">
                 {loadingMore ? <ActivityIndicator color={theme.muted} /> : <Text style={[styles.pillText, { color: theme.text }]}>Show more</Text>}
               </Pressable>

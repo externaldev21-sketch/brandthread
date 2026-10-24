@@ -19,7 +19,7 @@ import {
   type LegalDocId,
 } from '@/content/legal';
 import { radius, nestedRadius } from '@/constants/radii';
-import { FONT } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 export type { LegalSection } from '@/content/legal';
 
@@ -29,7 +29,8 @@ interface LegalDocumentProps {
 
 /**
  * Renders one of the legal documents from content/legal.ts — the single
- * source for the Terms of Service, Privacy Policy and Community Guidelines.
+ * source for the Terms of Service, Privacy Policy, Community Guidelines,
+ * Seller Agreement and Refund Policy.
  */
 export default function LegalDocument({ docId }: LegalDocumentProps) {
   const router = useRouter();
@@ -144,7 +145,7 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
         </View>
 
         <Text style={styles.footer}>
-          © 2026 Brandthread, Inc.
+          © {new Date().getFullYear()} Brandthread, Inc.
         </Text>
       </ScrollView>
     </View>
@@ -184,20 +185,15 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   brandMark: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.accent,
   },
-  brandMarkText: {
-    color: theme.onAccent,
-    fontFamily: FONT.bold,
-    fontSize: 17,
-  },
   brandName: {
     color: theme.text,
     fontFamily: FONT.bold,
-    fontSize: 17,
+    fontSize: FS.md,
     letterSpacing: -0.3,
   },
   pressed: {
@@ -205,7 +201,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   switcher: {
     flexDirection: 'row',
-    padding: 4,
+    padding: SP.xs,
     marginBottom: 36,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -221,7 +217,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingHorizontal: 0,
   },
   switchItem: {
-    paddingHorizontal: 16,
+    paddingHorizontal: SP.md,
     // 44px minimum comfortable touch target (COMP.minTouchTarget); was 34px.
     height: 44,
     borderRadius: nestedRadius(radius.md, 4),
@@ -234,7 +230,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   switchText: {
     color: theme.muted,
     fontFamily: FONT.semibold,
-    fontSize: 13,
+    fontSize: FS.sm,
   },
   switchTextActive: {
     color: theme.onAccent,
@@ -247,14 +243,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   eyebrow: {
     color: theme.accentLight,
     fontFamily: FONT.bold,
-    fontSize: 12,
+    fontSize: FS.meta,
     marginBottom: 14,
   },
   title: {
     color: theme.text,
     fontFamily: FONT.bold,
-    // FS.h1 (36) — the largest step on the declared type scale in lib/theme.ts.
-    fontSize: 34,
+    // FS.h1 (34) — the largest step on the declared type scale in lib/theme.ts.
+    fontSize: FS.h1,
     lineHeight: 42,
     letterSpacing: -1.2,
     marginBottom: 18,
@@ -262,14 +258,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   summary: {
     color: theme.muted,
     fontFamily: FONT.regular,
-    fontSize: 17,
+    fontSize: FS.md,
     lineHeight: 27,
     maxWidth: 700,
   },
   date: {
     color: theme.subtle,
     fontFamily: FONT.medium,
-    fontSize: 13,
+    fontSize: FS.sm,
     marginTop: 18,
   },
   sections: {
@@ -287,27 +283,27 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   sectionNumber: {
     color: theme.accentLight,
     fontFamily: FONT.bold,
-    fontSize: 12,
+    fontSize: FS.meta,
   },
   sectionTitle: {
     flex: 1,
     color: theme.text,
     fontFamily: FONT.bold,
-    fontSize: 22,
+    fontSize: FS.xl,
     lineHeight: 29,
     letterSpacing: -0.4,
   },
   paragraph: {
     color: theme.muted,
     fontFamily: FONT.regular,
-    fontSize: 15,
+    fontSize: FS.base,
     lineHeight: 25,
   },
   bulletRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    paddingLeft: 4,
+    paddingLeft: SP.xs,
   },
   bullet: {
     width: 5,
@@ -320,14 +316,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flex: 1,
     color: theme.muted,
     fontFamily: FONT.regular,
-    fontSize: 15,
+    fontSize: FS.base,
     lineHeight: 24,
   },
   numberText: {
     minWidth: 18,
     color: theme.accentLight,
     fontFamily: FONT.bold,
-    fontSize: 15,
+    fontSize: FS.base,
     lineHeight: 24,
   },
   heading: {
@@ -349,7 +345,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   footer: {
     color: theme.subtle,
     fontFamily: FONT.regular,
-    fontSize: 12,
+    fontSize: FS.meta,
     textAlign: 'center',
     marginTop: 40,
   },

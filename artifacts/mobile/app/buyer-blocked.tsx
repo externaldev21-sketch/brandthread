@@ -6,7 +6,7 @@
  * change applies on every device immediately.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 import { Platform } from 'react-native';
@@ -35,6 +35,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
 
 import { haptics } from '@/lib/haptics';
+import { showAlert, confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { TYPE_SCALE } from '@/constants/typography';
 
@@ -62,11 +64,14 @@ export default function BlockedAndMutedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Muted list load failure — shown on the Muted tab instead of an empty state.
+  const [mutedError, setMutedError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     setError(null);
+    setMutedError(null);
     const [b, m, w] = await Promise.allSettled([
       api.social.blocks(),
       getMutedUsers(),
@@ -75,13 +80,14 @@ export default function BlockedAndMutedScreen() {
     if (b.status === 'fulfilled') setBlocked(b.value);
     else setError(apiErrorMessage(b.reason, 'We couldn’t load your blocked accounts.'));
     if (m.status === 'fulfilled') setMuted(m.value);
+    else setMutedError(friendlyError(m.reason, 'We couldn’t load your muted accounts.'));
     if (w.status === 'fulfilled') setMutedWordCount(w.value.words.length);
     setLoading(false);
     setRefreshing(false);
   }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  useEffect(() => subscribeSocial(() => { getMutedUsers().then(setMuted).catch(() => {}); }), []);
+  useEffect(() => subscribeSocial(() => { getMutedUsers().then((rows) => { setMuted(rows); setMutedError(null); }).catch(() => {}); }), []);
 
   async function unblock(account: BlockedAccount) {
     setPendingId(account.userId);
@@ -97,13 +103,24 @@ export default function BlockedAndMutedScreen() {
     }
   }
 
+  // Same confirm as Muted accounts before unmuting.
   async function unmute(record: MuteRecord) {
     haptics.select();
+    const ok = await confirmAlert({
+      title: 'Unmute',
+      message: `Unmute ${record.mutedUserName}?`,
+      confirmLabel: 'Unmute',
+      cancelLabel: 'Keep muted',
+    });
+    if (!ok) return;
+    setPendingId(record.id);
     try {
       await unmuteUser(record.mutedUserId);
       setMuted((prev) => prev.filter((row) => row.id !== record.id));
-    } catch {
-      Alert.alert("Couldn't unmute", 'Try again.');
+    } catch (err) {
+      showAlert('Couldn’t unmute', friendlyError(err, 'Try again.'));
+    } finally {
+      setPendingId(null);
     }
   }
 
@@ -138,7 +155,14 @@ export default function BlockedAndMutedScreen() {
       ) : null}
       {/* No count under the error — it would assert "0" for a list that
           never loaded (audit QA-0247). Error XOR count/empty state. */}
-      {error && tab === 'blocked' ? null : (
+      {mutedError && tab === 'muted' ? (
+        <View style={s.errorCard}>
+          <Icon name="alert-circle" size={16} color={theme.error} />
+          <Text style={s.errorText}>{mutedError}</Text>
+          <PressableScale onPress={() => load(true)} accessibilityRole="button"><Text style={s.retry}>Retry</Text></PressableScale>
+        </View>
+      ) : null}
+      {(error && tab === 'blocked') || (mutedError && tab === 'muted') ? null : (
       <Text style={s.sectionLabel}>
         {tab === 'blocked'
           ? `${blocked.length} BLOCKED ACCOUNT${blocked.length === 1 ? '' : 'S'}`
@@ -215,19 +239,21 @@ export default function BlockedAndMutedScreen() {
                   onPress={() => unmute(item)}
                   variant="secondary"
                   size="small"
+                  loading={pendingId === item.id}
+                  disabled={pendingId !== null && pendingId !== item.id}
                   accessibilityHint={`Unmutes ${item.mutedUserName}`}
                 />
               )}
             />
           )}
-          ListEmptyComponent={(
+          ListEmptyComponent={!mutedError ? (
             <EmptyState
               icon="volume-x"
               title="No muted accounts"
               description="Mute someone from their profile or story to quietly hide their posts and stories."
               style={{ marginTop: SPACING.lg }}
             />
-          )}
+          ) : null}
         />
       )}
     </View>

@@ -71,7 +71,7 @@ import { useStickyState } from '@/lib/stickyState';
 import { useApi } from '@/lib/api';
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { openContextMenu } from '@/lib/contextMenu';
-import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
+import InboxSwipeRow, { inboxSwipeAccessibilityProps, type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
 import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
@@ -777,6 +777,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
   );
 
+  // Seller header subtitle: unread threads in the inbox (requests and archived excluded).
+  const totalUnread = conversations.reduce(
+    (sum, conv) => (conv.isRequest || conv.isArchived || pendingDeleteIds.has(conv.id) ? sum : sum + Math.max(0, conv.unreadCount ?? 0)),
+    0,
+  );
+
   const allRequestConvs = conversations
     .filter(conv => conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id));
   // The header search filters Requests too (name, handle, last message);
@@ -1387,12 +1393,14 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         accessibilityLabel: `Archive conversation with ${participant.name}`,
       },
     ];
+    const rowActions = swipeActions.filter(action => !conv.isOfficial || action.key === 'read' || action.key === 'mute');
 
     return (
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
-        <InboxSwipeRow rowId={conv.id} actions={swipeActions.filter(action => !conv.isOfficial || action.key === 'read' || action.key === 'mute')}>
+        <InboxSwipeRow rowId={conv.id} actions={rowActions}>
           <PressableScale
             {...(index === 0 ? tipTargetProps(inboxTipId) : null)}
+            {...inboxSwipeAccessibilityProps(rowActions)}
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPressIn={() => warmThreadOnPressIn(userId, conv.id)}
             onPress={() => openConversation(conv)}
@@ -1545,6 +1553,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10} disabled={!shouldAnimateRow(conv.id)}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
+            {...inboxSwipeAccessibilityProps(swipeActions)}
             style={[s.convRow, { backgroundColor: theme.background }]}
             onPress={() => openRequestConversation(conv)}
             activeOpacity={0.75}
@@ -1780,6 +1789,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       ) : (
         <ScreenHeader
           title="Messages"
+          subtitle={isSeller && totalUnread > 0 ? `${totalUnread} unread` : undefined}
           // The seller's Messages is pushed from Profile: bare back arrow.
           onBack={isSeller ? () => goBackOr(router) : undefined}
           actions={[

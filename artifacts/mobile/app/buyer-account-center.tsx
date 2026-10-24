@@ -24,10 +24,11 @@ const ROWS: Row[] = [
   { label: 'Personal details', icon: 'user', route: '/buyer-personal-details' },
   { label: 'Password and security', icon: 'shield', route: '/buyer-security' },
   { label: 'Login methods', icon: 'link', route: '/login-methods' },
-  { label: 'Biometric unlock', icon: 'unlock', route: '/biometric-unlock' },
-  { label: "Where you're logged in", icon: 'smartphone', route: '/login-activity' },
+  { label: 'App Lock', icon: 'unlock', route: '/biometric-unlock' },
+  { label: 'Login activity', icon: 'smartphone', route: '/login-activity' },
   { label: 'Download your information', icon: 'download', route: '/buyer-download-data' },
-  { label: 'Ad and recommendation preferences', icon: 'sliders', route: '/buyer-settings-detail?section=content' },
+  // Shopping preferences holds the real (server-backed) personalized recommendations switch.
+  { label: 'Recommendation preferences', icon: 'sliders', sub: 'Personalization, sizes, and style', route: '/shopping-preferences' },
   { label: 'Account status', icon: 'activity', route: '/account-status' },
   { label: 'Delete account', icon: 'trash-2', sub: 'Permanently delete your account and data', route: '/delete-account', destructive: true },
 ];
@@ -78,11 +79,10 @@ export default function BuyerAccountCenter() {
 
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
-  hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: 16, marginBottom: 16 },
+  hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADII.card, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
   logo: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontFamily: FONT.bold, fontSize: FS.xl },
-  heroTitle: { fontFamily: FONT.bold, fontSize: 15 },
-  heroSub: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, marginTop: 3 },
+  heroTitle: { fontFamily: FONT.bold, fontSize: FS.base },
   card: { padding: 0, paddingHorizontal: SP.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });

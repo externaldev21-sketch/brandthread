@@ -245,7 +245,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   codeText: { flexShrink: 1, fontSize: 34, fontFamily: FONT.bold, color: theme.text },
   copyPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     backgroundColor: theme.accentDim, paddingHorizontal: 14, paddingVertical: SP.sm, borderRadius: RADIUS.pill,
   },
   copyPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },

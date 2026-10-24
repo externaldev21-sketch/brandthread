@@ -13,6 +13,9 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { mapSecurityError, normalizePhoneForClerk } from '@/lib/accountSecurityErrors';
 import { useApi } from '@/lib/api';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { SPACING } from '@/constants/spacing';
 
 type Kind = 'email' | 'phone';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -38,6 +41,12 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
     : user?.primaryPhoneNumber?.phoneNumber;
 
   const [value, setValue] = useState('');
+  // The normalized identifier actually sent to Clerk (lowercased email, E.164 phone).
+  const [sentTo, setSentTo] = useState('');
+  // Set when "remove old" was on but Clerk refused to delete it.
+  const [oldKept, setOldKept] = useState<string | null>(null);
+  // Whether there was a previous identifier (an "update") or this was the first one (an "add").
+  const [replaced, setReplaced] = useState(false);
   const [code, setCode] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
   const [removeOld, setRemoveOld] = useState(true);
@@ -82,6 +91,7 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
       const target = await createIdentifier(entered);
       await target.prepareVerification(isEmail ? { strategy: 'email_code' } : undefined);
       setPending(target);
+      setSentTo(entered);
       setCode('');
     } catch (e) {
       setError(mapSecurityError(e, kind).message);
@@ -116,9 +126,21 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
         return;
       }
       const old = current;
+      const oldLabel = currentLabel ?? null;
       await makePrimary(pending.id);
+      setOldKept(null);
+      setReplaced(!!old && old.id !== pending.id);
       if (removeOld && old && old.id !== pending.id) {
-        try { await removeIdentifier(old as unknown as { destroy: () => Promise<unknown> }); } catch { /* the new one is already primary */ }
+        try {
+          await removeIdentifier(old as unknown as { destroy: () => Promise<unknown> });
+        } catch (removeErr) {
+          // The new one is already primary; tell the user the old one stayed.
+          setOldKept(oldLabel ?? `your old ${noun}`);
+          showAlert(
+            `Couldn't remove old ${noun}`,
+            friendlyError(removeErr, `Your new ${noun} is saved, but ${oldLabel ?? `the old one`} is still on your account. Try removing it again later.`),
+          );
+        }
       }
       await user.reload();
       if (isEmail && !isBuyerDevPreview() && !isSellerDevPreview()) {
@@ -137,8 +159,8 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
     return (
       <SecurityBody>
         <SecuritySuccess
-          title={isEmail ? 'Email updated' : 'Phone number updated'}
-          body={`Your ${noun} is now ${value.trim()}.`}
+          title={isEmail ? (replaced ? 'Email updated' : 'Email added') : (replaced ? 'Phone number updated' : 'Phone number added')}
+          body={`Your ${noun} is now ${sentTo}.${oldKept ? ` ${oldKept} is still on your account.` : ''}`}
           onDone={() => goBackOr(router)}
         />
       </SecurityBody>
@@ -149,7 +171,7 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
     return (
       <SecurityBody>
         <SecurityIntro>
-          {resent ? 'New code sent. ' : ''}Enter the 6-digit code we sent to {value.trim()}.
+          {resent ? 'New code sent. ' : ''}Enter the 6-digit code we sent to {sentTo}.
         </SecurityIntro>
         <SecurityField
           testID="verification-code-input"
@@ -166,7 +188,7 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
           onSubmitEditing={verify}
         />
         {current ? (
-          <Card style={{ padding: 0, marginTop: 20, paddingHorizontal: 16 }}>
+          <Card style={{ padding: 0, marginTop: 20, paddingHorizontal: SPACING.md }}>
             <ListRow
               icon={isEmail ? 'mail' : 'phone'}
               title={`Remove old ${noun}`}
@@ -176,8 +198,8 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
           </Card>
         ) : null}
         <SecurityErrorBox message={error} testID="change-identifier-error" />
-        <Button label="Verify and save" onPress={verify} loading={busy} disabled={code.length < 6} fullWidth style={{ marginTop: 16 }} />
-        <Button label="Send a new code" variant="tertiary" size="small" onPress={resend} disabled={busy} style={{ marginTop: 8 }} />
+        <Button label="Verify and save" onPress={verify} loading={busy} disabled={code.length < 6} fullWidth style={{ marginTop: SPACING.md }} />
+        <Button label="Send a new code" variant="tertiary" size="small" onPress={resend} disabled={busy} style={{ marginTop: SPACING.xs }} />
         <Button label={`Use a different ${noun}`} variant="tertiary" size="small" onPress={() => { setPending(null); setError(''); }} disabled={busy} />
       </SecurityBody>
     );
@@ -201,7 +223,7 @@ export function ChangeIdentifier({ kind }: { kind: Kind }) {
         onSubmitEditing={sendCode}
       />
       <SecurityErrorBox message={error} testID="change-identifier-error" />
-      <Button label="Send code" onPress={sendCode} loading={busy} disabled={!value.trim()} fullWidth style={{ marginTop: 16 }} />
+      <Button label="Send code" onPress={sendCode} loading={busy} disabled={!value.trim()} fullWidth style={{ marginTop: SPACING.md }} />
     </SecurityBody>
   );
 }

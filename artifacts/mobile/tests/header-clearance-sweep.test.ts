@@ -40,9 +40,13 @@ describe('headers: bare back arrow + title — no subtitle, no divider', () => {
   });
 
   it('no ScreenHeader call site anywhere passes a subtitle', () => {
+    // One owner-requested exception (round-2 messages audit): the seller
+    // inbox shows its unread total ("3 unread") under "Messages", inside the
+    // same 44pt header row. Nothing else may add a subtitle.
+    const allowed = new Set(['components/inbox/MessagesInbox.tsx']);
     const offenders = tsxFiles('app').concat(tsxFiles('components')).filter((f) => {
       const src = read(f);
-      return /<ScreenHeader\b[^>]*\bsubtitle=/s.test(src);
+      return /<ScreenHeader\b[^>]*\bsubtitle=/s.test(src) && ![...allowed].some((a) => f.endsWith(a));
     });
     expect(offenders).toEqual([]);
   });

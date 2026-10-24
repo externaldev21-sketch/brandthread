@@ -14,10 +14,11 @@ import { ActivityIndicator, Share, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { BrandthreadScreen, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, SegmentedControl } from '@/components/ui';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { CheckoutField, CheckoutSection, useCheckoutColors, GUTTER, type CheckoutColors } from '@/components/checkout/CheckoutPrimitives';
 import { CardEntry, PaymentController, StripePaymentProvider, stripePaymentAvailable } from '@/components/checkout/StripePayment';
 import type { PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
@@ -48,9 +49,11 @@ export default function GiftCardBuyScreen() {
   const preview = isBuyerDevPreview();
   const [info, setInfo] = useState<GiftCardStoreInfo | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoadFailed(false);
     if (preview) {
       // No backend in the web preview; samples only with &demo=1.
       if (isPreviewDemoMode()) setInfo({ ...PREVIEW_STORE_INFO, sellerId });
@@ -59,11 +62,11 @@ export default function GiftCardBuyScreen() {
     }
     api.giftCards.store(sellerId).then(result => { if (active) setInfo(result); }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [api, preview, sellerId]);
+  }, [api, preview, sellerId, reloadKey]);
 
   const body = !info
     ? (loadFailed
-      ? <View style={styles.center}><Text style={styles.plain}>We couldn’t load this store’s gift cards.</Text></View>
+      ? <ErrorState message="We couldn’t load this store’s gift cards." onRetry={() => setReloadKey(k => k + 1)} />
       : <View style={styles.center}><ActivityIndicator /></View>)
     : !info.enabled
       ? <View style={styles.center}><Text style={styles.plain}>{info.storeName || params.name || 'This store'} doesn’t sell gift cards right now.</Text></View>
@@ -85,6 +88,12 @@ function BuyForm({ info, signedIn, preview, previewDone }: { info: GiftCardStore
   const s = useMemo(() => makeStyles(ck), [ck]);
   const api = useApi();
   const router = useRouter();
+  // Billing details describe the buyer (the card holder), never the
+  // recipient and never a made-up name: the signed-in account's real name
+  // and email when Clerk has them, otherwise left blank for Stripe.
+  const { user } = useUser();
+  const buyerName = (user?.fullName ?? '').trim();
+  const buyerEmail = (user?.primaryEmailAddress?.emailAddress ?? '').trim();
   const controllerRef = useRef<PaymentControllerApi>(null);
   const keyRef = useRef(`gc_${randomUUID()}`);
   const [amountCents, setAmountCents] = useState<number | null>(info.denominations[1] ?? info.denominations[0] ?? null);
@@ -133,7 +142,7 @@ function BuyForm({ info, signedIn, preview, previewDone }: { info: GiftCardStore
           return null;
         }
       }, {
-        name: name.trim() || 'Gift card buyer', email: texting ? '' : email.trim(), phone: '',
+        name: buyerName, email: buyerEmail, phone: '',
         address: { line1: '', line2: null, city: '', state: '', postalCode: '', country: 'US' },
       });
       if (!outcome || outcome.status === 'canceled') return;
@@ -156,7 +165,7 @@ function BuyForm({ info, signedIn, preview, previewDone }: { info: GiftCardStore
     } finally {
       setPaying(false);
     }
-  }, [amountCents, api, email, info.sellerId, info.storeName, issue, message, name, phone, texting]);
+  }, [amountCents, api, buyerEmail, buyerName, email, info.sellerId, info.storeName, issue, message, name, phone, texting]);
 
   if (done) {
     return (

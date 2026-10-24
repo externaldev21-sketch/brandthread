@@ -29,10 +29,10 @@ describe('buyer: one "Settings and activity" list in Instagram\'s sections', () 
       'Who can see your content',
       'How others can interact with you',
       'What you see',
-      'Your app and media',
-      'Your orders and payments',
+      'Your app & media',
+      'Your orders & payments',
       'For professionals',
-      'More info and support',
+      'More info & support',
       'Login',
     ]);
     const login = BUYER_SETTINGS_CATALOG[BUYER_SETTINGS_CATALOG.length - 1];
@@ -53,7 +53,8 @@ describe('buyer: one "Settings and activity" list in Instagram\'s sections', () 
       '/shopping-preferences', '/buyer-my-sizes', '/buyer-addresses', '/buyer-payment-methods', '/push-notifications',
       '/buyer-privacy-settings', '/buyer-blocked', '/buyer-muted', '/buyer-restricted', '/buyer-friend-requests',
       '/muted-words', '/buyer-settings-detail?section=messages', '/buyer-settings-detail?section=content',
-      '/appearance', '/biometric-unlock', '/languages', '/buyer-settings-detail?section=accessibility',
+      // The buyer Language row was removed on purpose (buyers have no app-language setting).
+      '/appearance', '/biometric-unlock', '/buyer-settings-detail?section=accessibility',
       '/first-run-tips-settings', '/buyer-problem-report', '/buyer-download-data', '/buyer-settings-detail?section=about',
       '/community-guidelines', '/terms', '/privacy', '/refund-policy', '/seller-agreement', 'action:delete-account',
     ];
@@ -122,5 +123,51 @@ describe('merged duplicates', () => {
     expect(read('app/buyer-account-center.tsx')).toContain("route: '/login-activity'");
     expect(read('app/buyer-security.tsx')).toContain("router.push('/login-activity' as never)");
     expect(resolveLegacyRoute('/buyer-login-activity')).toBe('/login-activity');
+  });
+});
+
+describe('buyer settings audit follow-ups', () => {
+  it('has no buyer language row (owner call); seller keeps its Language rows', () => {
+    const buyerRoutes = routesOf(BUYER_SETTINGS_CATALOG);
+    expect(buyerRoutes).not.toContain('/app-language');
+    expect(buyerRoutes).not.toContain('/languages');
+    expect(routesOf(SELLER_SETTINGS_CATALOG)).toContain('/languages');
+  });
+
+  it('uses "&" in group titles and never repeats a group title (they are React keys)', () => {
+    for (const catalog of [BUYER_SETTINGS_CATALOG, SELLER_SETTINGS_CATALOG]) {
+      const titles = catalog.map((g) => g.title);
+      expect(titles.filter((t) => / and /.test(t))).toEqual([]);
+      expect(new Set(titles).size).toBe(titles.length);
+    }
+  });
+
+  it('a failed sign-out says so and keeps the user signed in', () => {
+    const screen = read('app/buyer-settings.tsx');
+    expect(screen).toMatch(/catch \(err\) \{[\s\S]*showAlert\('Couldn’t log out', friendlyError\(err,/);
+  });
+
+  it('settings detail: only linked sections, a not-found state, no dimmed read-only rows', () => {
+    const src = read('app/buyer-settings-detail.tsx');
+    expect(src).not.toContain('Object.assign(CONFIG');
+    for (const dead of ['activity:', 'archive:', 'story:', 'tags:', 'comments:', 'sharing:', "'hidden-words':", 'suggested:', 'payments:', 'language:', "'privacy-center':", 'media:', 'muted:', 'restricted:', 'favorites:', 'appearance:', 'qr:', "'close-friends':"]) {
+      expect(src, dead).not.toContain(`  ${dead} {`);
+    }
+    expect(src).toContain("messages: { title: 'Messages',");
+    expect(src).not.toMatch(/toggle: '(readReceipts|messageRequests|activityStatus)'/);
+    expect(src).toContain("toggle: 'reduceMotion'");
+    expect(src).toContain("toggle: 'captions'");
+    expect(src).toContain('This settings page doesn’t exist.');
+    expect(src).not.toContain('CONFIG.content');
+    expect(src).not.toContain('disabled={');
+    expect(src).not.toContain('fontSize: 13');
+  });
+
+  it('Accounts Center: recommendation row opens the page with the recommendations switch', () => {
+    const src = read('app/buyer-account-center.tsx');
+    expect(src).toContain("{ label: 'Recommendation preferences', icon: 'sliders', sub: 'Personalization, sizes, and style', route: '/shopping-preferences' }");
+    expect(src).toContain("label: 'App Lock'");
+    expect(src).toContain("label: 'Login activity'");
+    expect(read('app/shopping-preferences.tsx')).toContain('personalizedRecommendations');
   });
 });

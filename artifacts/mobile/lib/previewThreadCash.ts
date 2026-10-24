@@ -61,7 +61,8 @@ export const FRESH_THREAD_CASH_STATUS: ThreadCashStatus = {
     lastCheckInDate: null,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     alreadyCheckedInToday: false,
-    dayInCycle: 0,
+    // The server's first slot is day 1 (never 0) — "Day 1 of 7", today ringed.
+    dayInCycle: 1,
     streakBonusDays: 7,
   },
 };

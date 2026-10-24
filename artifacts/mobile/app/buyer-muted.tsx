@@ -18,6 +18,7 @@ import { Button, ListRow } from '@/components/ui';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
+import { RADIUS } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
@@ -126,7 +127,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
     // Overnight batch item 37: filled, no border at rest or focus.
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: SPACING.md, marginBottom: SPACING.sm,
-    backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 12, borderWidth: 0,
+    backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: RADIUS.md, borderWidth: 0,
     paddingHorizontal: 12, paddingVertical: 10,
   },
   searchInput: { flex: 1, color: theme.text, ...TYPE_SCALE.body },

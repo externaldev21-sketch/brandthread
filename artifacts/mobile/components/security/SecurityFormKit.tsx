@@ -11,7 +11,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { useColors } from '@/hooks/useColors';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -109,7 +109,7 @@ export function SecurityErrorBox({ message, testID }: { message: string; testID?
 
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   label: {
-    fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground,
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.mutedForeground,
     marginBottom: 6, marginTop: SPACING.sm,
   },
   inputRow: {
@@ -127,5 +127,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.destructive + '4d',
     paddingHorizontal: SPACING.sm, paddingVertical: 10, marginTop: SPACING.md,
   },
-  errorText: { flex: 1, fontSize: 11, fontFamily: FONT.regular, color: colors.destructive, lineHeight: 18 },
+  errorText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: colors.destructive, lineHeight: 18 },
 });

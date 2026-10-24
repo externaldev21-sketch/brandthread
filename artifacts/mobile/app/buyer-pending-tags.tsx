@@ -75,7 +75,7 @@ export default function BuyerPendingTags() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Pending tags" variant="push" onBack={() => goBackOr(router, '/buyer-settings-detail?section=tags')} />
+      <ScreenHeader title="Pending tags" variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
       <Text style={s.intro}>
         Approve a tag to show it on your profile's Tagged tab. Remove it to untag yourself.
       </Text>

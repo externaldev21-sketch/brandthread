@@ -7,6 +7,12 @@
  */
 import { Animated, Platform } from 'react-native';
 import { Easing } from 'react-native-reanimated';
+import { isMotionReduced } from '@/lib/reduceMotion';
+
+/** Under Reduce Motion (buyer setting or OS): jump straight to `toValue`. */
+function instantTo(value: Animated.Value, toValue: number) {
+  return Animated.timing(value, { toValue, duration: 0, useNativeDriver: Platform.OS !== 'web' });
+}
 
 /** Press feedback: shrink to 0.97 (Dev's less-AI pass, item 76), every press-state animation used by a
  *  shared pressable/button/card/tile/row component. Never scales below 1 at
@@ -33,6 +39,8 @@ export const PRESS_SPRING = { stiffness: 500, damping: 45, mass: 1 } as const;
  *  touch-up (toValue: 1) — see PRESS_SPRING above for why this replaced a
  *  per-component timing/spring pair. */
 export function pressScaleAnim(scale: Animated.Value, toValue: number) {
+  // Reduce Motion: no press scale at all — stay at (or snap back to) rest.
+  if (isMotionReduced()) return instantTo(scale, 1);
   return Animated.spring(scale, { toValue, ...PRESS_SPRING, useNativeDriver: Platform.OS !== 'web' });
 }
 
@@ -123,5 +131,6 @@ export const SPRING = { mass: 1, stiffness: 220, damping: 20, overshootClamping:
 
 /** `SPRING` for an RN `Animated.Value`. */
 export function springTo(value: Animated.Value, toValue: number) {
+  if (isMotionReduced()) return instantTo(value, toValue);
   return Animated.spring(value, { toValue, ...SPRING, useNativeDriver: Platform.OS !== 'web' });
 }

@@ -71,7 +71,7 @@ export default function BuyerStoryHidden() {
       const result = await api.interactionSettings.setStoryHidden(Array.from(hidden));
       setSaved(result.userIds);
       hapticSuccessAction();
-      goBackOr(router, '/buyer-settings-detail?section=story');
+      goBackOr(router, '/buyer-settings');
     } catch {
       Alert.alert('Could not save', 'Try again.');
     } finally {
@@ -81,7 +81,7 @@ export default function BuyerStoryHidden() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Hide story from" variant="push" onBack={() => goBackOr(router, '/buyer-settings-detail?section=story')} />
+      <ScreenHeader title="Hide story from" variant="push" onBack={() => goBackOr(router, '/buyer-settings')} />
       <Text style={s.intro}>
         People you choose won't see your stories, even if they follow you. They aren't notified.
       </Text>

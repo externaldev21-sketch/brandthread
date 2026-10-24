@@ -4,7 +4,7 @@
  * profile screen directly — that stays untouched; profile links to /buyer-saved,
  * which links here.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, useWindowDimensions, Dimensions, Modal, TextInput, ActivityIndicator, Share, Platform } from 'react-native';
@@ -105,7 +105,14 @@ export default function BuyerCollection() {
 
   const pull = usePullToRefresh(() => load(true));
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Only the first load shows the skeleton; coming back to the screen
+  // refreshes in place so the grid doesn't flash.
+  const loadedFor = useRef<string | null>(null);
+  useFocusEffect(useCallback(() => {
+    const silent = loadedFor.current === collectionId;
+    loadedFor.current = collectionId ?? null;
+    void load(silent);
+  }, [load, collectionId]));
 
   async function togglePublic(value: boolean) {
     if (!collection) return;

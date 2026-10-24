@@ -49,6 +49,23 @@ function toSwipeAction(action: InboxSwipeAction, index: number, all: InboxSwipeA
 }
 
 /**
+ * Screen-reader access to a row's swipe actions. The swipe container itself
+ * isn't focusable (VoiceOver/TalkBack land on the row's own button), so the
+ * row's button spreads these props to offer every swipe action — Block,
+ * Delete, Archive, Mute, Mark as read — from the actions menu without
+ * swiping. Derived from the same list passed to <InboxSwipeRow actions>.
+ */
+export function inboxSwipeAccessibilityProps(actions: InboxSwipeAction[]) {
+  return {
+    accessibilityActions: actions.map((a) => ({ name: a.key, label: a.accessibilityLabel ?? a.label })),
+    onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
+      const action = actions.find((a) => a.key === e.nativeEvent.actionName);
+      if (action) void action.onPress();
+    },
+  };
+}
+
+/**
  * Inbox / requests row swipe actions — the shared Apple Mail / Instagram DMs
  * swipe row (components/ui/SwipeRow.tsx): leading actions on the left,
  * trailing on the right, full swipe runs the outermost one.

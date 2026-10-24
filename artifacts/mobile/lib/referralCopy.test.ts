@@ -21,7 +21,10 @@ describe('referral copy', () => {
   it('uses the same timing on every surface', () => {
     expect(REFERRAL_TIMING_SHORT).toContain('first order of $10 or more');
     expect(REFERRAL_STEPS[1].body).toContain('$10 or more');
-    expect(readFileSync(join(__dirname, '../app/loyalty.tsx'), 'utf8')).toContain('first order of $10 or more');
+    // Rewards builds the same sentence from the shared constants ($5 / $10).
+    expect(readFileSync(join(__dirname, '../app/loyalty.tsx'), 'utf8')).toContain(
+      'Thread Cash after their first order of ${formatMoney(REFERRAL_MIN_ORDER_CENTS)} or more',
+    );
   });
 
   it('labels every status', () => {

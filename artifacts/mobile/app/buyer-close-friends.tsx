@@ -18,13 +18,12 @@ import { useColors } from '@/hooks/useColors';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import { FONT } from '@/lib/theme';
+import { RADIUS } from '@/lib/theme';
 
 import { TYPE_SCALE } from '@/constants/typography';
 
 import { SPACING } from '@/constants/spacing';
 
-import { radius } from '@/constants/radii';
 
 import { haptics, haptic } from '@/lib/haptics';
 
@@ -238,19 +237,11 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     // number given), same treatment as the shared SearchBar component.
     flexDirection: 'row', alignItems: 'center', gap: 10, margin: SPACING.md,
     paddingHorizontal: SPACING.md, height: 40, backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 12, borderWidth: 0,
+    borderRadius: RADIUS.md, borderWidth: 0,
   },
   searchInput: { flex: 1, color: colors.foreground, ...TYPE_SCALE.body },
   countBadge: { ...TYPE_SCALE.caption, color: colors.primary, paddingHorizontal: SPACING.md, marginBottom: SPACING.xxs },
   radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   radioActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 52 },
-  empty: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.sm },
-  emptyTitle: { ...TYPE_SCALE.headline, color: colors.foreground },
-  emptyDesc: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center', maxWidth: 240 },
-  findFriendsBtn: {
-    marginTop: SPACING.xs, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm,
-    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border,
-  },
-  findFriendsBtnText: { fontFamily: FONT.semibold, ...TYPE_SCALE.body, color: colors.foreground },
 });

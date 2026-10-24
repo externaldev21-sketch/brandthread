@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Animated, View, ScrollView, StyleSheet,
@@ -13,7 +13,7 @@ import { SectionHeader } from '@/components/BrandthreadUI';
 import { ListSkeleton } from '@/components/layout/Skeleton';
 import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/components/ui';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
-import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
+import { PrivacySettings, AudienceOption, DmPrivacy, DEFAULT_PRIVACY_SETTINGS } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
 // Brandthread's social graph is follow-based (POST /api/social/follow), so
@@ -39,6 +39,14 @@ function audienceOptions(ids: AudienceOption[]): OptionSheetOption[] {
   return ids.map((id) => ({ id, label: AUDIENCE_LABEL[id], description: AUDIENCE_DESCRIPTION[id] }));
 }
 
+// The settings badge reads one page of requests; at the cap there may be more.
+const FOLLOW_REQUEST_CAP = 50;
+
+function formatRequestCount(count: number, cap: number = FOLLOW_REQUEST_CAP): string | undefined {
+  if (count <= 0) return undefined;
+  return count >= cap ? `${cap}+` : String(count);
+}
+
 type PickerKey = keyof Pick<
   PrivacySettings,
   'profileVisibility' | 'whoCanSendFriendRequests' | 'whoCanSeePosts' | 'whoCanSeeFriendsList' | 'whoCanReplyToStories' | 'whoCanMention'
@@ -61,19 +69,27 @@ export default function BuyerPrivacySettings() {
   const [serverPrivate, setServerPrivate] = useState<boolean | null>(null);
   const [privateBusy, setPrivateBusy] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
+  // The server only lets some account types go private (canBePrivate). null until loaded.
+  const [canBePrivate, setCanBePrivate] = useState<boolean | null>(null);
   // "Saved by people you follow" on product pages — server-backed, written on toggle.
   const [showSaves, setShowSaves] = useState(true);
   // Contact discovery is server-backed (/api/social/contacts): null until loaded.
   const [contacts, setContacts] = useState<{ enabled: boolean; optedIn: boolean } | null>(null);
   const [contactsBusy, setContactsBusy] = useState(false);
+  const backSaveFailed = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
       // Server values (DM privacy, read receipts) win over the local copy.
-      Promise.all([getPrivacySettings(), api.privacy.get().catch(() => null)]).then(([local, server]) => {
+      // A failed local read falls back to defaults instead of leaving the skeleton up.
+      Promise.all([
+        getPrivacySettings().catch(() => ({ ...DEFAULT_PRIVACY_SETTINGS })),
+        api.privacy.get().catch(() => null),
+      ]).then(([local, server]) => {
         if (server) {
           setDmPrivacy(server.dmPrivacy);
           if (typeof server.isPrivate === 'boolean') setServerPrivate(server.isPrivate);
+          if (typeof server.canBePrivate === 'boolean') setCanBePrivate(server.canBePrivate);
           if (typeof server.showSavesToFollowers === 'boolean') setShowSaves(server.showSavesToFollowers);
         }
         setSettings({ ...local,
@@ -81,7 +97,7 @@ export default function BuyerPrivacySettings() {
           ...(typeof server?.showActivityStatus === 'boolean' ? { activityStatusVisible: server.showActivityStatus } : {}),
         });
       });
-      api.followRequests.list(50, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
+      api.followRequests.list(FOLLOW_REQUEST_CAP, 0).then((rows) => setRequestCount(Array.isArray(rows) ? rows.length : 0)).catch(() => {});
       api.social.contacts.status().then(setContacts).catch(() => setContacts(null));
     }, [])
   );
@@ -89,10 +105,12 @@ export default function BuyerPrivacySettings() {
   function update(key: keyof PrivacySettings, val: any) {
     setSettings(s => s ? { ...s, [key]: val } : s);
     setHasChanges(true);
+    backSaveFailed.current = false;
   }
 
-  async function saveSettings(showConfirmation: boolean) {
-    if (!settings) return;
+  /** Resolves true when everything saved. */
+  async function saveSettings(showConfirmation: boolean): Promise<boolean> {
+    if (!settings) return false;
     try {
       // Save local settings (stored in AsyncStorage)
       await updatePrivacySettings(settings);
@@ -101,10 +119,12 @@ export default function BuyerPrivacySettings() {
       await api.privacy.update({ dmPrivacy, readReceipts: settings.readReceiptsEnabled, showActivityStatus: settings.activityStatusVisible });
       setHasChanges(false);
       setSaveError(null);
+      backSaveFailed.current = false;
+      return true;
     } catch {
-      if (showConfirmation) setSaveError("Couldn't save. Try again.");
-      // On silent (back-navigation) saves, leave hasChanges set so the user
-      // isn't told their change was saved when it wasn't.
+      // Leave hasChanges set so the change isn't silently dropped.
+      setSaveError(showConfirmation ? "Couldn't save. Try again." : "Couldn't save your changes. Try again, or go back again to discard them.");
+      return false;
     }
   }
 
@@ -163,10 +183,20 @@ export default function BuyerPrivacySettings() {
     }
   }
 
+  // Back saves pending changes first; if that save fails, stay on the screen
+  // and show the error (a second Back discards).
   async function handleBack() {
-    if (hasChanges) await saveSettings(false);
+    if (hasChanges && !backSaveFailed.current) {
+      const ok = await saveSettings(false);
+      if (!ok) { backSaveFailed.current = true; return; }
+    }
     goBackOr(router, '/buyer-settings');
   }
+
+  const isPrivateNow = serverPrivate ?? settings?.profileVisibility === 'private';
+  // Hidden when the server says this account type can't go private — unless
+  // it already is, so it can still be switched off.
+  const showPrivateRow = canBePrivate !== false || isPrivateNow;
 
   if (!settings) {
     return (
@@ -189,25 +219,29 @@ export default function BuyerPrivacySettings() {
         collapse={titleCollapse}
       />
 
-      <Animated.ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false} onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
+      <Animated.ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl + insets.bottom }} showsVerticalScrollIndicator={false} onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
         {saveError ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title={saveError} disabled /></Card> : null}
 
         {/* PROFILE VISIBILITY */}
         <SectionHeader title="PROFILE" />
         <Card style={styles.card}>
-          <ListRow
-            icon="lock"
-            title="Private account"
-            subtitle="Approve who can follow you"
-            toggle={{ value: serverPrivate ?? settings.profileVisibility === 'private', onChange: (v) => { void applyPrivate(v); } }}
-            disabled={privateBusy}
-            testID="private-account-switch"
-          />
-          <View style={styles.divider} />
+          {showPrivateRow ? (
+            <>
+              <ListRow
+                icon="lock"
+                title="Private account"
+                subtitle="Approve who can follow you"
+                toggle={{ value: isPrivateNow, onChange: (v) => { void applyPrivate(v); } }}
+                disabled={privateBusy}
+                testID="private-account-switch"
+              />
+              <View style={styles.divider} />
+            </>
+          ) : null}
           <ListRow
             icon="user-plus"
             title="Follow requests"
-            value={requestCount > 0 ? String(requestCount) : undefined}
+            value={formatRequestCount(requestCount)}
             chevron
             onPress={() => router.push('/buyer-friend-requests' as never)}
           />
@@ -321,7 +355,7 @@ export default function BuyerPrivacySettings() {
                 ? 'Only people you follow can message you'
                 : 'Others go to your requests inbox until you accept'
             }
-            value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone'}
+            value={dmPrivacy === 'followers_only' ? 'People you follow' : 'Everyone'}
             chevron
             onPress={() => setPicker('dmPrivacy')}
           />
@@ -411,7 +445,7 @@ export default function BuyerPrivacySettings() {
         description="Others can always see your profile, but direct messages from non-followers are handled based on this setting."
         options={[
           { id: 'requests', label: 'Everyone', description: 'Non-followers go to your requests inbox', icon: 'inbox' },
-          { id: 'followers_only', label: 'Followers only', description: 'Block direct messages from everyone else', icon: 'user-check' },
+          { id: 'followers_only', label: 'People you follow', description: 'Block direct messages from everyone else', icon: 'user-check' },
         ]}
         selectedId={dmPrivacy}
         onSelect={(id) => { setDmPrivacy(id as DmPrivacy); setHasChanges(true); setPicker(null); }}

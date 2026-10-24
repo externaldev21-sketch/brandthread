@@ -6,7 +6,7 @@
  * translated — the copy below says so.
  */
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { useFocusEffect } from 'expo-router';
 
@@ -30,6 +30,12 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+
+import { ErrorState } from '@/components/ui/ErrorState';
+
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
 
 interface LanguageOption {
   code: string;
@@ -62,9 +68,11 @@ export default function LanguagesScreen() {
   const [storeLanguage, setStoreLanguage] = useState<string>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     if (isBuyer) {
       const settings = await loadBuyerSettings();
       setStoreLanguage(LANGUAGES.find(l => l.name === settings.language)?.code ?? 'en');
@@ -74,8 +82,9 @@ export default function LanguagesScreen() {
     try {
       const data = await api.seller.getSettings() as any;
       setStoreLanguage(data.settings?.storeLanguage ?? 'en');
-    } catch {
-      setStoreLanguage('en');
+    } catch (err) {
+      // Don't pretend the store is in English: show the failure and let them retry.
+      setLoadError(friendlyError(err, 'Couldn’t load your store language.'));
     } finally {
       setLoading(false);
     }
@@ -95,8 +104,7 @@ export default function LanguagesScreen() {
       }
       setStoreLanguage(code);
     } catch (error) {
-      const message = error instanceof Error ? error.message.replace(/^API \d{3}:\s*/, '') : '';
-      Alert.alert('Could not save store language', message && !message.startsWith('{') ? message : 'Please try again.');
+      showAlert(isBuyer ? 'Couldn’t save app language' : 'Couldn’t save store language', friendlyError(error, 'Try again.'));
     } finally {
       setSaving(null);
     }
@@ -109,6 +117,8 @@ export default function LanguagesScreen() {
       <ScreenHeader title="Store language" />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
+      ) : loadError ? (
+        <ErrorState message={loadError} onRetry={() => { void load(); }} />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 60 + tabBarInset }} showsVerticalScrollIndicator={false}>
           {/* Current language banner */}

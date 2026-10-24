@@ -14,7 +14,7 @@ import { useFocusEffect } from 'expo-router';
 
 import { useApi } from '@/lib/api';
 
-import { FONT } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -55,8 +55,8 @@ function CardBrand({ brand }: { brand: string }) {
   );
 }
 const cb = StyleSheet.create({
-  wrap: { borderRadius: RADII.chip, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
-  text: { fontSize: 11, fontFamily: FONT.bold },
+  wrap: { borderRadius: RADII.chip, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderWidth: 1 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 export default function BuyerPaymentMethodsScreen() {
@@ -188,7 +188,8 @@ export default function BuyerPaymentMethodsScreen() {
                       </Text>
                       {!pm.isDefault && (
                         <Button
-                          label="Make default"
+                          label="Set as default"
+                          accessibilityLabel={`Set card ending in ${pm.last4} as default`}
                           onPress={() => setDefault(pm)}
                           variant="tertiary"
                           size="compact"
@@ -234,12 +235,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   card:  { backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, overflow: 'hidden', marginBottom: SPACING.lg },
   rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginHorizontal: SPACING.md },
   pmRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACING.md, paddingVertical: 14 },
-  pmNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pmNameRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   pmName: { ...TYPE_SCALE.callout, fontFamily: FONT.semibold, color: palette.foreground },
-  defaultBadge: { backgroundColor: `${theme.success}26`, borderRadius: RADII.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  defaultBadge: { backgroundColor: `${theme.success}26`, borderRadius: RADII.pill, paddingHorizontal: SP.sm, paddingVertical: 3 },
   defaultBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: theme.success },
   pmMeta: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginTop: 2 },
   setDefaultBtn: { alignSelf: 'flex-start', marginTop: 2, minWidth: 0, paddingHorizontal: 0 },
-  securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
+  securityNote: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
   securityNoteText: { flex: 1, ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18 },
 });

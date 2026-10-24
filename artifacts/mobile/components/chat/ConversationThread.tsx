@@ -100,7 +100,7 @@ import {
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
-import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
+import { confirmDestructiveActionSheet, showAlert } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -1873,7 +1873,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         ? {
             text: `Unblock ${participant.name}`,
             onPress: async () => {
-              if (await confirmUnblock({ userId: participant.userId, name: participant.name }, api.social.unblock)) {
+              // A seeded preview thread applies it locally — no real API call.
+              const unblock = conv && isPreviewId(conv.id) ? async () => {} : api.social.unblock;
+              if (await confirmUnblock({ userId: participant.userId, name: participant.name }, unblock, showAlert)) {
                 setMessaging((current) => ({ ...current, blockedByMe: false }));
               }
             },
@@ -1882,7 +1884,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             text: `Block ${participant.name}`,
             style: 'destructive' as const,
             onPress: async () => {
-              if (await confirmBlock({ userId: participant.userId, name: participant.name }, api.social.block)) {
+              const block = conv && isPreviewId(conv.id) ? async () => {} : api.social.block;
+              if (await confirmBlock({ userId: participant.userId, name: participant.name }, block, showAlert)) {
                 setMessaging((current) => ({ ...current, blockedByMe: true }));
               }
             },

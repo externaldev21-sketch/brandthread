@@ -4,7 +4,7 @@
  * code (or just check its balance first). Reached from Menu, Gift cards.
  * Balances come only from the server.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BrandthreadScreen, PressableScale } from '@/components/BrandthreadUI';
@@ -44,7 +44,11 @@ export default function BuyerGiftCardsScreen() {
   const [checking, setChecking] = useState(false);
   const [balanceResult, setBalanceResult] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [history, setHistory] = useState<GiftCardHistoryEntry[]>([]);
+  // History per card id, so a quick toggle between cards can never show one
+  // card's history under another; each has its own loading/error state.
+  type HistoryState = { status: 'loading' | 'ready' | 'error'; entries: GiftCardHistoryEntry[] };
+  const [historyById, setHistoryById] = useState<Record<string, HistoryState>>({});
+  const historySeq = useRef<Record<string, number>>({});
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -97,12 +101,28 @@ export default function BuyerGiftCardsScreen() {
     }
   }
 
-  async function toggle(card: GiftCard) {
+  const loadHistory = useCallback(async (cardId: string) => {
+    if (preview) {
+      setHistoryById(prev => ({ ...prev, [cardId]: { status: 'ready', entries: [] } }));
+      return;
+    }
+    const seq = (historySeq.current[cardId] ?? 0) + 1;
+    historySeq.current[cardId] = seq;
+    setHistoryById(prev => ({ ...prev, [cardId]: { status: 'loading', entries: prev[cardId]?.entries ?? [] } }));
+    try {
+      const result = await api.giftCards.get(cardId);
+      if (historySeq.current[cardId] !== seq) return;
+      setHistoryById(prev => ({ ...prev, [cardId]: { status: 'ready', entries: result.history } }));
+    } catch {
+      if (historySeq.current[cardId] !== seq) return;
+      setHistoryById(prev => ({ ...prev, [cardId]: { status: 'error', entries: [] } }));
+    }
+  }, [api, preview]);
+
+  function toggle(card: GiftCard) {
     if (openId === card.id) { setOpenId(null); return; }
     setOpenId(card.id);
-    setHistory([]);
-    if (preview) return;
-    api.giftCards.get(card.id).then(result => setHistory(result.history)).catch(() => {});
+    void loadHistory(card.id);
   }
 
   const owned = cards.filter(card => card.role === 'owner');
@@ -111,7 +131,7 @@ export default function BuyerGiftCardsScreen() {
 
   const renderCard = (card: GiftCard) => (
     <View key={card.id} style={s.cardWrap}>
-      <PressableScale onPress={() => void toggle(card)} accessibilityRole="button" accessibilityLabel={`${card.storeName ?? 'Store'} gift card ${giftCardMask(card)}`}>
+      <PressableScale onPress={() => toggle(card)} accessibilityRole="button" accessibilityLabel={`${card.storeName ?? 'Store'} gift card ${giftCardMask(card)}`}>
         <GiftCardFace
           compact
           storeName={card.storeName ?? 'Gift card'}
@@ -122,7 +142,12 @@ export default function BuyerGiftCardsScreen() {
       {openId === card.id ? (
         <View style={s.history}>
           {card.role === 'owner' ? <Text style={s.fine}>Works only at {card.storeName}. {formatMoney(card.initialCents)} to start.</Text> : null}
-          {history.map(entry => (
+          {historyById[card.id]?.status === 'loading' && !(historyById[card.id]?.entries.length) ? (
+            <ActivityIndicator style={{ alignSelf: 'flex-start' }} testID="gift-card-history-loading" />
+          ) : historyById[card.id]?.status === 'error' ? (
+            <RetryRow label="Couldn’t load this card’s history" onRetry={() => void loadHistory(card.id)} testID="gift-card-history-retry" />
+          ) : null}
+          {(historyById[card.id]?.status === 'error' ? [] : historyById[card.id]?.entries ?? []).map(entry => (
             <View key={entry.id} style={s.historyRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.historyLabel}>{HISTORY_LABEL[entry.type]}</Text>
@@ -210,7 +235,7 @@ function makeStyles(ck: CheckoutColors) {
     addRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.xs },
     checkRow: { alignItems: 'flex-start', gap: SP.xs, marginBottom: SP.lg },
     balanceResult: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
-    add: { marginTop: 25, minWidth: 84 },
+    add: { marginTop: SP.lg, minWidth: 84 },
     center: { alignItems: 'center', paddingTop: SP.xl, gap: SP.xs },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
     label: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted },

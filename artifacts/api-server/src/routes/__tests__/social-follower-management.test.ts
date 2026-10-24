@@ -19,6 +19,8 @@ const state = vi.hoisted(() => ({
   insertedMutes: [] as any[],
   updatedMuteFilters: [] as any[],
   deletedNotifications: [] as any[],
+  updateSets: [] as any[],
+  updateReturning: [] as any[],
 }));
 
 vi.mock("@workspace/db", async (importOriginal) => {
@@ -83,7 +85,11 @@ vi.mock("@workspace/db", async (importOriginal) => {
         set: (v: any) => ({
           where: (w: any) => {
             state.updatedMuteFilters.push(w);
-            return Promise.resolve();
+            state.updateSets.push(v);
+            // Awaitable directly (see-less) or via .returning() (follower dismiss).
+            const done: any = Promise.resolve();
+            done.returning = () => Promise.resolve(state.updateReturning.splice(0, state.updateReturning.length));
+            return done;
           },
         }),
       })),
@@ -123,6 +129,8 @@ beforeEach(() => {
   state.followRows = [{ followerId: "target-1", followingId: "me-1" }];
   state.insertedMutes = [];
   state.updatedMuteFilters = [];
+  state.updateSets = [];
+  state.updateReturning = [];
 });
 
 describe("DELETE /api/social/followers/:userId", () => {
@@ -143,6 +151,45 @@ describe("DELETE /api/social/followers/:userId", () => {
     try {
       const res = await fetch(`${base}/api/social/followers/me-1`, { method: "DELETE" });
       expect(res.status).toBe(400);
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe("POST /api/social/followers/:userId/dismiss", () => {
+  it("stamps follow_back_dismissed_at on their follow of me without removing the follow", async () => {
+    state.updateReturning = [{ followerId: "target-1" }];
+    const { server, base } = await startServer();
+    try {
+      const res = await fetch(`${base}/api/social/followers/target-1/dismiss`, { method: "POST" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true, dismissed: true });
+      expect(state.updateSets).toHaveLength(1);
+      expect(state.updateSets[0].followBackDismissedAt).toBeInstanceOf(Date);
+      // Nothing was deleted: the follow edge is untouched.
+      expect(state.followRows).toEqual([{ followerId: "target-1", followingId: "me-1" }]);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("404s when that person doesn't follow me", async () => {
+    const { server, base } = await startServer();
+    try {
+      const res = await fetch(`${base}/api/social/followers/stranger/dismiss`, { method: "POST" });
+      expect(res.status).toBe(404);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("rejects dismissing yourself", async () => {
+    const { server, base } = await startServer();
+    try {
+      const res = await fetch(`${base}/api/social/followers/me-1/dismiss`, { method: "POST" });
+      expect(res.status).toBe(400);
+      expect(state.updateSets).toHaveLength(0);
     } finally {
       server.close();
     }

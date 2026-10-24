@@ -21,7 +21,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { API_BASE_URL } from '@/lib/api';
 import { FONT, FS, SP } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
-import { referralInviteePath } from '@/lib/referralCopy';
+import { REFERRAL_GET_CENTS, REFERRAL_GIVE_CENTS, referralInviteePath } from '@/lib/referralCopy';
+import { formatMoney } from '@/lib/format';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { SecondaryButton } from '@/components/BrandthreadUI';
@@ -67,7 +68,7 @@ export default function InviteDeepLinkScreen() {
     return (
       <View style={[styles.root, { backgroundColor: theme.background, paddingBottom: insets.bottom + SP.lg }]}>
         <Text style={[styles.title, { color: theme.text }]}>You've been invited to Brandthread</Text>
-        <Text style={[styles.body, { color: theme.muted }]}>Join with this invite and get $10 Thread Cash.</Text>
+        <Text style={[styles.body, { color: theme.muted }]}>Join with this invite and get {formatMoney(REFERRAL_GIVE_CENTS)} Thread Cash.</Text>
         <Text style={[styles.code, { color: theme.text }]} accessibilityLabel={`Invite code ${code.split('').join(' ')}`}>{code}</Text>
         <PrimaryButton label={store.label} onPress={download} style={{ alignSelf: 'stretch', marginTop: SP.lg }} />
         <Text style={[styles.note, { color: theme.muted }]}>Your invite is copied, so it's waiting when you open the app.</Text>
@@ -94,7 +95,7 @@ export default function InviteDeepLinkScreen() {
       <View style={[styles.root, { paddingBottom: insets.bottom + SP.lg }]}>
       <Text style={[styles.title, { color: theme.text }]}>You are already on Brandthread</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
-        Invite links are for new members. Share yours and you both get $5 Thread Cash.
+        Invite links are for new members. Share yours and you both get {formatMoney(REFERRAL_GET_CENTS)} Thread Cash.
       </Text>
       <PrimaryButton
         label="Share your invite"

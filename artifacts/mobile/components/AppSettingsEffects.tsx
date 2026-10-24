@@ -4,7 +4,9 @@
  *  - pulls the server copy (/api/me/settings) into local storage once per
  *    signed-in account, so a change made on another device shows up here;
  *  - Reduce motion: forces every Reanimated animation into its reduced form
- *    (on top of the OS setting, which is always honoured);
+ *    (on top of the OS setting, which is always honoured), and feeds
+ *    lib/reduceMotion.ts so RN `Animated` primitives and useReduceMotion()
+ *    honour it too;
  *  - Save login info: keeps the Clerk token cache in step with the toggle.
  * High contrast and upload quality read the same settings snapshot directly
  * (hooks/useColors.ts, lib/buyerSettings.ts uploadQuality()).
@@ -17,12 +19,15 @@ import { getBuyerSettingsSnapshot, loadBuyerSettings, subscribeBuyerSettings } f
 import { hydrateBuyerSettings } from '@/lib/buyerSettingsSync';
 import { setSaveLoginInfo } from '@/lib/tokenCache';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
+import { setReduceMotionPreference } from '@/lib/reduceMotion';
 
 export function AppSettingsEffects() {
   const api = useApi();
   const { isSignedIn, userId } = useAuth();
   const [reduceMotion, setReduceMotion] = useState(getBuyerSettingsSnapshot().reduceMotion);
   const hydratedFor = useRef<string | null>(null);
+
+  useEffect(() => { setReduceMotionPreference(reduceMotion); }, [reduceMotion]);
 
   useEffect(() => {
     void loadBuyerSettings().then((s) => {
