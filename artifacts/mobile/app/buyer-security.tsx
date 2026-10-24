@@ -105,7 +105,7 @@ export default function BuyerSecurity() {
           <View style={s.divider} />
           <ListRow
             icon="smartphone"
-            title="Where you're logged in"
+            title="Login activity"
             chevron
             onPress={() => router.push('/login-activity' as never)}
           />

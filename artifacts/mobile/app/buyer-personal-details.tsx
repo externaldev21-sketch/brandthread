@@ -159,7 +159,7 @@ export default function BuyerPersonalDetails() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Personal Details" />
+      <ScreenHeader title="Personal details" />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
@@ -245,7 +245,7 @@ export default function BuyerPersonalDetails() {
       </ScrollView>
 
       {hasChanges && (
-        <StickyBottomCTA label="Save Changes" loading={saving} disabled={saving} onPress={() => { void handleSave(); }} />
+        <StickyBottomCTA label="Save changes" loading={saving} disabled={saving} onPress={() => { void handleSave(); }} />
       )}
     </View>
   );
@@ -258,7 +258,7 @@ const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typ
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
-  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  input: { flex: 1, minWidth: 0, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
   inputDisabled: { color: palette.mutedForeground },
   note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
   noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },

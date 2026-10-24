@@ -189,7 +189,7 @@ export default function HelpScreen() {
   return (
     <View style={s.root}>
       <ScreenHeader
-        title="Help & Support"
+        title="Help & support"
         actions={[
           { icon: 'life-buoy', onPress: scrollToContact, accessibilityLabel: 'Jump to contact support' },
         ]}
