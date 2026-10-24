@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, TextInput, Alert, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, TextInput, ActivityIndicator, Animated } from 'react-native';
+
+import { showAlert } from '@/lib/actionSheet';
+
+import { Button } from '@/components/ui/Button';
 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
@@ -22,7 +26,7 @@ import { useNavigation, useRouter } from 'expo-router';
 import { haptics, haptic } from '@/lib/haptics';
 
 
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 
@@ -48,7 +52,11 @@ import { SP, FONT, TEXT_DISABLED } from '@/lib/theme';
 
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
+import { getPreviewAccount } from '@/lib/previewAccount';
+
+import { previewBuyerIdentity } from '@/lib/previewBuyerIdentity';
 
 import { canSyncAccountServer, fetchAccountSettings, patchAccountSettings, withTimeout } from '@/lib/accountSettings';
 
@@ -68,6 +76,12 @@ import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/p
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
+const CUSTOM_GENDER = 'Custom';
+const GENDER_MAX = 30;
+/** A stored gender that isn't one of the presets is the person's own custom text. */
+function isCustomGender(gender: string): boolean {
+  return gender === CUSTOM_GENDER || (!!gender && !(GENDER_OPTIONS as readonly string[]).includes(gender));
+}
 const BIO_MAX = 150;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const LINK_RE = /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i;
@@ -77,19 +91,10 @@ const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'jordan
 
 type CoreFields = { name: string; username: string; bio: string; link: string };
 
-// react-native-web's Alert.alert() is a no-op (RN's Alert has no web
-// implementation upstream), so the native Alert.alert below never shows
-// anything in a browser — the unsaved-changes prompt would silently vanish
-// on web only. Use the browser's own confirm() there; every other platform
-// keeps the native two-button alert.
+// showAlert renders the app's own themed dialog on web (WebAlertHost) and the
+// native two-button alert everywhere else.
 function confirmDiscardChanges(onDiscard: () => void) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm('Discard changes? You have unsaved changes. If you leave now, they will be lost.')) {
-      onDiscard();
-    }
-    return;
-  }
-  Alert.alert(
+  showAlert(
     'Discard changes?',
     'You have unsaved changes. If you leave now, they will be lost.',
     [
@@ -134,6 +139,11 @@ export default function BuyerEditProfileScreen() {
   const { theme } = useAppTheme();
   const api = useApi();
   const { getToken, userId } = useAuth();
+  const { user } = useUser();
+  // Read at load time only, so Clerk finishing late never re-runs the load
+  // and overwrites what the person already typed.
+  const clerkUserRef = useRef(user);
+  clerkUserRef.current = user;
   // Profile song (Instagram "Music" row). Hidden entirely unless a licensed
   // preview source is configured and the profileMusic flag is on.
   const profileMusicOn = useProfileMusicEnabled();
@@ -161,19 +171,24 @@ export default function BuyerEditProfileScreen() {
   // local-only path instead so the whole screen — including username
   // availability, photo upload and Save — works end-to-end against the same
   // AsyncStorage-backed profile store the rest of the screen already reads
-  // and writes via loadBuyerProfile/saveBuyerProfile. __DEV__-gated, so this
-  // is never reachable in a production build.
-  const preview = __DEV__ && isBuyerDevPreview();
+  // and writes via loadBuyerProfile/saveBuyerProfile. isBuyerDevPreview()
+  // already refuses production builds/hosts (an extra __DEV__ gate broke the
+  // exported preview build, which then 401'd on every call).
+  const preview = isBuyerDevPreview();
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
   const [extra, setExtra] = useState<Pick<BuyerProfileFields, 'pronouns' | 'gender' | 'aiCreator'>>({
     pronouns: '', gender: '', aiCreator: false,
   });
+  const [initialExtra, setInitialExtra] = useState(extra);
+  // "Custom" in the Gender sheet opens a text field for the person's own words.
+  const [customGenderOpen, setCustomGenderOpen] = useState(false);
   const [fields, setFields] = useState<CoreFields>({ name: '', username: '', bio: '', link: '' });
   const [initial, setInitial] = useState<CoreFields>({ name: '', username: '', bio: '', link: '' });
   // Fields this screen doesn't edit (phone, location) but must round-trip unchanged on save.
   const [loadedProfile, setLoadedProfile] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // A moving profile picture — set only when the avatar is a video; picking
   // a plain photo (the existing flow below) always clears this back out,
@@ -317,7 +332,7 @@ export default function BuyerEditProfileScreen() {
   async function pickAvatarVideo(asset: { uri: string; mimeType?: string | null; duration?: number | null }) {
     const seconds = typeof asset.duration === 'number' ? asset.duration / 1000 : null;
     if (seconds !== null && seconds > AVATAR_VIDEO_MAX_SECONDS + 0.25) {
-      Alert.alert(
+      showAlert(
         'Video too long',
         `Avatar videos can be at most ${AVATAR_VIDEO_MAX_SECONDS} seconds. Pick a shorter clip and try again.`,
       );
@@ -364,6 +379,7 @@ export default function BuyerEditProfileScreen() {
   }
 
   const loadProfile = useCallback(() => {
+    setLoadError(false);
     // Pronouns / gender / AI-creator follow the account (/api/me/settings);
     // the server copy wins over this device's cache when it has one.
     const remoteSettings = preview || !canSyncAccountServer()
@@ -373,24 +389,37 @@ export default function BuyerEditProfileScreen() {
       .then(([badgeState, rawProfileState, socialProfile, remote, me]) => {
         const profileState = { ...rawProfileState, ...profileExtrasFromSettings(remote) };
         setBadge(styleBadgeFromServer(me?.styleBadge) ?? badgeState ?? { ...DEFAULT_STYLE_BADGE, enabled: false });
+        // Nothing saved on this device yet: fall back to the account itself
+        // (server profile, then Clerk) — and, in the preview's demo=1 only,
+        // to the demo identity the profile tab shows. Fresh stays empty.
+        const demoIdentity = preview && isPreviewDemoMode() ? previewBuyerIdentity(true) : null;
+        const demoAccount = demoIdentity ? getPreviewAccount('buyer', true) : null;
+        const clerkUser = clerkUserRef.current;
+        const clerkName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ');
         const merged: CoreFields = {
-          name: profileState.name || socialProfile.name,
-          username: profileState.username || socialProfile.username || DEFAULT_BUYER_PROFILE.username,
+          name: profileState.name || socialProfile.name || me?.displayName || me?.name || clerkName || demoIdentity?.name || '',
+          username: profileState.username || socialProfile.username || me?.username || clerkUser?.username || demoIdentity?.username || DEFAULT_BUYER_PROFILE.username,
           bio: (profileState.bio && profileState.bio !== DEFAULT_BUYER_PROFILE.bio ? profileState.bio : socialProfile.bio) || '',
           link: profileState.links || socialProfile.website || '',
         };
-        setExtra({
-          pronouns: me?.pronouns || profileState.pronouns || socialProfile.pronouns || '',
-          gender: profileState.gender || '',
+        const loadedExtra = {
+          pronouns: me?.pronouns || profileState.pronouns || socialProfile.pronouns || demoAccount?.pronouns || '',
+          // A legacy literal "Custom" (stored before custom text existed) means "not entered yet".
+          gender: profileState.gender === CUSTOM_GENDER ? '' : profileState.gender || '',
           aiCreator: profileState.aiCreator,
-        });
+        };
+        setExtra(loadedExtra);
+        setInitialExtra(loadedExtra);
+        setCustomGenderOpen(profileState.gender === CUSTOM_GENDER || isCustomGender(loadedExtra.gender));
         setFields(merged);
         setInitial(merged);
         setLoadedProfile(profileState);
         if (profileState.avatarUri) setAvatarUri(profileState.avatarUri);
         if (profileState.avatarVideoUri) setAvatarVideoUri(profileState.avatarVideoUri);
       })
-      .catch(() => {})
+      // Every source is local or best-effort, but a failure must not pass as
+      // an empty profile someone could save over their real one.
+      .catch(() => setLoadError(true))
       .finally(() => setLoaded(true));
   }, [api, preview]);
 
@@ -410,8 +439,9 @@ export default function BuyerEditProfileScreen() {
 
   const isDirty = useMemo(
     () => fields.name !== initial.name || fields.username !== initial.username
-      || fields.bio !== initial.bio || fields.link !== initial.link,
-    [fields, initial],
+      || fields.bio !== initial.bio || fields.link !== initial.link
+      || extra.gender.trim() !== initialExtra.gender.trim() || extra.aiCreator !== initialExtra.aiCreator,
+    [fields, initial, extra, initialExtra],
   );
 
   // Warn on back navigation (header button, swipe, or hardware back) if there are unsaved text-field edits.
@@ -475,7 +505,7 @@ export default function BuyerEditProfileScreen() {
         bio: fields.bio.trim(),
         links: fields.link.trim(),
         pronouns: extra.pronouns,
-        gender: extra.gender,
+        gender: extra.gender.trim().slice(0, GENDER_MAX),
         aiCreator: extra.aiCreator,
         avatarUri: avatarUri || '',
         avatarVideoUri: avatarVideoUri || '',
@@ -516,16 +546,31 @@ export default function BuyerEditProfileScreen() {
       ]);
 
       setInitial(fields);
+      setInitialExtra({ ...extra, gender: cleanedFields.gender });
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
     } catch (err) {
       const mapped = profileSaveErrorMessage(err);
       if (mapped.field === 'username') { setUsernameStatus('invalid'); setUsernameError(mapped.message); }
-      Alert.alert('Could not save', mapped.message);
+      showAlert('Could not save', mapped.message);
     } finally {
       setSaving(false);
     }
+  }
+
+  if (loaded && loadError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <ScreenHeader title="Edit profile" onBack={() => goBackOr(router)} />
+        <View style={styles.errorState} testID="buyer-edit-profile-error">
+          <Icon name="alert-circle" size={28} color={theme.muted} />
+          <Text style={[styles.errorTitle, { color: theme.text }]}>Couldn't load your profile</Text>
+          <Text style={[styles.errorBody, { color: theme.muted }]}>Try again in a moment.</Text>
+          <Button label="Retry" variant="primary" size="small" onPress={() => { setLoaded(false); loadProfile(); }} />
+        </View>
+      </View>
+    );
   }
 
   if (!loaded) {
@@ -760,9 +805,29 @@ export default function BuyerEditProfileScreen() {
               onPress={() => { haptic('sheet'); setGenderPickerOpen(true); }}
             >
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
-              <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>
+              <Text style={[styles.chevronLabel, { color: theme.muted }]} numberOfLines={1}>{extra.gender || (customGenderOpen ? CUSTOM_GENDER : 'Add')}</Text>
               <Icon name="chevron-right" size={17} color={theme.muted} />
             </TouchableOpacity>
+            {customGenderOpen && (
+              <>
+                <Divider theme={theme} />
+                <View style={styles.row}>
+                  <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Custom gender</Text>
+                  <TextInput
+                    accessibilityLabel="Custom gender"
+                    testID="edit-profile-custom-gender"
+                    style={[styles.rowInput, { color: theme.text }]}
+                    value={extra.gender}
+                    onChangeText={v => setExtra(prev => ({ ...prev, gender: v.slice(0, GENDER_MAX) }))}
+                    placeholder="Enter your gender"
+                    placeholderTextColor={theme.muted}
+                    autoCorrect={false}
+                    maxLength={GENDER_MAX}
+                    returnKeyType="done"
+                  />
+                </View>
+              </>
+            )}
             <Divider theme={theme} />
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
@@ -830,8 +895,17 @@ export default function BuyerEditProfileScreen() {
 
         <GenderPicker
           visible={genderPickerOpen}
-          current={extra.gender}
-          onSelect={v => setExtra(prev => ({ ...prev, gender: v }))}
+          current={customGenderOpen ? CUSTOM_GENDER : extra.gender}
+          onSelect={v => {
+            if (v === CUSTOM_GENDER) {
+              // Keep any custom text already typed; otherwise start empty.
+              setExtra(prev => ({ ...prev, gender: isCustomGender(prev.gender) ? prev.gender : '' }));
+              setCustomGenderOpen(true);
+              return;
+            }
+            setCustomGenderOpen(false);
+            setExtra(prev => ({ ...prev, gender: v }));
+          }}
           onClose={() => setGenderPickerOpen(false)}
         />
         {bannerFlow.sheet}
@@ -843,6 +917,9 @@ export default function BuyerEditProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.lg },
+  errorTitle: { fontSize: 16, fontFamily: FONT.semibold, textAlign: 'center' },
+  errorBody: { fontSize: 14, fontFamily: FONT.regular, textAlign: 'center' },
   saveText: { fontSize: 15, fontFamily: FONT.semibold },
   sectionLabel: { fontSize: 13, fontFamily: FONT.semibold, paddingHorizontal: 20, paddingTop: 16 },
   sectionHint: { fontSize: 13, fontFamily: FONT.regular, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },

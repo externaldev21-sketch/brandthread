@@ -29,7 +29,9 @@ const appleEmoji = readFileSync(resolve(__dirname, '../lib/appleEmoji.tsx'), 'ut
 describe('No nested <button> inside <button> in CommentRow', () => {
   it('the row itself is a plain View, not a Pressable', () => {
     const rowStart = comments.indexOf('function CommentRow(');
-    const rowBody = comments.slice(rowStart, rowStart + 1200);
+    // Slice to the end of CommentRow (its prop list grew with onPressAuthor),
+    // not a fixed character count.
+    const rowBody = comments.slice(rowStart, comments.indexOf('function ViewRepliesButton'));
     expect(rowBody).toMatch(/return\s*\(\s*<View style=\{\[s\.commentRow/);
   });
 
@@ -77,14 +79,14 @@ describe('Time and Reply share one baseline (the 6px-higher-Reply bug)', () => {
     expect(comments).toContain("replyBtn: { justifyContent: 'center' },");
   });
 
-  it('Time and Reply use the identical font size and line height', () => {
-    expect(comments).toContain('commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },');
-    expect(comments).toContain('replyLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },');
+  it('Time and Reply use the identical font size (the 12pt FS.meta token) and line height', () => {
+    expect(comments).toContain('commentTime: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: SUBTLE },');
+    expect(comments).toContain('replyLabel: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: SUBTLE },');
   });
 });
 
 describe('Like heart: its own column near the comment text, solid when liked, never clipped', () => {
-  it('uses Ionicons filled/outline heart instead of Feather\'s outline-only glyph', () => {
+  it('uses FontAwesome\'s solid heart when liked and the outline Icon heart when not (Icon only ships an outline glyph)', () => {
     expect(comments).toContain('FontAwesome');
     expect(comments).toMatch(/liked\s*\?\s*<FontAwesome name="heart" size=\{16\}/);
     expect(comments).toContain('<Icon name="heart" size={16}');
@@ -149,12 +151,12 @@ describe('Row and username/text typography', () => {
     expect(comments).toMatch(/commentRow: \{[\s\S]*?paddingVertical: 8,/);
   });
 
-  it('username is 13pt semibold gray (#8a8a8a)', () => {
-    expect(comments).toContain('authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED');
+  it('username is 13pt (FS.sm) semibold in the theme MUTED gray', () => {
+    expect(comments).toContain('authorName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED');
   });
 
-  it('comment text is 15pt regular white with lineHeight 19', () => {
-    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },');
+  it('comment text is 15pt (FS.base) regular FG with lineHeight 19', () => {
+    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 19 },');
   });
 });
 
@@ -169,7 +171,9 @@ describe('PressableScale opt-out fixes the hugely-spaced comment rows (round 3)'
     const rowStart = comments.indexOf('function CommentRow(');
     const rowBody = comments.slice(rowStart, comments.indexOf('function ViewRepliesButton'));
     const pressStart = rowBody.indexOf('style={s.commentContentPress}');
-    const pressEnd = rowBody.indexOf('>', rowBody.indexOf('rippleEnabled={false}'));
+    // Search from the content Pressable itself: the author-avatar Pressable
+    // above it also sets rippleEnabled={false}.
+    const pressEnd = rowBody.indexOf('>', rowBody.indexOf('rippleEnabled={false}', pressStart));
     expect(rowBody.slice(pressStart, pressEnd)).toContain('noMinHeight');
   });
 
@@ -238,5 +242,33 @@ describe('Comment composer uses the shared slim Composer', () => {
 
   it('uses a 32pt avatar with an explicit dark fill, not the theme-elevated color that used to be indistinguishable from the composer background', () => {
     expect(comments).toContain('<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />');
+  });
+});
+
+describe('Comment typography uses the equal-value FS tokens', () => {
+  const theme = readFileSync(resolve(__dirname, '../lib/theme.ts'), 'utf8');
+  it('FS.meta/sm/base are still 12/13/15, so the token swap is value-identical', () => {
+    expect(theme).toMatch(/meta:\s*12,/);
+    expect(theme).toMatch(/sm:\s*13,/);
+    expect(theme).toMatch(/base:\s*15,/);
+  });
+  it('the dead emptyState/emptyTitle/emptyText styles are gone (the list uses its own empty line)', () => {
+    expect(comments).not.toMatch(/\bemptyState:|\bemptyTitle:|\bemptyText:/);
+  });
+});
+
+describe('Author avatar and name open the profile like @mentions', () => {
+  it('CommentRow takes onPressAuthor and wires both the avatar and the name to it', () => {
+    const rowStart = comments.indexOf('function CommentRow(');
+    const rowBody = comments.slice(rowStart, comments.indexOf('function ViewRepliesButton'));
+    expect(rowBody).toContain('onPressAuthor?: (comment: Row) => void;');
+    expect(rowBody).toContain('testID="comment-author-avatar"');
+    expect(rowBody).toMatch(/<Text style=\{s\.authorName\}[^>]*onPress=\{openAuthor\}/);
+  });
+  it('routes to the same profile screen the mention handler uses', () => {
+    const start = comments.indexOf('const handlePressAuthor = useCallback(');
+    expect(start).toBeGreaterThan(-1);
+    expect(comments.slice(start, start + 500)).toContain("pathname: '/buyer-other-profile' as never");
+    expect(comments).toContain('onPressAuthor={onPressAuthorStable}');
   });
 });

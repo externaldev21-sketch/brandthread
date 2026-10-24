@@ -104,6 +104,8 @@ vi.mock('@/components/search/FilterSheet', () => ({ FilterSheet: () => null }));
 vi.mock('@/components/SaveHeart', () => ({ SaveHeart: () => null }));
 vi.mock('@/components/CachedImage', () => ({ CachedImage: (p: Record<string, unknown>) => React.createElement('CachedImage', p) }));
 vi.mock('@/components/social/FollowButton', () => ({ default: (p: Record<string, unknown>) => React.createElement('FollowButton', p) }));
+// PersonRow's unfollow confirm sheet (pulls in the web alert host otherwise).
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: vi.fn() }));
 
 import { DiscoverSearchOverlay } from '@/components/discover/search/DiscoverSearchOverlay';
 

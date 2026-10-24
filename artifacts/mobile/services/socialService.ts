@@ -14,6 +14,7 @@ import { emitProfileEvent } from '@/lib/profileEvents';
 import { subscribeUserEvents } from '@/lib/realtime/userEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { clearPreviewMyNote, isPreviewNotesEnabled } from '@/lib/previewNotes';
 import { noteFollowGraphChanged, purgeAuthorFromFeedPostsCache } from '@/lib/feedPostsCache';
 import { queryClient } from '@/lib/queryClient';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
@@ -2168,6 +2169,20 @@ export async function postNote(text: string, audience?: Exclude<NoteAudience, 'f
   });
   notify();
   return note;
+}
+
+/** Clear my own active note (DELETE /api/social/notes/me; idempotent). With
+ *  no signed-in account in the dev preview there is no backend, so this
+ *  clears the in-memory preview note instead — same gate the inbox uses
+ *  around postNote()/postPreviewNote(). */
+export async function deleteMyNote(): Promise<void> {
+  if (_socialUserId === 'anon' && isPreviewNotesEnabled()) {
+    clearPreviewMyNote();
+    notify();
+    return;
+  }
+  await serviceRequest('/api/social/notes/me', { method: 'DELETE' });
+  notify();
 }
 
 /** Active notes from people I follow (+ my own), for the stories tray. */

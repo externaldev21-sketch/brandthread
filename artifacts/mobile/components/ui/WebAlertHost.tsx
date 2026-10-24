@@ -14,6 +14,7 @@ import { Alert, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { registerWebAlertPresenter } from '@/lib/actionSheet';
 import {
   dismissWebAlert,
   installWebAlertPolyfill,
@@ -27,6 +28,11 @@ import {
 // Patch as soon as this module is evaluated (the root layout imports it), so
 // alerts raised during the very first render are queued, not dropped.
 installWebAlertPolyfill(Alert as any, Platform.OS);
+// lib/actionSheet.ts `showAlert` / `confirmAlert` hand web alerts to a
+// registered presenter; route them into this same polyfilled dialog queue.
+if (Platform.OS === 'web') {
+  registerWebAlertPresenter((req) => Alert.alert(req.title, req.message, req.buttons, req.options));
+}
 
 export function WebAlertHost() {
   if (Platform.OS !== 'web') return null;

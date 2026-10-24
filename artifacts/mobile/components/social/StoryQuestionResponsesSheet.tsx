@@ -9,6 +9,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Avatar } from '@/components/ui';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { FONT, FS } from '@/lib/theme';
 import { crispPx } from '@/lib/crispPixel';
 
@@ -18,8 +19,11 @@ export interface QuestionResponses {
   }> }>;
 }
 
-export function StoryQuestionResponsesSheet({ visible, loading, data, onClose, onReply }: {
-  visible: boolean; loading: boolean; data: QuestionResponses | null; onClose: () => void; onReply: (userId: string) => void;
+export function StoryQuestionResponsesSheet({ visible, loading, data, error = false, onRetry, onClose, onReply }: {
+  visible: boolean; loading: boolean; data: QuestionResponses | null;
+  /** Loading the answers failed: shows an error + Retry instead of "No responses yet." */
+  error?: boolean; onRetry?: () => void;
+  onClose: () => void; onReply: (userId: string) => void;
 }) {
   const { theme } = useAppTheme();
   const total = data?.questions.reduce((n, q) => n + q.answers.length, 0) ?? 0;
@@ -27,6 +31,8 @@ export function StoryQuestionResponsesSheet({ visible, loading, data, onClose, o
     <Sheet visible={visible} onClose={onClose} title="Responses" testID="story-question-responses">
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
+      ) : error ? (
+        <ErrorState message="Couldn’t load responses." onRetry={onRetry} />
       ) : total === 0 ? (
         <Text style={[s.empty, { color: theme.muted }]}>No responses yet.</Text>
       ) : (

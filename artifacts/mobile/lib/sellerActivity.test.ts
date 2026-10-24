@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityItem } from './activity';
 import {
-  buildSellerActivitySections, hasUnreadSellerActivity, isSellerActivityItem, matchesSellerChip,
+  SELLER_ACTIVITY_CHIPS, buildSellerActivitySections, hasUnreadSellerActivity, isSellerActivityItem, matchesSellerChip, sellerChipEmpty,
 } from './sellerActivity';
 
 const NOW = new Date('2026-10-01T12:00:00Z');
@@ -61,5 +61,14 @@ describe('buildSellerActivitySections', () => {
     const sections = buildSellerActivitySections([item('a', 'post_like', 24 * 20, { isRead: false })], NOW);
     expect(sections.map((s) => s.key)).toEqual(['new']);
     expect(sections[0]!.title).toBe('New');
+  });
+});
+
+describe('seller activity empty copy', () => {
+  it('"All" names every kind of activity the screen collects, not just likes and followers', () => {
+    const message = sellerChipEmpty('all').message.toLowerCase();
+    for (const chip of SELLER_ACTIVITY_CHIPS.filter((c) => c.key !== 'all')) {
+      expect(message).toContain(chip.label.toLowerCase());
+    }
   });
 });

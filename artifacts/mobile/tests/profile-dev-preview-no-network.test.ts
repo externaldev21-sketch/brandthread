@@ -18,7 +18,8 @@ const read = (relativePath: string) =>
 describe('profile screens never hit the real API in dev-preview, however Clerk is stubbed', () => {
   it('(tabs)/profile.tsx: every data loader also checks isSellerDevPreview(), not just !userId', () => {
     const src = read('app/(tabs)/profile.tsx');
-    expect(src).toContain("import { isSellerDevPreview } from '@/lib/devPreview';");
+    // (isPreviewDemoMode rides along for the demo=1-only profile seed.)
+    expect(src).toMatch(/import \{[^}]*\bisSellerDevPreview\b[^}]*\} from '@\/lib\/devPreview';/);
     // loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount,
     // loadPage and loadShopProducts each have their own identical guard
     // (loadUnreadMessages went away with the Messages button, polish #99).

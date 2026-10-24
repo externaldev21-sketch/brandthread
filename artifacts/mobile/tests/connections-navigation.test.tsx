@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { routerMock, apiMock, paramsMock } = vi.hoisted(() => ({
   routerMock: { push: vi.fn(), back: vi.fn() },
-  apiMock: { social: { followers: vi.fn(), following: vi.fn() } },
+  apiMock: { social: { followers: vi.fn(), following: vi.fn(), follow: vi.fn(), unfollow: vi.fn() } },
   paramsMock: vi.fn(() => ({ type: 'followers', userId: 'user_seller' } as Record<string, string | undefined>)),
 }));
 
@@ -76,7 +76,7 @@ vi.mock('@/components/BrandthreadUI', () => {
 });
 vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: vi.fn() }));
 vi.mock('@/components/ui/OptionSheet', () => ({
-  OptionSheet: () => React.createElement('View', { testID: 'sort-sheet' }),
+  OptionSheet: (props: any) => React.createElement('View', { ...props, testID: 'sort-sheet' }),
 }));
 vi.mock('@/components/social/RemoveFollowerSheet', () => ({
   RemoveFollowerSheet: () => React.createElement('View', { testID: 'remove-follower-sheet' }),
@@ -88,7 +88,7 @@ vi.mock('@/services/socialService', () => ({
   setSellerFollowing: vi.fn().mockResolvedValue(undefined),
   removeFollower: vi.fn().mockResolvedValue({ followersCount: 0 }),
 }));
-vi.mock('@/lib/haptics', () => ({ hapticDestructiveConfirm: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
+vi.mock('@/lib/haptics', () => ({ hapticDestructiveConfirm: vi.fn(), hapticFollow: vi.fn(), haptics: { selection: vi.fn(), light: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), rigid: vi.fn() } }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
@@ -100,6 +100,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 }));
 
 import ConnectionsScreen from '@/app/connections';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 
 async function flush() { for (let i = 0; i < 6; i += 1) await Promise.resolve(); }
 
@@ -124,6 +125,8 @@ describe('connections list', () => {
       { userId: 'user_brand', name: 'Brand Co', username: 'brandco', handle: '@brandco', initials: 'BC', accountType: 'seller', isFollowing: false },
     ]);
     apiMock.social.following.mockReset().mockResolvedValue([]);
+    apiMock.social.unfollow.mockReset().mockResolvedValue({ ok: true });
+    vi.mocked(showActionSheet).mockReset();
   });
 
   afterEach(async () => {
@@ -159,5 +162,28 @@ describe('connections list', () => {
     await act(async () => { retry.props.onPress(); await flush(); });
     expect(apiMock.social.followers).toHaveBeenCalledTimes(2);
     expect(row(renderer, 'user_buyer')).toBeTruthy();
+  });
+
+  it("confirms before unfollowing from another account's Followers list", async () => {
+    renderer = await renderScreen();
+    const pill = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Following, tap to unfollow' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { pill.props.onPress(); await flush(); });
+    expect(apiMock.social.unfollow).not.toHaveBeenCalled();
+    expect(showActionSheet).toHaveBeenCalledTimes(1);
+    const [title, , buttons] = vi.mocked(showActionSheet).mock.calls[0];
+    expect(title).toBe('Unfollow Ava Buyer?');
+    expect(buttons.map((b) => b.text)).toEqual(['Unfollow', 'Cancel']);
+    await act(async () => { buttons[0].onPress?.(); await flush(); });
+    expect(apiMock.social.unfollow).toHaveBeenCalledWith('user_buyer');
+  });
+
+  it('puts the sort label back and says so when re-sorting fails', async () => {
+    paramsMock.mockReturnValue({ type: 'following', userId: undefined });
+    renderer = await renderScreen();
+    apiMock.social.following.mockRejectedValueOnce(new Error('offline'));
+    const sheet = renderer.root.findByProps({ testID: 'sort-sheet' });
+    await act(async () => { sheet.props.onSelect('earliest'); await flush(); });
+    expect(apiMock.social.following).toHaveBeenLastCalledWith(undefined, 'earliest');
+    expect(renderer.root.findByProps({ testID: 'sort-sheet' }).props.selectedId).toBe('default');
   });
 });

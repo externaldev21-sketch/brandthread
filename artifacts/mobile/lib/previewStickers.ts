@@ -28,7 +28,8 @@ function build(id: string, mine: boolean): Story {
     polls: { poll: mine
       ? { counts: [18, 11], percentages: [62, 38], total: 29, myVote: null }
       : { counts: null, percentages: null, total: null, myVote: null } },
-    questions: { question: { answered: false, count: mine ? 7 : null } },
+    // The count matches the seeded answers the Responses sheet lists.
+    questions: { question: { answered: false, count: mine ? PREVIEW_STICKER_ANSWERS.length : null } },
     products: { product: { productId: 'preview-product-1', name: 'Chrome Zip Hoodie', imageUrl: posterUri(1), priceCents: 14800, available: true, soldOut: false } },
     countdowns: { countdown: { dropId: 'preview-drop-1', name: 'Autumn Capsule', releaseAt, launched: false, live: false, subscribed: false } },
   };

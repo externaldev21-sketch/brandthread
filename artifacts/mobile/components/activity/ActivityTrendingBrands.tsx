@@ -63,7 +63,7 @@ const TrendingBrandItem = React.memo(function TrendingBrandItem({ brand, first, 
         </View>
       </Pressable>
       <View style={[styles.action, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
-        <FollowButton userId={brand.id} initial={NOT_FOLLOWING} size="compact" style={styles.follow} />
+        <FollowButton userId={brand.id} name={brand.name} initial={NOT_FOLLOWING} size="compact" style={styles.follow} />
       </View>
     </View>
   );

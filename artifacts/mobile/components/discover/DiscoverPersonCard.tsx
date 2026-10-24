@@ -55,6 +55,7 @@ export function DiscoverPersonCard({ person }: { person: DiscoverPersonSuggestio
       </View>
       <FollowButton
         userId={person.userId}
+        name={person.name}
         initial={{ isFollowing: person.isFollowing, isFollowedBy: false, isMutual: false }}
         size="compact"
         style={styles.follow}

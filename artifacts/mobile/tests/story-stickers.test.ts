@@ -52,6 +52,37 @@ describe('sticker wiring', () => {
     expect(src).toContain('api.social.questionAnswer(');
   });
 
+  it('Location and Link stickers never place a placeholder: location comes from the picker, link from a validated URL', () => {
+    const src = read('app/buyer-story-create.tsx');
+    expect(src).not.toContain("linkUrl: 'https://', linkText: 'Link'");
+    expect(src).toContain('<StickerTile icon="link" label="Link" onPress={() => { setStickerSheetOpen(false); openLinkModal(); }} />');
+    expect(src).toContain('const url = normalizeStoryLinkUrl(linkUrlDraft);');
+    expect(src).toContain("if (!url) { setLinkError('Enter a valid link, like example.com/shop'); return; }");
+    expect(src).toContain("else addOverlay({ type: 'location', locationLabel: place.name, locationPlaceId: place.id });");
+    // Tapping a placed location / link sticker reopens its picker to change it in place.
+    expect(src).toContain("if (tapped?.type === 'location') { setSelectedId(null); setEditingStickerId(id); setLocationPickerOpen(true); return; }");
+    expect(src).toContain("if (editingStickerId) changeOverlay(editingStickerId, { locationLabel: place.name, locationPlaceId: place.id });");
+    expect(src).toContain('if (editingStickerId) changeOverlay(editingStickerId, patch);');
+  });
+
+  it('the product picker shows a load error with a retry instead of "No products to tag yet."', () => {
+    const src = read('app/buyer-story-create.tsx');
+    expect(src).toMatch(/catch \{\s*setTaggableProducts\(\[\]\);\s*setTaggableState\('error'\);/);
+    expect(src).toMatch(/taggableState === 'error' \? \([\s\S]*?Couldn’t load your products\.[\s\S]*?onPress=\{\(\) => void loadTaggableProducts\(\)\}/);
+  });
+
+  it('the text tool hides the edit chrome underneath it, and the upload ring fits its 11pt label', () => {
+    const src = read('app/buyer-story-create.tsx');
+    expect(src).toContain("chromeHidden: { display: 'none' },");
+    expect(src.match(/textToolOpen && styles\.chromeHidden/g)?.length).toBe(5);
+    expect(src).toContain('const RING_SIZE = 30;');
+    expect(src).toContain('color: ON_DARK, fontSize: FS.xs, lineHeight: RING_SIZE, fontFamily: FONT.semibold,');
+  });
+
+  it('the mention suggestion chip shows "@handle"', () => {
+    expect(read('components/MentionPickerSheet.tsx')).toContain('<Text style={styles.barItemText} numberOfLines={1}>{withAt(p.username ?? p.handle)}</Text>');
+  });
+
   it('overlay types include the countdown sticker', () => {
     expect(read('services/socialTypes.ts')).toMatch(/\| 'countdown'/);
   });

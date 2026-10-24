@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, TextInput, Animated, ActivityIndicator } from 'react-native';
+
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
+import { useRole } from '@/contexts/RoleContext';
 
 import { CachedImage as Image } from '@/components/CachedImage';
 
@@ -20,6 +26,8 @@ import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useNavigation, useRouter } from 'expo-router';
+
+import BuyerEditProfileScreen from '@/app/(buyer)/edit-profile';
 
 import { haptics, haptic } from '@/lib/haptics';
 
@@ -93,8 +101,9 @@ type ImageSlotKey = 'avatar' | 'logo' | 'banner';
 // Dev-web preview only (?bt_preview=seller): no signed-in session exists so
 // api.seller.getProfile()/updateProfile() and the upload endpoints all 401.
 // Seed a local editable profile so the whole screen works end-to-end, and
-// simulate the reserved-username / upload round trips below. __DEV__-gated,
-// so this is never reachable outside a dev web preview.
+// simulate the reserved-username / upload round trips below. Gated by
+// isSellerDevPreview() itself (dev builds and the exported preview build
+// only — never the production host), so a real account never reaches it.
 const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'shop']);
 // The preview account (lib/previewAccount.ts): a fresh preview is a brand-new
 // seller — just the name and username from onboarding, every other field
@@ -116,14 +125,28 @@ const QUICK_LINKS: { icon: IconName; label: string; description: string; route: 
   { icon: 'file-text', label: 'Store policies', description: 'Return and cancellation policy', route: '/store-policies' },
 ];
 
-export default function EditProfileScreen() {
+/**
+ * `/edit-profile` is the SELLER editor (storefront, payouts, policies…). A
+ * buyer who lands here — e.g. a shared settings link, or the web URL, which
+ * is the same `/edit-profile` for both editors — gets the buyer editor
+ * rendered in place (no redirect, so the two same-path routes can't bounce).
+ */
+export default function EditProfileRoute() {
+  const { role, isLoaded } = useRole();
+  if (isLoaded && role === 'buyer') return <BuyerEditProfileScreen />;
+  return <EditProfileScreen />;
+}
+
+function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
   const api = useApi();
   const { getToken, userId } = useAuth();
   const { theme } = useAppTheme();
-  const preview = __DEV__ && isSellerDevPreview();
+  // isSellerDevPreview() already refuses production; the extra __DEV__ gate
+  // broke the exported preview build (no session → "Couldn't load your profile").
+  const preview = isSellerDevPreview();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
   const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
@@ -366,7 +389,7 @@ export default function EditProfileScreen() {
   async function pickAvatarVideo(asset: { uri: string; mimeType?: string | null; duration?: number | null }) {
     const seconds = typeof asset.duration === 'number' ? asset.duration / 1000 : null;
     if (seconds !== null && seconds > AVATAR_VIDEO_MAX_SECONDS + 0.25) {
-      Alert.alert('Video too long', `Avatar videos can be at most ${AVATAR_VIDEO_MAX_SECONDS} seconds. Pick a shorter clip and try again.`);
+      showAlert('Video too long', `Avatar videos can be at most ${AVATAR_VIDEO_MAX_SECONDS} seconds. Pick a shorter clip and try again.`);
       return;
     }
     setUploadError(prev => ({ ...prev, avatar: null }));
@@ -454,8 +477,8 @@ export default function EditProfileScreen() {
       setInitial(fields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);
-    } catch {
-      Alert.alert('Could not save', 'Could not save profile. Please try again.');
+    } catch (err) {
+      showAlert('Could not save', friendlyError(err, 'Could not save profile. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -711,19 +734,10 @@ export default function EditProfileScreen() {
 
 /* ── Sub-components ──────────────────────────────────────────────── */
 
-// react-native-web's Alert.alert() is a no-op (RN's Alert has no web
-// implementation upstream), so the native Alert.alert below never shows
-// anything in a browser — the unsaved-changes prompt would silently vanish
-// on web only. Use the browser's own confirm() there; every other platform
-// keeps the native two-button alert.
+// showAlert renders the app's own themed dialog on web (WebAlertHost) and the
+// native two-button alert everywhere else.
 function confirmDiscardChanges(onDiscard: () => void) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm('Discard changes? You have unsaved changes. If you leave now, they will be lost.')) {
-      onDiscard();
-    }
-    return;
-  }
-  Alert.alert(
+  showAlert(
     'Discard changes?',
     'You have unsaved changes. If you leave now, they will be lost.',
     [

@@ -70,6 +70,18 @@ export interface BuyerActivityResponse {
   comments: { total: number; items: Array<{ id: string; postId: string; authorId: string; authorName: string; body: string; isReply: boolean; createdAt: string }> };
 }
 
+/** One row of GET /api/social/me/liked-posts — a post I liked, newest like first. */
+export type LikedPost = {
+  id: string;
+  thumbnailUri: string | null;
+  mediaUris: string[];
+  mediaType: 'image' | 'video';
+  caption: string | null;
+  authorId: string;
+  authorName: string;
+  likedAt: string;
+};
+
 /** Server story highlight (GET /api/social/highlights/*). */
 /** GET /api/drops/:id/sms-blast — the seller's drop waitlist screen. */
 export interface DropSmsBlastPreview {
@@ -3952,6 +3964,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           authorInitials: string; authorColor: string;
           text: string; createdAt: number; expiresAt: number;
         }>>('/api/social/notes/following'),
+      /** Posts I liked that I can still see, newest like first (cursor-paginated). */
+      likedPosts: (opts: { cursor?: string; limit?: number } = {}) => {
+        const q = new URLSearchParams();
+        if (opts.cursor) q.set('cursor', opts.cursor);
+        if (opts.limit != null) q.set('limit', String(opts.limit));
+        const qs = q.toString();
+        return get<{ posts: LikedPost[]; nextCursor: string | null }>(`/api/social/me/liked-posts${qs ? `?${qs}` : ''}`);
+      },
+      /** Followers whose "Follow back" prompt I dismissed (server-persisted). */
+      followBackDismissals: () =>
+        get<{ userIds: string[] }>('/api/social/follow-back-dismissals'),
+      /** Hide the "Follow back" prompt for one follower, on every device. */
+      dismissFollowBack: (userId: string) =>
+        post<{ ok: true }>(`/api/social/follow-back-dismissals/${encodeURIComponent(userId)}`, {}),
       /** Who has viewed my story (author only) */
       storyViewers: (storyId: string) =>
         get<Array<{ userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; viewedAt: string }>>(

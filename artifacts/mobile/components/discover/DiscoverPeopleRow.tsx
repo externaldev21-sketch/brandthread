@@ -60,6 +60,7 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
             </PressableScale>
             <FollowButton
               userId={item.userId}
+              name={item.name}
               initial={{ isFollowing: item.isFollowing, isFollowedBy: false, isMutual: false }}
               size="compact"
               style={{ marginTop: SP.xs, alignSelf: 'stretch' }}

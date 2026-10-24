@@ -173,6 +173,7 @@ function ViewerPage({
         <View style={{ marginTop: SP.sm }}>
           <FollowButton
             userId={post.authorId}
+            name={post.authorName}
             initial={followInitial}
             size="compact"
             style={styles.followInline}

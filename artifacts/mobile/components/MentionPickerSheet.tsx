@@ -175,7 +175,7 @@ export function MentionSuggestionsBar({
               accessibilityLabel={`Mention ${withAt(p.username ?? p.handle)}`}
             >
               <PersonAvatar person={p} size={28} />
-              <Text style={styles.barItemText} numberOfLines={1}>{(p.username ?? p.handle ?? '').replace(/^@+/, '')}</Text>
+              <Text style={styles.barItemText} numberOfLines={1}>{withAt(p.username ?? p.handle)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

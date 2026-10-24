@@ -1,7 +1,10 @@
 import React from "react";
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
-  useQueryClient: () => ({ getQueryData: () => undefined, setQueryData: vi.fn() }),
+  useQueryClient: () => ({
+    getQueryData: () => undefined, setQueryData: vi.fn(),
+    fetchQuery: ({ queryFn }: { queryFn: () => unknown }) => queryFn(),
+  }),
 }));
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,7 +34,8 @@ const {
     giftCards: { store: vi.fn(async () => ({ enabled: false })) },
     seller: { getProfile: vi.fn() },
     publicSellers: { get: vi.fn(), recordVisit: vi.fn(), recordStoreVisit: vi.fn() },
-    reviews: { forSeller: vi.fn() },
+    reviews: { forSeller: vi.fn(), storeTrust: vi.fn(async () => ({})) },
+    brandMembership: { brand: vi.fn(async () => ({ level: null })) },
     social: { block: vi.fn(), profile: vi.fn(), tagged: vi.fn() },
   },
   followStateMock: vi.fn(),
@@ -116,7 +120,8 @@ vi.mock("@/components/ui/ErrorState", () => ({
 }));
 
 vi.mock("@clerk/expo", () => ({
-  useAuth: () => authMock(),
+  // Clerk reports isSignedIn alongside userId (useSignInGate reads it).
+  useAuth: () => { const auth = authMock(); return { isSignedIn: !!auth.userId, ...auth }; },
 }));
 
 // The save heart has its own coverage (saved-products-store.test.ts).
@@ -214,10 +219,34 @@ vi.mock("@/lib/money", () => ({
   formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}`,
 }));
 
+const { muteMocks, actionSheetMock } = vi.hoisted(() => ({
+  muteMocks: {
+    getMutedUsers: vi.fn(async (): Promise<Array<{ mutedUserId: string }>> => []),
+    muteUser: vi.fn(async () => {}),
+    unmuteUser: vi.fn(async () => {}),
+    getRestrictedUsers: vi.fn(async (): Promise<Array<{ restrictedUserId: string }>> => []),
+    restrictUser: vi.fn(async () => {}),
+    unrestrictUser: vi.fn(async () => {}),
+    getNotesForTray: vi.fn(async () => []),
+  },
+  actionSheetMock: vi.fn(),
+}));
+
 vi.mock("@/services/socialService", () => ({
   getSellerFollowState: followStateMock,
   setSellerFollowing: setFollowingMock,
+  ...muteMocks,
 }));
+
+vi.mock("@/components/ui/ActionSheet", () => ({ showActionSheet: actionSheetMock }));
+// Native picker module (pulled in via the banner editor); never opened here.
+// The sheet chrome (reanimated transitions) is not under test here: render its content.
+vi.mock("@/components/ui/BottomSheet", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/ui/BottomSheet")>()),
+  Sheet: ({ children, testID }: { children?: React.ReactNode; testID?: string }) => React.createElement("View", { testID }, children),
+}));
+vi.mock("@/components/ui/Snackbar", () => ({ Snackbar: () => null }));
+vi.mock("expo-document-picker", () => ({ getDocumentAsync: vi.fn() }));
 
 vi.mock("@/services/profileService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/profileService")>()),
@@ -242,6 +271,12 @@ import BuyerOtherProfileScreen from "@/app/buyer-other-profile";
 async function switchTab(renderer: ReactTestRenderer, label: string) {
   const tab = renderer.root.findAll((n) => n.props.testID === `profile-tab-${label}` && typeof n.props.onPress === "function")[0];
   await act(async () => { tab.props.onPress(); await flush(); });
+}
+
+/** The "..." sheet mounts on first open (MenuSheet), so open it before reading its rows. */
+async function openMenu(renderer: ReactTestRenderer) {
+  const more = renderer.root.findAll((n) => n.props.testID === "seller-profile-more" && typeof n.props.onPress === "function")[0];
+  await act(async () => { more.props.onPress(); await flush(); });
 }
 
 async function flush() {
@@ -347,10 +382,12 @@ describe("seller-profile.tsx owner vs visitor privacy (Instagram own-profile vs 
     expect(renderer.root.findAllByProps({ accessibilityLabel: "Inbox" })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-view-as-visitor" })).toHaveLength(0);
     expect(apiMock.seller.getProfile).not.toHaveBeenCalled();
-    // Visitor actions: Follow, Message and a ... menu with Share / Report / Block.
+    await openMenu(renderer);
+    expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-view-as-visitor" })).toHaveLength(0);
+    // Visitor actions: Follow, Message and a ... menu with Share / Mute / Report / Block.
     expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" }).length).toBeGreaterThan(0);
     expect(renderer.root.findAllByProps({ testID: "seller-profile-message" }).length).toBeGreaterThan(0);
-    for (const key of ["share", "report", "block"]) {
+    for (const key of ["share", "mute", "report", "block"]) {
       expect(renderer.root.findAllByProps({ testID: `profile-menu-sheet-${key}` }).length).toBeGreaterThan(0);
     }
   });
@@ -371,7 +408,9 @@ describe("seller-profile.tsx owner vs visitor privacy (Instagram own-profile vs 
     expect(text).toContain("Edit profile");
     expect(renderer.root.findAllByProps({ testID: "seller-profile-dashboard" }).length).toBeGreaterThan(0);
     expect(renderer.root.findAllByProps({ accessibilityLabel: "Inbox" }).length).toBeGreaterThan(0);
+    await openMenu(renderer);
     expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-view-as-visitor" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-mute" })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-report" })).toHaveLength(0);
     await switchTab(renderer, "shop");
     expect(renderer.root.findAllByProps({ testID: "profile-product-edit-prod-1" }).length).toBeGreaterThan(0);
@@ -383,6 +422,7 @@ describe("seller-profile.tsx owner vs visitor privacy (Instagram own-profile vs 
   it("View as visitor opens the visitor preview route", async () => {
     authMock.mockReturnValue({ isLoaded: true, userId: "seller-9" });
     renderer = await renderScreen();
+    await openMenu(renderer);
     const row = renderer.root.findAll((n) => n.props.testID === "profile-menu-sheet-view-as-visitor" && typeof n.props.onPress === "function")[0];
     await act(async () => { row.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith("/seller-profile?id=seller-9&asVisitor=1");
@@ -540,6 +580,54 @@ describe("seller-profile.tsx follow", () => {
     await act(async () => { follow.props.onPress(); await flush(); });
     expect(setFollowingMock).toHaveBeenCalledWith("seller-9", true);
     expect(textContent(renderer.root.findByProps({ testID: "profile-stat-followers" }).props.children)).toContain("13");
+  });
+});
+
+describe("seller-profile.tsx unfollow confirm + mute (visitor)", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
+  beforeEach(() => {
+    actionSheetMock.mockReset();
+    muteMocks.getMutedUsers.mockReset().mockResolvedValue([]);
+    muteMocks.muteUser.mockClear();
+    muteMocks.unmuteUser.mockClear();
+  });
+
+  it("asks before unfollowing (like the Following list) and only unfollows on confirm", async () => {
+    followStateMock.mockResolvedValue({ isFollowing: true, followersCount: 12 });
+    setFollowingMock.mockResolvedValue({ isFollowing: false, followersCount: 11 });
+    renderer = await renderScreen();
+    const following = renderer.root.findAll((node) => typeof node.props.accessibilityLabel === "string"
+      && node.props.accessibilityLabel.endsWith("tap to unfollow") && typeof node.props.onPress === "function")[0];
+    await act(async () => { following.props.onPress(); await flush(); });
+    expect(setFollowingMock).not.toHaveBeenCalled();
+    expect(actionSheetMock).toHaveBeenCalledTimes(1);
+    const [title, , buttons] = actionSheetMock.mock.calls[0];
+    expect(title).toBe("Unfollow Acme Co?");
+    expect(buttons.map((b: { text: string; style?: string }) => [b.text, b.style])).toEqual([["Unfollow", "destructive"], ["Cancel", "cancel"]]);
+    await act(async () => { buttons[0].onPress(); await flush(); });
+    expect(setFollowingMock).toHaveBeenCalledWith("seller-9", false);
+  });
+
+  it("offers Mute for a brand I haven't muted, and Unmute once muted", async () => {
+    renderer = await renderScreen();
+    await openMenu(renderer);
+    const mute = renderer.root.findAll((n) => n.props.testID === "profile-menu-sheet-mute" && typeof n.props.onPress === "function")[0];
+    expect(textContent(renderer.root.findAllByProps({ testID: "profile-menu-sheet-mute" })[0])).toContain("Mute Acme Co");
+    await act(async () => { mute.props.onPress(); await flush(); });
+    expect(muteMocks.muteUser).toHaveBeenCalledWith(expect.objectContaining({ userId: "seller-9", name: "Acme Co" }));
+    expect(textContent(renderer.root.findAllByProps({ testID: "profile-menu-sheet-mute" })[0])).toContain("Unmute Acme Co");
+  });
+
+  it("loads an existing mute and unmutes", async () => {
+    muteMocks.getMutedUsers.mockResolvedValue([{ mutedUserId: "seller-9" }]);
+    renderer = await renderScreen();
+    await openMenu(renderer);
+    expect(textContent(renderer.root.findAllByProps({ testID: "profile-menu-sheet-mute" })[0])).toContain("Unmute Acme Co");
+    const unmute = renderer.root.findAll((n) => n.props.testID === "profile-menu-sheet-mute" && typeof n.props.onPress === "function")[0];
+    await act(async () => { unmute.props.onPress(); await flush(); });
+    expect(muteMocks.unmuteUser).toHaveBeenCalledWith("seller-9");
+    expect(muteMocks.muteUser).not.toHaveBeenCalled();
   });
 });
 

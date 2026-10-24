@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, FlatList,
-  Alert, StyleSheet,
+  StyleSheet,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -26,6 +27,10 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { Icon } from '@/components/ui/Icon';
 import { CONTACT_SYNC_ENABLED } from '@/lib/contactSyncFlag';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -41,6 +46,28 @@ type FollowRow = {
 
 // Real incoming follow requests to a private account (server-backed).
 type RequestRow = { userId: string; name: string; handle: string; avatarUrl: string | null };
+
+// "Dismiss" on an Incoming follower is saved, so the row stays gone on the
+// next focus/refresh: server-side for a real account
+// (GET/POST /api/social/follow-back-dismissals), on-device in the dev-web
+// preview, which has no backend.
+const PREVIEW_DISMISSALS_KEY = 'bt.preview.followBackDismissals';
+const usesLocalDismissals = () => isBuyerDevPreview() || isSellerDevPreview();
+
+async function readPreviewDismissals(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PREVIEW_DISMISSALS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+async function addPreviewDismissal(userId: string): Promise<void> {
+  const ids = await readPreviewDismissals();
+  if (!ids.includes(userId)) await AsyncStorage.setItem(PREVIEW_DISMISSALS_KEY, JSON.stringify([...ids, userId]));
+}
 
 export default function BuyerFriendRequestsScreen() {
   const { theme } = useAppTheme();
@@ -69,18 +96,24 @@ export default function BuyerFriendRequestsScreen() {
     if (!silent) setLoading(true);
     setLoadFailed(false);
     try {
-      const [followers, following, sugs, reqs] = await Promise.all([
+      const [followers, following, sugs, reqs, dismissedIds] = await Promise.all([
         api.social.followers(),
         api.social.following(),
         getFriendSuggestions(),
         api.followRequests.list().catch(() => [] as RequestRow[]),
+        // A failed dismissals read just shows those rows again — never blocks the screen.
+        usesLocalDismissals()
+          ? readPreviewDismissals()
+          : api.social.followBackDismissals().then(r => r.userIds).catch(() => [] as string[]),
       ]);
       setRequests(Array.isArray(reqs) ? reqs : []);
+      const dismissed = new Set(Array.isArray(dismissedIds) ? dismissedIds : []);
 
-      // Incoming = people who follow me but I don't follow back
+      // Incoming = people who follow me but I don't follow back (minus the
+      // ones I dismissed)
       setIncoming(
         followers
-          .filter(f => !f.isFollowingBack)
+          .filter(f => !f.isFollowingBack && !dismissed.has(f.userId))
           .map(f => ({
             userId:          f.userId,
             name:            f.name,
@@ -125,8 +158,8 @@ export default function BuyerFriendRequestsScreen() {
       await api.social.follow(row.userId);
       setIncoming(prev => prev.filter(r => r.userId !== row.userId));
       void requestContextualPushPermission(userId, api);
-    } catch {
-      Alert.alert('Couldn’t follow back', 'Try again in a moment.');
+    } catch (err) {
+      showAlert('Couldn’t follow back', friendlyError(err, 'Try again in a moment.'));
     } finally {
       setActionId(null);
     }
@@ -140,27 +173,42 @@ export default function BuyerFriendRequestsScreen() {
       else await api.followRequests.decline(row.userId);
       setRequests(prev => prev.filter(r => r.userId !== row.userId));
       if (action === 'approve') void loadData();
-    } catch {
-      Alert.alert(action === 'approve' ? 'Couldn’t confirm request' : 'Couldn’t delete request', 'Try again in a moment.');
+    } catch (err) {
+      showAlert(action === 'approve' ? 'Couldn’t confirm request' : 'Couldn’t delete request', friendlyError(err, 'Try again in a moment.'));
     } finally {
       setActionId(null);
     }
   };
 
-  // ── Dismiss incoming (do nothing — they still follow me) ────────────────────
-  const handleDismiss = (row: FollowRow) => {
+  // ── Dismiss incoming (they still follow me; the row just stops showing) ─────
+  const handleDismiss = async (row: FollowRow) => {
     setIncoming(prev => prev.filter(r => r.userId !== row.userId));
+    try {
+      if (usesLocalDismissals()) await addPreviewDismissal(row.userId);
+      else await api.social.dismissFollowBack(row.userId);
+    } catch (err) {
+      // Not saved: put the row back so it doesn't silently reappear later.
+      setIncoming(prev => (prev.some(r => r.userId === row.userId) ? prev : [...prev, row]));
+      showAlert('Couldn’t dismiss', friendlyError(err, 'Try again in a moment.'));
+    }
   };
 
-  // ── Cancel sent (unfollow) ───────────────────────────────────────────────────
+  // ── Cancel sent (unfollow) — confirms first, same as the Following list ─────
+  const confirmCancel = (row: FollowRow) => {
+    showActionSheet(`Unfollow ${row.name}?`, undefined, [
+      { text: 'Unfollow', style: 'destructive', onPress: () => { void handleCancel(row); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const handleCancel = async (row: FollowRow) => {
     hapticFollow(false);
     setActionId(row.userId);
     try {
       await api.social.unfollow(row.userId);
       setSent(prev => prev.filter(r => r.userId !== row.userId));
-    } catch {
-      Alert.alert('Couldn’t unfollow', 'Try again in a moment.');
+    } catch (err) {
+      showAlert('Couldn’t unfollow', friendlyError(err, 'Try again in a moment.'));
     } finally {
       setActionId(null);
     }
@@ -175,13 +223,13 @@ export default function BuyerFriendRequestsScreen() {
       if (res?.status === 'requested') setRequestedIds(prev => new Set([...prev, sug.userId]));
       // Keep the local social service in sync for anything that reads it.
       await sendFriendRequest({ userId: sug.userId, name: sug.name, handle: sug.handle, initials: sug.initials, color: sug.color }).catch(() => {});
-    } catch {
+    } catch (err) {
       setSentSet(prev => {
         const next = new Set(prev);
         next.delete(sug.userId);
         return next;
       });
-      Alert.alert('Couldn’t follow. Try again.');
+      showAlert('Couldn’t follow', friendlyError(err, 'Try again in a moment.'));
     }
   };
 
@@ -245,7 +293,7 @@ export default function BuyerFriendRequestsScreen() {
         renderItem={({ item: row }) => (
           <View style={s.row}>
             <PressableScaleRow onPress={() => goToProfile(row)} onLongPress={() =>
-              Alert.alert(row.name, undefined, [
+              showAlert(row.name, undefined, [
                 { text: 'Block',  style: 'destructive', onPress: () => blockUser({ userId: row.userId, name: row.name, handle: row.handle, initials: row.initials, color: row.color }) },
                 { text: 'Cancel', style: 'cancel' },
               ])
@@ -260,7 +308,7 @@ export default function BuyerFriendRequestsScreen() {
               </View>
             </PressableScaleRow>
             <View style={s.rowActions}>
-              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => handleDismiss(row)} /></View>
+              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => { void handleDismiss(row); }} /></View>
               <View style={s.requestBtn}><Button label="Follow" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={actionId === row.userId} onPress={() => handleFollowBack(row)} /></View>
             </View>
           </View>
@@ -308,7 +356,7 @@ export default function BuyerFriendRequestsScreen() {
                 variant="tertiary"
                 size="small"
                 loading={actionId === row.userId}
-                onPress={() => handleCancel(row)}
+                onPress={() => confirmCancel(row)}
               />
             </View>
           </View>
@@ -371,7 +419,7 @@ export default function BuyerFriendRequestsScreen() {
   return (
     <View style={s.container}>
       <ScreenHeader
-        title="Connections"
+        title="Follow requests"
         actions={[{ icon: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search' }]}
       />
 

@@ -44,7 +44,10 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).toContain('<ProfileAccountSwitcher');
     expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
     expect(sellerProfile).toContain("key: 'activity', icon: 'bell'");
-    expect(sellerProfile).toContain("key: 'share', icon: 'share-2'");
+    // Share profile is the labelled button under the bio only — the ••• menu
+    // no longer repeats it (audit: "Share profile" was offered twice).
+    expect(sellerProfile).not.toContain("key: 'share', icon: 'share-2'");
+    expect(sellerProfile).toContain('label="Share profile"');
     expect(sellerProfile).toContain('<ProfileTopBarIcon name="bell"');
     // Polish #86/#98: one menu — Settings lives in the ••• sheet and Share is
     // the labelled "Share profile" button, so neither has its own icon.

@@ -10,6 +10,10 @@
  * GET    /api/social/search?q=&limit=    — search buyers by name / username
  * GET    /api/social/suggested?limit=    — "Suggested for you" (Activity tab)
  * POST   /api/social/suggested/:userId/dismiss — hide a suggestion
+ * GET    /api/social/me/liked-posts?cursor=&limit= — posts I liked, newest like first
+ * DELETE /api/social/notes/me            — clear my active note (idempotent)
+ * GET    /api/social/follow-back-dismissals         — { userIds } I hid from "Follow back"
+ * POST   /api/social/follow-back-dismissals/:userId — hide one follow-back prompt
  */
 import { Router } from "express";
 import { emitUserBlocked } from "../lib/blockEvents";
@@ -20,8 +24,8 @@ import { withStorefrontBannerAdopted } from "../lib/storefrontBanner";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const bannerStorage = new ObjectStorageService();
-import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes, savedItems, feedNotInterested } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, followRequests, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, followBackDismissals, activityMutes, savedItems, feedNotInterested } from "@workspace/db";
+import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, lt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getUserAppSettings } from "../lib/userAppSettingsStore";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -726,6 +730,115 @@ router.get("/profile/:userId", async (req, res) => {
   });
 });
 
+// ─── GET /api/social/me/liked-posts ──────────────────────────────────────────
+// "Posts you've liked": my current likes (unliking deletes the interaction
+// row), newest like first, cursor-paginated on (likedAt, likeId). Only posts I
+// can still open: the public-post rule (published, not held/removed, author
+// not suspended/deleted, private authors only when I follow them), no block
+// either way, not hidden with "Not interested", the author's "Who can see your
+// posts" setting, and my muted words — same filters as feeds and profiles.
+const LIKED_POSTS_DEFAULT_LIMIT = 30;
+const LIKED_POSTS_MAX_LIMIT = 50;
+
+export function encodeLikedCursor(likedAt: Date, likeId: string): string {
+  return Buffer.from(`${likedAt.toISOString()}|${likeId}`, "utf8").toString("base64url");
+}
+export function decodeLikedCursor(raw: string): { likedAt: Date; likeId: string } | null {
+  let decoded: string;
+  try { decoded = Buffer.from(raw, "base64url").toString("utf8"); } catch { return null; }
+  const sep = decoded.indexOf("|");
+  if (sep <= 0) return null;
+  const likedAt = new Date(decoded.slice(0, sep));
+  const likeId = decoded.slice(sep + 1);
+  if (Number.isNaN(likedAt.getTime()) || !/^[0-9a-f-]{36}$/i.test(likeId)) return null;
+  return { likedAt, likeId };
+}
+
+type LikedPostRow = {
+  mediaType: string; mediaUrl: string; mediaUrls: string[] | null; thumbnailUrl: string | null;
+  slides: Array<{ kind: "photo" | "video"; url: string; thumbnailUrl: string }> | null;
+};
+export function likedPostMedia(row: LikedPostRow) {
+  const slides = Array.isArray(row.slides) ? row.slides.filter((s) => typeof s?.url === "string" && s.url) : [];
+  const listed = Array.isArray(row.mediaUrls) ? row.mediaUrls.filter((u) => typeof u === "string" && u) : [];
+  const mediaUris = listed.length > 0 ? listed : slides.length > 0 ? slides.map((s) => s.url) : row.mediaUrl ? [row.mediaUrl] : [];
+  const mediaType: "image" | "video" = row.mediaType === "video" ? "video" : "image";
+  const thumbnailUri = row.thumbnailUrl
+    || slides.find((s) => s.thumbnailUrl)?.thumbnailUrl
+    || (mediaType === "image" ? mediaUris[0] ?? null : null)
+    || null;
+  return { thumbnailUri, mediaUris, mediaType };
+}
+
+router.get("/me/liked-posts", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const rawLimit = parseInt(String(req.query.limit ?? LIKED_POSTS_DEFAULT_LIMIT), 10);
+  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : LIKED_POSTS_DEFAULT_LIMIT, 1), LIKED_POSTS_MAX_LIMIT);
+  const rawCursor = typeof req.query.cursor === "string" ? req.query.cursor : "";
+  const cursor = rawCursor ? decodeLikedCursor(rawCursor) : null;
+  if (rawCursor && !cursor) {
+    res.status(400).json({ error: "Invalid cursor", code: "VALIDATION_ERROR" }); return;
+  }
+
+  const rows = await db.select({
+    likeId: interactions.id,
+    likedAt: interactions.createdAt,
+    id: posts.id,
+    userId: posts.userId,
+    mediaType: posts.mediaType,
+    mediaUrl: posts.mediaUrl,
+    mediaUrls: posts.mediaUrls,
+    thumbnailUrl: posts.thumbnailUrl,
+    slides: posts.slides,
+    caption: posts.caption,
+    styleTags: posts.styleTags,
+  }).from(interactions)
+    .innerJoin(posts, eq(posts.id, interactions.postId))
+    .where(and(
+      eq(interactions.userId, myId),
+      eq(interactions.type, "like"),
+      publicPostCondition(new Date(), myId),
+      notBlockedWith(myId, posts.userId),
+      sql`NOT EXISTS (SELECT 1 FROM ${feedNotInterested} WHERE ${feedNotInterested.userId} = ${myId} AND ${feedNotInterested.postId} = ${posts.id})`,
+      ...(cursor
+        ? [or(
+          lt(interactions.createdAt, cursor.likedAt),
+          and(eq(interactions.createdAt, cursor.likedAt), lt(interactions.id, cursor.likeId)),
+        )]
+        : []),
+    ))
+    .orderBy(desc(interactions.createdAt), desc(interactions.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor = hasMore && last ? encodeLikedCursor(last.likedAt, last.likeId) : null;
+
+  const authorIds = [...new Set(pageRows.map((row) => row.userId))];
+  const [allowed, muted, profiles] = await Promise.all([
+    ownersAllowing("whoCanSeePosts", authorIds.filter((id) => id !== myId), myId),
+    mutedPhrasesFor(myId),
+    profilesById(authorIds),
+  ]);
+  const visible = pageRows.filter((row) =>
+    (row.userId === myId || allowed.has(row.userId))
+    && (row.userId === myId || muted.length === 0
+      || !matchesMutedWords([row.caption ?? "", ...(row.styleTags ?? [])].join(" "), muted)));
+
+  res.json({
+    posts: visible.map((row) => ({
+      id: row.id,
+      ...likedPostMedia(row),
+      caption: row.caption ?? null,
+      authorId: row.userId,
+      authorName: profiles.get(row.userId)?.name ?? "Brandthread member",
+      likedAt: row.likedAt.toISOString(),
+    })),
+    nextCursor,
+  });
+});
+
 // ─── GET /api/social/posts/:postId ───────────────────────────────────────────
 // A single post by id, in the same normalized BuyerPost shape as
 // /profile/:userId/posts — for opening a specific post (e.g. from a saved
@@ -1335,6 +1448,38 @@ router.post("/suggested/:userId/dismiss", async (req, res) => {
   const target = req.params.userId as string;
   await db.insert(suggestionDismissals)
     .values({ userId: myId, suggestedUserId: target })
+    .onConflictDoNothing();
+  res.json({ ok: true });
+});
+
+// ─── Follow-back dismissals ──────────────────────────────────────────────────
+// The X on a "Follow back" prompt hides that follower's prompt for this
+// viewer on every device (same shape as suggestion_dismissals above).
+const FOLLOW_BACK_DISMISSALS_MAX = 1000;
+
+router.get("/follow-back-dismissals", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const rows = await db.select({ userId: followBackDismissals.dismissedUserId })
+    .from(followBackDismissals)
+    .where(eq(followBackDismissals.userId, myId))
+    .orderBy(desc(followBackDismissals.createdAt))
+    .limit(FOLLOW_BACK_DISMISSALS_MAX);
+  res.json({ userIds: rows.map((row) => row.userId) });
+});
+
+router.post("/follow-back-dismissals/:userId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const raw = String(req.params.userId ?? "").trim();
+  if (!raw || raw.length > 200) {
+    res.status(400).json({ error: "userId required", code: "VALIDATION_ERROR" }); return;
+  }
+  // Accept a users.id alias as well as a Clerk ID (same rule as /block).
+  const target = (await resolveToClerkId(raw)) ?? raw;
+  if (target === myId) {
+    res.status(400).json({ error: "Cannot dismiss yourself", code: "VALIDATION_ERROR" }); return;
+  }
+  await db.insert(followBackDismissals)
+    .values({ userId: myId, dismissedUserId: target })
     .onConflictDoNothing();
   res.json({ ok: true });
 });
@@ -1962,6 +2107,14 @@ router.get("/notes/following", async (req, res) => {
     .limit(page.limit + 1)
     .offset(page.offset);
   res.json(finishListPage(res, page, fetched).map(buildNoteView));
+});
+
+// ─── DELETE /api/social/notes/me — clear my own note ────────────────────────
+// Idempotent: deleting when there is no (or only an expired) note is still ok.
+router.delete("/notes/me", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  await db.delete(notes).where(eq(notes.authorId, myId));
+  res.json({ ok: true });
 });
 
 // ─── Block CRUD ───────────────────────────────────────────────────────────────

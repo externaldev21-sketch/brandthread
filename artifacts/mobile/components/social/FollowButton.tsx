@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Icon } from '@/components/ui/Icon';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { showAlert } from '@/lib/actionSheet';
 import { hapticFollow } from '@/lib/haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FILL_ELEVATED, FONT, FS, RADIUS, SP, TEXT_DISABLED } from '@/lib/theme';
@@ -27,8 +29,10 @@ type Props = {
   /** Runs before following/unfollowing; return false to stop (e.g. useSignInGate's requireSignIn for guests). */
   guard?: () => boolean;
   style?: any;
-  /** Shown when a follow/unfollow fails (after the rollback). Defaults to a native alert. */
+  /** Shown when a follow/unfollow fails (after the rollback). Defaults to an alert. */
   onError?: (message: string) => void;
+  /** The account's display name, for the unfollow confirm's title ("Unfollow {name}?"). */
+  name?: string;
 };
 
 /**
@@ -39,8 +43,10 @@ type Props = {
  * Never a silent no-op: seeded preview people (`preview-*` ids) follow
  * through lib/previewFollowStore, a signed-out viewer is sent to sign in,
  * and a failed request rolls back AND says so (`onError`, else an alert).
+ * Unfollowing confirms first (the Following list's two-option sheet,
+ * app/connections.tsx), so no screen using this button unfollows on one tap.
  */
-export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError, guard }: Props) {
+export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError, guard, name }: Props) {
   const { theme } = useAppTheme();
   const api = useApi();
   const router = useRouter();
@@ -63,10 +69,10 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
 
   const reportError = (message: string) => {
     if (onError) onError(message);
-    else if (Platform.OS !== 'web') Alert.alert('Something went wrong', message);
+    else showAlert('Something went wrong', message);
   };
 
-  const handlePress = async () => {
+  const handlePress = () => {
     if (busy || disabled || userId.startsWith('u_')) return;
     if (guard && !guard()) return;
     touchedRef.current = true;
@@ -74,6 +80,14 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       router.push('/sign-in' as never);
       return;
     }
+    if (!state.isFollowing) { void toggle(); return; }
+    showActionSheet(name ? `Unfollow ${name}?` : 'Unfollow this account?', undefined, [
+      { text: 'Unfollow', style: 'destructive', onPress: () => { void toggle(); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const toggle = async () => {
     const wasFollowing = state.isFollowing;
     const optimistic: FollowState = wasFollowing
       ? { isFollowing: false, isFollowedBy: state.isFollowedBy, isMutual: false }

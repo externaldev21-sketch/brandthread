@@ -33,14 +33,14 @@ import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 
-import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View, type ViewToken } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 
 import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -90,6 +90,8 @@ import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-c
 import { useApi } from '@/lib/api';
 
 import { ApiError } from '@/lib/networkNotice';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 
@@ -161,6 +163,7 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
   if (category === 'follows') icon = 'user-plus';
   else if (category === 'likes') icon = 'heart';
   else if (category === 'comments') icon = 'message-circle';
+  else if (row.type === 'repost') icon = 'repeat';
   if (!icon) return null;
   return (
     <View style={styles.typeBadge}>
@@ -550,6 +553,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
   // `screenPadding.bottom` above alone left the final row behind the bar.
   const api = useApi();
   const { user } = useUser();
+  const { signOut } = useAuth();
   // Inline "Trending brands" under the activity (replaces "Find people to follow").
   const { brands: trendingBrands, reload: reloadTrending } = useActivityTrendingBrands(user?.id);
   // "Story mentions" rail above the feed (Activity is the same screen for
@@ -700,7 +704,7 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     },
     onFailed: (failed) => {
       restoreRows(failed);
-      Alert.alert('Could not delete', 'Check your connection and try again.');
+      showAlert('Could not delete', 'Check your connection and try again.');
     },
   }), [restoreRows]);
   // Leaving Activity sends a waiting delete now rather than dropping it.
@@ -994,9 +998,9 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
     try {
       await setSellerFollowing(userId, next);
-    } catch {
+    } catch (err) {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', friendlyError(err, 'Please try again in a moment.'));
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -1015,8 +1019,9 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       return;
     }
     // "Following" → Instagram's two-option unfollow confirm, same as the
-    // Following list (app/connections.tsx).
-    showActionSheet(undefined, undefined, [
+    // Following list (app/connections.tsx handleFollowingPillPress).
+    const name = row.actors[0]?.name;
+    showActionSheet(name ? `Unfollow ${name}?` : 'Unfollow?', undefined, [
       { text: 'Unfollow', style: 'destructive', onPress: () => { void setFollowingPerson(userId, false); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1053,8 +1058,8 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       await blockUser({ userId: actor.id, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' });
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
       showToast('Blocked');
-    } catch {
-      Alert.alert('Could not block', 'Please try again in a moment.');
+    } catch (err) {
+      showAlert('Could not block', friendlyError(err, 'Please try again in a moment.'));
     }
   }, [showToast]);
 
@@ -1102,8 +1107,8 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
       setRemoveFollowerTarget(null);
       showToast('Removed');
-    } catch {
-      Alert.alert('Could not remove follower', 'Please try again in a moment.');
+    } catch (err) {
+      showAlert('Could not remove follower', friendlyError(err, 'Please try again in a moment.'));
     } finally {
       setRemovingFollower(false);
     }
@@ -1118,10 +1123,10 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     setDotIds(new Set());
     try {
       await markAllActivityRead();
-    } catch {
+    } catch (err) {
       setItems(previous);
       setDotIds(previousDots);
-      Alert.alert('Could not mark all as read', 'Check your connection and try again.');
+      showAlert('Could not mark all as read', friendlyError(err, 'Check your connection and try again.'));
     }
   }, []);
 
@@ -1131,13 +1136,13 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     try {
       await setSellerFollowing(person.userId, true);
       setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'done' }));
-    } catch {
+    } catch (err) {
       setSuggestedFollowState((prev) => {
         const next = { ...prev };
         delete next[person.userId];
         return next;
       });
-      Alert.alert('Could not follow', 'Please try again in a moment.');
+      showAlert('Could not follow', friendlyError(err, 'Please try again in a moment.'));
     }
   }, []);
 
@@ -1203,6 +1208,11 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
     <SectionHeader title={section.title} style={styles.reframeSectionHeader} />
   ), [styles]);
 
+  const signInAgain = useCallback(async () => {
+    await signOut().catch(() => {});
+    router.replace(`/sign-in?returnTo=${encodeURIComponent(isTab ? '/activity' : '/activity-center')}` as never);
+  }, [isTab, router, signOut]);
+
   const errorMessage = errorKind === 'auth'
     ? "Sign in again to see your activity."
     : errorKind === 'server'
@@ -1260,8 +1270,11 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
           <EmptyState
             tone="error"
             message={errorMessage}
-            actionLabel="Try again"
-            onAction={() => { void loadFirstPage('initial'); }}
+            // An expired session can't be fixed by retrying the same call:
+            // sign out and back in, returning here (same flow as
+            // delete-account's "Sign in again").
+            actionLabel={errorKind === 'auth' ? 'Sign in' : 'Try again'}
+            onAction={errorKind === 'auth' ? () => { void signInAgain(); } : () => { void loadFirstPage('initial'); }}
           />
         </View>
       ) : (
@@ -1650,7 +1663,7 @@ export const makeStyles = (theme: AppThemePreset) => {
   },
   followText: {
     fontFamily: FONT.semibold,
-    fontSize: 15,
+    fontSize: FS.base,
   },
   followTextNotFollowing: {
     color: '#000000',

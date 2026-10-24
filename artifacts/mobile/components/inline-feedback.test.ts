@@ -148,7 +148,8 @@ describe('buyer-post-comments — posting progress and failure', () => {
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/buyer-post-comments.tsx'), 'utf8');
     expect(src).toContain('sending');
-    expect(src).toContain('canSend={inputText.trim().length > 0 && !sending}');
+    // Photo replies widened canSend (text OR a ready photo); `!sending` still gates it.
+    expect(src).toMatch(/canSend=\{\(inputText\.trim\(\)\.length > 0 \|\| !!photo\.media\) && !sending\b/);
   });
 
   it('shows InlineSpinner on the send button while sending', async () => {
@@ -156,8 +157,9 @@ describe('buyer-post-comments — posting progress and failure', () => {
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/buyer-post-comments.tsx'), 'utf8');
     expect(src).toContain('<Composer');
-    expect(src).toContain('canSend={inputText.trim().length > 0 && !sending}');
-    expect(src).toContain('busy={sending}');
+    expect(src).toMatch(/canSend=\{\(inputText\.trim\(\)\.length > 0 \|\| !!photo\.media\) && !sending\b/);
+    // The spinner also covers an in-flight photo upload.
+    expect(src).toMatch(/busy=\{sending(?: \|\| photo\.uploading)?\}/);
   });
 
   it('has sendError state for posting failure', async () => {

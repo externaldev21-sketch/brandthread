@@ -40,6 +40,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   } }),
 }));
 vi.mock('@/lib/api', () => ({ useApi: () => ({ social: { follow: followMock, unfollow: unfollowMock } }) }));
+// FollowButton's unfollow confirm sheet (its real module pulls in the whole sheet/keyboard stack).
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: vi.fn() }));
 
 import { ActivityTrendingBrands } from '../components/activity/ActivityTrendingBrands';
 

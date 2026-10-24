@@ -214,18 +214,24 @@ export default function ConnectionsScreen() {
 
   // Re-sort the Following list server-side when the sheet's selection changes
   // (without re-showing the loading skeleton over an already-loaded screen).
+  // A failed re-sort puts the header back on the order the list is actually
+  // in and says so, instead of showing the new label over the old order.
   const handleSelectSort = useCallback((id: string) => {
     const nextSort = id as FollowSort;
+    const prevSort = sort;
     setSort(nextSort);
     setSortSheetOpen(false);
-    if (!user?.id) return;
+    if (!user?.id || nextSort === prevSort) return;
     api.social.following(listOwner, nextSort)
       .then((rows) => {
         setFollowing((Array.isArray(rows) ? rows : []).map(toConnectionUser).filter((row) => row.id));
         setHasMore((prev) => ({ ...prev, following: Array.isArray(rows) && rows.length >= PAGE_SIZE }));
       })
-      .catch(() => {});
-  }, [api, listOwner, user?.id]);
+      .catch(() => {
+        setSort(prevSort);
+        showToast("Couldn't change the sort. Try again.");
+      });
+  }, [api, listOwner, showToast, sort, user?.id]);
 
   // Typing in the search bar queries the whole list server-side (debounced);
   // the loaded rows are filtered locally until the results arrive.
@@ -415,10 +421,11 @@ export default function ConnectionsScreen() {
           // Viewing someone else's followers list — no reverse-follow data
           // is exposed for rows here, so a plain Follow/Following pill
           // (Instagram shows the same on another account's followers list).
+          // "Following" confirms before unfollowing, same as the Following list.
           <FollowPill
             following={followStateFor(item)}
             disabled={followPending.has(item.id)}
-            onPress={() => (followStateFor(item) ? handleUnfollow(item) : handleFollow(item))}
+            onPress={() => handleFollowingPillPress(item)}
             theme={theme}
           />
         ) : (
