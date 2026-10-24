@@ -283,7 +283,7 @@ interface DesignLayerCompositorProps {
  * of the display size requested.
  *
  * A project with no visible layers yet (a brand-new blank canvas) renders a
- * plain white artboard at the canvas's own aspect ratio — never a generic
+ * plain artboard in its background colour at the canvas's own aspect ratio — never a generic
  * grey type-icon. That's what an actually-blank canvas looks like; a
  * placeholder icon reads as "this thumbnail is broken", not "this canvas is
  * empty".
@@ -303,40 +303,39 @@ export default function DesignLayerCompositor({
   const sorted = [...layers].sort((a, b) => a.order - b.order);
   const hasAnyLayer = sorted.some(l => l.visible);
 
+  // The real canvas rect, aspect-fit inside the square display box. The
+  // background (and the rounded corners) belong to this rect only — a
+  // non-square canvas must not paint its colour into the letterbox, or the
+  // thumbnail misrepresents where the canvas edges are.
+  const fit = Math.min(displaySize / cw, displaySize / ch);
+  const fitW = Math.max(1, cw * fit);
+  const fitH = Math.max(1, ch * fit);
+  const isTransparent = bgHex === 'transparent';
+  // A blank canvas uses its own background (a black canvas is not a white
+  // artboard); only a transparent blank canvas falls back to white so it is
+  // still visible as an artboard.
+  const rectBg = hasAnyLayer
+    ? (isTransparent ? 'transparent' : bgHex)
+    : (isTransparent ? '#FFFFFF' : bgHex);
+
   return (
-    <View
-      style={[
-        cs.container,
-        {
-          width: displaySize,
-          height: displaySize,
-          backgroundColor: bgHex === 'transparent' ? 'transparent' : bgHex,
+    <View style={[cs.container, { width: displaySize, height: displaySize }]}>
+      <View
+        style={{
+          width: fitW,
+          height: fitH,
           borderRadius,
-        },
-      ]}
-    >
-      {hasAnyLayer ? (
-        <Svg
-          width={displaySize}
-          height={displaySize}
-          viewBox={`0 0 ${cw} ${ch}`}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-        >
-          {sorted.map(layer => renderLayer(layer, 1, 1, bgHex))}
-        </Svg>
-      ) : (
-        <View style={cs.placeholder}>
-          <View
-            style={{
-              width: cw * Math.min(displaySize / cw, displaySize / ch),
-              height: ch * Math.min(displaySize / cw, displaySize / ch),
-              // The canvas's own background (a black canvas is not a white
-              // artboard); only a transparent canvas falls back to white.
-              backgroundColor: bgHex === 'transparent' ? '#FFFFFF' : bgHex,
-            }}
-          />
-        </View>
-      )}
+          overflow: 'hidden',
+          backgroundColor: rectBg,
+        }}
+        testID="design-compositor-canvas"
+      >
+        {hasAnyLayer && (
+          <Svg width={fitW} height={fitH} viewBox={`0 0 ${cw} ${ch}`}>
+            {sorted.map(layer => renderLayer(layer, 1, 1, bgHex))}
+          </Svg>
+        )}
+      </View>
     </View>
   );
 }
@@ -346,9 +345,6 @@ export default function DesignLayerCompositor({
 const cs = StyleSheet.create({
   container: {
     overflow: 'hidden',
-  },
-  placeholder: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

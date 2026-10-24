@@ -21,6 +21,7 @@ import {
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
+import type { GarmentType } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { radius } from '@/constants/radii';
 import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
@@ -40,7 +41,9 @@ interface DesignTemplate {
   subcategory: string;
   dimensions: string;
   views?: number;
-  garmentType?: string;
+  /** Must be a GarmentType design-garment can render (polo/tank use the
+   *  closest supported body, the T-shirt). */
+  garmentType?: GarmentType;
   presetId?: string;
 }
 
@@ -52,8 +55,8 @@ const TEMPLATES: DesignTemplate[] = [
   { id: 'gt4', name: 'Bomber Jacket', category: 'Garments', subcategory: 'jacket', dimensions: 'Front + Back + Side', views: 4, garmentType: 'jacket' },
   { id: 'gt5', name: 'Snapback Cap', category: 'Garments', subcategory: 'hat', dimensions: 'Front + Back + Side', views: 4, garmentType: 'hat' },
   { id: 'gt6', name: 'Tote Bag', category: 'Garments', subcategory: 'bag', dimensions: 'Front + Back', views: 3, garmentType: 'bag' },
-  { id: 'gt7', name: 'Polo Shirt', category: 'Garments', subcategory: 'polo', dimensions: 'Front + Back', views: 3, garmentType: 'polo' },
-  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tank' },
+  { id: 'gt7', name: 'Polo Shirt', category: 'Garments', subcategory: 'polo', dimensions: 'Front + Back', views: 3, garmentType: 'tshirt' },
+  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tshirt' },
 
   // Social
   { id: 'st1', name: 'Instagram Story', category: 'Social', subcategory: 'story', dimensions: '1080 × 1920', presetId: 'ig_story' },
@@ -68,9 +71,10 @@ const TEMPLATES: DesignTemplate[] = [
   { id: 'pt3', name: 'Email Banner', category: 'Product', subcategory: 'email', dimensions: '600 × 200', presetId: 'email_banner' },
 
   // Packaging
-  { id: 'pk1', name: 'Product Box', category: 'Packaging', subcategory: 'box', dimensions: 'Custom', presetId: 'custom' },
-  { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: 'Custom', presetId: 'custom' },
-  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom' },
+  // Print sizes at 300 dpi: 8 × 6 in box panel, 2 × 3.5 in hang tag, 10 × 13 in mailer.
+  { id: 'pk1', name: 'Product Box', category: 'Packaging', subcategory: 'box', dimensions: '2400 × 1800', presetId: 'product_box' },
+  { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: '600 × 1050', presetId: 'hang_tag' },
+  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: '3000 × 3900', presetId: 'mailer_bag' },
 ];
 
 // 32pt-tall "Use Template" buttons → invisible 44pt touch height. The slop
@@ -114,11 +118,15 @@ export default function DesignTemplatesScreen() {
       if (template.garmentType) {
         // Create the project first so "Save Placement" and "Open Editor" in
         // design-garment have a real projectId, instead of dead-ending.
-        const project = await createProject('garment', template.name, {}, template.garmentType as any);
+        const project = await createProject('garment', template.name, {}, template.garmentType);
         router.push(`/design-garment?projectId=${project.id}&garmentType=${template.garmentType}` as any);
       } else if (template.presetId) {
         const size = parseDimensions(template.dimensions);
-        const project = await createProject('canvas', template.name, size ?? {});
+        const project = await createProject(
+          template.category === 'Packaging' ? 'packaging' : 'canvas',
+          template.name,
+          size ?? {},
+        );
         router.push(`/design-canvas?id=${project.id}` as any);
       }
     } catch {

@@ -61,6 +61,7 @@ import {
   DesignProject,
   SELLER_CANVAS_PRESETS, SellerCanvasPreset,
 } from '@/services/designTypes';
+import { friendlyError } from '@/lib/friendlyError';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
@@ -75,8 +76,10 @@ import { useSheetTransition } from '@/components/ui/BottomSheet';
 
 // ─── Grid geometry ─────────────────────────────────────────────────────────────
 // 3 columns, flush horizontal padding of 16px each side, 8px inter-column gaps.
-// DesignLayerCompositor accepts a square displaySize; we pass CELL_SIZE and let
-// the compositor handle any aspect-ratio letterboxing internally.
+// DesignLayerCompositor accepts a square displaySize and aspect-fits the canvas
+// inside it; thumbDisplaySize() picks the square that makes the fitted canvas
+// fill the portrait cell (no empty band under square/landscape thumbnails'
+// letterbox), and the cell centers it.
 const GRID_COLUMNS = 3;
 const GRID_GAP     = SP.sm;                          // 8px between columns
 const GRID_H_PAD   = SP.md;                          // 16px left/right page margin
@@ -87,6 +90,16 @@ const CELL_SIZE    = Math.floor(
 // Aspect: ~1.4 portrait ratio (like phone screen art). Matches the tall thumbnails
 // visible in screenshot 0.
 const THUMB_H      = Math.round(CELL_SIZE * 1.4);
+
+/** Square compositor size whose aspect-fit canvas fills (but never exceeds)
+ *  the CELL_SIZE × THUMB_H cell. The square's own letterbox is transparent and
+ *  clipped by the cell. */
+function thumbDisplaySize(project: DesignProject): number {
+  const w = project.canvas.width || 1080;
+  const h = project.canvas.height || 1080;
+  const long = Math.max(w, h);
+  return Math.floor(Math.min(CELL_SIZE * long / w, THUMB_H * long / h));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -419,7 +432,6 @@ const rm = StyleSheet.create({
 // ─── New Canvas Sheet ─────────────────────────────────────────────────────────
 
 type NewCanvasTab = 'presets' | 'custom' | 'clipboard';
-type ColorProfile = 'sRGB' | 'P3';
 type SizeUnit = 'px' | 'in';
 
 const SCREEN_QUICK_CHOICES: { label: string; width: number; height: number; desc: string; icon: IconName }[] = [
@@ -441,10 +453,11 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   const [customW, setCustomW] = useState('1080');
   const [customH, setCustomH] = useState('1080');
   const [unit, setUnit] = useState<SizeUnit>('px');
-  const [colorProfile, setColorProfile] = useState<ColorProfile>('sRGB');
   const [dpi, setDpi] = useState(72);
   const [customTitle, setCustomTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  // Which preset row was tapped, so only that row shows the spinner.
+  const [creatingPresetId, setCreatingPresetId] = useState<string | null>(null);
   const [clipState, setClipState] = useState<
     'idle' | 'checking' | 'has_image' | 'has_text' | 'empty' | 'unsupported'
   >('idle');
@@ -481,6 +494,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   async function createFromPreset(preset: SellerCanvasPreset) {
     if (creating) return;
     setCreating(true);
+    setCreatingPresetId(preset.id);
     try {
       const proj = await createProject('canvas', preset.label, {
         width: preset.width, height: preset.height,
@@ -488,7 +502,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       });
       onClose(); onCreated(proj.id);
     } catch { Alert.alert('Error', 'Could not create canvas.'); }
-    finally { setCreating(false); }
+    finally { setCreating(false); setCreatingPresetId(null); }
   }
 
   async function createCustom() {
@@ -630,7 +644,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                         <Text style={sh.presetLbl}>{qc.label}</Text>
                         <Text style={sh.presetDim}>{qc.width} × {qc.height} — {qc.desc}</Text>
                       </View>
-                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                      {creatingPresetId === qc.label.toLowerCase() ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
                   <Text style={[sh.sectionHd, { marginTop: SP.lg }]}>Seller presets</Text>
@@ -653,7 +667,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                         <Text style={sh.presetLbl}>{preset.label}</Text>
                         <Text style={sh.presetDim}>{preset.description}</Text>
                       </View>
-                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
+                      {creatingPresetId === preset.id ? <ActivityIndicator size="small" color={MUTED} /> : <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
                 </>
@@ -704,15 +718,6 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
                       </View>
                     </>
                   )}
-                  <Text style={[sh.sectionHd, { marginTop: SP.md }]}>Color profile</Text>
-                  <View style={sh.segRow}>
-                    {(['sRGB', 'P3'] as ColorProfile[]).map(cp => (
-                      <TouchableOpacity key={cp} style={[sh.segBtn, colorProfile === cp && sh.segBtnOn]} onPress={() => setColorProfile(cp)}
-                        accessibilityRole="radio" accessibilityState={{ checked: colorProfile === cp }} accessibilityLabel={cp}>
-                        <Text style={[sh.segLbl, colorProfile === cp && sh.segLblOn]}>{cp}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
                   <View style={sh.dimPreview}>
                     <Text style={sh.dimPreviewTxt}>
                       {toPx(customW)} × {toPx(customH)} px{unit === 'in' ? `  (${customW || 0} × ${customH || 0} in @ ${dpi} dpi)` : ''}
@@ -1191,7 +1196,7 @@ function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNa
         <View style={g.thumb}>
           <DesignLayerCompositor
             project={project}
-            displaySize={CELL_SIZE}
+            displaySize={thumbDisplaySize(project)}
             borderRadius={RADIUS.sm}
           />
         </View>
@@ -1256,7 +1261,7 @@ function StackGridItem({ projects, selected, selectionMode, onPress, onLongPress
           <View style={g.stackBack1} />
           <DesignLayerCompositor
             project={top}
-            displaySize={CELL_SIZE}
+            displaySize={thumbDisplaySize(top)}
             borderRadius={RADIUS.sm}
           />
         </View>
@@ -1277,6 +1282,8 @@ const g = StyleSheet.create({
     height: THUMB_H,
     borderRadius: RADIUS.sm,
     overflow: 'hidden',
+    alignItems: 'center',     // aspect-fit thumbnail centered in the cell
+    justifyContent: 'center',
     backgroundColor: CARD,   // visible while compositor renders
   },
   meta:        { paddingTop: 5, paddingBottom: SP.xs, paddingHorizontal: 2, minHeight: 44, justifyContent: 'center' },
@@ -1651,7 +1658,7 @@ export default function DesignGalleryScreen() {
       cancelSelection();
       loadData();
     } catch (e: unknown) {
-      Alert.alert('Could not stack', e instanceof Error ? e.message : 'Try again.');
+      Alert.alert('Could not stack', friendlyError(e, 'These designs could not be stacked. Try again.'));
     }
   }
 
@@ -1853,13 +1860,16 @@ export default function DesignGalleryScreen() {
             </>
           ) : (
             <>
-              <TouchableOpacity
-                style={s.actionBtnTouch}
-                onPress={() => enterSelection()} hitSlop={HIT}
-                accessibilityLabel="Enter selection mode" accessibilityRole="button" testID="header-select"
-              >
-                <Text style={s.actionBtn}>Select</Text>
-              </TouchableOpacity>
+              {/* Nothing to select on an empty gallery — hide Select. */}
+              {projects.length > 0 && (
+                <TouchableOpacity
+                  style={s.actionBtnTouch}
+                  onPress={() => enterSelection()} hitSlop={HIT}
+                  accessibilityLabel="Enter selection mode" accessibilityRole="button" testID="header-select"
+                >
+                  <Text style={s.actionBtn}>Select</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={s.actionBtnTouch}

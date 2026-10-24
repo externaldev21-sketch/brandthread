@@ -34,6 +34,16 @@ import { radius } from '@/constants/radii';
 // ─── Step type definitions ────────────────────────────────────────────────────
 
 type GarmentTemplate = typeof GARMENT_TEMPLATES[number];
+
+const PROJECT_TYPES = Object.keys(PROJECT_TYPE_LABELS) as DesignProjectType[];
+function isProjectType(v: unknown): v is DesignProjectType {
+  return typeof v === 'string' && (PROJECT_TYPES as string[]).includes(v);
+}
+
+/** Parses a digits-only dimension field; empty / non-numeric → NaN (invalid). */
+function parseDimension(text: string): number {
+  return /^\d+$/.test(text) ? parseInt(text, 10) : NaN;
+}
 type CanvasPreset = typeof CANVAS_PRESETS[number];
 
 type ProjectTypeOption = {
@@ -120,8 +130,12 @@ export default function DesignProjectScreen() {
   const [projectType, setProjectType] = useState<DesignProjectType | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<GarmentTemplate | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<CanvasPreset | null>(null);
-  const [canvasWidth, setCanvasWidth] = useState(1080);
-  const [canvasHeight, setCanvasHeight] = useState(1080);
+  // String-backed so the field can be cleared and retyped; parsed (and
+  // bounds-checked) only when deciding whether Next is allowed.
+  const [widthText, setWidthText] = useState('1080');
+  const [heightText, setHeightText] = useState('1080');
+  const canvasWidth = parseDimension(widthText);
+  const canvasHeight = parseDimension(heightText);
   const [useCustomDims, setUseCustomDims] = useState(false);
   const [backgroundHex, setBackgroundHex] = useState('#000000');
   const [bgMode, setBgMode] = useState<string>('#000000');
@@ -131,14 +145,18 @@ export default function DesignProjectScreen() {
 
   // Apply URL params on mount
   useEffect(() => {
-    const typeParam = params.type as DesignProjectType | undefined;
-    const garmentParam = params.garmentType as GarmentType | undefined;
+    // Unknown values are ignored: an invalid ?type= keeps the wizard on step 1,
+    // an unknown ?garmentType= leaves the garment picker (step 2) open.
+    const typeParam = isProjectType(params.type) ? params.type : undefined;
+    const tmpl = typeParam === 'garment'
+      ? GARMENT_TEMPLATES.find(t => t.garmentType === params.garmentType) ?? null
+      : null;
     if (typeParam) {
       setProjectType(typeParam);
-      if (typeParam === 'garment' && garmentParam) {
-        const tmpl = GARMENT_TEMPLATES.find(t => t.garmentType === garmentParam) ?? null;
+      setProjectName(PROJECT_TYPE_LABELS[typeParam]);
+      if (tmpl) {
         setSelectedTemplate(tmpl);
-        if (tmpl) setProjectName(tmpl.label);
+        setProjectName(tmpl.label);
         setStep(3);
       } else {
         setStep(2);
@@ -166,8 +184,8 @@ export default function DesignProjectScreen() {
 
   function selectPreset(preset: CanvasPreset) {
     setSelectedPreset(preset);
-    setCanvasWidth(preset.width);
-    setCanvasHeight(preset.height);
+    setWidthText(String(preset.width));
+    setHeightText(String(preset.height));
     setProjectName(preset.label);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -362,8 +380,8 @@ export default function DesignProjectScreen() {
                       <View style={styles.dimInputWrap}>
                         <TextInput
                           style={styles.dimInput}
-                          value={String(canvasWidth)}
-                          onChangeText={v => { const n = parseInt(v); if (!isNaN(n)) setCanvasWidth(n); }}
+                          value={widthText}
+                          onChangeText={v => setWidthText(v.replace(/[^0-9]/g, ''))}
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
@@ -378,8 +396,8 @@ export default function DesignProjectScreen() {
                       <View style={styles.dimInputWrap}>
                         <TextInput
                           style={styles.dimInput}
-                          value={String(canvasHeight)}
-                          onChangeText={v => { const n = parseInt(v); if (!isNaN(n)) setCanvasHeight(n); }}
+                          value={heightText}
+                          onChangeText={v => setHeightText(v.replace(/[^0-9]/g, ''))}
                           keyboardType="numeric"
                           placeholderTextColor={SUBTLE}
                           editable={useCustomDims}
@@ -404,6 +422,11 @@ export default function DesignProjectScreen() {
                     <Text style={[styles.customToggleText, useCustomDims && { color: accent }]}>Use custom dimensions</Text>
                   </TouchableOpacity>
                 </BrandthreadCard>
+                {!dimsValid && (
+                  <Text style={styles.infoSub} accessibilityLiveRegion="polite" testID="design-project-dims-error">
+                    Width and height must be whole pixels between 8 and 16384.
+                  </Text>
+                )}
               </View>
             )}
             <View style={styles.nextRow}>
