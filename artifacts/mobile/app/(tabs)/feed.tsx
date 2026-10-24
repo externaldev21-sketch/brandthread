@@ -26,6 +26,7 @@ import { useRouter, useIsFocused, useScrollToTop, useLocalSearchParams } from 'e
 import { useReportSheet } from '@/components/safety/ReportSheet';
 
 import { useAuth, useUser } from '@clerk/expo';
+import { useBlockAction } from '@/lib/useBlockAction';
 
 import { ForYouEmptyShop } from '@/components/feed/ForYouEmptyShop';
 
@@ -2248,9 +2249,10 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (before, after) =>
  */
 function ThreadRailOverlay({
   item, engagement, bottom, paused, reduceMotion, shareOpen, onOpenShare, onCloseShare,
-  onLike, onSave, onRepost, onFollow, onOpenCreator, onNotInterested,
+  onLike, onSave, onRepost, onFollow, onOpenCreator, onNotInterested, onBlockCreator,
 }: {
   item: SpotlightItem; engagement: EngagementState | undefined; bottom: number;
+  onBlockCreator?: (item: SpotlightItem) => void;
   paused: boolean; reduceMotion: boolean; shareOpen: boolean;
   onOpenShare: (id: string) => void; onCloseShare: () => void;
   onLike: (id: string) => Promise<void>; onSave: (id: string) => Promise<void>;
@@ -2294,7 +2296,8 @@ function ThreadRailOverlay({
       productName={item.productName} mediaUri={item.mediaUris[0]} isVideo={item.contentType === 'video'}
       shareCount={engagement?.shares ?? item.shares} reposted={!!engagement?.reposted} onRepost={() => onRepost(item.id)}
       recommendationReason={item.sponsored ? 'This is a paid promotion.' : 'You are viewing a post in the Threads feed. Posts can include accounts you follow and posts available to you.'}
-      onClose={onCloseShare} onReport={report} onNotInterested={() => onNotInterested(item.id)} onFeedback={showToast} />
+      onClose={onCloseShare} onReport={report} onNotInterested={() => onNotInterested(item.id)} onFeedback={showToast}
+      onBlock={onBlockCreator ? () => onBlockCreator(item) : undefined} />
   </>;
 }
 
@@ -3536,6 +3539,18 @@ function FeedScreenContent({
     showToast('Post hidden', 'info');
   }, [api, userId, loadFeed, showToast, requireSignIn]);
 
+  // Block from a post's menu: once the server saves the block, drop every
+  // post by that author from the loaded feed (the server already filters
+  // blocked authors from later pages).
+  const blockUser = useBlockAction();
+  const handleBlockCreator = useCallback(async (item: SpotlightItem) => {
+    if (!item.sellerId) return;
+    const blockedId = item.sellerId;
+    if (!(await blockUser({ userId: blockedId, name: item.creator }))) return;
+    setSellerFeedPosts(prev => prev.filter(post => post.sellerId !== blockedId));
+    showToast(`${item.creator} is blocked.`, 'info');
+  }, [blockUser, showToast]);
+
   useEffect(() => {
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
     if (sellerIds.length === 0) return;
@@ -3948,6 +3963,7 @@ function FeedScreenContent({
               onChromeHiddenChange={handleChromeHiddenChange}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
+              onBlockCreator={spotlight.sellerId && spotlight.sellerId !== userId && !spotlight.sellerId.startsWith('preview-') ? handleBlockCreator : undefined}
               onVideoWatched={handleVideoWatched}
               // The mini product sheet keeps the video playing, muted (#139).
               soundOn={soundOn}
@@ -4040,6 +4056,7 @@ function FeedScreenContent({
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: hiddenRailFor === activeSpotlight.id ? 0 : feedContentOpacity }]} pointerEvents={hiddenRailFor === activeSpotlight.id ? "none" : "box-none"}>
           <ThreadRailOverlay
             item={activeSpotlight}
+            onBlockCreator={activeSpotlight.sellerId && activeSpotlight.sellerId !== userId && !activeSpotlight.sellerId.startsWith('preview-') ? handleBlockCreator : undefined}
             engagement={engagements[activeSpotlight.id] ?? initialEngagement(activeSpotlight)}
             bottom={progressLine + PROGRESS_LINE_HEIGHT + RAIL_DISC_TO_PROGRESS}
             shareOpen={sharePostId === activeSpotlight.id}

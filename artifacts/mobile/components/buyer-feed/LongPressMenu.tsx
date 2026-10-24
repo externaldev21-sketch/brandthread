@@ -38,7 +38,7 @@ export function LongPressMenu({
   visible, creator, isVideo, speedActive, onToggleSpeed,
   saved, onToggleSave, reposted, canRepost = true, onToggleRepost,
   onShare, onCopyLink, captions, canDownload = false, onDownload,
-  onNotInterested, onReport, onClose, clearMode, onToggleClearMode, photoAutoAdvance,
+  onNotInterested, onReport, onBlock, blockLabel = 'Block', onClose, clearMode, onToggleClearMode, photoAutoAdvance,
 }: {
   visible: boolean;
   /** Seller display name, read out by VoiceOver on the "Don't recommend" row. */
@@ -61,6 +61,9 @@ export function LongPressMenu({
   onDownload?: () => void;
   onNotInterested: (reason: NotInterestedReason) => void;
   onReport: () => void;
+  /** Omitted for the viewer's own posts. */
+  onBlock?: () => void;
+  blockLabel?: string;
   onClose: () => void;
   /** Clear mode hides all overlay chrome on the post. */
   clearMode?: boolean;
@@ -80,6 +83,7 @@ export function LongPressMenu({
   const act = (fn: () => void) => () => { onClose(); fn(); };
 
   const topActions: { key: string; icon: FeatherName; label: string; onPress: () => void; active?: boolean }[] = [
+    ...(onBlock ? [{ key: 'block', icon: 'slash' as const, label: blockLabel, onPress: act(onBlock) }] : []),
     { key: 'report', icon: 'flag', label: 'Report', onPress: act(onReport) },
     { key: 'not-interested', icon: 'slash', label: 'Not interested', onPress: () => { haptic('sheet'); setPage('not-interested'); } },
   ];

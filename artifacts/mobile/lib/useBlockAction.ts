@@ -9,12 +9,15 @@ import { useApi } from '@/lib/api';
 
 import { confirmBlock, type BlockSubject } from '@/lib/safety';
 
-import { haptics } from '@/lib/haptics';
+import { haptics, hapticSuccess } from '@/lib/haptics';
+import { Platform } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 
 export function useBlockAction(): (subject: BlockSubject) => Promise<boolean> {
   const api = useApi();
   return useCallback(async (subject: BlockSubject) => {
-    const done = await confirmBlock(subject, api.social.block);
+    const done = await confirmBlock(subject, api.social.block, Platform.OS === 'web' ? showActionSheet : undefined);
+    if (done) hapticSuccess();
     return done;
   }, [api]);
 }

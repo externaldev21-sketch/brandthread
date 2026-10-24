@@ -62,6 +62,8 @@ interface ThreadShareSheetProps {
   shareCount?: number;
   onClose: () => void;
   onReport: () => void;
+  /** Block the post's author. Omitted for the viewer's own posts. */
+  onBlock?: () => void;
   onNotInterested: () => void;
   onFeedback: (message: string, kind?: 'info' | 'error') => void;
   /** Whether the signed-in viewer has already reposted this post. */
@@ -96,6 +98,7 @@ function AccountThreadShareSheet({
   shareCount = 0,
   onClose,
   onReport,
+  onBlock,
   onNotInterested,
   onFeedback,
   reposted = false,

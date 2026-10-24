@@ -32,6 +32,7 @@ import { BrandsYouMightLikeRow, useBrandsYouMightLike } from '@/components/disco
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useReportSheet } from '@/components/safety/ReportSheet';
+import { useBlockAction } from '@/lib/useBlockAction';
 import { useApi } from '@/hooks/useApi';
 import { SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -67,7 +68,7 @@ import { useFeedAds } from '@/hooks/useFeedAds';
 import { sponsoredAnchors, type SponsoredFeedItem } from '@/lib/feedAds';
 import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
-  composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
+  composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops, discoverPostTargetId,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
 } from '@/lib/discoverFeed';
 import { useScreenInteractive } from '@/lib/perf';
@@ -95,9 +96,10 @@ export default function DiscoverScreen() {
   const tabBarClearance = useTabBarClearance();
   const router = useRouter();
   const { openReport } = useReportSheet();
+  const blockUser = useBlockAction();
   const api = useApi();
   const { theme } = useAppTheme();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
 
   const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
   // First-run tip target: the scrolling list/grid the swipe-up hint
@@ -585,13 +587,19 @@ export default function DiscoverScreen() {
           onReport={() => {
             openReport({
               targetType: 'post',
-              targetId: menuPost.id,
+              targetId: discoverPostTargetId(menuPost.id),
               label: 'Post',
               ownerId: menuPost.authorId,
               ownerName: menuPost.authorName,
             });
           }}
           onClose={() => { setSafetyMenuPost(null); setSafetyMenuOpen(null); }}
+          onBlock={isSignedIn && menuPost.authorId !== userId && !menuPost.authorId.startsWith('preview-') ? () => {
+            const author = menuPost;
+            void blockUser({ userId: author.authorId, name: author.authorName }).then((done) => {
+              if (done) removePostFromLists(author.authorId);
+            });
+          } : undefined}
         />
       )}
       <FirstRunTip

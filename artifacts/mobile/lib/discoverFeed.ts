@@ -97,6 +97,11 @@ function colorFor(id: string): string {
   return AVATAR_SHADES[hash % AVATAR_SHADES.length];
 }
 
+/** The API id behind a namespaced Discover tile. */
+export function discoverPostTargetId(tileId: string): string {
+  return tileId.replace(/^(?:trend|friend)_/, '');
+}
+
 /** Maps one item of `api.publicDiscover.page()` into a Discover tile. */
 export function mapDiscoverItemToPost(row: any): DiscoverPost | null {
   if (!row?.id || !row?.author?.userId || !row?.imageUrl) return null;

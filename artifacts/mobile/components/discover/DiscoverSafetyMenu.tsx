@@ -16,13 +16,15 @@ import { RADII } from '@/constants/radii';
 import { MenuSheet } from '@/components/ui/MenuSheet';
 
 export function DiscoverSafetyMenu({
-  visible, authorName, onNotInterested, onMute, onReport, onClose, postId, preview, onOpen,
+  visible, authorName, onNotInterested, onMute, onReport, onBlock, onClose, postId, preview, onOpen,
 }: {
   visible: boolean;
   authorName: string;
   onNotInterested: () => void;
   onMute: () => void;
   onReport: () => void;
+  /** Omitted when the author can't be blocked (e.g. no author id). */
+  onBlock?: () => void;
   onClose: () => void;
   /** With a post: shown as the long-press preview menu (Instagram grid
    *  long-press) — the post enlarged over a blurred screen, the actions
@@ -40,6 +42,7 @@ export function DiscoverSafetyMenu({
       preview,
       onPreviewPress: onOpen,
       items: [
+        ...(onBlock ? [{ key: 'block', label: `Block ${authorName}`, icon: 'slash' as const, destructive: true, onPress: onBlock }] : []),
         ...(url ? [
           { key: 'share', label: 'Share', icon: 'share' as const, onPress: () => { void shareLink(url, `${authorName} on Brandthread`); } },
           { key: 'copy', label: 'Copy link', icon: 'link' as const, onPress: () => { void copyLink(url); } },
@@ -60,6 +63,7 @@ export function DiscoverSafetyMenu({
       testID="discover-safety-menu"
       sections={[
         [
+          ...(onBlock ? [{ key: 'block', label: `Block ${authorName}`, icon: 'slash' as const, destructive: true, onPress: onBlock }] : []),
           { key: 'not-interested', icon: 'eye-off', label: 'Not interested', onPress: onNotInterested },
           { key: 'mute', icon: 'volume-x', label: `Mute ${authorName}`, onPress: onMute },
         ],

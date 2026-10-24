@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
+import { Platform } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -83,7 +85,12 @@ export default function BlockedAndMutedScreen() {
 
   async function unblock(account: BlockedAccount) {
     setPendingId(account.userId);
-    const done = await confirmUnblock({ userId: account.userId, name: account.name }, api.social.unblock);
+    // react-native-web's Alert.alert renders nothing; web gets the themed sheet.
+    const done = await confirmUnblock(
+      { userId: account.userId, name: account.name },
+      api.social.unblock,
+      Platform.OS === 'web' ? showActionSheet : undefined,
+    );
     setPendingId(null);
     if (done) {
       setBlocked((prev) => prev.filter((row) => row.userId !== account.userId));

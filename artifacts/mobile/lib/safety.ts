@@ -131,64 +131,76 @@ export const BLOCK_EXPLAINER =
   'They won’t be able to find your profile, see your posts, comments or stories, or message you. ' +
   'You won’t see theirs either. They aren’t notified.';
 
+/** Shows a confirm dialog — `Alert.alert`'s shape, minus the options bag. */
+export type ConfirmPresenter = (
+  title: string,
+  message: string,
+  buttons: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[],
+) => void;
+
 /**
  * Ask for confirmation, then block. Resolves true only when the block was
- * saved on the server.
+ * saved on the server. `present` swaps the native Alert for another dialog
+ * (react-native-web's Alert.alert is a no-op; see components/ui/ActionSheet).
  */
 export function confirmBlock(
   subject: BlockSubject,
   block: (userId: string) => Promise<unknown>,
+  present?: ConfirmPresenter,
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    Alert.alert(
-      `Block ${subject.name}?`,
-      BLOCK_EXPLAINER,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await block(subject.userId);
-              resolve(true);
-            } catch (error) {
-              Alert.alert('Couldn’t block', apiErrorMessage(error, 'Check your connection and try again.'));
-              resolve(false);
-            }
-          },
+    const buttons: Parameters<ConfirmPresenter>[2] = [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await block(subject.userId);
+            resolve(true);
+          } catch (error) {
+            (present ?? Alert.alert)('Couldn’t block', apiErrorMessage(error, 'Check your connection and try again.'), [{ text: 'OK' }]);
+            resolve(false);
+          }
         },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+      },
+    ];
+    if (present) {
+      present(`Block ${subject.name}?`, BLOCK_EXPLAINER, buttons);
+      return;
+    }
+    Alert.alert(`Block ${subject.name}?`, BLOCK_EXPLAINER, buttons, { cancelable: true, onDismiss: () => resolve(false) });
   });
 }
 
 export function confirmUnblock(
   subject: BlockSubject,
   unblock: (userId: string) => Promise<unknown>,
+  present?: ConfirmPresenter,
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    Alert.alert(
-      `Unblock ${subject.name}?`,
-      'They’ll be able to see your profile and content and message you again. You can block them again at any time.',
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-        {
-          text: 'Unblock',
-          onPress: async () => {
-            try {
-              await unblock(subject.userId);
-              resolve(true);
-            } catch (error) {
-              Alert.alert('Couldn’t unblock', apiErrorMessage(error, 'Check your connection and try again.'));
-              resolve(false);
-            }
-          },
+    const title = `Unblock ${subject.name}?`;
+    const message = 'They’ll be able to see your profile and content and message you again. You can block them again at any time.';
+    const buttons: Parameters<ConfirmPresenter>[2] = [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      {
+        text: 'Unblock',
+        onPress: async () => {
+          try {
+            await unblock(subject.userId);
+            resolve(true);
+          } catch (error) {
+            (present ?? Alert.alert)('Couldn’t unblock', apiErrorMessage(error, 'Check your connection and try again.'), [{ text: 'OK' }]);
+            resolve(false);
+          }
         },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+      },
+    ];
+    if (present) {
+      present(title, message, buttons);
+      return;
+    }
+    Alert.alert(title, message, buttons, { cancelable: true, onDismiss: () => resolve(false) });
   });
 }
 
