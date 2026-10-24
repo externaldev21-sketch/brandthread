@@ -51,7 +51,7 @@ vi.mock("@/constants/spacing", () => ({
 import { RetryRow } from "./RetryRow";
 
 describe("RetryRow", () => {
-  it("renders the default 'Couldn't load — Tap to retry' copy", () => {
+  it("renders the default 'Couldn't load — tap to retry' copy", () => {
     let renderer!: ReturnType<typeof create>;
     act(() => {
       renderer = create(<RetryRow onRetry={() => {}} />);
@@ -59,7 +59,7 @@ describe("RetryRow", () => {
     const text = JSON.stringify(renderer.toJSON());
     expect(text).toContain("Couldn't load. Tap to retry.");
     expect(text).toContain("Couldn't load");
-    expect(text).toContain(" — Tap to retry");
+    expect(text).toContain(" — tap to retry");
   });
 
   it("renders a custom label, e.g. \"Couldn't load balance\", never a fabricated zero", () => {

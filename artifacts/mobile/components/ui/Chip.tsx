@@ -8,7 +8,7 @@
  * Layout/interaction reference only: UNIQLO and Alta filter chips.
  */
 import React from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, type Insets } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -74,12 +74,15 @@ export interface ChipProps {
   /** Trailing text after the label, not struck or dimmed (e.g. "Notify me"
    *  on a sold-out size; Zalando size picker convention). */
   trailingLabel?: string;
+  /** Overrides the default touch padding, e.g. for a one-character chip
+   *  ("1") that draws narrower than the 40pt the default assumes. */
+  hitSlop?: Insets;
 }
 
 export function Chip({
   label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, variant = 'default',
   strikethrough = false, accessibilityLabel, accessibilityRole = 'button',
-  pressableWhenDisabled = false, accessibilityHint, trailingLabel,
+  pressableWhenDisabled = false, accessibilityHint, trailingLabel, hitSlop,
 }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
@@ -99,7 +102,7 @@ export function Chip({
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       // Drawn 34pt (32pt quick-reply) tall — pad the touch area to 44pt.
-      hitSlop={isQuickReply ? QUICK_REPLY_HIT_SLOP : CHIP_HIT_SLOP}
+      hitSlop={hitSlop ?? (isQuickReply ? QUICK_REPLY_HIT_SLOP : CHIP_HIT_SLOP)}
       testID={testID}
     >
       <Animated.View
@@ -154,9 +157,11 @@ export interface ChipGroupProps {
   onChange: (ids: string[]) => void;
   multiple?: boolean;
   style?: React.ComponentProps<typeof View>['style'];
+  /** Passed to every chip (see ChipProps.hitSlop). */
+  chipHitSlop?: Insets;
 }
 
-export function ChipGroup({ options, selectedIds, onChange, multiple = false, style }: ChipGroupProps) {
+export function ChipGroup({ options, selectedIds, onChange, multiple = false, style, chipHitSlop }: ChipGroupProps) {
   const toggle = (id: string) => {
     if (multiple) {
       onChange(selectedIds.includes(id) ? selectedIds.filter((existing) => existing !== id) : [...selectedIds, id]);
@@ -173,6 +178,7 @@ export function ChipGroup({ options, selectedIds, onChange, multiple = false, st
           count={option.count}
           selected={selectedIds.includes(option.id)}
           onPress={() => toggle(option.id)}
+          hitSlop={chipHitSlop}
         />
       ))}
     </View>

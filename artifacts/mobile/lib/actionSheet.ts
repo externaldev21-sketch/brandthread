@@ -6,7 +6,7 @@
  * confirmation, which the Instagram/TikTok message-request references both
  * present as a bottom action sheet rather than a centered dialog.
  */
-import { ActionSheetIOS, Alert, Platform } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, type AlertButton, type AlertOptions } from 'react-native';
 
 export interface ConfirmActionSheetOptions {
   title: string;
@@ -39,6 +39,43 @@ export function confirmDestructiveActionSheet(options: ConfirmActionSheetOptions
       [
         { text: cancelLabel, style: 'cancel', onPress: () => resolve(false) },
         { text: options.confirmLabel, style: 'destructive', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
+
+// ─── showAlert / confirmAlert ────────────────────────────────────────────────
+//
+// Same arguments as `Alert.alert`. On web, components/ui/WebAlertHost.tsx
+// (mounted by <ActionSheetHost />) polyfills `Alert.alert` with a themed
+// dialog, so one call works on every platform.
+
+export type AlertButtonSpec = AlertButton;
+
+/** Drop-in replacement for `Alert.alert(title, message, buttons, options)`. */
+export function showAlert(title: string, message?: string, buttons?: AlertButtonSpec[], options?: AlertOptions): void {
+  Alert.alert(title, message, buttons && buttons.length ? buttons : [{ text: 'OK' }], options);
+}
+
+export interface ConfirmAlertOptions {
+  title: string;
+  message?: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  /** Styles the confirm button as destructive (red on iOS). */
+  destructive?: boolean;
+}
+
+/** Two-button confirm on every platform. Resolves true only on confirm. */
+export function confirmAlert(options: ConfirmAlertOptions): Promise<boolean> {
+  return new Promise((resolve) => {
+    showAlert(
+      options.title,
+      options.message,
+      [
+        { text: options.cancelLabel ?? 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: options.confirmLabel, style: options.destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
       ],
       { cancelable: true, onDismiss: () => resolve(false) },
     );

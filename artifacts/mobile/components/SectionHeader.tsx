@@ -21,10 +21,12 @@ interface SectionHeaderProps {
   title: string;
   action?: string;
   onAction?: () => void;
+  /** Screen-reader name for the action when its text alone is ambiguous ("New +"). */
+  actionAccessibilityLabel?: string;
   colors?: { foreground: string; primary: string };
 }
 
-export function SectionHeader({ title, action, onAction, colors: colorsProp }: SectionHeaderProps) {
+export function SectionHeader({ title, action, onAction, actionAccessibilityLabel, colors: colorsProp }: SectionHeaderProps) {
   const themeColors = useColors();
   const colors = colorsProp ?? themeColors;
   return (
@@ -33,7 +35,7 @@ export function SectionHeader({ title, action, onAction, colors: colorsProp }: S
         <Text accessibilityRole="header" maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.title, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       </View>
       {action && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn} hitSlop={ACTION_HIT_SLOP} accessibilityRole="button" accessibilityLabel={action}>
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn} hitSlop={ACTION_HIT_SLOP} accessibilityRole="button" accessibilityLabel={actionAccessibilityLabel ?? action}>
           <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.action, { color: colors.primary }]} numberOfLines={1}>{action}</Text>
         </TouchableOpacity>
       )}
