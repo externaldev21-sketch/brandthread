@@ -1,12 +1,14 @@
 /**
  * Recent Searches — dedicated "See all" page (Mobbin "Instagram iOS
  * Clearing search history"): full list, "Clear all" top-right, a
- * confirmation alert before wiping the (server-side, per-user) history,
- * and an empty state with "Clear all" disabled once it's gone.
+ * confirmation alert before wiping the history, and an empty state with
+ * "Clear all" disabled once it's gone. History is kept on the device
+ * (lib/recentSearches) and merged with the signed-in server history.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
@@ -17,10 +19,12 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { haptics } from '@/lib/haptics';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { clearRecentSearches, loadRecentSearches, mergeRecent, removeRecentSearch } from '@/lib/recentSearches';
 
 export default function BuyerSearchHistoryScreen() {
   const router = useRouter();
   const api = useApi();
+  const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
 
   const [terms, setTerms] = useState<string[]>([]);
@@ -28,13 +32,15 @@ export default function BuyerSearchHistoryScreen() {
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
+    const local = await loadRecentSearches();
     try {
-      const { recent } = await api.public.recent(30);
-      setTerms(recent.map((r) => r.query));
+      const server = isSignedIn ? (await api.public.recent(30)).recent.map((r) => r.query) : [];
+      setTerms(mergeRecent(local, server, 30));
       setFailed(false);
     } catch {
-      setTerms([]);
-      setFailed(true);
+      // The on-device list still shows when the server history can't load.
+      setTerms(local);
+      setFailed(local.length === 0);
     } finally {
       setLoading(false);
     }
@@ -50,7 +56,10 @@ export default function BuyerSearchHistoryScreen() {
 
   async function removeTerm(term: string) {
     setTerms((current) => current.filter((t) => t !== term));
-    try { await api.public.removeRecent(term); } catch { /* row already optimistically removed */ }
+    await removeRecentSearch(term);
+    if (isSignedIn) {
+      try { await api.public.removeRecent(term); } catch { /* row already optimistically removed */ }
+    }
   }
 
   function confirmClearAll() {
@@ -67,7 +76,10 @@ export default function BuyerSearchHistoryScreen() {
           onPress: async () => {
             haptics.warning();
             setTerms([]);
-            try { await api.public.clearRecent(); } catch { /* already cleared locally */ }
+            await clearRecentSearches();
+            if (isSignedIn) {
+              try { await api.public.clearRecent(); } catch { /* already cleared locally */ }
+            }
           },
         },
       ],

@@ -1255,6 +1255,27 @@ router.get("/search/suggested", async (req, res) => {
         .limit(lim),
     ]);
 
+    // A young marketplace has few followed sellers, which left the search
+    // empty state with a single brand. Top up with the sellers that have the
+    // most active listings (still real data), never past `lim`.
+    if (topBrands.length < lim) {
+      const have = topBrands.map((b) => b.sellerId);
+      const fill = await db.select({ sellerId: products.ownerId, listings: count() })
+        .from(products)
+        .innerJoin(users, eq(users.clerkId, products.ownerId))
+        .where(and(
+          eq(products.status, "active"), isNull(products.deletedAt),
+          inArray(users.accountType, ["seller", "both"]), eq(users.isSystemAccount, false),
+          isNull(users.suspendedAt), isNull(users.deletedAt), isNull(users.deletionRequestedAt),
+          notBlockedWith(viewerId, products.ownerId),
+          have.length ? notInArray(products.ownerId, have) : undefined,
+        ))
+        .groupBy(products.ownerId)
+        .orderBy(desc(count()), asc(products.ownerId))
+        .limit(lim - topBrands.length);
+      topBrands.push(...fill.map((f) => ({ sellerId: f.sellerId, followerCount: 0 })));
+    }
+
     const sellerIds = [...new Set([...topBrands.map((b) => b.sellerId), ...recentProducts.map((p) => p.ownerId)])];
     const sellerRows = sellerIds.length > 0
       ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName })

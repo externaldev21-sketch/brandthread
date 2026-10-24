@@ -47,6 +47,7 @@ import { aiConsentGate } from "../lib/aiConsent";
 import aiConsentRouter from "./ai-consent";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import searchUnifiedRouter from "./search-unified";
 import accountDeletionPublicRouter from "./account-deletion-public";
 import discoveryRouter from "./discovery";
 import featuredPublicRouter from "./featured-public";
@@ -308,6 +309,7 @@ const bumpSearchOnWrite: import("express").RequestHandler = (req, res, next) => 
 };
 router.use(["/product-bulk", "/shopify-imports", "/product-import", "/product-launches"], bumpSearchOnWrite);
 router.use("/public",          checkoutConfigRouter); // GET /checkout-config (no auth)
+router.use("/public",          searchUnifiedRouter); // /search/all — unified products/brands/people/posts search
 router.use("/public",          publicRouter);
 router.use("/public",          sharePreviewRouter); // /posts/:id/share-preview, /stores/:slug/share-preview (OG data)
 router.use("/public",          sitemapRouter); // /sitemap.xml — products, seller profiles, drops (served at brandthread.app/sitemap.xml)
