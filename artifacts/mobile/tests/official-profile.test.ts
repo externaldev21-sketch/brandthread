@@ -77,7 +77,10 @@ describe('official hero + grid', () => {
     expect(profile).toContain('{ videoUri: null, posterUri: null, plain: true }');
   });
   it('grid marks slideshows as multi-photo and videos with play + views', () => {
-    expect(grid).toContain("item.kind === 'slideshow' ? 'layers'");
+    // Only carousels get the corner glyph; a single photo carries no badge.
+    expect(grid).toContain("(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? (");
+    expect(grid).toContain('<Icon name="layers" size={11}');
+    expect(grid).not.toContain("? 'layers' : 'image'");
     expect(grid).toContain("icon: 'play' as const, value: formatCompactCount(item.viewsCount)");
     expect(grid).toContain("item.kind === 'video' && typeof item.viewsCount === 'number'");
   });

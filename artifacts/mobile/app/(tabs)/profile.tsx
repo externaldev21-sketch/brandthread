@@ -16,8 +16,9 @@ import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 import { useStickyState } from '@/lib/stickyState';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
 } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,7 +62,10 @@ import {
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { getPreviewSocialCounts } from '@/lib/previewSocialCounts';
+import { getDemoSellerProfile } from '@/components/profile/previewProfileDemo';
+import type { DiscoverPost } from '@/lib/discoverFeed';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
@@ -73,6 +77,8 @@ import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewId
 
 interface SellerProfileData {
   brandName:          string | null;
+  /** The account's @username — the share sheet's QR/link is built from it. */
+  username?:          string | null;
   displayName:        string | null;
   bio:                string | null;
   subscriptionStatus: string | null;
@@ -252,6 +258,7 @@ export default function ProfileScreen() {
       setServerBanner(resolveProfileBanner(data as any));
       setProfile({
         brandName:          data.brandName   ?? null,
+        username:           (data as any).username ?? null,
         displayName:        data.displayName ?? null,
         bio:                data.bio         ?? null,
         subscriptionStatus: data.subscriptionStatus ?? null,
@@ -391,6 +398,30 @@ export default function ProfileScreen() {
     setSocialCounts((counts) => ({ ...counts, following: followingCountAfter(counts.following, event) }));
   }), [userId]);
 
+  // Preview `demo=1` only: the seeded catalog (lib/previewSellerProducts.ts)
+  // fills Posts and Shop, and the demo's follower counts fill the stats, so
+  // the demo seller isn't a blank new account. A fresh preview and every real
+  // account never reach this (getDemoSellerProfile returns null).
+  const [demoPosts, setDemoPosts] = useState<DiscoverPost[]>([]);
+  useEffect(() => {
+    if (!isSellerDevPreview() || !isPreviewDemoMode()) return;
+    let alive = true;
+    void (async () => {
+      const [demo, counts, queue] = await Promise.all([
+        getDemoSellerProfile(),
+        getPreviewSocialCounts(),
+        import('@/lib/discoverPlayerQueue'),
+      ]);
+      if (!alive || !demo) return;
+      setDemoPosts(demo.posts);
+      setSellerPosts(demo.posts.map(queue.discoverPostToThreadPost));
+      setShopProducts(demo.products);
+      setProductsCount(demo.products.length);
+      if (counts) setSocialCounts((current) => ({ ...current, ...counts }));
+    })();
+    return () => { alive = false; };
+  }, []);
+
   // Shop tab: the seller's live listings (same source as the full products page).
   const loadShopProducts = useCallback(async () => {
     // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
@@ -441,7 +472,7 @@ export default function ProfileScreen() {
     const brandName = brandNameInput.trim();
     const bio = bioInput.trim();
     if (!brandName) {
-      Alert.alert('Add a brand name', 'Your Profile needs a brand name before you can save.');
+      showAlert('Add a brand name', 'Your Profile needs a brand name before you can save.');
       return;
     }
     if (savingProfile) return;
@@ -451,6 +482,7 @@ export default function ProfileScreen() {
       const updated = await api.auth.updateProfile({ brandName, bio });
       setProfile((current) => ({
         brandName: updated.brandName ?? brandName,
+        username: current?.username ?? null,
         displayName: updated.displayName ?? current?.displayName ?? null,
         bio: updated.bio ?? bio,
         subscriptionStatus: current?.subscriptionStatus ?? null,
@@ -474,7 +506,7 @@ export default function ProfileScreen() {
       void loadProfile();
     } catch (error) {
       reportNetworkError(error, saveProfileDetails);
-      Alert.alert('Could not save changes', 'Check your connection and try again.');
+      showAlert('Could not save changes', 'Check your connection and try again.');
     } finally {
       setSavingProfile(false);
     }
@@ -495,6 +527,15 @@ export default function ProfileScreen() {
   const draftPosts = sellerPosts.filter(p => !p.isArchived && (p.isDraft || isFutureScheduled(p)));
 
   const handleTilePress = useCallback((item: ProfileGridItem) => {
+    // Demo posts have no backend row: open the feed player on the seeded grid.
+    const demoIndex = demoPosts.findIndex(candidate => candidate.id === item.id);
+    if (demoIndex >= 0) {
+      void import('@/lib/discoverPlayerQueue').then(({ setDiscoverPlayerQueue }) => {
+        const token = setDiscoverPlayerQueue(demoPosts, demoIndex);
+        router.push(`/discover-player?q=${encodeURIComponent(token)}` as never);
+      });
+      return;
+    }
     const post = sellerPosts.find(candidate => candidate.id === item.id);
     if (!post || !userId) return;
     const isLive = !post.isDraft && !(post.scheduledAt && new Date(post.scheduledAt).getTime() > Date.now());
@@ -507,7 +548,7 @@ export default function ProfileScreen() {
     } else {
       router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never);
     }
-  }, [brandTitle, router, sellerPosts, userId]);
+  }, [brandTitle, demoPosts, router, sellerPosts, userId]);
 
   const handleShopTilePress = useCallback((item: ProfileGridItem) => {
     router.push(productDetailHref(item.id, { isOwner: true }) as never);
@@ -815,7 +856,7 @@ export default function ProfileScreen() {
           { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => nav('/settings') },
           // Was Edit's long-press (the shared Button has no long press).
           { key: 'quick-edit', icon: 'edit-3', label: 'Edit name and bio', onPress: openProfileEditor },
-          caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: () => setShareSheetVisible(true) },
+          // "Share profile" is the labelled button under the bio — not repeated here.
           // The store website link (brandthread.app/@handle) — the same Share store sheet as the Dashboard.
           caps.showShare && { key: 'share-store', icon: 'shopping-bag', label: 'Share store', onPress: () => openShareStoreSheet() },
           caps.showViewAsVisitor && userId && {
@@ -884,6 +925,11 @@ export default function ProfileScreen() {
         visible={shareSheetVisible}
         onClose={() => setShareSheetVisible(false)}
         avatarUrl={profile?.avatarPosterUrl || profile?.profileImageUrl || null}
+        // The seller's own @username, so the sheet never has to re-fetch it
+        // (and the preview, which has no session, still gets its QR code).
+        profileUsername={previewSellerBrandName() ? PREVIEW_SELLER_IDENTITY.username : profile?.username ?? null}
+        profileDisplayName={brandTitle}
+        profileBrandName={brandTitle}
         sellerExtra={{
           rating: null,
           products: sellerPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.thumbnailUri ?? p.mediaUris?.[0] })),

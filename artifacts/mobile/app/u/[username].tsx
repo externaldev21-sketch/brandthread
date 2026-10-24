@@ -306,19 +306,6 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
 
-  // ── Shared chrome ──────────────────────────────────────────────────────────
-  header: {
-    height: COMP.headerH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-  },
-  backBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   center: {
     flex: 1,
     alignItems: 'center',

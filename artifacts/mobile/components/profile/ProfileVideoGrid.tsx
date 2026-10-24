@@ -86,7 +86,6 @@ function tileLabel(item: ProfileGridItem): string {
   if (item.pinned) parts.push('Pinned');
   if (typeof item.viewsCount === 'number') parts.push(`${formatCompactCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
-  if (item.pinned) parts.push('Pinned');
   if (item.statusLabel) parts.push(item.statusLabel);
   if (item.caption) parts.push(item.caption.slice(0, 80));
   return parts.join(', ');
@@ -171,9 +170,12 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
               <View style={styles.pinBadge} pointerEvents="none" testID={`profile-tile-pinned-${item.id}`}>
                 <MaterialCommunityIcons name="pin" size={16} color="#FFFFFF" /* theme-exempt: over media */ style={styles.pinGlyph} />
               </View>
-            ) : (item.slideCount ?? 0) > 1 || item.kind !== 'video' ? (
+            ) : (item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? (
+              // Instagram: only a carousel gets a corner glyph — a single
+              // photo is the default and carries no badge (the old "photo"
+              // glyph plus the bag badge cluttered both top corners).
               <View style={styles.kindBadge} pointerEvents="none">
-                <Icon name={(item.slideCount ?? 0) > 1 || item.kind === 'slideshow' ? 'layers' : 'image'} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Icon name="layers" size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
             ) : null}
             {item.productCount > 0 ? (

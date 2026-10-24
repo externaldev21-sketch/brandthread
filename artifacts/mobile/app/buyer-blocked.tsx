@@ -6,11 +6,13 @@
  * change applies on every device immediately.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 import { Platform } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -98,12 +100,17 @@ export default function BlockedAndMutedScreen() {
   }
 
   async function unmute(record: MuteRecord) {
+    if (pendingId) return;
     haptics.select();
+    setPendingId(record.id);
     try {
       await unmuteUser(record.mutedUserId);
       setMuted((prev) => prev.filter((row) => row.id !== record.id));
-    } catch {
-      Alert.alert("Couldn't unmute", 'Try again.');
+    } catch (err) {
+      // The row stays, so the person can retry.
+      showAlert("Couldn't unmute", friendlyError(err, 'Try again.'));
+    } finally {
+      setPendingId(null);
     }
   }
 
@@ -215,6 +222,8 @@ export default function BlockedAndMutedScreen() {
                   onPress={() => unmute(item)}
                   variant="secondary"
                   size="small"
+                  loading={pendingId === item.id}
+                  disabled={pendingId !== null && pendingId !== item.id}
                   accessibilityHint={`Unmutes ${item.mutedUserName}`}
                 />
               )}
@@ -242,7 +251,7 @@ const makeStyles = (theme: AppThemePreset, palette: ReturnType<typeof useColors>
     flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start',
     padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  explainerText: { flex: 1, color: theme.muted, ...TYPE_SCALE.callout, lineHeight: 19 },
+  explainerText: { flex: 1, color: theme.muted, ...TYPE_SCALE.callout },
   wordsRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginTop: SPACING.sm,
     padding: SPACING.md, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,

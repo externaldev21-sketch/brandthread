@@ -21,7 +21,7 @@
  * never nested) and the same follow endpoint every other Follow pill uses.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -30,7 +30,9 @@ import { SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SearchBar } from '@/components/BrandthreadUI';
-import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
+import { PersonRow, PERSON_ROW_PADDING_V, type SearchPerson } from '@/components/search/PersonRow';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { ApiError } from '@/lib/networkNotice';
 import { activityHref, groupedPeopleTitle, GROUPED_PEOPLE_MAX_IDS } from '@/lib/activity';
 import { getPreviewActivity, isPreviewActivityEnabled, previewActorAvatarUri } from '@/lib/previewActivity';
@@ -72,9 +74,10 @@ function previewActors(ids: readonly string[]): GroupedActivityActor[] {
   return actors;
 }
 
-function toSearchPerson(actor: GroupedActivityActor, followsYou: boolean): SearchPerson {
+function toSearchPerson(actor: GroupedActivityActor, followsYou: boolean, requested: boolean): SearchPerson {
   return {
     followsYou,
+    requested,
     userId: actor.id,
     name: actor.name,
     username: null,
@@ -87,14 +90,15 @@ function toSearchPerson(actor: GroupedActivityActor, followsYou: boolean): Searc
   };
 }
 
-const ActorRow = React.memo(function ActorRow({ actor, followsYou, pending, onOpen, onToggleFollow }: {
+const ActorRow = React.memo(function ActorRow({ actor, followsYou, requested, pending, onOpen, onToggleFollow }: {
   actor: GroupedActivityActor;
   followsYou: boolean;
+  requested: boolean;
   pending: boolean;
   onOpen: (actor: GroupedActivityActor) => void;
   onToggleFollow: (actor: GroupedActivityActor) => void;
 }) {
-  const person = useMemo(() => toSearchPerson(actor, followsYou), [actor, followsYou]);
+  const person = useMemo(() => toSearchPerson(actor, followsYou, requested), [actor, followsYou, requested]);
   const handleOpen = useCallback(() => onOpen(actor), [actor, onOpen]);
   const handleToggle = useCallback(() => onToggleFollow(actor), [actor, onToggleFollow]);
   return <PersonRow person={person} loading={pending} onPress={handleOpen} onToggleFollow={handleToggle} />;
@@ -131,6 +135,9 @@ export default function ActivityPeopleScreen() {
   const [status, setStatus] = useState<Status>('loading');
   const [errorKind, setErrorKind] = useState<'auth' | 'offline' | 'server'>('offline');
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  // Private accounts this viewer has a pending follow request to (the server
+  // answered a follow with status "requested") — their pill reads "Requested".
+  const [requested, setRequested] = useState<ReadonlySet<string>>(() => new Set());
   const [query, setQuery] = useState('');
   const requestId = useRef(0);
 
@@ -187,16 +194,39 @@ export default function ActivityPeopleScreen() {
     setActors((prev) => prev.map((a) => (a.id === actorId ? { ...a, isFollowing } : a)));
   }, []);
 
+  const markRequested = useCallback((actorId: string, on: boolean) => {
+    setRequested((prev) => {
+      if (prev.has(actorId) === on) return prev;
+      const copy = new Set(prev);
+      if (on) copy.add(actorId); else copy.delete(actorId);
+      return copy;
+    });
+  }, []);
+
+  // PersonRow already confirms before an unfollow; this runs the change.
+  // Tapping "Requested" cancels the pending request (the unfollow endpoint
+  // also clears follow requests).
   const handleToggleFollow = useCallback(async (actor: GroupedActivityActor) => {
     if (pending.has(actor.id)) return;
-    const next = !actor.isFollowing;
+    const wasRequested = requested.has(actor.id);
+    const next = wasRequested ? false : !actor.isFollowing;
     setPending((prev) => new Set(prev).add(actor.id));
-    setFollowing(actor.id, next);
+    if (wasRequested) markRequested(actor.id, false);
+    else setFollowing(actor.id, next);
     try {
-      await setSellerFollowing(actor.id, next);
-    } catch {
-      setFollowing(actor.id, !next);
-      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Try again in a moment.');
+      const state = await setSellerFollowing(actor.id, next);
+      if (next && (state as unknown as { status?: string } | undefined)?.status === 'requested') {
+        // Private account: only a request was sent — not following yet.
+        setFollowing(actor.id, false);
+        markRequested(actor.id, true);
+      }
+    } catch (err) {
+      if (wasRequested) markRequested(actor.id, true);
+      else setFollowing(actor.id, !next);
+      showAlert(
+        wasRequested ? 'Could not cancel request' : next ? 'Could not follow' : 'Could not unfollow',
+        friendlyError(err, 'Try again in a moment.'),
+      );
     } finally {
       setPending((prev) => {
         const copy = new Set(prev);
@@ -204,7 +234,7 @@ export default function ActivityPeopleScreen() {
         return copy;
       });
     }
-  }, [pending, setFollowing]);
+  }, [markRequested, pending, requested, setFollowing]);
 
   const handleToggleFollowVoid = useCallback((actor: GroupedActivityActor) => {
     void handleToggleFollow(actor);
@@ -221,11 +251,12 @@ export default function ActivityPeopleScreen() {
       actor={item}
       // Everyone on a "New followers" list follows the viewer already.
       followsYou={type === 'new_follower'}
+      requested={requested.has(item.id)}
       pending={pending.has(item.id)}
       onOpen={handleOpen}
       onToggleFollow={handleToggleFollowVoid}
     />
-  ), [handleOpen, handleToggleFollowVoid, pending, type]);
+  ), [handleOpen, handleToggleFollowVoid, pending, requested, type]);
 
   const keyExtractor = useCallback((item: GroupedActivityActor) => item.id, []);
 
@@ -324,14 +355,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
   },
+  // Same vertical padding as the PersonRow it stands in for, so the list
+  // doesn't jump when the rows arrive.
   skeletonRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    paddingVertical: SP.xs + 2,
+    paddingVertical: PERSON_ROW_PADDING_V,
   },
   skeletonText: {
     flex: 1,
-    gap: SP.xs + 2,
+    gap: SP.xs,
   },
 });

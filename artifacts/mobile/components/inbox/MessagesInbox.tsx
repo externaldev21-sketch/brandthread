@@ -61,7 +61,7 @@ import {
   subscribeSocial,
   searchProfiles, createOrGetConversation, muteConversation, deleteConversationForMe, MY_USER_ID,
   getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
-  getNotesForTray, postNote,
+  getNotesForTray, postNote, deleteMyNote,
 } from '@/services/socialService';
 import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from '@/services/socialTypes';
 import { NOTE_MAX_CHARS } from '@/services/socialTypes';
@@ -104,7 +104,7 @@ import {
   markPreviewStorySeen, PREVIEW_MY_STORY,
 } from '@/lib/previewStories';
 import {
-  isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
+  isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote, clearPreviewMyNote,
 } from '@/lib/previewNotes';
 import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { keepIfSame } from '@/lib/keepIfSame';
@@ -877,6 +877,18 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     } else {
       setMyNote(await postNote(text, audience));
     }
+    closeNoteCompose();
+  }
+
+  // "Delete note" in the compose sheet (it confirms first) — clears the
+  // bubble back to the "Your thoughts go here..." prompt.
+  async function removeNote() {
+    if (!userId && isPreviewNotesEnabled()) {
+      clearPreviewMyNote();
+    } else {
+      await deleteMyNote();
+    }
+    setMyNote(null);
     closeNoteCompose();
   }
 
@@ -1802,7 +1814,10 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
               horizontal
               showsHorizontalScrollIndicator={false}
               style={[s.activeRail, { marginVertical: -2 }]}
-              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md, paddingVertical: 2 }}
+              // Bottom-aligned: every item's avatar + name share one baseline even when
+              // "Your note" (a 3-line placeholder, or a 2-line note) is taller than the
+              // fixed note slot the other items reserve.
+              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md, paddingVertical: 2, alignItems: 'flex-end' }}
             >
               {/* "Your story" — always first. The note bubble sits above the
                   avatar as its own sibling Pressable (never nested inside
@@ -2104,6 +2119,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
         avatarUri={myAvatarUri}
         initials={myInitials}
         onShare={submitNote}
+        onDelete={removeNote}
       />
 
       <Snackbar

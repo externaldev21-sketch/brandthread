@@ -20,9 +20,10 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useStickyState } from '@/lib/stickyState';
 import { getCachedTabData } from '@/lib/tabDataCache';
 import {
-  View, Text, StyleSheet, Animated, Share, Linking, Alert,
+  View, Text, StyleSheet, Animated, Share, Linking,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
+import { showAlert } from '@/lib/actionSheet';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -42,7 +43,7 @@ import {
   subscribeSocial, setPostPinned, pinErrorMessage,
 } from '@/services/socialService';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { useApi } from '@/lib/api';
+import { useApi, type LikedPost } from '@/lib/api';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
@@ -89,6 +90,8 @@ import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/pr
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { getPreviewSocialCounts } from '@/lib/previewSocialCounts';
 import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getDemoLikedPosts } from '@/components/profile/previewProfileDemo';
+import type { DiscoverPost } from '@/lib/discoverFeed';
 import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
 import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { buyerOwnMenuItems } from '@/components/profile/buyerProfileMenu';
@@ -238,6 +241,7 @@ type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
   | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null; source: 'post' | 'story' }
   | { kind: 'saved'; saved: SavedItem }
+  | { kind: 'liked'; item: ProfileGridItem; liked: LikedPost }
   | { kind: 'order'; order: BuyerOrderView }
   | { kind: 'closetPiece'; piece: ClosetPiece }
   | { kind: 'closetOutfit'; outfit: ClosetOutfit }
@@ -372,6 +376,16 @@ export default function ProfileScreen() {
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
   const [pinSnackbar, setPinSnackbar] = useState('');
+  // Liked tab (GET /api/social/me/liked-posts, newest like first). Loaded the
+  // first time the tab opens, then paged on scroll via `nextCursor`.
+  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
+  const [likedCursor, setLikedCursor] = useState<string | null>(null);
+  const [likedLoading, setLikedLoading] = useState(false);
+  const [likedError, setLikedError] = useState(false);
+  const [likedLoaded, setLikedLoaded] = useState(false);
+  // demo=1 only: the seeded liked posts in Discover shape, for the feed player.
+  const [demoLikedDiscover, setDemoLikedDiscover] = useState<DiscoverPost[]>([]);
+  const likedRequestRef = useRef(0);
 
   const loadCounts = useCallback(async () => {
     const id = user?.id;
@@ -394,6 +408,51 @@ export default function ProfileScreen() {
       setServerBanner(resolveProfileBanner(data as any));
     } catch { /* keep the last known counts */ }
   }, [api, user?.id]);
+
+  const loadLiked = useCallback(async (mode: 'first' | 'more' = 'first') => {
+    const id = user?.id;
+    if (mode === 'more' && (!likedCursor || likedLoading)) return;
+    const request = ++likedRequestRef.current;
+    setLikedLoading(true);
+    if (mode === 'first') setLikedError(false);
+    try {
+      if (isBuyerDevPreview()) {
+        // No backend in the preview: demo=1 shows the seeded Discover cast's
+        // posts; a fresh preview stays an honest empty Liked tab.
+        const demo = await getDemoLikedPosts();
+        if (request !== likedRequestRef.current) return;
+        setLikedPosts(demo?.posts ?? []);
+        setDemoLikedDiscover(demo?.discover ?? []);
+        setLikedCursor(null);
+        return;
+      }
+      if (!id) { setLikedPosts([]); setLikedCursor(null); return; }
+      const page = await api.social.likedPosts({ cursor: mode === 'more' ? likedCursor ?? undefined : undefined, limit: 30 });
+      if (request !== likedRequestRef.current || accountRef.current !== id) return;
+      const next = Array.isArray(page?.posts) ? page.posts : [];
+      setLikedPosts((prev) => {
+        if (mode === 'first') return next;
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...next.filter((p) => !seen.has(p.id))];
+      });
+      setLikedCursor(page?.nextCursor ?? null);
+    } catch {
+      if (request === likedRequestRef.current && mode === 'first') setLikedError(true);
+    } finally {
+      if (request === likedRequestRef.current) {
+        setLikedLoading(false);
+        setLikedLoaded(true);
+      }
+    }
+  }, [api, likedCursor, likedLoading, user?.id]);
+
+  // Opening Liked (or switching accounts while on it) loads the first page;
+  // pull-to-refresh reloads it too (onRefresh below).
+  const loadLikedRef = useRef(loadLiked);
+  loadLikedRef.current = loadLiked;
+  useEffect(() => {
+    if (activeTab === 'Liked') void loadLikedRef.current('first');
+  }, [activeTab, user?.id]);
 
   // The closet is its own request so a slow closet never holds up the profile.
   const loadCloset = useCallback(async () => {
@@ -462,8 +521,10 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try { await loadData(); } finally { setRefreshing(false); }
-  }, [loadData]);
+    try {
+      await Promise.all([loadData(), activeTab === 'Liked' ? loadLikedRef.current('first') : Promise.resolve()]);
+    } finally { setRefreshing(false); }
+  }, [activeTab, loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -627,7 +688,7 @@ export default function ProfileScreen() {
     if (!post) return;
     setPostSheet(null);
     setPosts(prev => prev.filter(item => item.id !== post.id));
-    try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not archive post', 'Try again.'); }
+    try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); showAlert('Could not archive post', 'Try again.'); }
   };
 
   // Instagram "Pin to your profile" / "Unpin from profile" (max 3, pinned first).
@@ -642,7 +703,7 @@ export default function ProfileScreen() {
       setPinSnackbar(pin ? 'Pinned to your profile' : 'Unpinned from profile');
       await loadData();
     } catch (error) {
-      Alert.alert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
+      showAlert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
     }
   };
 
@@ -650,7 +711,7 @@ export default function ProfileScreen() {
     const post = target ?? postSheet;
     if (!post) return;
     setPostSheet(null);
-    Alert.alert("Delete this post? This can't be undone.", undefined, [
+    showAlert("Delete this post? This can't be undone.", undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -658,7 +719,7 @@ export default function ProfileScreen() {
         onPress: async () => {
           haptics.warning();
           setPosts(prev => prev.filter(item => item.id !== post.id));
-          try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert("Couldn't delete post", 'Try again.'); }
+          try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); showAlert("Couldn't delete post", 'Try again.'); }
         },
       },
     ]);
@@ -726,9 +787,30 @@ export default function ProfileScreen() {
   const postTapRef = useRef(handlePostTap);
   postTapRef.current = handlePostTap;
 
-  const handleSavedTap = useCallback(() => {
-    router.push('/buyer-saved' as any);
+  // A saved cell opens the thing that was saved (same destinations as the
+  // full Saved list, app/buyer-saved.tsx), not the generic list.
+  const handleSavedTap = useCallback((item: SavedItem) => {
+    const id = encodeURIComponent(item.targetId);
+    if (item.type === 'post') router.push(`/buyer-post-viewer?postId=${id}` as never);
+    else if (item.type === 'product') router.push(`/thread-product-detail?productId=${id}&productName=${encodeURIComponent(item.title)}` as never);
+    else if (item.type === 'store') router.push(`/seller-profile?sellerId=${id}` as never);
+    else if (item.type === 'collection') router.push(`/buyer-collection?collectionId=${id}` as never);
+    else router.push('/buyer-saved' as never);
   }, [router]);
+
+  // A liked post opens in the post viewer; demo posts (no backend row) open
+  // the feed player on the seeded set instead.
+  const handleLikedTap = useCallback((item: ProfileGridItem) => {
+    const demoIndex = demoLikedDiscover.findIndex((p) => p.id === item.id);
+    if (demoIndex >= 0) {
+      void import('@/lib/discoverPlayerQueue').then(({ setDiscoverPlayerQueue }) => {
+        const token = setDiscoverPlayerQueue(demoLikedDiscover, demoIndex);
+        router.push(`/discover-player?q=${encodeURIComponent(token)}` as never);
+      });
+      return;
+    }
+    router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.id)}` as never);
+  }, [demoLikedDiscover, router]);
 
   const handleDraftsTilePress = useCallback(() => {
     router.push('/buyer-drafts' as never);
@@ -768,14 +850,24 @@ export default function ProfileScreen() {
         ? closetOutfits.map((outfit) => ({ kind: 'closetOutfit' as const, outfit }))
         : closetPieces.map((piece) => ({ kind: 'closetPiece' as const, piece }));
     }
-    // Liked has no backing data yet — a clean empty slot rather than
-    // inventing engagement history.
-    return [];
-  }, [activeTab, posts, savedItems, myOrders, tagged.items, reposts.items, closetView, closetPieces, closetOutfits]);
+    // Liked: posts this buyer has liked, newest like first.
+    return likedPosts.map((liked) => ({
+      kind: 'liked' as const,
+      liked,
+      item: {
+        id: liked.id,
+        kind: liked.mediaType === 'video' ? 'video' as const : 'photo' as const,
+        posterUri: liked.thumbnailUri ?? (liked.mediaType === 'image' ? liked.mediaUris[0] ?? null : null),
+        caption: liked.caption ?? '',
+        productCount: 0,
+        slideCount: liked.mediaUris.length > 1 ? liked.mediaUris.length : undefined,
+      },
+    }));
+  }, [activeTab, posts, savedItems, myOrders, tagged.items, reposts.items, likedPosts, closetView, closetPieces, closetOutfits]);
 
   const closetOutfitColumns = 2;
   const closetOutfitWidth = Math.floor((layout.columnWidth - (closetOutfitColumns - 1)) / closetOutfitColumns);
-  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' || activeTab === 'Reposts' ? layout.gridColumns
+  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' || activeTab === 'Reposts' || activeTab === 'Liked' ? layout.gridColumns
     : activeTab === 'Closet' ? (closetView === 'outfits' ? closetOutfitColumns : layout.gridColumns)
     : activeTab === 'Saved' ? savedColumns : 1;
 
@@ -831,6 +923,17 @@ export default function ProfileScreen() {
         />
       );
     }
+    if (item.kind === 'liked') {
+      return (
+        <ProfileVideoTile
+          item={item.item}
+          index={index}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          onPress={handleLikedTap}
+        />
+      );
+    }
     if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
     if (item.kind === 'closetPiece') {
       return (
@@ -854,10 +957,10 @@ export default function ProfileScreen() {
       );
     }
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
-  }, [closetOutfitWidth, handleClosetPiecePress, handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, router, savedCellSize, theme]);
+  }, [closetOutfitWidth, handleClosetPiecePress, handleDraftsTilePress, handleLikedTap, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, router, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'order' ? row.order.id
+    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'liked' ? `l-${row.liked.id}` : row.kind === 'order' ? row.order.id
       : row.kind === 'closetPiece' ? `cp-${row.piece.id}` : row.kind === 'closetOutfit' ? `co-${row.outfit.id}` : row.saved.id
   ), []);
 
@@ -1022,14 +1125,16 @@ export default function ProfileScreen() {
       <View style={topBarStyles.bannerBelow} testID="profile-banner-below">
         {profileMeta}
       </View>
-      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Button label="Edit profile" variant="secondary" size="compact" fullWidth style={{ borderRadius: 8, paddingHorizontal: SP.sm, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} onPress={() => router.push('/(buyer)/edit-profile')} testID="profile-edit-button" />
+      {/* Same row geometry as the seller own profile (app/(tabs)/profile.tsx
+          actionRow): token gap/padding/radius, 36pt compact buttons. */}
+      <View style={styles.actionRow}>
+        <View style={styles.actionFlex}>
+          <Button label="Edit profile" variant="secondary" size="compact" fullWidth style={[styles.actionButton, styles.actionSurface]} onPress={() => router.push('/(buyer)/edit-profile')} testID="profile-edit-button" />
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Button label="Share profile" variant="secondary" size="compact" fullWidth style={{ borderRadius: 8, paddingHorizontal: SP.sm, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} onPress={handleShareProfile} testID="profile-share-button" />
+        <View style={styles.actionFlex}>
+          <Button label="Share profile" variant="secondary" size="compact" fullWidth style={[styles.actionButton, styles.actionSurface]} onPress={handleShareProfile} testID="profile-share-button" />
         </View>
-        <Button label="" icon="user-plus" variant="secondary" size="compact" style={{ width: 36, borderRadius: 8, paddingHorizontal: 0, backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }} accessibilityLabel="Discover people" onPress={() => router.push('/(buyer)/friends' as any)} testID="profile-discover-people" />
+        <Button label="" icon="user-plus" variant="secondary" size="compact" style={[styles.actionSquare, styles.actionSurface]} accessibilityLabel="Discover people" onPress={() => router.push('/(buyer)/friends' as any)} testID="profile-discover-people" />
       </View>
 
       {/* ── Story Highlights: circles + "New" ── */}
@@ -1106,9 +1211,9 @@ export default function ProfileScreen() {
           // height, not just a fixed constant.
           <ProfileGridPlaceholder
             quiet
-            loading={loading}
-            error={false}
-            onRetry={loadData}
+            loading={loading || (activeTab === 'Liked' && !likedLoaded && likedLoading)}
+            error={activeTab === 'Liked' && likedError}
+            onRetry={activeTab === 'Liked' ? () => { void loadLiked('first'); } : loadData}
             layout={layout}
             icon={emptyIcon}
             illustration={emptyIllustration}
@@ -1125,6 +1230,8 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: emptyArea.paddingBottom }}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        onEndReached={activeTab === 'Liked' && likedCursor ? () => { void loadLiked('more'); } : undefined}
+        onEndReachedThreshold={0.5}
       />
       </ProfileEmptyAreaContext.Provider>
       <ProfileStickyHeader
@@ -1219,6 +1326,13 @@ function makeStyles(theme: AppThemePreset) {
     // Saved cells are sized from the column minus a 16pt gutter each side.
     savedRow: { paddingHorizontal: SP.md },
 
+    // Bio → action row: 16pt; buttons 8pt apart (the seller row's SP.sm).
+    actionRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, alignItems: 'center' },
+    actionFlex: { flex: 1, minWidth: 0 },
+    actionButton: { borderRadius: RADIUS.sm, paddingHorizontal: SP.sm },
+    // Icon-only: a square at the compact Button's own 36pt height.
+    actionSquare: { width: 36, borderRadius: RADIUS.sm, paddingHorizontal: 0 },
+    actionSurface: { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated },
     // Bio → highlights: 16pt.
     highlightsWrap: { paddingTop: 16 },
     brandsWrap: { paddingTop: 12 },

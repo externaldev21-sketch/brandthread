@@ -89,6 +89,7 @@ export function RisingBrandRow({ brand }: { brand: RisingBrand }) {
       </View>
       <FollowButton
         userId={brand.sellerId}
+        name={brand.brandName}
         initial={{ isFollowing: false, isFollowedBy: false, isMutual: false }}
         size="compact"
         style={styles.follow}

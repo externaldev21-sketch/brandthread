@@ -56,6 +56,7 @@ import { PollComposer, QuestionComposer, CountdownPicker } from '@/components/so
 import { MentionStickerView, ReshareCard, RESHARE_CARD_WIDTH, RESHARE_CARD_HEIGHT } from '@/components/StoryMentionSticker';
 import { InlineSlider } from '@/components/InlineSlider';
 import { LocationPicker } from '@/components/social/LocationPicker';
+import { normalizeStoryLinkUrl, storyLinkDisplay, STORY_LINK_LABEL_MAX } from '@/lib/storyLinkSticker';
 import {
   MAX_MENTIONS_PER_STORY, MENTION_MIN_SCALE, activeMentionQuery, clampMentionOpacity, clampOverlayPosition, clampOverlayScale,
   insertMention, nextMentionStyle, tapSlop, taggedPeople, withAt,
@@ -273,7 +274,9 @@ function OverlayChip({
 // ─── Posting-progress toast ─────────────────────────────────────────────────
 // Matches Instagram's own "Your story is uploading… NN%" pill: a thumbnail,
 // the label, and a ring that fills as `percent` climbs to 100.
-const RING_SIZE = 22;
+// 30pt (was 22) so "100" at the 11pt floor (FS.xs, ~21pt wide) fits inside
+// the stroke's 25pt inner circle.
+const RING_SIZE = 30;
 const RING_STROKE = 2.5;
 const RING_R = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRC = 2 * Math.PI * RING_R;
@@ -324,9 +327,15 @@ const postingStyles = StyleSheet.create({
   percent: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     textAlign: 'center', textAlignVertical: 'center',
-    color: ON_DARK, fontSize: 9, fontFamily: FONT.semibold,
+    color: ON_DARK, fontSize: FS.xs, lineHeight: RING_SIZE, fontFamily: FONT.semibold,
   },
 });
+
+// Camera chrome geometry: the "Change grid" pill's fixed height (it's centred
+// on the 44pt top-bar buttons) and where the Layout popover sits while the
+// rail's labels are showing (44pt icon column + gap + widest label).
+const CHANGE_GRID_PILL_H = 28;
+const RAIL_EXPANDED_POPOVER_LEFT = 120;
 
 // ─── Grid-layout option icon (camera Layout popover) ───────────────────────
 function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
@@ -717,11 +726,20 @@ export default function StoryComposer() {
   const [questionComposerOpen, setQuestionComposerOpen] = useState(false);
   const [countdownPickerOpen, setCountdownPickerOpen] = useState(false);
   const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
+  // 'error' = the products request failed (shown with a retry), never conflated with "no products".
+  const [taggableState, setTaggableState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [shopModalOpen, setShopModalOpen] = useState(false);
   // Location sticker → real place search (/api/places; Google Places when the
   // server has GOOGLE_PLACES_API_KEY, otherwise previously-used places + a
   // free-text custom location).
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  // Link sticker → URL entry (validated + normalized to https://) and an optional label.
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [linkUrlDraft, setLinkUrlDraft] = useState('');
+  const [linkLabelDraft, setLinkLabelDraft] = useState('');
+  const [linkError, setLinkError] = useState<string | null>(null);
+  // A placed location / link sticker being edited (tap it on the canvas); null while adding a new one.
+  const [editingStickerId, setEditingStickerId] = useState<string | null>(null);
   const [shopUrlDraft, setShopUrlDraft] = useState('');
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
@@ -1000,15 +1018,42 @@ export default function StoryComposer() {
     setSelectedId(id);
   };
 
+  const openLinkModal = useCallback((editing?: StoryOverlay) => {
+    const url = editing?.linkUrl ?? '';
+    setEditingStickerId(editing?.id ?? null);
+    setLinkUrlDraft(url);
+    // A label equal to the URL's own display text was auto-filled, not typed.
+    setLinkLabelDraft(editing?.linkText && editing.linkText !== storyLinkDisplay(url) ? editing.linkText : '');
+    setLinkError(null);
+    setLinkModalOpen(true);
+  }, []);
+
+  const closeLinkModal = () => { setLinkModalOpen(false); setEditingStickerId(null); setLinkError(null); };
+
+  const commitLink = () => {
+    const url = normalizeStoryLinkUrl(linkUrlDraft);
+    if (!url) { setLinkError('Enter a valid link, like example.com/shop'); return; }
+    const patch = { linkUrl: url, linkText: linkLabelDraft.trim() || storyLinkDisplay(url) };
+    if (editingStickerId) changeOverlay(editingStickerId, patch);
+    else addOverlay({ type: 'link', ...patch });
+    closeLinkModal();
+  };
+
+  const closeLocationPicker = () => { setLocationPickerOpen(false); setEditingStickerId(null); };
+
   // Tap on a placed overlay: a mention is selected and its style cycles
-  // classic → outline → solid → neon; anything else just clears the selection.
+  // classic → outline → solid → neon; a location / link sticker reopens its
+  // picker to change it; anything else just clears the selection.
   const tapOverlay = useCallback((id: string) => {
     const tapped = overlaysRef.current.find((o) => o.id === id);
+    if (tapped?.type === 'location') { setSelectedId(null); setEditingStickerId(id); setLocationPickerOpen(true); return; }
+    // The shared post's own link is canonical (it points at that post), so it isn't editable.
+    if (tapped?.type === 'link' && id !== 'ov_shared_post_link') { setSelectedId(null); openLinkModal(tapped); return; }
     if (tapped?.type !== 'mention') { setSelectedId(null); return; }
     haptics.selection();
     setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, mentionStyle: nextMentionStyle(o.mentionStyle) } : o)));
     setSelectedId(id);
-  }, []);
+  }, [openLinkModal]);
 
   const commitTextOverlay = () => {
     const text = textDraft.trim();
@@ -1032,13 +1077,20 @@ export default function StoryComposer() {
   // The "@partial" the text tool's caret is in (drives the inline suggestions).
   const atToken = textToolOpen ? activeMentionQuery(textDraft) : null;
 
-  const openProductPicker = async () => {
+  const loadTaggableProducts = async () => {
+    setTaggableState('loading');
     try {
       setTaggableProducts(await getTaggableProducts());
+      setTaggableState('ready');
     } catch {
       setTaggableProducts([]);
+      setTaggableState('error');
     }
+  };
+
+  const openProductPicker = () => {
     setProductPickerOpen(true);
+    void loadTaggableProducts();
   };
 
   // ── Post ──────────────────────────────────────────────────────────────────
@@ -1319,7 +1371,7 @@ export default function StoryComposer() {
               accessibilityRole="button"
               accessibilityState={{ selected: flash === 'on' }}
             >
-              <Icon name={flash === 'off' ? 'zap-off' : 'zap'} size={20} color={flash === 'on' ? '#FBBF24' : ON_DARK} />
+              <View style={styles.railIcon}><Icon name={flash === 'off' ? 'zap-off' : 'zap'} size={20} color={flash === 'on' ? '#FBBF24' : ON_DARK} /></View>
               {railExpanded && <Text style={styles.railLabel}>Flash</Text>}
             </TouchableOpacity>
           )}
@@ -1330,7 +1382,7 @@ export default function StoryComposer() {
             accessibilityLabel="Create a text story"
             accessibilityRole="button"
           >
-            <Text style={styles.railAa}>Aa</Text>
+            <View style={styles.railIcon}><Text style={styles.railAa}>Aa</Text></View>
             {railExpanded && <Text style={styles.railLabel}>Create</Text>}
           </TouchableOpacity>
 
@@ -1341,7 +1393,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: boomerangOn }}
           >
-            <Icon name="repeat" size={20} color={boomerangOn ? theme.accent : ON_DARK} />
+            <View style={styles.railIcon}><Icon name="repeat" size={20} color={boomerangOn ? theme.accent : ON_DARK} /></View>
             {railExpanded && <Text style={[styles.railLabel, boomerangOn && { color: theme.accent }]}>Boomerang</Text>}
           </TouchableOpacity>
 
@@ -1352,7 +1404,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: !!gridSpec }}
           >
-            <Icon name="grid" size={20} color={gridSpec ? theme.accent : ON_DARK} />
+            <View style={styles.railIcon}><Icon name="grid" size={20} color={gridSpec ? theme.accent : ON_DARK} /></View>
             {railExpanded && <Text style={[styles.railLabel, gridSpec && { color: theme.accent }]}>Layout</Text>}
           </TouchableOpacity>
 
@@ -1363,7 +1415,7 @@ export default function StoryComposer() {
             accessibilityRole="button"
             accessibilityState={{ selected: handsFree }}
           >
-            <Icon name="video" size={20} color={handsFree ? theme.accent : ON_DARK} />
+            <View style={styles.railIcon}><Icon name="video" size={20} color={handsFree ? theme.accent : ON_DARK} /></View>
             {railExpanded && <Text style={[styles.railLabel, handsFree && { color: theme.accent }]}>Hands-free</Text>}
           </TouchableOpacity>
 
@@ -1373,12 +1425,13 @@ export default function StoryComposer() {
             accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
             accessibilityRole="button"
           >
-            <Icon name={railExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={ON_DARK} />
+            <View style={styles.railIcon}><Icon name={railExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={ON_DARK} /></View>
           </TouchableOpacity>
 
           {gridPopoverOpen && (
-            // Sits beside Layout, one row lower while the Flash item is shown.
-            <View style={[styles.gridPopover, hasPermission && { top: 152 }]}>
+            // Sits beside Layout, one row lower while the Flash item is shown,
+            // and clear of the labels while the rail is expanded.
+            <View style={[styles.gridPopover, hasPermission && { top: 152 }, railExpanded && { left: RAIL_EXPANDED_POPOVER_LEFT }]}>
               {GRID_SPECS.map((spec) => (
                 <TouchableOpacity key={spec.id} style={styles.gridOption} onPress={() => selectGrid(spec)} hitSlop={4} accessibilityRole="button" accessibilityLabel={`Grid ${spec.cols} by ${spec.rows}`}>
                   <GridIcon spec={spec} active={gridSpec?.id === spec.id} />
@@ -1388,9 +1441,11 @@ export default function StoryComposer() {
           )}
         </View>
 
-        {/* "Change grid" pill — shown once a layout is active, like Instagram's own label under the rail */}
+        {/* "Change grid" pill — shown once a layout is active. It sits in the top bar's empty
+            middle (centred on the X / settings buttons), so it can never collide with the rail
+            (collapsed or expanded) or the no-camera fallback below it. */}
         {gridSpec && (
-          <TouchableOpacity style={[styles.changeGridPill, { top: topInset + 90 + 190 }]} onPress={() => setGridPopoverOpen(true)} accessibilityRole="button" accessibilityLabel="Change grid">
+          <TouchableOpacity style={[styles.changeGridPill, { top: topInset + SP.sm + (44 - CHANGE_GRID_PILL_H) / 2 }]} onPress={() => setGridPopoverOpen(true)} accessibilityRole="button" accessibilityLabel="Change grid">
             <Icon name="grid" size={14} color={ON_DARK} />
             <Text style={styles.changeGridText}>Change grid</Text>
             <Icon name="chevron-down" size={14} color={ON_DARK} />
@@ -1794,8 +1849,8 @@ export default function StoryComposer() {
         </OverlayChip>
       ))}
 
-      {/* Top bar */}
-      <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
+      {/* Top bar — hidden while the text tool is open (its 0.72 backdrop would show it through) */}
+      <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }, textToolOpen && styles.chromeHidden]}>
         <TouchableOpacity
           style={styles.camIconBtn}
           onPress={() => {
@@ -1861,7 +1916,7 @@ export default function StoryComposer() {
 
       {/* Draw sub-toolbar */}
       {drawOpen ? (
-        <View style={[styles.drawBar, { top: topInset + 60 }]}>
+        <View style={[styles.drawBar, { top: topInset + 60 }, textToolOpen && styles.chromeHidden]}>
           {['#FFFFFF', '#000000', '#F87171', '#FBBF24', '#34D399', '#60A5FA'].map((c) => (
             <TouchableOpacity key={c} style={[styles.drawColorDot, { backgroundColor: c }, drawColor === c && styles.drawColorDotActive]} onPress={() => setDrawColor(c)} hitSlop={{ top: 11, bottom: 11, left: 4, right: 4 }} accessibilityLabel={`Draw color ${c}`} accessibilityRole="button" />
           ))}
@@ -1879,7 +1934,7 @@ export default function StoryComposer() {
 
       {/* Mention controls: tagged-people chip (works even when every sticker is invisible) + style/opacity for the selected sticker */}
       {mentionOverlays.length > 0 ? (
-        <View style={[styles.mentionDock, { bottom: insets.bottom + (isReshare ? 150 : 138) }]} pointerEvents="box-none">
+        <View style={[styles.mentionDock, { bottom: insets.bottom + (isReshare ? 150 : 138) }, textToolOpen && styles.chromeHidden]} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.taggedChip}
             onPress={() => { setTaggedSheetOpen(true); }}
@@ -1914,9 +1969,10 @@ export default function StoryComposer() {
         </View>
       ) : null}
 
-      {/* Bottom bar */}
+      {/* Bottom bar — hidden while the text tool is open, so its Mention/Location row never
+          draws over "Your story / Close Friends / send" showing through the backdrop */}
       {isReshare ? (
-        <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
+        <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }, textToolOpen && styles.chromeHidden]}>
           {reshareUnavailable ? (
             <View style={styles.reshareUnavailable} testID="reshare-unavailable">
               <Icon name="slash" size={16} color={ON_DARK} />
@@ -1961,7 +2017,7 @@ export default function StoryComposer() {
           )}
         </View>
       ) : (
-      <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }, textToolOpen && styles.chromeHidden]}>
         <TextInput returnKeyType="done"
           style={styles.captionInput}
           value={captionDraft}
@@ -2228,7 +2284,7 @@ export default function StoryComposer() {
               <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
               <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { setStickerSheetOpen(false); setPollComposerOpen(true); }} />
               <StickerTile icon="help-circle" label="Question" onPress={() => { setStickerSheetOpen(false); setQuestionComposerOpen(true); }} />
-              <StickerTile icon="link" label="Link" onPress={() => { addOverlay({ type: 'link', linkUrl: 'https://', linkText: 'Link' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="link" label="Link" onPress={() => { setStickerSheetOpen(false); openLinkModal(); }} />
               {isSeller ? (
                 <StickerTile icon="shopping-bag" label="Product" onPress={() => { setStickerSheetOpen(false); openProductPicker(); }} />
               ) : null}
@@ -2282,7 +2338,16 @@ export default function StoryComposer() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Tag a product</Text>
             <ScrollView>
-              {taggableProducts.length === 0 ? (
+              {taggableState === 'loading' ? (
+                <ActivityIndicator style={{ marginVertical: SP.lg }} color={ON_DARK} />
+              ) : taggableState === 'error' ? (
+                <View style={styles.pickerErrorWrap} testID="story-product-picker-error">
+                  <Text style={styles.emptyText}>Couldn’t load your products.</Text>
+                  <TouchableOpacity style={styles.pickerRetryBtn} onPress={() => void loadTaggableProducts()} accessibilityRole="button" accessibilityLabel="Try again">
+                    <Text style={styles.pickerRetryText}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : taggableProducts.length === 0 ? (
                 <Text style={styles.emptyText}>No products to tag yet.</Text>
               ) : taggableProducts.map((p) => (
                 <PressableScale
@@ -2352,21 +2417,23 @@ export default function StoryComposer() {
         </ModalSafeArea>
       </Modal>
 
-      {/* ── Shop-link modal (sellers) ── */}
-      <Modal visible={locationPickerOpen} transparent animationType="fade" onRequestClose={() => setLocationPickerOpen(false)}>
+      {/* ── Location sticker: place search + free-text custom place (tap a placed one to change it) ── */}
+      <Modal visible={locationPickerOpen} transparent animationType="fade" onRequestClose={closeLocationPicker}>
         <ModalSafeArea>
           <View style={styles.overlayModalBackdrop}>
             <View style={[styles.overlayModalCard, { backgroundColor: theme.background }]} testID="story-location-picker">
-              <Text style={[styles.sheetTitle, { color: theme.text }]}>Add location</Text>
+              <Text style={[styles.sheetTitle, { color: theme.text }]}>{editingStickerId ? 'Change location' : 'Add location'}</Text>
               <LocationPicker
                 autoFocus
                 onSelect={(place) => {
-                  addOverlay({ type: 'location', locationLabel: place.name, locationPlaceId: place.id });
-                  setLocationPickerOpen(false);
+                  // Only ever a picked/typed place name — never a placeholder label.
+                  if (editingStickerId) changeOverlay(editingStickerId, { locationLabel: place.name, locationPlaceId: place.id });
+                  else addOverlay({ type: 'location', locationLabel: place.name, locationPlaceId: place.id });
+                  closeLocationPicker();
                 }}
               />
               <View style={styles.overlayModalActions}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setLocationPickerOpen(false)} accessibilityRole="button">
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={closeLocationPicker} accessibilityRole="button">
                   <Text style={[styles.modalCancelText, { color: theme.text }]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
@@ -2374,6 +2441,59 @@ export default function StoryComposer() {
           </View>
         </ModalSafeArea>
       </Modal>
+      {/* ── Link sticker: URL (validated, https:// added when missing) + optional label ── */}
+      <Modal visible={linkModalOpen} transparent animationType="fade" onRequestClose={closeLinkModal}>
+        <ModalSafeArea>
+          <View style={styles.overlayModalBackdrop}>
+            <View style={styles.overlayModalCard} testID="story-link-modal">
+              <Text style={styles.sheetTitle}>{editingStickerId ? 'Edit link' : 'Add a link'}</Text>
+              <TextInput returnKeyType="next"
+                style={[styles.shopInput, WEB_INPUT_RESET]}
+                value={linkUrlDraft}
+                onChangeText={(t) => { setLinkUrlDraft(t); if (linkError) setLinkError(null); }}
+                placeholder="example.com/shop"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                accessibilityLabel="Link URL"
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                onSubmitEditing={commitLink}
+              />
+              {linkError ? (
+                <Text style={styles.linkErrorText} accessibilityLiveRegion="polite" testID="story-link-error">{linkError}</Text>
+              ) : null}
+              <TextInput returnKeyType="done"
+                style={[styles.shopInput, WEB_INPUT_RESET, { marginTop: SP.sm }]}
+                value={linkLabelDraft}
+                onChangeText={setLinkLabelDraft}
+                placeholder="Sticker text (optional)"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                accessibilityLabel="Link label (optional)"
+                maxLength={STORY_LINK_LABEL_MAX}
+                onSubmitEditing={commitLink}
+              />
+              <View style={styles.overlayModalActions}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={closeLinkModal} accessibilityRole="button" hitSlop={{ top: 6, bottom: 6 }} testID="story-link-cancel">
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalAddBtn, { backgroundColor: theme.accent }, !linkUrlDraft.trim() && { opacity: 0.5 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !linkUrlDraft.trim() }}
+                  disabled={!linkUrlDraft.trim()}
+                  hitSlop={{ top: 6, bottom: 6 }}
+                  onPress={commitLink}
+                  testID="story-link-add"
+                >
+                  <Text style={[styles.modalAddText, getOnAccentTextStyle(theme)]}>{editingStickerId ? 'Save' : 'Add'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ModalSafeArea>
+      </Modal>
+      {/* ── Shop-link modal (sellers) ── */}
       <Modal visible={shopModalOpen} transparent animationType="fade" onRequestClose={() => setShopModalOpen(false)}>
         <ModalSafeArea>
           <View style={styles.overlayModalBackdrop}>
@@ -2473,7 +2593,7 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
     case 'countdown':
       return <CountdownSticker name={ov.dropName ?? 'Drop'} releaseAt={ov.dropReleaseAt ?? null} mode="editor" />;
     case 'link':
-      return <View style={styles.pillChip}><Icon name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || ov.linkUrl}</Text></View>;
+      return <View style={styles.pillChip}><Icon name="link-2" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.linkText || storyLinkDisplay(ov.linkUrl ?? '')}</Text></View>;
     case 'shop':
       return <View style={styles.pillChip}><Icon name="external-link" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.shopLabel || ov.shopUrl}</Text></View>;
     case 'product':
@@ -2507,10 +2627,14 @@ const styles = StyleSheet.create({
   editToolRow: { flexDirection: 'row', gap: SP.sm },
 
   leftRail: { position: 'absolute', left: SP.md, zIndex: 20 },
-  // Same 44pt width as camIconBtn (the X button directly above it), sharing
-  // its left inset, so the "Aa" glyph's own center lines up exactly with
-  // the X icon's center instead of sitting ~4pt further right.
-  railBtn: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44, marginBottom: SP.sm },
+  // Every icon sits in a fixed 44pt column — the same width as camIconBtn
+  // (the X button directly above it), sharing its left inset — so each
+  // glyph's center lines up exactly with the X icon's center. Expanded
+  // labels sit to the right of the icon (like Instagram's rail) instead of
+  // under it, so a wide label ("Hands-free") never widens the column and
+  // shifts the icons right.
+  railBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, minHeight: 44, marginBottom: SP.sm },
+  railIcon: { width: 44, alignItems: 'center', justifyContent: 'center' },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
   railLabel: { color: TEXT_SECONDARY, fontSize: FS.xs, fontFamily: FONT.medium },
   gridPopover: {
@@ -2519,9 +2643,10 @@ const styles = StyleSheet.create({
   },
   gridOption: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', margin: 2 },
   changeGridPill: {
-    position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 'auto', width: 140,
+    position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 'auto', width: 140, height: CHANGE_GRID_PILL_H,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
+    // Above the top bar row (zIndex 30) it now shares, so taps reach it.
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.sm, paddingHorizontal: SP.sm, zIndex: 31,
   },
   changeGridText: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.semibold },
   gridDots: { flexDirection: 'row', gap: 4, marginTop: SP.xs, justifyContent: 'center' },
@@ -2623,6 +2748,7 @@ const styles = StyleSheet.create({
   drawUndo: { marginLeft: 'auto', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 
   editBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, paddingHorizontal: SP.md },
+  chromeHidden: { display: 'none' },
   captionInput: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.medium, paddingVertical: SP.sm, marginBottom: SP.xs },
   audienceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   myStoryChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
@@ -2676,6 +2802,9 @@ const styles = StyleSheet.create({
   stickerTile: { width: Math.floor((W - SP.md * 2 - SP.sm * 3) / 4), height: 78, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', gap: 6 },
   stickerTileLabel: { color: ON_DARK, fontSize: FS.meta, fontFamily: FONT.medium },
   emptyText: { color: MUTED, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
+  pickerErrorWrap: { alignItems: 'center', paddingBottom: SP.md },
+  pickerRetryBtn: { minHeight: 44, paddingHorizontal: SP.lg, borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', alignItems: 'center', justifyContent: 'center' },
+  pickerRetryText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   productRowText: { color: FG, fontSize: FS.base, fontFamily: FONT.medium },
 
@@ -2702,6 +2831,7 @@ const styles = StyleSheet.create({
   overlayModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   overlayModalCard: { width: '100%', maxWidth: 480, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
   shopInput: { color: ON_DARK, fontSize: FS.md, borderBottomWidth: 1, borderBottomColor: BORDER, paddingVertical: SP.sm },
+  linkErrorText: { color: MUTED, fontSize: FS.meta, fontFamily: FONT.medium, marginTop: SP.xs },
   overlayModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: SP.sm, marginTop: SP.md },
   modalCancelBtn: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
   modalCancelText: { color: MUTED, fontFamily: FONT.medium },

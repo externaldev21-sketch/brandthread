@@ -8,7 +8,8 @@ import { SPACING } from '@/constants/spacing';
  * same moderation, blocks and allowReposts rules as any other post and embeds
  * only the direct original.
  *
- * Preview / demo sessions never call the API — posting just returns.
+ * Preview / demo sessions never call the API — posting confirms with the
+ * success haptic + the app toast, then returns.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -32,7 +33,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { useApi } from '@/lib/api';
 
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+
+import { showAlert } from '@/lib/actionSheet';
 
 import { isUUID } from '@/lib/engagementUtils';
 
@@ -42,7 +45,7 @@ import { QUOTE_MAX_LENGTH, quoteErrorMessage } from '@/lib/quotePost';
 
 import { RADII } from '@/constants/radii';
 
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, TYPE } from '@/lib/theme';
 
 import type { QuotedPostSummary } from '@/services/socialTypes';
 
@@ -80,12 +83,17 @@ export default function QuotePostScreen() {
     setError(null);
     try {
       // Demo / preview ids never reach the server.
+      // Same success haptic + app toast as a real post, but outside demo=1
+      // the toast says plainly that nothing was published.
       if (isBuyerDevPreview() || !isUUID(postId)) {
+        haptic('postPublished');
+        showAlert(isPreviewDemoMode() ? 'Quote posted' : 'Preview only — nothing was published');
         goBackOr(router, '/');
         return;
       }
       await api.posts.create({ quotedPostId: postId, caption: trimmed, mediaType: 'photo' });
       haptic('postPublished');
+      showAlert('Quote posted');
       goBackOr(router, '/');
     } catch (err) {
       setError(quoteErrorMessage(err));
@@ -137,9 +145,8 @@ const makeStyles = (theme: { background: string; surface: string; border: string
     borderColor: theme.border,
     backgroundColor: theme.surface,
     color: theme.text,
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    lineHeight: 22,
+    // TYPE.body = FS.base / FONT.regular / lineHeight 22 — the same values.
+    ...TYPE.body,
     textAlignVertical: 'top',
   },
   counter: { alignSelf: 'flex-end', fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted },

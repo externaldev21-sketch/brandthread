@@ -94,7 +94,9 @@ export function SegmentTabs<K extends string>({
           showsHorizontalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
-          style={styles.flex}
+          // ChipRow sets flexGrow/flexShrink 0, which outranks the `flex: 1`
+          // shorthand on react-native-web and collapsed the row to 0px wide.
+          style={styles.scrollFill}
           contentContainerStyle={styles.scrollContent}
         >
           {items}
@@ -110,6 +112,7 @@ export function SegmentTabs<K extends string>({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'stretch', height: X_TAB_HEIGHT },
   flex: { flex: 1 },
+  scrollFill: { flexGrow: 1, flexShrink: 1 },
   fillRow: { flexDirection: 'row' },
   scrollContent: { paddingHorizontal: X_GUTTER, gap: X_SPACE[24], alignItems: 'stretch' },
   tabFill: { flex: 1, alignItems: 'center' },

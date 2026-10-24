@@ -1,5 +1,9 @@
 import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
 
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
 import { hapticSuccessAction, haptics, haptic } from '@/lib/haptics';
 
 import { trackStoryView, getStories, subscribeSocial, muteUser, MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR } from '@/services/socialService';
@@ -9,7 +13,7 @@ import { relativeTime } from '@/lib/activity';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, Pressable, Animated, Easing, PanResponder, StyleSheet, Alert, Modal, FlatList, Linking, Platform, Share, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, Animated, Easing, PanResponder, StyleSheet, Modal, FlatList, Linking, Platform, Share, useWindowDimensions } from 'react-native';
 
 import { CachedImage } from '@/components/CachedImage';
 
@@ -56,6 +60,12 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+
+import { ErrorState } from '@/components/ui/ErrorState';
+
+import { TYPE_SCALE } from '@/constants/typography';
+
+import { pickAvatarColor } from '@/lib/avatarColors';
 
 
 import { isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation } from '@/lib/previewInbox';
@@ -193,10 +203,13 @@ export default function BuyerStoryViewer() {
   const [responsesOpen, setResponsesOpen] = useState(false);
   const [responsesLoading, setResponsesLoading] = useState(false);
   const [responses, setResponses] = useState<QuestionResponses | null>(null);
+  const [responsesError, setResponsesError] = useState(false);
   const [stickerPaused, setStickerPaused] = useState(false);
   const overlayPaused = !!mentionTap || taggedSheetOpen || responsesOpen || stickerPaused;
   const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; avatarUrl: string | null; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
+  // The viewers fetch failed (shown as an error + Retry, not "No viewers yet").
+  const [viewersError, setViewersError] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
   const loadGeneration = useRef(0);
   // Blurring the reply input (e.g. web's mousedown-fires-blur-before-click)
@@ -312,9 +325,15 @@ export default function BuyerStoryViewer() {
     if (!currentStory || !isMine || isHighlight) return;
     let cancelled = false;
     setViewersLoading(true);
+    setViewersError(false);
     api.social.storyViewers(currentStory.id)
       .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (!myUserId && isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : [])); })
-      .catch(() => { if (!cancelled) setServerViewers(!myUserId && isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []); })
+      .catch(() => {
+        if (cancelled) return;
+        const demo = !myUserId && isPreviewDemoMode();
+        setServerViewers(demo ? PREVIEW_STORY_VIEWERS : []);
+        setViewersError(!demo);
+      })
       .finally(() => { if (!cancelled) setViewersLoading(false); });
     return () => { cancelled = true; };
   }, [currentStory?.id, myUserId]);
@@ -398,7 +417,7 @@ export default function BuyerStoryViewer() {
       
     } catch (error) {
       // e.g. "Replies are turned off for this story." from the server.
-      Alert.alert('Couldn’t send reply', apiErrorMessage(error, 'Try again.'));
+      showAlert('Couldn’t send reply', apiErrorMessage(error, 'Try again.'));
     } finally {
       setSendingReply(false);
     }
@@ -427,13 +446,16 @@ export default function BuyerStoryViewer() {
 
   // Swipe left/right jumps straight to the next/previous user's story reel
   // (distinct from tapping, which steps through the current user's slides).
+  // A highlight plays as ONE story group (its items are segments of a single
+  // progress bar), so a swipe leaves the group: swipe left closes (there is
+  // no next group here), swipe right restarts it from its first item.
   const goToNextUser = useCallback(() => {
-    applyNav(navNextUser(storyIdx, stories.length));
-  }, [storyIdx, stories.length, applyNav]);
+    applyNav(isHighlight ? { storyIdx, slideIdx, shouldClose: true } : navNextUser(storyIdx, stories.length));
+  }, [isHighlight, storyIdx, slideIdx, stories.length, applyNav]);
 
   const goToPrevUser = useCallback(() => {
-    applyNav(navPrevUser(storyIdx));
-  }, [storyIdx, applyNav]);
+    applyNav(isHighlight ? { storyIdx: 0, slideIdx: 0, shouldClose: false } : navPrevUser(storyIdx));
+  }, [isHighlight, storyIdx, applyNav]);
 
   // JS-driven (a few 3pt bars) so the value can be read back: pausing keeps
   // the bar where it is and resuming runs only the remaining time — the same
@@ -549,6 +571,8 @@ export default function BuyerStoryViewer() {
   // options menu below already uses for the same reason.
   const isMyStory = !isHighlight && ((!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me');
   const seenByCount = serverViewers.length || (currentStory as any).viewsCount || currentStory.viewers.length;
+  const segmentCount = isHighlight ? slideCounts.reduce((n, c) => n + c, 0) : currentStory.media.length;
+  const activeSegment = isHighlight ? slideCounts.slice(0, storyIdx).reduce((n, c) => n + c, 0) + slideIdx : slideIdx;
 
   const slidePeople = taggedPeople(currentSlide.overlays);
   const openProfile = (p: TaggedPerson) => {
@@ -592,6 +616,7 @@ export default function BuyerStoryViewer() {
     openResponses: async (sid: string) => {
       haptic('sheet');
       setResponsesOpen(true);
+      setResponsesError(false);
       if (isPreviewStickerStory(sid)) {
         setResponses({ questions: [{ overlayId: 'question', prompt: 'What should we drop next?', answers: PREVIEW_STICKER_ANSWERS }] });
         return;
@@ -600,7 +625,8 @@ export default function BuyerStoryViewer() {
       try {
         setResponses(await api.social.questionAnswers(sid));
       } catch {
-        setResponses({ questions: [] });
+        setResponses(null);
+        setResponsesError(true);
       } finally {
         setResponsesLoading(false);
       }
@@ -608,13 +634,27 @@ export default function BuyerStoryViewer() {
   };
   const replyToAnswer = async (userId: string) => {
     if (!currentStory) return;
-    if (isPreviewStickerStory(currentStory.id)) { setResponsesOpen(false); return; }
+    if (isPreviewStickerStory(currentStory.id)) {
+      // Demo: no backend to open the DM, so open the same conversation screen
+      // through the seeded local inbox (the story-reply path above uses it too).
+      const who = PREVIEW_STICKER_ANSWERS.find((a) => a.userId === userId);
+      if (!who || !isPreviewInboxEnabled()) {
+        showAlert('Replies aren’t available in the demo', 'Sign in to reply to answers.');
+        return;
+      }
+      const conv = getOrCreatePreviewConversationForAuthor({
+        authorId: who.userId, authorName: who.name, authorHandle: who.handle, authorInitials: who.initials, authorColor: pickAvatarColor(who.userId),
+      });
+      setResponsesOpen(false);
+      router.push(`/buyer-conversation?id=${encodeURIComponent(conv.id)}` as never);
+      return;
+    }
     try {
       const dm = await api.social.questionReplyConversation(currentStory.id, userId);
       setResponsesOpen(false);
       router.push(`/buyer-conversation?id=${encodeURIComponent(dm.conversationId)}` as never);
-    } catch {
-      showAlert('Could not open the conversation', 'Try again.');
+    } catch (err) {
+      showAlert('Could not open the conversation', friendlyError(err, 'Try again.'));
     }
   };
 
@@ -622,11 +662,13 @@ export default function BuyerStoryViewer() {
     setViewerModalVisible(true);
     if (!currentStory) return;
     setViewersLoading(true);
+    setViewersError(false);
     try {
       const rows = await api.social.storyViewers(currentStory.id);
       setServerViewers(rows.length ? rows : (isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []));
     } catch {
       setServerViewers(isPreviewDemoMode() ? PREVIEW_STORY_VIEWERS : []);
+      setViewersError(!isPreviewDemoMode());
     } finally {
       setViewersLoading(false);
     }
@@ -735,14 +777,12 @@ export default function BuyerStoryViewer() {
           <Pressable accessibilityRole="button" accessibilityLabel="Previous"
             style={styles.tapLeft}
             onPress={retreatSlide}
-            accessibilityLabel="Previous"
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
           <Pressable accessibilityRole="button" accessibilityLabel="Next"
             style={styles.tapRight}
             onPress={advanceSlide}
-            accessibilityLabel="Next"
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
@@ -790,17 +830,19 @@ export default function BuyerStoryViewer() {
         style={styles.bottomScrim}
       />
 
-      {/* PROGRESS BAR */}
+      {/* PROGRESS BAR — one segment per slide; a highlight is one group, so
+          it gets one segment per slide of every item it holds. */}
       <View style={[styles.progressContainer, { top: headerTopInset + SP.sm }]}>
-        {currentStory.media.map((_, i) => (
+        {Array.from({ length: segmentCount }, (_, i) => (
           <View
             key={i}
             style={styles.progressTrack}
+            testID="story-progress-segment"
             onLayout={trackWidth === 0 ? (e) => setTrackWidth(e.nativeEvent.layout.width) : undefined}
           >
-            {slideIdx > i ? (
+            {activeSegment > i ? (
               <View style={styles.progressFull} />
-            ) : slideIdx === i && trackWidth > 0 ? (
+            ) : activeSegment === i && trackWidth > 0 ? (
               // Animate `transform` (scaleX pinned to the left edge via a matching
               // translateX) instead of `width`, so this runs on the native driver
               // and never drops frames — the timer/advance logic above is untouched.
@@ -836,15 +878,19 @@ export default function BuyerStoryViewer() {
             style={({ pressed }) => [styles.productTag, { opacity: pressed ? 0.8 : 1 }]}
             onPress={() => {
               haptic('sheet');
-              Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
+              setIsPaused(true);
+              showAlert(currentSlide.productTagName ?? 'Product', undefined, [
                 {
                   text: 'Shop',
-                  onPress: () => router.push(
-                    `/thread-product-detail?productId=${encodeURIComponent(currentSlide.productTagId ?? '')}&productName=${encodeURIComponent(currentSlide.productTagName ?? '')}` as never,
-                  ),
+                  onPress: () => {
+                    setIsPaused(false);
+                    router.push(
+                      `/thread-product-detail?productId=${encodeURIComponent(currentSlide.productTagId ?? '')}&productName=${encodeURIComponent(currentSlide.productTagName ?? '')}` as never,
+                    );
+                  },
                 },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
+                { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
+              ], { cancelable: true, onDismiss: () => setIsPaused(false) });
             }}
             accessibilityRole="button"
             accessibilityLabel={`Shop ${currentSlide.productTagName ?? 'this product'}`}
@@ -862,7 +908,8 @@ export default function BuyerStoryViewer() {
             onPress={(event) => {
               setIsPaused(true);
               const author = { userId: currentStory.authorId, name: currentStory.authorName };
-              openPullDownMenu(event, menuItemsFromButtons([
+              const resume = () => setIsPaused(false);
+              const buttons = [
                 ...(slidePeople.length > 0 ? [{
                   text: 'Tagged people',
                   onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
@@ -879,16 +926,16 @@ export default function BuyerStoryViewer() {
                         color: currentStory.authorColor,
                       });
                       goBackOr(router);
-                    } catch {
-                      Alert.alert('Couldn’t mute', 'Try again.');
+                    } catch (err) {
+                      showAlert('Couldn’t mute', friendlyError(err, 'Try again.'));
                       setIsPaused(false);
                     }
                   },
                 },
                 {
                   text: 'Report story',
-                  style: 'destructive',
-                  onPress: () => { router.push(reportHref({
+                  style: 'destructive' as const,
+                  onPress: () => { resume(); router.push(reportHref({
                     targetType: 'story',
                     targetId: currentStory.id,
                     label: `${currentStory.authorName}'s story`,
@@ -898,14 +945,18 @@ export default function BuyerStoryViewer() {
                 },
                 {
                   text: `Block ${currentStory.authorName}`,
-                  style: 'destructive',
+                  style: 'destructive' as const,
                   onPress: async () => {
                     if (await confirmBlock(author, api.social.block)) goBackOr(router);
                     else setIsPaused(false);
                   },
                 },
-                { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
-              ], { 'Tagged people': 'users', 'Report story': 'flag' }), { title: currentStory.authorName, onDismiss: () => setIsPaused(false) });
+                { text: 'Cancel', style: 'cancel' as const, onPress: resume },
+              ];
+              // Pull-down menu (resumes on outside tap); if no menu host is
+              // mounted, the same actions as a web-visible action sheet.
+              const opened = openPullDownMenu(event, menuItemsFromButtons(buttons, { 'Tagged people': 'users', 'Report story': 'flag' }), { title: currentStory.authorName, onDismiss: resume });
+              if (!opened) showAlert(currentStory.authorName, undefined, buttons, { cancelable: true, onDismiss: resume });
             }}
           />
         ) : null}
@@ -1011,7 +1062,7 @@ export default function BuyerStoryViewer() {
                     text: 'Delete story',
                     style: 'destructive',
                     onPress: () => {
-                      Alert.alert('Delete this story?', 'It will be removed for everyone who can see it.', [
+                      showAlert('Delete this story?', 'It will be removed for everyone who can see it.', [
                         { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
                         {
                           text: 'Delete',
@@ -1020,8 +1071,8 @@ export default function BuyerStoryViewer() {
                             try {
                               await api.social.deleteStory(currentStory.id);
                               goBackOr(router);
-                            } catch {
-                              Alert.alert('Couldn’t delete', 'Try again.');
+                            } catch (err) {
+                              showAlert('Couldn’t delete', friendlyError(err, 'Try again.'));
                               setIsPaused(false);
                             }
                           },
@@ -1131,6 +1182,8 @@ export default function BuyerStoryViewer() {
         visible={responsesOpen}
         loading={responsesLoading}
         data={responses}
+        error={responsesError}
+        onRetry={() => { void stickerActions.openResponses(currentStory.id); }}
         onClose={() => setResponsesOpen(false)}
         onReply={(userId) => { void replyToAnswer(userId); }}
       />
@@ -1178,7 +1231,13 @@ export default function BuyerStoryViewer() {
                 </View>
               )}
               ListEmptyComponent={
-                <Text style={styles.noViewers}>{viewersLoading ? 'Loading…' : 'No viewers yet'}</Text>
+                viewersLoading ? (
+                  <Text style={styles.noViewers}>Loading…</Text>
+                ) : viewersError ? (
+                  <ErrorState message="Couldn’t load viewers." onRetry={() => { void openViewersModal(); }} />
+                ) : (
+                  <Text style={styles.noViewers}>No viewers yet</Text>
+                )
               }
             />
           </View>
@@ -1278,7 +1337,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   authorName: {
     color: ON_DARK,
     fontFamily: FONT.semibold,
-    fontSize: 14,
+    fontSize: TYPE_SCALE.callout.fontSize,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -1326,8 +1385,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexShrink: 1,
   },
   tapZoneRow: {
+    // Pinned to all four edges: with only `top`, the row (and its 100%-high
+    // zones) collapsed to 0pt, so tap-to-advance / hold-to-pause never fired.
     position: 'absolute',
     top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',

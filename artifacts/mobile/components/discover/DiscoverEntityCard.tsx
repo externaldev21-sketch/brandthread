@@ -73,6 +73,7 @@ export function DiscoverEntityCard({
       </PressableScale>
       <FollowButton
         userId={id}
+        name={name}
         initial={followInitial}
         size="compact"
         style={{ marginTop: SP.xs, alignSelf: 'stretch' }}

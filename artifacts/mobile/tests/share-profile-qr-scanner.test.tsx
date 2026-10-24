@@ -3,7 +3,7 @@
  * copy variants depending on `Platform.OS`:
  *   - web:    "Scanning isn't available on web. Try it on a phone."
  *   - native: "Allow camera access to scan a Brandthread profile code."
- *             plus an "Allow Camera" retry button.
+ *             plus an "Allow camera" retry button.
  *
  * PR #403 changed the web copy from "isn't available in this preview" to
  * "isn't available on web" but could not get a live screenshot of it: the
@@ -105,8 +105,8 @@ describe('ShareProfileQrScanner — camera-unavailable copy', () => {
     const texts = findAllText(renderer.root);
     expect(texts).toContain("Scanning isn't available on web. Try it on a phone.");
     expect(texts.some((t) => /preview/i.test(t))).toBe(false);
-    // Web has no meaningful permission prompt, so no "Allow Camera" retry button.
-    expect(texts).not.toContain('Allow Camera');
+    // Web has no meaningful permission prompt, so no "Allow camera" retry button.
+    expect(texts).not.toContain('Allow camera');
     act(() => { renderer.unmount(); });
   });
 
@@ -118,7 +118,7 @@ describe('ShareProfileQrScanner — camera-unavailable copy', () => {
     });
     const texts = findAllText(renderer.root);
     expect(texts).toContain('Allow camera access to scan a Brandthread profile code.');
-    expect(texts).toContain('Allow Camera');
+    expect(texts).toContain('Allow camera');
     expect(texts.some((t) => t.includes('on web'))).toBe(false);
     act(() => { renderer.unmount(); });
   });

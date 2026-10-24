@@ -17,8 +17,15 @@ import type { QuotedPostSummary } from '@/services/socialTypes';
 
 const THUMB = 64;
 
+/**
+ * Neutral fallback when the original has no author name (e.g. the quote
+ * composer opened with only a postId). Shared by the post viewer and the
+ * quote composer — never attribute an unknown author to "Brandthread".
+ */
+export const QUOTED_AUTHOR_FALLBACK = 'Original post';
+
 export function quotedAuthorName(q: { author: { displayName: string | null; brandName: string | null; username: string | null } }): string {
-  return q.author.brandName || q.author.displayName || (q.author.username ? `@${q.author.username}` : 'Brandthread');
+  return q.author.brandName || q.author.displayName || (q.author.username ? `@${q.author.username}` : QUOTED_AUTHOR_FALLBACK);
 }
 
 interface Props {
@@ -68,7 +75,7 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
       style={styles.card}
       onPress={() => onPress(quotedPost.id)}
       accessibilityRole="button"
-      accessibilityLabel={`Open post by ${name}`}
+      accessibilityLabel={name === QUOTED_AUTHOR_FALLBACK ? 'Open original post' : `Open post by ${name}`}
       testID={testID}
     >
       {body}

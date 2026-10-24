@@ -4,7 +4,11 @@ import { hapticDestructiveConfirm, hapticToggle, haptics, haptic } from '@/lib/h
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
-import { View, Text, FlatList, Alert, StyleSheet } from 'react-native';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
+
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
 
 import { LONG_LIST_TUNING } from '@/lib/listTuning';
 
@@ -23,7 +27,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getNotifications, markNotificationRead, markNotificationUnread, deleteNotification, muteNotificationCategory, clearAllReadNotifications, subscribeSocial } from '@/services/socialService';
 
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
-import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
+import { BrandedLoadingState, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -409,8 +413,15 @@ export default function BuyerNotifications() {
     const notif = optionsFor;
     if (!notif) return;
     closeOptions();
-    if (!isBuyerDevPreview()) await deleteNotification(notif.id);
+    // Optimistic: the row goes now and comes back if the delete fails.
     setNotifs(prev => prev.filter(n => n.id !== notif.id));
+    if (isBuyerDevPreview()) return;
+    try {
+      await deleteNotification(notif.id);
+    } catch (err) {
+      setNotifs(prev => (prev.some(n => n.id === notif.id) ? prev : [...prev, notif].sort((a, b) => b.createdAt.localeCompare(a.createdAt))));
+      showAlert('Could not delete notification', friendlyError(err, 'Try again.'));
+    }
   };
 
   const handleMuteOption = async () => {
@@ -424,20 +435,20 @@ export default function BuyerNotifications() {
     const label = categoryLabel(notif.category);
     try {
       await muteNotificationCategory(notif.category);
-    } catch {
-      Alert.alert(`Could not mute ${label} alerts`, 'Try again.');
+    } catch (err) {
+      showAlert(`Could not mute ${label} alerts`, friendlyError(err, 'Try again.'));
       return;
     }
     await loadNotifs();
-    Alert.alert(`${label} alerts muted`, `You won't get ${label.toLowerCase()} notifications or push alerts.`, [
+    showAlert(`${label} alerts muted`, `You won't get ${label.toLowerCase()} notifications or push alerts.`, [
       {
         text: 'Undo',
         onPress: async () => {
           try {
             await muteNotificationCategory(notif.category, false);
             await loadNotifs();
-          } catch {
-            Alert.alert('Could not unmute', 'Try again.');
+          } catch (err) {
+            showAlert('Could not unmute', friendlyError(err, 'Try again.'));
           }
         },
       },
@@ -461,8 +472,8 @@ export default function BuyerNotifications() {
           hapticDestructiveConfirm();
           try {
             await clearAllReadNotifications(selectedCategory ?? null);
-          } catch {
-            Alert.alert('Could not clear notifications', 'Try again.');
+          } catch (err) {
+            showAlert('Could not clear notifications', friendlyError(err, 'Try again.'));
             return;
           }
           await loadNotifs();
@@ -478,30 +489,32 @@ export default function BuyerNotifications() {
       return;
     }
     if (haptic) emitHaptic('select');
+    // Optimistic flip, rolled back if the server call fails.
+    setNotifs(prev => prev.map(item =>
+      item.id === notif.id ? { ...item, isRead: !notif.isRead } : item
+    ));
     try {
       if (notif.isRead) {
         await markNotificationUnread(notif.id);
       } else {
         await markNotificationRead(notif.id);
       }
-    } catch {
-      Alert.alert(notif.isRead ? 'Could not mark as unread' : 'Could not mark as read', 'Try again.');
-      return;
+    } catch (err) {
+      setNotifs(prev => prev.map(item =>
+        item.id === notif.id ? { ...item, isRead: notif.isRead } : item
+      ));
+      showAlert(notif.isRead ? 'Could not mark as unread' : 'Could not mark as read', friendlyError(err, 'Try again.'));
     }
-    setNotifs(prev => prev.map(item =>
-      item.id === notif.id ? { ...item, isRead: !notif.isRead } : item
-    ));
   };
 
   const renderItem = ({ item, index }: { item: ListItem; index: number }) => {
     if (item.type === 'header') {
       return (
-        <>
-          {index > 0 && <ThreadDivider style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.sm }} />}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionHeaderText, { color: theme.text }]}>{item.title}</Text>
-          </View>
-        </>
+        // Sentence-case title, no dashed divider between sections — the same
+        // section treatment as Activity (activity-center SectionHeader).
+        <View style={[styles.sectionHeader, index > 0 && styles.sectionHeaderSpaced]}>
+          <Text style={[styles.sectionHeaderText, { color: theme.text }]} accessibilityRole="header">{item.title}</Text>
+        </View>
       );
     }
 
@@ -528,7 +541,12 @@ export default function BuyerNotifications() {
           tone: 'destructive',
           onPress: async () => {
             setNotifs(prev => prev.filter(n => n.id !== notif.id));
-            try { await deleteNotification(notif.id); } catch { await loadNotifs(); }
+            try {
+              await deleteNotification(notif.id);
+            } catch (err) {
+              await loadNotifs();
+              showAlert('Could not delete notification', friendlyError(err, 'Try again.'));
+            }
           },
           accessibilityLabel: 'Clear notification',
         }]}
@@ -635,7 +653,8 @@ export default function BuyerNotifications() {
         {filterEdges.left && (
           <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeLeft]}>
             <LinearGradient
-              colors={[theme.background, `${theme.background}00`]}
+              colors={[theme.background, theme.background, `${theme.background}00`]}
+              locations={[0, 0.45, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
@@ -646,7 +665,8 @@ export default function BuyerNotifications() {
         {filterEdges.right && (
           <View pointerEvents="none" style={[styles.pillsEdge, styles.pillsEdgeRight]}>
             <LinearGradient
-              colors={[`${theme.background}00`, theme.background]}
+              colors={[`${theme.background}00`, theme.background, theme.background]}
+              locations={[0, 0.55, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
@@ -741,11 +761,13 @@ const makeStyles = () => StyleSheet.create({
     gap: SPACING.sm,
     alignItems: 'center',
   },
+  // Wide enough that the gradient fades the chip under it out and the
+  // chevron sits on the solid end of the gradient, not on chip text.
   pillsEdge: {
     position: 'absolute',
     top: SPACING.sm,
     bottom: SPACING.sm,
-    width: 28,
+    width: 48,
     justifyContent: 'center',
   },
   pillsEdgeLeft: {
@@ -770,6 +792,9 @@ const makeStyles = () => StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     marginTop: SPACING.sm,
+  },
+  sectionHeaderSpaced: {
+    marginTop: SPACING.lg,
   },
   // Instagram's section titles: sentence case, semibold, page text colour.
   sectionHeaderText: {

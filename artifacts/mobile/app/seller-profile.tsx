@@ -20,7 +20,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { plural } from '@/lib/plural';
 import type { MembershipLevel } from '@/lib/api';
 import { LEVEL_LABEL } from '@/lib/membershipLevels';
-import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
@@ -35,7 +35,11 @@ import { useApi } from '@/hooks/useApi';
 import { useStoreGiftCards } from '@/hooks/useStoreGiftCards';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { getSellerFollowState, setSellerFollowing, setPostPinned, pinErrorMessage } from '@/services/socialService';
+import {
+  getSellerFollowState, setSellerFollowing, setPostPinned, pinErrorMessage, getMutedUsers, muteUser, unmuteUser,
+} from '@/services/socialService';
+import { showAlert } from '@/lib/actionSheet';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import type { SellerThreadPost } from '@/services/socialService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -229,6 +233,8 @@ export default function SellerProfileScreen() {
   const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
+  // Whether I muted this brand (same mute list as people), so the menu offers Unmute.
+  const [isMuted, setIsMuted] = useState(false);
   const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopError, setShopError] = useState(false);
@@ -475,7 +481,7 @@ export default function SellerProfileScreen() {
   }, [videos]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  const handleFollow = useCallback(async () => {
+  const applyFollow = useCallback(async () => {
     if (followPending || !canonicalSellerId || !authLoaded) return;
     // The signed-out developer preview must not invent a follow on a real
     // official account. A real identity is required for server persistence.
@@ -503,11 +509,48 @@ export default function SellerProfileScreen() {
       }
       setIsFollowing(previous.isFollowing);
       setFollowers(previous.followers);
-      Alert.alert('Couldn’t update follow', 'Check your connection and try again.');
+      showAlert('Couldn’t update follow', 'Check your connection and try again.');
     } finally {
       setFollowPending(false);
     }
   }, [authLoaded, canonicalSellerId, followPending, followers, goToSignIn, isFollowing, requireSignIn, seller?.isOfficial, userId]);
+
+  // Unfollowing asks first, like the Following list (connections.tsx).
+  const handleFollow = useCallback(() => {
+    if (followPending || !canonicalSellerId || !authLoaded) return;
+    if (isFollowing) {
+      showActionSheet(`Unfollow ${seller?.brandName ?? 'this brand'}?`, undefined, [
+        { text: 'Unfollow', style: 'destructive', onPress: () => { void applyFollow(); } },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+    void applyFollow();
+  }, [applyFollow, authLoaded, canonicalSellerId, followPending, isFollowing, seller?.brandName]);
+
+  // My mute list (server-backed, local mirror offline); visitors only.
+  useEffect(() => {
+    if (!canonicalSellerId || !caps.showVisitorMenu || !userId) { setIsMuted(false); return undefined; }
+    let active = true;
+    void getMutedUsers().catch(() => []).then((mutes) => {
+      if (active) setIsMuted(mutes.some((m) => m.mutedUserId === canonicalSellerId));
+    });
+    return () => { active = false; };
+  }, [canonicalSellerId, caps.showVisitorMenu, userId]);
+
+  const handleToggleMute = useCallback(async () => {
+    if (!seller || !requireSignIn()) return;
+    const undo = isMuted;
+    try {
+      if (undo) await unmuteUser(seller.sellerId);
+      else await muteUser({ userId: seller.sellerId, name: seller.brandName, handle: `@${seller.username}`, initials: seller.initials, color: theme.cardElevated });
+      setIsMuted(!undo);
+      hapticSuccessAction();
+      setSnackbar(undo ? `Unmuted ${seller.brandName}` : `Muted ${seller.brandName}`);
+    } catch {
+      showAlert(undo ? 'Couldn’t unmute' : 'Couldn’t mute', 'Try again.');
+    }
+  }, [isMuted, requireSignIn, seller, theme.cardElevated]);
 
   const handleShare = useCallback(() => {
     if (!seller) return;
@@ -534,7 +577,7 @@ export default function SellerProfileScreen() {
   const handleMessageSeller = useCallback(() => {
     if (!seller) return;
     if (seller.vacationMode) {
-      Alert.alert('Seller is away', seller.vacationMessage ?? 'This seller is currently away and is not accepting new messages.');
+      showAlert('Seller is away', seller.vacationMessage ?? 'This seller is currently away and is not accepting new messages.');
       return;
     }
     if (!requireSignIn()) return;
@@ -588,6 +631,11 @@ export default function SellerProfileScreen() {
     if (caps.showVisitorMenu) {
       items.push(
         {
+          key: 'mute', icon: isMuted ? 'volume-2' : 'volume-x',
+          label: isMuted ? `Unmute ${seller.brandName}` : `Mute ${seller.brandName}`,
+          onPress: () => { void handleToggleMute(); },
+        },
+        {
           key: 'report', icon: 'flag', label: 'Report',
           onPress: () => router.push(reportHref({
             targetType: 'profile', targetId: sellerId, label: seller.brandName, ownerId: sellerId, ownerName: seller.brandName,
@@ -605,7 +653,7 @@ export default function SellerProfileScreen() {
       );
     }
     return items;
-  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, replayCount, router, seller, sellsGiftCards]);
+  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, handleToggleMute, isMuted, replayCount, router, seller, sellsGiftCards]);
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;
@@ -627,14 +675,14 @@ export default function SellerProfileScreen() {
       setSnackbar(pin ? 'Pinned to your profile' : 'Unpinned from profile');
       void videos.reload({ fresh: true });
     } catch (error) {
-      Alert.alert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
+      showAlert(pin ? 'Couldn’t pin post' : 'Couldn’t unpin post', pinErrorMessage(error));
     }
   }, [videos]);
 
   const handleCopyPostLink = useCallback(async (post: SellerThreadPost) => {
     const profileUrl = seller ? buildCanonicalProfileUrl(seller.username) : null;
     const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
-    if (!url) { Alert.alert('Couldn’t copy link', 'Try again.'); return; }
+    if (!url) { showAlert('Couldn’t copy link', 'Try again.'); return; }
     await Clipboard.setStringAsync(url);
     setSnackbar('Link copied');
   }, [seller]);

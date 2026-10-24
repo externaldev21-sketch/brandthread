@@ -79,7 +79,9 @@ const TABLE: Record<ProfileEmptyTab, {
     title: 'No saved posts yet',
     message: 'Items you save will appear here.',
     publicMessage: 'Saved items are private.',
-    cta: { label: 'View saved', route: '/buyer-saved' },
+    // Nothing is saved yet, so send them where saving happens — not to
+    // another (equally empty) saved list.
+    cta: { label: 'Discover', route: '/(buyer)/discover' },
   },
   'buyer:liked': {
     icon: 'heart',

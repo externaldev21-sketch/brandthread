@@ -690,6 +690,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
           accessibilityLabel="Clear search"
           accessibilityHint="Removes the current search text"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={srS.clear}
         >
           <Icon name="x" size={ICON.sm} color={palette.mutedForeground} />
         </PressableScale>
@@ -709,6 +710,9 @@ const srS = StyleSheet.create({
   // Only a subtle (still solid) fill change signals focus.
   focused: { backgroundColor: '#2C2C2E' },
   input:   { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
+  // PressableScale's 44pt min-height box would otherwise sit the "x" at its
+  // top edge — centre it so it lines up with the search icon and the text.
+  clear:   { alignItems: 'center', justifyContent: 'center' },
 });
 
 // ─── FilterChip ───────────────────────────────────────────────────────────────

@@ -69,6 +69,6 @@ export function sellerChipEmpty(chip: SellerActivityChip): { icon: string; title
     case 'mentions': return { icon: 'at-sign', title: 'No mentions yet', message: 'Mentions and tags show up here.' };
     case 'reposts': return { icon: 'repeat', title: 'No reposts yet', message: 'Reposts of your posts show up here.' };
     case 'followers': return { icon: 'user-plus', title: 'No new followers yet', message: 'New followers show up here.' };
-    default: return { icon: 'activity', title: 'No activity yet', message: 'Likes and followers show up here.' };
+    default: return { icon: 'activity', title: 'No activity yet', message: 'Likes, comments, mentions, reposts and new followers show up here.' };
   }
 }

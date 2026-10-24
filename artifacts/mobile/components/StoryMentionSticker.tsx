@@ -10,7 +10,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CachedImage, CachedImage as Image } from '@/components/CachedImage';
 import { Icon } from '@/components/ui/Icon';
-import { FONT, FS, ON_DARK, SP } from '@/lib/theme';
+import { FONT, FS, ON_DARK, RADIUS, SP } from '@/lib/theme';
+import { SPACING } from '@/constants/spacing';
 import { withAt, type MentionStyle } from '@/lib/storyMentionSticker';
 import { RESHARE_CARD_RADIUS } from '@/lib/storyReshare';
 import { crispPx } from '@/lib/crispPixel';
@@ -67,7 +68,9 @@ export function ReshareCard({
 }
 
 const styles = StyleSheet.create({
-  base: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: crispPx(1.5), borderColor: 'transparent' },
+  // Tokens of the same value only (shared with the viewer, so the sticker's size must not move):
+  // 12 = SPACING.sm, 8 = RADIUS.sm. The 6pt vertical padding has no equal token and stays literal.
+  base: { paddingHorizontal: SPACING.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: crispPx(1.5), borderColor: 'transparent' },
   text: { fontSize: FS.md, fontFamily: FONT.bold },
 
   card: {

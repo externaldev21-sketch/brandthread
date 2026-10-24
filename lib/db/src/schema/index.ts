@@ -2009,6 +2009,17 @@ export const suggestionDismissals = pgTable('suggestion_dismissals', {
   pk: primaryKey({ columns: [t.userId, t.suggestedUserId] }),
 }));
 
+// Dismissed "Follow back" prompts (Activity / followers list) — the X on a
+// follow-back suggestion keeps that follower from being suggested back to
+// this viewer again, across devices (migration 641).
+export const followBackDismissals = pgTable('follow_back_dismissals', {
+  userId:          text('user_id').notNull(),
+  dismissedUserId: text('dismissed_user_id').notNull(),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.dismissedUserId] }),
+}));
+
 // "See less" on an Activity row (Instagram's "..." menu) — a persisted,
 // per-user mute of either a whole notification type ("type:new_follower") or
 // a specific actor ("actor:<clerkId>"), stored as one opaque key so a single

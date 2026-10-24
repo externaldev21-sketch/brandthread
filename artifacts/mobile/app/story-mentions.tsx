@@ -14,6 +14,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
@@ -74,7 +75,7 @@ export default function StoryMentionsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const screenPadding = useScreenPadding({ withTabBarInset: false });
   const router = useRouter();
-  const { items, loading, reload } = useStoryMentions();
+  const { items, loading, error, reload } = useStoryMentions();
   const pull = usePullToRefresh(reload);
   const ordered = useMemo(() => orderMentions(items), [items]);
   const now = useMemo(() => Date.now(), [items]);
@@ -110,7 +111,11 @@ export default function StoryMentionsScreen() {
             { paddingBottom: screenPadding.bottom + SP.xl },
             ordered.length === 0 && styles.listEmpty,
           ]}
-          ListEmptyComponent={(
+          ListEmptyComponent={error ? (
+            <View style={styles.stateWrap}>
+              <ErrorState message="Couldn’t load story mentions." onRetry={() => { void reload(); }} />
+            </View>
+          ) : (
             <View style={styles.stateWrap}>
               <EmptyState
                 icon="at-sign"

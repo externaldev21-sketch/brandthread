@@ -160,10 +160,35 @@ describe('notes bubble wiring', () => {
     expect(composer).toContain("close_friends: 'Close friends'");
     expect(composer).toContain('title="Share with"');
     expect(composer).toContain('placeholder="Share a thought…"');
-    expect(composer).toContain('const canShare = trimmed.length > 0 && !saving;');
+    // Share is also held off while a delete is in flight (Delete note, round 2 #50).
+    expect(composer).toContain('const canShare = trimmed.length > 0 && !saving && !deleting;');
     expect(composer).toContain('<CharacterRing');
     // Sits on the shared sheet, so it rides the keyboard.
     expect(composer).toContain('<Sheet');
+  });
+
+  it('lets you delete your own note from the compose sheet, after a confirm', () => {
+    const composer = read('components/social/NoteComposerSheet.tsx');
+    // Only offered when you already have a note.
+    expect(composer).toContain('const canDelete = !!onDelete && initialText.trim().length > 0;');
+    expect(composer).toMatch(/\{canDelete \? \(\s*<PressableScale\s*onPress=\{deleteNote\}/);
+    expect(composer).toContain('accessibilityLabel="Delete note"');
+    // Confirms first (web-visible confirmAlert), and only deletes on yes.
+    expect(composer).toContain("import { confirmAlert } from '@/lib/actionSheet';");
+    expect(composer).toMatch(/const ok = await confirmAlert\(\{\s*title: 'Delete note\?'[\s\S]*?destructive: true,\s*\}\);\s*if \(!ok\) return;/);
+    // A failed delete keeps the sheet open with friendly copy.
+    expect(composer).toContain("setDeleteError(friendlyError(err, 'Couldn’t delete your note. Try again.'));");
+    const inbox = read('components/inbox/MessagesInbox.tsx');
+    expect(inbox).toContain('onDelete={removeNote}');
+    expect(inbox).toContain('await deleteMyNote();');
+    expect(inbox).toContain('clearPreviewMyNote();');
+    expect(inbox).toMatch(/async function removeNote\(\) \{[\s\S]*?setMyNote\(null\);\s*closeNoteCompose\(\);/);
+  });
+
+  it("friends' note bubbles wrap to two lines and the tray stays bottom-aligned", () => {
+    const inbox = read('components/inbox/MessagesInbox.tsx');
+    expect(inbox).toMatch(/s\.noteBubbleText, \{ color: theme\.text, fontFamily: FONT\.medium \}\]\} numberOfLines=\{2\}/);
+    expect(inbox).toContain("contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md, paddingVertical: 2, alignItems: 'flex-end' }}");
   });
 
   it('posts the chosen audience to the server', () => {

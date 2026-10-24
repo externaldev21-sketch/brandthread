@@ -2,8 +2,9 @@
  * QR scanner opened from the share-profile screen's scan icon.
  *
  * Layout mirrors the Mobbin Instagram QR-scanner reference 1:1: a full-bleed
- * camera viewfinder with rounded corner brackets, a back chevron top-left,
- * and a small icon top-right. Scanning a valid Brandthread profile QR code
+ * camera viewfinder with rounded corner brackets and a back chevron
+ * top-left (the reference's second, top-right close did the same thing as
+ * Back, so it was dropped). Scanning a valid Brandthread profile QR code
  * (or deep link) navigates straight to that scanned user's public profile;
  * anything else is ignored so a foreign QR code never routes anywhere.
  *
@@ -94,7 +95,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
               accessibilityRole="button"
               accessibilityLabel="Allow camera access"
             >
-              <Text style={styles.permissionBtnText}>Allow Camera</Text>
+              <Text style={styles.permissionBtnText}>Allow camera</Text>
             </Pressable>
           )}
         </View>
@@ -122,15 +123,6 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
           testID="qr-scanner-back"
         >
           <Icon name="chevron-left" size={ICON.lg} color="#FFFFFF" />
-        </Pressable>
-        <Pressable
-          onPress={onClose}
-          style={styles.headerIcon}
-          hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
-          accessibilityRole="button"
-          accessibilityLabel="Close scanner"
-        >
-          <Icon name="x" size={ICON.md} color="#FFFFFF" />
         </Pressable>
       </View>
 

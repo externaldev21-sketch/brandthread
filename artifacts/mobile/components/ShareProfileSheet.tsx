@@ -72,6 +72,8 @@ import { LOGO_SOURCE } from '@/constants/branding';
 
 import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';
 
+import { requestGuestSignIn } from '@/lib/guestSignIn';
+
 
 // Lazy: keeps react-native-svg's QR codegen out of every screen that merely
 // imports ShareProfileSheet (mirrors the pattern in ShareCardFrame.tsx).
@@ -144,15 +146,11 @@ export function ShareProfileSheet({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    if (!authLoaded) return;
     setError(false);
     setLoading(true);
-    // Signed-out previews must never call the protected profile API.
-    if (!isSignedIn) {
-      setIdentity(null);
-      setLoading(false);
-      return;
-    }
+    // The caller already knows the username (both own-profile screens pass
+    // it): no lookup needed — this is also how the signed-out preview, which
+    // has no session to ask, still gets its QR code.
     if (normalizeUsername(profileUsername)) {
       setIdentity({
         username: profileUsername ?? null,
@@ -160,6 +158,13 @@ export function ShareProfileSheet({
         brandName: profileBrandName ?? null,
         accountType: null,
       });
+      setLoading(false);
+      return;
+    }
+    if (!authLoaded) return;
+    // Signed out (and no username passed in) must never call the protected profile API.
+    if (!isSignedIn) {
+      setIdentity(null);
       setLoading(false);
       return;
     }
@@ -211,11 +216,19 @@ export function ShareProfileSheet({
     }
   }, [showToast]);
 
+  // SELFIE is the person's own photo; without one it used to fall back to the
+  // COLOR gradient silently, so the tab looked broken. Say why instead.
+  const selfieAvailable = !!avatarUrl;
   const handleSelectVariant = useCallback((next: BackgroundVariant) => {
     if (variant === next) return;
+    if (next === 'selfie' && !selfieAvailable) {
+      haptic('error');
+      showToast('Add a profile photo to use SELFIE.', 'error');
+      return;
+    }
     haptic('select');
     setVariant(next);
-  }, [variant]);
+  }, [selfieAvailable, showToast, variant]);
 
   const handleOpenScanner = useCallback(() => {
     setScreen('scanner');
@@ -224,6 +237,10 @@ export function ShareProfileSheet({
   const handleCloseScanner = useCallback(() => {
     setScreen('share');
   }, []);
+
+  const handleSignIn = useCallback(() => {
+    requestGuestSignIn('/', undefined, onClose);
+  }, [onClose]);
 
   const handleSetUsername = useCallback(() => {
     onClose();
@@ -322,9 +339,10 @@ export function ShareProfileSheet({
                 <Pressable
                   key={option}
                   onPress={() => handleSelectVariant(option)}
-                  style={[styles.styleOption, variant === option && styles.styleOptionSelected]}
+                  style={[styles.styleOption, variant === option && styles.styleOptionSelected, option === 'selfie' && !selfieAvailable && styles.styleOptionUnavailable]}
                   accessibilityRole="tab"
                   accessibilityLabel={`${VARIANT_LABEL[option]} background`}
+                  accessibilityHint={option === 'selfie' && !selfieAvailable ? 'Needs a profile photo' : undefined}
                   accessibilityState={{ selected: variant === option }}
                   aria-selected={variant === option}
                   testID={`share-profile-style-${option}`}
@@ -354,10 +372,13 @@ export function ShareProfileSheet({
               <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
                 <Icon name="loader" size={24} color="#0A0A0B" />
               </View>
-            ) : !isSignedIn ? (
+            ) : !isSignedIn && !identity ? (
               <View style={[styles.card, styles.stateCard]}>
                 <Icon name="link-2" size={28} color="#0A0A0B" />
                 <Text style={styles.stateText}>Sign in to share your profile</Text>
+                <PressableScale onPress={handleSignIn} accessibilityRole="button" accessibilityLabel="Sign in" testID="share-profile-sign-in">
+                  <Text style={styles.retryText}>Sign in</Text>
+                </PressableScale>
               </View>
             ) : error ? (
               <View style={[styles.card, styles.stateCard]}>
@@ -448,7 +469,7 @@ export function ShareProfileSheet({
               )}
             </View>
           )}
-          {!loading && !error && isSignedIn && canonicalUrl && (
+          {!loading && !error && canonicalUrl && (
             <Text style={[styles.shareHint, { color: theme.muted }]}>
               Send through Messages or an app in your share sheet. Copy link to paste it anywhere.
             </Text>
@@ -624,6 +645,7 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
   },
   styleOptionTextSelected: { color: '#0A0A0B' },
+  styleOptionUnavailable: { opacity: 0.45 },
   contentWrap: {
     flex: 1,
     alignItems: 'center',

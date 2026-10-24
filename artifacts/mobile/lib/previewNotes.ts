@@ -83,3 +83,9 @@ export function postPreviewNote(text: string, audience?: Note['audience']): Note
   };
   return myPreviewNote;
 }
+
+/** Clear my own preview note — mirrors DELETE /api/social/notes/me
+ *  (idempotent: clearing when there is no note is a no-op). */
+export function clearPreviewMyNote(): void {
+  myPreviewNote = null;
+}

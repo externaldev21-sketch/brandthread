@@ -13,11 +13,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePersistedChoice } from '@/hooks/usePersistedChoice';
 
-import { ActivityIndicator, Alert, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, ScrollView, SectionList, Text, View, type ViewToken } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -47,6 +47,10 @@ import { useApi } from '@/lib/api';
 
 import { ApiError } from '@/lib/networkNotice';
 
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 
 import { haptics } from '@/lib/haptics';
@@ -75,6 +79,7 @@ export default function SellerActivityScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const { signOut } = useAuth();
 
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [dotIds, setDotIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -301,9 +306,9 @@ export default function SellerActivityScreen() {
     setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
     try {
       await setSellerFollowing(userId, next);
-    } catch {
+    } catch (err) {
       setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
-      showAlert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+      showAlert(next ? 'Could not follow' : 'Could not unfollow', friendlyError(err, 'Please try again in a moment.'));
     } finally {
       setFollowPending((prev) => {
         const copy = new Set(prev);
@@ -321,7 +326,9 @@ export default function SellerActivityScreen() {
       void setFollowingPerson(userId, true);
       return;
     }
-    showActionSheet(undefined, undefined, [
+    // Same "Unfollow {name}?" confirm as the Following list (app/connections.tsx).
+    const name = row.actors[0]?.name;
+    showActionSheet(name ? `Unfollow ${name}?` : 'Unfollow?', undefined, [
       { text: 'Unfollow', style: 'destructive', onPress: () => { void setFollowingPerson(userId, false); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -349,14 +356,22 @@ export default function SellerActivityScreen() {
       buttons.push({
         text: 'Block',
         style: 'destructive',
-        onPress: () => {
-          void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
-            .then(() => {
-              setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
-              showToast('Blocked');
-            })
-            .catch(() => showAlert('Could not block', 'Please try again in a moment.'));
-        },
+        // Same "Block name?" confirm as every other Block entry point.
+        onPress: () => showActionSheet(`Block ${actor.name}?`, BLOCK_EXPLAINER, [
+          {
+            text: 'Block',
+            style: 'destructive',
+            onPress: () => {
+              void blockUser({ userId: actor.id!, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' })
+                .then(() => {
+                  setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
+                  showToast('Blocked');
+                })
+                .catch((err) => showAlert('Could not block', friendlyError(err, 'Please try again in a moment.')));
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]),
       });
     }
     buttons.push({ text: 'Cancel', style: 'cancel' });
@@ -383,6 +398,13 @@ export default function SellerActivityScreen() {
       <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>{section.title}</Text>
     </View>
   ), [styles]);
+
+  // An expired session can't be fixed by retrying: sign out and back in,
+  // returning here (same flow as delete-account's "Sign in again").
+  const signInAgain = useCallback(async () => {
+    await signOut().catch(() => {});
+    router.replace(`/sign-in?returnTo=${encodeURIComponent('/seller-activity')}` as never);
+  }, [router, signOut]);
 
   const empty = sellerChipEmpty(chip);
   const errorMessage = errorKind === 'auth'
@@ -422,8 +444,8 @@ export default function SellerActivityScreen() {
             icon={errorKind === 'auth' ? 'lock' : 'wifi-off'}
             variant="error"
             message={errorMessage}
-            actionLabel="Try again"
-            onAction={() => { void loadFirstPage('initial'); }}
+            actionLabel={errorKind === 'auth' ? 'Sign in' : 'Try again'}
+            onAction={errorKind === 'auth' ? () => { void signInAgain(); } : () => { void loadFirstPage('initial'); }}
           />
         </View>
       ) : (

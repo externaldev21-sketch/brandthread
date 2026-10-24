@@ -1229,6 +1229,9 @@ export function respond({ method, path, query, role, options = {} }) {
       { key: 'field', ago: 45 * DAY, followsMe: true, accountType: 'seller' },
       { userId: 'user_priya', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: '#B45309', ago: 20 * DAY, followsMe: true, accountType: 'buyer' },
       { userId: 'user_theo', name: 'Theo Marsh', username: 'theomarsh', handle: '@theomarsh', initials: 'TM', color: '#0F766E', ago: 2 * DAY, followsMe: false, accountType: 'buyer' },
+      // Followed back from the Followers list below — every "Follows you"
+      // row here is also on Followers, and every followed-back follower is here.
+      { userId: 'demo-follower-2', name: 'Marcus Webb', username: 'marcusw', handle: '@marcusw', initials: 'MW', color: '#EC4899', ago: 1 * DAY, followsMe: true, accountType: 'buyer' },
     ];
     const list = rows.map((r) => {
       const brand = r.key ? BRANDS[r.key] : null;
@@ -1250,7 +1253,8 @@ export function respond({ method, path, query, role, options = {} }) {
     else list.sort((a, b) => new Date(b.followedAt) - new Date(a.followedAt));
     return list;
   }
-  // Followers list PR: two buyers who follow the demo account — the
+  // Followers list PR: the people who follow the demo account (the same
+  // people the Following list above tags "Follows you") — the
   // viewer's own Followers list gets a "Remove" button per row (see
   // components/social/RemoveFollowerSheet.tsx).
   if (p === '/social/followers') {
@@ -1263,6 +1267,18 @@ export function respond({ method, path, query, role, options = {} }) {
       {
         userId: 'demo-follower-2', name: 'Marcus Webb', username: 'marcusw', handle: '@marcusw',
         initials: 'MW', color: '#EC4899', accountType: 'buyer', followedAt: iso(1 * DAY + 2 * HOUR),
+        isFollowingBack: true, isFollowing: true, followsMe: true,
+      },
+      // The two "Follows you" rows on the Following list above, so the two
+      // lists agree (both followed back).
+      {
+        userId: 'user_priya', name: 'Priya Nandan', username: 'priyan', handle: '@priyan',
+        initials: 'PN', color: '#B45309', accountType: 'buyer', followedAt: iso(21 * DAY),
+        isFollowingBack: true, isFollowing: true, followsMe: true,
+      },
+      {
+        userId: BRANDS.field.clerkId, name: BRANDS.field.name, username: BRANDS.field.handle, handle: BRANDS.field.handle,
+        initials: BRANDS.field.name.slice(0, 2).toUpperCase(), color: '#7A7A7A', accountType: 'seller', followedAt: iso(46 * DAY),
         isFollowingBack: true, isFollowing: true, followsMe: true,
       },
     ].filter((row) => !query.get('q') || `${row.name} ${row.username}`.toLowerCase().includes(query.get('q').toLowerCase()));

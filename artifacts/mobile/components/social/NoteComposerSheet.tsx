@@ -11,6 +11,8 @@
  *     ("Followers you follow back ⌄"), the Share button on the right, enabled
  *     once there's text. A character ring sits beside Share.
  *  4. Tapping the audience opens the "Share with" picker (radio rows).
+ *  5. With a note already up, "Delete note" under the avatar removes it
+ *     (after a confirm), like Instagram's own "Delete note".
  *
  * The keyboard opens immediately and the whole sheet rides on top of it.
  */
@@ -26,6 +28,8 @@ import { OptionSheet } from '@/components/ui/OptionSheet';
 import { radius } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
 import { hapticLight, hapticMedium, hapticSuccess, hapticError } from '@/lib/haptics';
+import { confirmAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { NOTE_MAX_CHARS, type NoteAudience } from '@/services/socialTypes';
 
 export const NOTE_AUDIENCE_LABEL: Record<Exclude<NoteAudience, 'followers'>, string> = {
@@ -48,10 +52,12 @@ export interface NoteComposerSheetProps {
   initials?: string;
   /** Posts the note. Throw to keep the sheet open with an error. */
   onShare: (text: string, audience: Exclude<NoteAudience, 'followers'>) => Promise<void>;
+  /** Deletes your current note (shown only when editing one). Throw to keep the sheet open with an error. */
+  onDelete?: () => Promise<void>;
 }
 
 export function NoteComposerSheet({
-  visible, onClose, initialText = '', initialAudience, avatarUri, initials, onShare,
+  visible, onClose, initialText = '', initialAudience, avatarUri, initials, onShare, onDelete,
 }: NoteComposerSheetProps) {
   const { theme } = useAppTheme();
   const [text, setText] = useState(initialText);
@@ -61,6 +67,8 @@ export function NoteComposerSheet({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // Explicit content height: a web <textarea> defaults to 2 rows, so the
   // bubble would never hug a one-line note otherwise.
   const [inputH, setInputH] = useState(LINE);
@@ -72,13 +80,15 @@ export function NoteComposerSheet({
     setText(initialText);
     setAudience(initialAudience === 'close_friends' ? 'close_friends' : 'friends');
     setFailed(false);
+    setDeleteError(null);
     // autoFocus alone is unreliable inside a Modal that's still animating in.
     const t = setTimeout(() => inputRef.current?.focus(), 60);
     return () => clearTimeout(t);
   }, [visible, initialText, initialAudience]);
 
   const trimmed = text.trim();
-  const canShare = trimmed.length > 0 && !saving;
+  const canShare = trimmed.length > 0 && !saving && !deleting;
+  const canDelete = !!onDelete && initialText.trim().length > 0;
   const remaining = NOTE_MAX_CHARS - text.length;
 
   async function share() {
@@ -94,6 +104,29 @@ export function NoteComposerSheet({
       setFailed(true);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteNote() {
+    if (!onDelete || deleting || saving) return;
+    hapticLight();
+    const ok = await confirmAlert({
+      title: 'Delete note?',
+      message: 'Your note will be removed for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete();
+      hapticSuccess();
+    } catch (err) {
+      hapticError();
+      setDeleteError(friendlyError(err, 'Couldn’t delete your note. Try again.'));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -194,6 +227,26 @@ export function NoteComposerSheet({
             Couldn’t share your note. Try again.
           </Text>
         ) : null}
+        {canDelete ? (
+          <PressableScale
+            onPress={deleteNote}
+            disabled={deleting || saving}
+            style={styles.delete}
+            accessibilityRole="button"
+            accessibilityLabel="Delete note"
+            accessibilityState={{ disabled: deleting || saving, busy: deleting }}
+            testID="note-delete"
+          >
+            {deleting
+              ? <ActivityIndicator color={theme.text} size="small" />
+              : <Text style={[styles.deleteLabel, { color: theme.text }]}>Delete note</Text>}
+          </PressableScale>
+        ) : null}
+        {deleteError ? (
+          <Text style={[styles.error, { color: theme.error }]} accessibilityLiveRegion="polite">
+            {deleteError}
+          </Text>
+        ) : null}
       </View>
 
       <OptionSheet
@@ -283,6 +336,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shareDisabled: { opacity: 0.4 },
+  delete: { minHeight: 44, paddingHorizontal: 16, marginTop: 16, alignItems: 'center', justifyContent: 'center' },
+  deleteLabel: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
   shareLabel: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
 });
 

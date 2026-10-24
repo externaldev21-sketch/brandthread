@@ -142,6 +142,7 @@ vi.mock("react-native-reanimated", () => {
     withTiming: (toValue: unknown) => toValue,
     withSpring: (toValue: unknown) => toValue,
     withSequence: (...values: unknown[]) => values[values.length - 1],
+    useReducedMotion: () => true,
     interpolateColor: (value: number, input: number[], output: string[]) => {
       const index = input.indexOf(value);
       return index >= 0 ? output[index] : output[value >= (input[input.length - 1] ?? 1) ? output.length - 1 : 0];
@@ -153,6 +154,8 @@ vi.mock("react-native-reanimated", () => {
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
   useLocalSearchParams: () => searchParamsMock(),
+  useGlobalSearchParams: () => ({}),
+  usePathname: () => "/buyer-other-profile",
   useFocusEffect: (callback: () => void) => {
     const ReactActual = require("react") as typeof import("react");
     ReactActual.useEffect(callback, [callback]);
@@ -184,8 +187,22 @@ vi.mock("@/lib/money", () => ({
   formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}`,
 }));
 
-vi.mock("@/services/socialService", () => ({
-  muteUser: vi.fn(), restrictUser: vi.fn(), createOrGetConversation: vi.fn(),
+const { socialMocks, actionSheetMock } = vi.hoisted(() => ({
+  socialMocks: {
+    muteUser: vi.fn(async () => {}), unmuteUser: vi.fn(async () => {}),
+    restrictUser: vi.fn(async () => {}), unrestrictUser: vi.fn(async () => {}),
+    getMutedUsers: vi.fn(async (): Promise<Array<{ mutedUserId: string }>> => []),
+    getRestrictedUsers: vi.fn(async (): Promise<Array<{ restrictedUserId: string }>> => []),
+    createOrGetConversation: vi.fn(),
+  },
+  actionSheetMock: vi.fn(),
+}));
+
+vi.mock("@/services/socialService", () => socialMocks);
+vi.mock("@/components/ui/ActionSheet", () => ({ showActionSheet: actionSheetMock }));
+// The sheet chrome (reanimated transitions) is not under test here: render its content.
+vi.mock("@/components/ui/BottomSheet", () => ({
+  Sheet: ({ children, testID }: { children?: React.ReactNode; testID?: string }) => React.createElement("View", { testID }, children),
 }));
 
 vi.mock("@/lib/contextualPushPermission", () => ({ requestContextualPushPermission: vi.fn() }));
@@ -332,5 +349,87 @@ describe("buyer-other-profile.tsx — a buyer's profile as seen by a visitor", (
     expect(creatorVideosMock.mock.calls[0][3]).toMatchObject({ asVisitor: true });
     const text = textContent(renderer.toJSON());
     for (const forbidden of PRIVATE_BUYER_TEXT) expect(text, forbidden).not.toContain(forbidden);
+  });
+});
+
+describe("buyer-other-profile.tsx — the shared \"...\" sheet, mute / restrict and unfollow", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
+  beforeEach(() => {
+    actionSheetMock.mockReset();
+    for (const fn of Object.values(socialMocks)) fn.mockClear();
+    socialMocks.getMutedUsers.mockResolvedValue([]);
+    socialMocks.getRestrictedUsers.mockResolvedValue([]);
+    authMock.mockReturnValue({ isLoaded: true, isSignedIn: true, userId: "viewer-1" } as never);
+  });
+
+  async function openSheet() {
+    const more = renderer.root.findAll((n) => n.props.testID === "buyer-other-profile-more" && typeof n.props.onPress === "function")[0];
+    await act(async () => { more.props.onPress(); await flush(); });
+  }
+
+  const row = (key: string) => renderer.root.findAll((n) => n.props.testID === `buyer-other-profile-more-sheet-${key}` && typeof n.props.onPress === "function")[0];
+  const rowText = (key: string) => textContent(renderer.root.findAllByProps({ testID: `buyer-other-profile-more-sheet-${key}` })[0]);
+
+  it("uses the shared ProfileMenuSheet with seller-profile's labels (Block {name})", async () => {
+    renderer = await renderScreen();
+    await openSheet();
+    expect(rowText("block")).toContain("Block Pat Buyer");
+    expect(rowText("mute")).toContain("Mute Pat Buyer");
+    expect(rowText("restrict")).toContain("Restrict Pat Buyer");
+    expect(rowText("report")).toContain("Report");
+  });
+
+  it("loads an existing mute / restrict and offers Unmute / Unrestrict", async () => {
+    socialMocks.getMutedUsers.mockResolvedValue([{ mutedUserId: "buyer-7" }]);
+    socialMocks.getRestrictedUsers.mockResolvedValue([{ restrictedUserId: "buyer-7" }]);
+    renderer = await renderScreen();
+    await openSheet();
+    expect(rowText("mute")).toContain("Unmute Pat Buyer");
+    expect(rowText("restrict")).toContain("Unrestrict Pat Buyer");
+    await act(async () => { row("mute").props.onPress(); await flush(); });
+    await act(async () => { row("restrict").props.onPress(); await flush(); });
+    expect(socialMocks.unmuteUser).toHaveBeenCalledWith("buyer-7");
+    expect(socialMocks.unrestrictUser).toHaveBeenCalledWith("buyer-7");
+    expect(socialMocks.muteUser).not.toHaveBeenCalled();
+    expect(rowText("mute")).toContain("Mute Pat Buyer");
+    expect(rowText("restrict")).toContain("Restrict Pat Buyer");
+  });
+
+  it("muting flips the row to Unmute", async () => {
+    renderer = await renderScreen();
+    await openSheet();
+    await act(async () => { row("mute").props.onPress(); await flush(); });
+    expect(socialMocks.muteUser).toHaveBeenCalledWith(expect.objectContaining({ userId: "buyer-7", name: "Pat Buyer" }));
+    expect(rowText("mute")).toContain("Unmute Pat Buyer");
+  });
+
+  it("asks before unfollowing and only unfollows on confirm", async () => {
+    apiMock.social.profile.mockResolvedValue({ ...buyerProfile, isFollowing: true });
+    apiMock.social.unfollow.mockReset().mockResolvedValue({ followersCount: 40 });
+    renderer = await renderScreen();
+    const following = renderer.root.findAll((n) => typeof n.props.accessibilityLabel === "string"
+      && n.props.accessibilityLabel.endsWith("tap to unfollow") && typeof n.props.onPress === "function")[0];
+    await act(async () => { following.props.onPress(); await flush(); });
+    expect(apiMock.social.unfollow).not.toHaveBeenCalled();
+    const [title, , buttons] = actionSheetMock.mock.calls[0];
+    expect(title).toBe("Unfollow Pat Buyer?");
+    expect(buttons.map((b: { text: string; style?: string }) => [b.text, b.style])).toEqual([["Unfollow", "destructive"], ["Cancel", "cancel"]]);
+    await act(async () => { buttons[0].onPress(); await flush(); });
+    expect(apiMock.social.unfollow).toHaveBeenCalledWith("buyer-7");
+  });
+
+  it("hides the \"...\" actions while the profile failed to (re)load, keeping the in-grid Retry", async () => {
+    renderer = await renderScreen();
+    expect(renderer.root.findAllByProps({ testID: "buyer-other-profile-more" }).length).toBeGreaterThan(0);
+    apiMock.social.profile.mockRejectedValue(Object.assign(new Error("down"), { status: 500 }));
+    const shell = renderer.root.findAll((n) => typeof n.props.onRefresh === "function")[0];
+    await act(async () => { await shell.props.onRefresh(); await flush(); });
+    expect(renderer.root.findAllByProps({ testID: "buyer-other-profile-more" })).toHaveLength(0);
+    const more = renderer.root.findAll((n) => n.props.accessibilityLabel === "More options" && "disabled" in n.props)[0];
+    expect(more.props.disabled).toBe(true);
+    // The in-grid Retry stays the error affordance (no full-screen error over a loaded profile).
+    expect(renderer.root.findAllByProps({ testID: "profile-grid-error" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "buyer-other-profile-error" })).toHaveLength(0);
   });
 });

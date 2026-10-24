@@ -55,7 +55,7 @@ import { RADII } from '@/constants/radii';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
 
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 
@@ -352,6 +352,7 @@ export const CommentRow = React.memo(function CommentRow({
   onReply,
   onMore,
   onPressMention,
+  onPressAuthor,
 }: {
   comment: Row;
   /** The comment a notification deep-linked to — briefly tinted. */
@@ -362,6 +363,8 @@ export const CommentRow = React.memo(function CommentRow({
   onReply: (comment: Row) => void;
   onMore: (comment: Row) => void;
   onPressMention?: (mention: CommentMentionRef) => void;
+  /** Opens the comment author's profile — same destination as an @mention. */
+  onPressAuthor?: (comment: Row) => void;
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
@@ -369,10 +372,28 @@ export const CommentRow = React.memo(function CommentRow({
   /** Optimistic comments carry a tmp_ prefix — show a subtle pending indicator */
   const isPending = comment.id.startsWith('tmp_');
   const translation = useCaptionTranslation(comment.body);
+  const avatar = <Avatar uri={isOfficialAccountId(comment.author.userId) ? (officialAvatarUri() ?? comment.author.avatarUrl) : comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} recyclingKey={comment.id} />;
+  const openAuthor = onPressAuthor && !isPending && !comment.author.deleted ? () => onPressAuthor(comment) : undefined;
 
   return (
     <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending, highlighted && s.commentRowHighlighted]} testID={highlighted ? 'comment-deep-link-highlight' : undefined}>
-      <Avatar uri={isOfficialAccountId(comment.author.userId) ? (officialAvatarUri() ?? comment.author.avatarUrl) : comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} recyclingKey={comment.id} />
+      {/* Avatar and name open the author's profile, exactly like an
+          @mention in the comment text. The avatar's Pressable is a sibling
+          of the content Pressable (never nested), and the name is a
+          pressable <Text> like MentionText's links. */}
+      {openAuthor ? (
+        <PressableScale
+          onPress={openAuthor}
+          accessibilityRole="link"
+          accessibilityLabel={`Open ${comment.author.name}'s profile`}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          rippleEnabled={false}
+          noMinHeight
+          testID="comment-author-avatar"
+        >
+          {avatar}
+        </PressableScale>
+      ) : avatar}
 
       <View style={s.commentBody}>
         <PressableScale
@@ -394,7 +415,7 @@ export const CommentRow = React.memo(function CommentRow({
           ) : null}
 
           <View style={s.commentHeader}>
-            <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
+            <Text style={s.authorName} numberOfLines={1} onPress={openAuthor} accessibilityRole={openAuthor ? 'link' : undefined} testID="comment-author-name">{comment.author.name}</Text>
             {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
             {!isCreator && comment.dayOne ? (
               <Text style={[s.creatorBadge, { color: MUTED }]} accessibilityLabel="Day 1 buyer" testID="comment-day-one">· Day 1</Text>
@@ -881,6 +902,8 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   const [heldNotice, setHeldNotice] = useState<string | null>(null);
   const [actionsFor, setActionsFor] = useState<Row | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** Measured composer height (reply banner + mention strip + emoji row + input), so the toast floats just above it. */
+  const [composerHeight, setComposerHeight] = useState(0);
 
   const listRef = useRef<FlashListRef<Row | ViewRepliesRow>>(null);
   const inputRef = useRef<TextInput>(null);
@@ -1106,6 +1129,16 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     } as never);
   }, [router]);
 
+  /** Author avatar/name → the same profile route an @mention opens. */
+  const handlePressAuthor = useCallback((comment: Row) => {
+    const { userId, handle } = comment.author;
+    if (!userId || userId === 'me') return;
+    router.push({
+      pathname: '/buyer-other-profile' as never,
+      params: handle ? { userId, handle: `@${handle}` } : { userId },
+    } as never);
+  }, [router]);
+
   const mentionQuery = activeMentionQuery(inputText);
 
   const handleSend = async () => {
@@ -1196,10 +1229,19 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     }
   };
 
-  /** Real comment count (excludes temp optimistic items and held comments) */
+  /**
+   * Header count rule: the number of comments (top-level + replies) this
+   * viewer can actually see in the loaded thread. It excludes optimistic
+   * tmp_ items, held ("In review") comments, and — for guests, whose muted
+   * words are filtered on the device rather than by the server — comments
+   * hidden by those muted words, so "N comments" never exceeds what's shown.
+   * Signed-in muted-word hides are already excluded server-side and are
+   * surfaced separately by the "N hidden by your muted words" footer.
+   */
   const realCount = useMemo(
-    () => comments.filter(c => !c.id.startsWith('tmp_') && !c.pendingReview).length,
-    [comments],
+    () => comments.filter(c => !c.id.startsWith('tmp_') && !c.pendingReview
+      && (user?.id || !guestMutedPhrases || !matchesGuestMutedWords(c.body, guestMutedPhrases))).length,
+    [comments, user?.id, guestMutedPhrases],
   );
 
   /**
@@ -1300,9 +1342,10 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
         onReply={handleReply}
         onMore={setActionsFor}
         onPressMention={handlePressMention}
+        onPressAuthor={handlePressAuthor}
       />
     )
-  ), [highlightId, postAuthorId, handleLike, handleReply, handlePressMention, toggleReplies]);
+  ), [highlightId, postAuthorId, handleLike, handleReply, handlePressMention, handlePressAuthor, toggleReplies]);
 
   // Typing in the composer re-renders this screen on every keystroke. Keep
   // the list's props referentially stable so the visible comment rows (and
@@ -1311,6 +1354,7 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
   const onDislikeStable = useStableCallback(handleDislike);
   const onReplyStable = useStableCallback(handleReply);
   const onPressMentionStable = useStableCallback(handlePressMention);
+  const onPressAuthorStable = useStableCallback(handlePressAuthor);
   const renderCommentRow = useCallback(({ item }: { item: Row | ViewRepliesRow }) => (
     isViewRepliesRow(item) ? (
       <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
@@ -1324,9 +1368,10 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
         onReply={onReplyStable}
         onMore={setActionsFor}
         onPressMention={onPressMentionStable}
+        onPressAuthor={onPressAuthorStable}
       />
     )
-  ), [highlightId, postAuthorId, toggleReplies, onLikeStable, onDislikeStable, isPreviewPost, onReplyStable, onPressMentionStable]);
+  ), [highlightId, postAuthorId, toggleReplies, onLikeStable, onDislikeStable, isPreviewPost, onReplyStable, onPressMentionStable, onPressAuthorStable]);
   const listHeader = useMemo(() => (
     <>
       {loading && [0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
@@ -1431,13 +1476,19 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
           </KeyboardGestureArea>
 
         {toast ? (
-          <View style={s.toast} pointerEvents="none" accessibilityLiveRegion="polite">
+          <View style={[s.toast, composerHeight > 0 && { bottom: composerHeight + SP.sm }]} pointerEvents="none" accessibilityLiveRegion="polite" testID="comments-toast">
             <Icon name="check" size={14} color={theme.onAccent} />
             <Text style={s.toastText}>{toast}</Text>
           </View>
         ) : null}
 
-        <View style={[s.inputWrap, composerLocked && { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+        <View
+          style={[s.inputWrap, composerLocked && { paddingBottom: Math.max(insets.bottom, SP.sm) }]}
+          onLayout={(e) => {
+            const h = Math.round(e.nativeEvent.layout.height);
+            setComposerHeight((prev) => (prev === h ? prev : h));
+          }}
+        >
           {sendError ? (
             <PressableScale style={s.sendErrorBanner} onPress={() => setSendError(null)} accessibilityRole="alert">
               <Icon name="alert-circle" size={12} color={theme.error} />
@@ -1724,9 +1775,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   sortChipTextOn: { color: CARD },
 
   listContent: { paddingTop: 4, paddingBottom: SP.md, flexGrow: 1 },
-  emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: SP.lg },
-  emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
-  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   listFooter: { alignItems: 'center', gap: SP.xs, paddingTop: SP.xs },
   loadMore: { paddingVertical: SP.sm, paddingHorizontal: SP.md, minHeight: 36, justifyContent: 'center' },
   loadMoreText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.meta },
@@ -1749,12 +1797,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   commentRowHighlighted: { backgroundColor: 'rgba(255,255,255,0.08)' },
   commentBody: { flex: 1, minWidth: 0 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
-  authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED, flexShrink: 1 },
+  authorName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: FS.sm },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, marginBottom: 2 },
-  commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
+  commentTime: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
-  commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
+  commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
   translationLink: { alignSelf: 'flex-start', marginTop: 2, color: MUTED },
   reviewPill: {
@@ -1777,7 +1825,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // `hitSlop` instead) — otherwise PressableScale's forced 44pt-tall box
   // stretches this whole meta row to 44pt regardless of the 12pt text inside it.
   replyBtn: { justifyContent: 'center' },
-  replyLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
+  replyLabel: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: SUBTLE },
   // Its own right-hand column, top-aligned ~4pt below the username line
   // (header line-height ~16 + 3pt header margin + 4pt gap), never sunk down
   // to the meta row. No overflow:hidden anywhere in this chain, and the icon
@@ -1802,6 +1850,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.meta, color: MUTED },
 
   toast: {
+    // `bottom` is overridden at the call site with the composer's measured
+    // height + 8pt; 150 is only the pre-layout fallback.
     position: 'absolute', alignSelf: 'center', bottom: 150,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 8,

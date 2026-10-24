@@ -170,6 +170,7 @@ export function SearchEmptyState({
               </Pressable>
               <FollowButton
                 userId={b.id}
+                name={b.name}
                 initial={{ isFollowing: false, isFollowedBy: false, isMutual: false }}
                 size="compact"
                 guard={requireSignIn}

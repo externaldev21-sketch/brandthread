@@ -58,6 +58,7 @@ export function DiscoverBrandTile({ brand }: { brand: BrandCardData }) {
       </PressableScale>
       <FollowButton
         userId={brand.id}
+        name={brand.name}
         initial={{ isFollowing, isFollowedBy: false, isMutual: false }}
         size="compact"
         style={styles.follow}

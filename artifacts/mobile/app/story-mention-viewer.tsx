@@ -18,7 +18,7 @@
  * (api.social.storyMentions(), or the `&demo=1` preview seed).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 
@@ -44,7 +44,19 @@ import { PressableScale } from '@/components/BrandthreadUI';
 
 import { IconButton } from '@/components/ui';
 
-import { MentionStickerView, ReshareCard } from '@/components/StoryMentionSticker';
+import { ReshareCard } from '@/components/StoryMentionSticker';
+
+import { ViewerMentionStickers, MentionPopover, type MentionTap } from '@/components/StoryMentionViewerParts';
+
+import { mentionProfileHref, type TaggedPerson } from '@/lib/storyMentionSticker';
+
+import { menuItemsFromButtons, openPullDownMenu } from '@/lib/contextMenu';
+
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
+import { TYPE_SCALE } from '@/constants/typography';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -124,13 +136,8 @@ function SlideMedia({ slide, overlays, original, paused }: {
       {overlays.map((overlay) => {
         const transform = [{ rotate: `${overlay.rotation ?? 0}deg` }, { scale: overlay.scale ?? 1 }];
         const place = { position: 'absolute' as const, left: overlay.x, top: overlay.y, transform };
-        if (overlay.type === 'mention') {
-          return (
-            <View key={overlay.id} style={[place, { opacity: overlay.opacity ?? 1 }]} pointerEvents="none">
-              <MentionStickerView handle={overlay.mentionHandle} variant={overlay.mentionStyle} />
-            </View>
-          );
-        }
+        // Mentions are drawn by ViewerMentionStickers above the tap zones
+        // (tappable, same as the main viewer).
         if (overlay.type === 'reshare_card') {
           return (
             <View key={overlay.id} style={place} pointerEvents="none">
@@ -179,7 +186,8 @@ export default function StoryMentionViewerScreen() {
   const { theme } = useAppTheme();
   const topInset = useHeaderTopInset();
   const { storyId } = useLocalSearchParams<{ storyId?: string }>();
-  const { items, loading } = useStoryMentions();
+  const { items, loading, error, reload } = useStoryMentions();
+  const [retrying, setRetrying] = useState(false);
 
   // The queue is fixed once loaded (newest first): a refetch on refocus must
   // not reshuffle what is playing.
@@ -192,6 +200,9 @@ export default function StoryMentionViewerScreen() {
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  // "View profile" popover for a tapped mention sticker, and the options menu; both hold playback.
+  const [mentionTap, setMentionTap] = useState<MentionTap | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   // Like state per story: what I tapped this visit, else what the server said.
   const [likedOverride, setLikedOverride] = useState<Record<string, boolean>>({});
   const [unavailable, setUnavailable] = useState<Set<string>>(() => new Set());
@@ -206,11 +217,11 @@ export default function StoryMentionViewerScreen() {
   }, []));
 
   useEffect(() => {
-    if (queue !== null || loading) return;
+    if (queue !== null || loading || retrying) return;
     const ordered = orderMentions(items);
     setQueue(ordered);
     setStoryIdx(startIndexFor(ordered.map((item) => item.storyId), storyId));
-  }, [items, loading, queue, storyId]);
+  }, [items, loading, queue, retrying, storyId]);
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -226,7 +237,7 @@ export default function StoryMentionViewerScreen() {
     () => stories.map((item) => (unavailable.has(item.storyId) || isMentionExpired(item) ? 1 : Math.max(1, item.story.media.length))),
     [stories, unavailable],
   );
-  const paused = !focused || holding || replyFocused || sending;
+  const paused = !focused || holding || replyFocused || sending || !!mentionTap || menuOpen;
 
   const close = useCallback(() => goBackOr(router), [router]);
   const applyNav = useCallback((result: NavResult) => {
@@ -351,7 +362,7 @@ export default function StoryMentionViewerScreen() {
       set(res.liked);
     } catch {
       set(wasLiked);
-      Alert.alert('Could not update like', 'Try again.');
+      showAlert('Could not update like', 'Try again.');
     }
   }, [api, current, heartPop, likedNow]);
   const isLiked = !!current && likedNow(current);
@@ -394,7 +405,7 @@ export default function StoryMentionViewerScreen() {
       if (err instanceof ApiError && (err.status === 404 || err.status === 410)) {
         setUnavailable((prevSet) => new Set(prevSet).add(current.storyId));
       } else {
-        Alert.alert('Couldn’t send reply', 'Try again.');
+        showAlert('Couldn’t send reply', friendlyError(err, 'Try again.'));
       }
     } finally {
       setSending(false);
@@ -418,10 +429,37 @@ export default function StoryMentionViewerScreen() {
         <StatusBar hidden />
         {loading || queue === null ? (
           <View style={styles.loadingTrack} />
-        ) : (
+        ) : error && stories.length === 0 ? (
+          // The mentions fetch failed: say so and offer a retry, not "unavailable".
           <>
-            <Icon name="slash" size={40} color="rgba(255,255,255,0.3)" />
-            <Text style={styles.emptyText}>Story unavailable</Text>
+            <Icon name="alert-circle" size={40} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyText}>Couldn’t load story mentions.</Text>
+            <PressableScale
+              onPress={async () => {
+                setRetrying(true);
+                setQueue(null);
+                try { await reload(); } finally { setRetrying(false); }
+              }}
+              style={styles.addPill}
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              testID="story-mention-retry"
+              noMinHeight
+            >
+              <Text style={styles.addLabel}>Try again</Text>
+            </PressableScale>
+          </>
+        ) : missing || stories.length > 0 ? (
+          // Same notice as the main story viewer.
+          <>
+            <Icon name="camera-off" size={40} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyText}>This story's no longer available.</Text>
+          </>
+        ) : (
+          // Nothing left to play: no live story mentions me right now.
+          <>
+            <Icon name="at-sign" size={40} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyText}>No story mentions right now.</Text>
           </>
         )}
         <View style={[styles.closeWrap, { top: topInset + SP.sm }]}>
@@ -438,6 +476,21 @@ export default function StoryMentionViewerScreen() {
     targetType: 'story', targetId: current.storyId, label: `${tagName}’s story`,
     ownerId: tagger.userId, ownerName: tagName,
   });
+  const openProfile = (p: TaggedPerson) => {
+    setMentionTap(null);
+    router.push(mentionProfileHref(p) as never);
+  };
+  // Visible "Story options" (matches the main viewer's); the header long-press still works too.
+  const openOptions = (event: unknown) => {
+    setMenuOpen(true);
+    const resume = () => setMenuOpen(false);
+    const buttons = [
+      { text: 'Report story', style: 'destructive' as const, onPress: () => { resume(); openReportSheet(); } },
+      { text: 'Cancel', style: 'cancel' as const, onPress: resume },
+    ];
+    const opened = openPullDownMenu(event, menuItemsFromButtons(buttons, { 'Report story': 'flag' }), { title: tagName, onDismiss: resume });
+    if (!opened) showAlert(tagName, undefined, buttons, { cancelable: true, onDismiss: resume });
+  };
   const slides = currentUnavailable ? 1 : current.story.media.length;
   const hasText = text.trim().length > 0;
 
@@ -447,8 +500,8 @@ export default function StoryMentionViewerScreen() {
       <Animated.View style={[styles.shrinkLayer, { transform: [{ translateY: dragY }, { scale }], opacity }]}>
         {currentUnavailable ? (
           <View style={[StyleSheet.absoluteFill, styles.centered]}>
-            <Icon name="slash" size={40} color="rgba(255,255,255,0.3)" />
-            <Text style={styles.emptyText}>Story unavailable</Text>
+            <Icon name="camera-off" size={40} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyText}>This story's no longer available.</Text>
           </View>
         ) : (
           <SlideMedia
@@ -481,6 +534,14 @@ export default function StoryMentionViewerScreen() {
             />
           </View>
         </View>
+
+        {/* Mention stickers above the tap zones, so a tap opens "View profile"
+            (same path as the main viewer). */}
+        {!currentUnavailable ? (
+          <View style={[StyleSheet.absoluteFill, { zIndex: 6 }]} pointerEvents="box-none">
+            <ViewerMentionStickers overlays={slide.overlays ?? []} onTap={(t) => { haptic('sheet'); setMentionTap(t); }} />
+          </View>
+        ) : null}
 
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topScrim} />
         <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']} style={styles.bottomScrim} />
@@ -534,6 +595,14 @@ export default function StoryMentionViewerScreen() {
             <Text style={styles.name} numberOfLines={1}>{tagName}</Text>
             <Text style={styles.sub} numberOfLines={1}>Mentioned you · {relativeTime(current.mentionedAt)}</Text>
           </Pressable>
+          <IconButton
+            name="more-horizontal"
+            variant="plain"
+            color={ON_DARK}
+            accessibilityLabel="Story options"
+            testID="story-mention-options"
+            onPress={openOptions}
+          />
           <IconButton name="x" onPress={close} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
         </View>
 
@@ -600,6 +669,7 @@ export default function StoryMentionViewerScreen() {
           />
         </KeyboardAvoidingView>
       </Animated.View>
+      <MentionPopover target={mentionTap} onClose={() => setMentionTap(null)} onViewProfile={openProfile} />
     </View>
   );
 }
@@ -626,7 +696,7 @@ const styles = StyleSheet.create({
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },
   headerText: { flex: 1, marginLeft: SP.sm },
-  name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 14, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: TYPE_SCALE.callout.fontSize, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   // Over bright media (sunset skies): near-white, medium weight and a firmer
   // shadow so "Mentioned you · 1h ago" stays legible on top of the scrim.
   sub: { color: '#F4F4F5', fontFamily: FONT.medium, fontSize: FS.sm, textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },

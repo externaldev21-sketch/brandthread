@@ -23,7 +23,7 @@ const {
   subscribeSocialMock: vi.fn(),
   loadBuyerProfileMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn() },
-  apiMock: { social: { myStories: vi.fn(), profile: vi.fn() }, threadCash: { get: vi.fn() } },
+  apiMock: { social: { myStories: vi.fn(), profile: vi.fn(), likedPosts: vi.fn() }, threadCash: { get: vi.fn() } },
   getBuyerOrdersWithStatusMock: vi.fn(),
 }));
 
@@ -461,6 +461,7 @@ describe('buyer profile tabs', () => {
     loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
     apiMock.social.myStories.mockReset().mockResolvedValue([]);
     apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null });
+    apiMock.social.likedPosts.mockReset().mockResolvedValue({ posts: [], nextCursor: null });
     loadHighlightsMock.mockReset().mockResolvedValue([]);
     apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
     getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
@@ -528,13 +529,47 @@ describe('buyer profile tabs', () => {
     )).toHaveLength(0);
   });
 
-  it('shows an honest empty state on Liked (no fabricated engagement data)', async () => {
+  it('shows an honest empty state on Liked when the account has liked nothing', async () => {
+    renderer = await renderScreen();
+
+    await pressTab(renderer, 'Liked');
+    expect(apiMock.social.likedPosts).toHaveBeenCalled();
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('No liked posts yet'),
+    ).length).toBeGreaterThan(0);
+  });
+
+  it('Liked shows the posts this buyer liked (api.social.likedPosts) and opens one in the post viewer', async () => {
+    apiMock.social.likedPosts.mockResolvedValue({
+      posts: [{
+        id: 'liked-1', thumbnailUri: 'https://example.com/liked-1.jpg', mediaUris: ['https://example.com/liked-1.jpg'],
+        mediaType: 'image', caption: 'Liked fit', authorId: 'seller-9', authorName: 'Northline', likedAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
     renderer = await renderScreen();
 
     await pressTab(renderer, 'Liked');
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('No liked posts yet'),
-    ).length).toBeGreaterThan(0);
+    )).toHaveLength(0);
+    const tile = renderer.root.findAll(node => node.props.testID === 'profile-video-tile-liked-1' && typeof node.props.onPress === 'function')[0];
+    expect(tile).toBeTruthy();
+    await act(async () => { tile.props.onPress(); await flushPromises(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-post-viewer?postId=liked-1');
+  });
+
+  it('a Saved cell opens the saved item itself, not the generic Saved list', async () => {
+    getSavedItemsMock.mockResolvedValue([
+      { id: 'saved-1', type: 'product', targetId: 'prod-1', title: 'Archive Cargo Pants', subtitle: '$120' },
+    ]);
+    renderer = await renderScreen();
+
+    await pressTab(renderer, 'Saved');
+    const cell = renderer.root.findAll(node => node.props.accessibilityLabel === 'Archive Cargo Pants' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { cell.props.onPress(); await flushPromises(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/thread-product-detail?productId=prod-1&productName=Archive%20Cargo%20Pants');
+    expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-saved');
   });
 
   it('opens Orders from the ... menu (no Orders tab any more)', async () => {

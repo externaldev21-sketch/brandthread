@@ -5,7 +5,7 @@
  * The server snapshots the media, so a highlight outlives the 24 h story.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, useWindowDimensions } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 
@@ -40,6 +40,10 @@ import { useApi, type HighlightPickerStory } from '@/lib/api';
 
 import { isPreviewDemoMode } from '@/lib/devPreview';
 
+import { showAlert } from '@/lib/actionSheet';
+
+import { friendlyError } from '@/lib/friendlyError';
+
 import { previewHighlightPickerStories } from '@/lib/previewHighlights';
 
 const GAP = 1;
@@ -57,6 +61,9 @@ export default function BuyerHighlightStories() {
   const { width } = useWindowDimensions();
   const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
   const demo = isPreviewDemoMode();
+  // Opened without a highlight (outside the demo): nothing to edit. Its own
+  // state, not the misleading "check your connection" load error.
+  const noHighlight = !demo && !highlightId;
 
   const [stories, setStories] = useState<HighlightPickerStory[]>([]);
   // storyId -> highlight item id for stories already in the highlight.
@@ -80,7 +87,7 @@ export default function BuyerHighlightStories() {
           setSelected(new Set(list.slice(0, 2).map((s) => s.storyId)));
           return;
         }
-        if (!highlightId) throw new Error('missing highlight');
+        if (!highlightId) return;
         const [pickable, mine] = await Promise.all([api.social.highlightStories(), api.social.myHighlights()]);
         if (!alive) return;
         const current = mine.find((h) => h.id === highlightId);
@@ -119,8 +126,8 @@ export default function BuyerHighlightStories() {
       for (const storyId of toAdd) await api.social.addHighlightItem(highlightId, storyId);
       for (const [, itemId] of toRemove) await api.social.removeHighlightItem(highlightId, itemId);
       goBackOr(router);
-    } catch {
-      Alert.alert('Could not save', 'Your highlight was not updated. Try again.');
+    } catch (err) {
+      showAlert('Could not save', friendlyError(err, 'Your highlight was not updated. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -154,7 +161,12 @@ export default function BuyerHighlightStories() {
   return (
     <View style={s.page}>
       <ScreenHeader title="Select stories" />
-      {loading ? (
+      {noHighlight ? (
+        <View style={s.fill}>
+          <EmptyState icon="alert-circle" title="No highlight selected" description="Open a highlight from your Highlights to choose its stories."
+            action={{ label: 'Go back', onPress: () => goBackOr(router) }} />
+        </View>
+      ) : loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : failed ? (
         <View style={s.fill}>
@@ -179,7 +191,7 @@ export default function BuyerHighlightStories() {
         label={selected.size > 0 ? `Done (${selected.size})` : 'Done'}
         onPress={() => { void save(); }}
         loading={saving}
-        disabled={loading || failed}
+        disabled={loading || failed || noHighlight}
       />
     </View>
   );

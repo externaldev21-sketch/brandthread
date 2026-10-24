@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Linking,
@@ -42,7 +41,8 @@ import { quotePostHref } from '@/lib/quotePost';
 import { stitchHref } from '@/lib/fits';
 import { useRouter } from 'expo-router';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { showAlert } from '@/lib/actionSheet';
 import { getPreviewConversations } from '@/lib/previewInbox';
 import { remixActionVisible, remixRoute } from '@/lib/remix';
 import { publishPostEngagement } from '@/lib/postEngagement';
@@ -368,18 +368,21 @@ function AccountThreadShareSheet({
   function openMoreOptions() {
     const options: { text: string; onPress: () => void; style?: 'cancel' }[] = [];
     options.push({ text: 'Add to Story', onPress: addToStory });
-    if (isUUID(postId)) {
+    // The quote composer handles preview/demo ids itself (it confirms locally
+    // and never calls the API), so the preview can reach it too.
+    const quoteAvailable = isUUID(postId) || isBuyerDevPreview() || isSellerDevPreview();
+    if (quoteAvailable) {
       options.push({ text: 'Quote', onPress: () => { onClose(); router.push(quotePostHref({ postId, author: creator, caption, thumb: isVideo ? undefined : mediaUri, mediaType: isVideo ? 'video' : 'photo' }) as never); } });
     }
     if (remixAllowed) options.push({ text: 'Remix', onPress: () => { onClose(); router.push(remixRoute(postId) as never); } });
     if (isUUID(postId)) options.push({ text: 'Stitch', onPress: () => { onClose(); router.push(stitchHref(postId) as never); } });
     options.push({ text: 'Other apps', onPress: () => { void systemShare('more', shareText); } });
     options.push({ text: 'Cancel', style: 'cancel', onPress: () => {} });
-    Alert.alert('More', undefined, options);
+    showAlert('More', undefined, options);
   }
 
   function whyThisVideo() {
-    Alert.alert('Why this video', recommendationReason?.trim() || DEFAULT_RECOMMENDATION_REASON);
+    showAlert('Why this video', recommendationReason?.trim() || DEFAULT_RECOMMENDATION_REASON);
   }
 
   async function saveVideo() {
@@ -399,7 +402,7 @@ function AccountThreadShareSheet({
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) {
         if (!permission.canAskAgain) {
-          Alert.alert(
+          showAlert(
             'Photos access is off',
             'Allow Brandthread to add videos in Settings, then try again.',
             [
@@ -505,12 +508,16 @@ function AccountThreadShareSheet({
                 />
               ))}
               <ShareAction label="Find friends" icon="users" onPress={() => { onClose(); router.push('/(buyer)/friends' as never); }} />
-              <ShareAction
-                label="More"
-                testID="thread-share-more-contacts"
-                icon="more-horizontal"
-                onPress={() => setPickerOpen(true)}
-              />
+              {/* The contact picker lists the same people as this row, so with
+                  no chats or friends at all it would only open an empty list. */}
+              {contactStatus === 'ready' && allTargets.length === 0 ? null : (
+                <ShareAction
+                  label="More"
+                  testID="thread-share-more-contacts"
+                  icon="more-horizontal"
+                  onPress={() => setPickerOpen(true)}
+                />
+              )}
               <ShareAction
                 label="Invite"
                 icon="user-plus"

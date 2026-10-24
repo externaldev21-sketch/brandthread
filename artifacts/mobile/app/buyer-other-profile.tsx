@@ -1,4 +1,4 @@
-import { restrictUser } from '@/services/socialService';
+import { restrictUser, unrestrictUser, getRestrictedUsers } from '@/services/socialService';
 import { haptics, hapticLight, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { SPACING } from '@/constants/spacing';
 /**
@@ -20,7 +20,7 @@ import { SPACING } from '@/constants/spacing';
  */
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, Text, Alert, StyleSheet, Modal, Pressable, Platform, Share, Linking } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, Platform, Share, Linking } from 'react-native';
 import { ProfileSongLine } from '@/components/profile/ProfileSongLine';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -33,7 +33,9 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { GiveawayProfileCard } from '@/components/GiveawayProfileCard';
-import { muteUser, createOrGetConversation } from '@/services/socialService';
+import { muteUser, unmuteUser, getMutedUsers, createOrGetConversation } from '@/services/socialService';
+import { showAlert } from '@/lib/actionSheet';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
@@ -58,7 +60,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
-import { MenuSheet } from '@/components/ui/MenuSheet';
+import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { isVisitorPreviewParam, resolveProfileMode } from '@/lib/profileAccess';
@@ -140,6 +142,9 @@ export default function BuyerOtherProfileScreen() {
   const [followLoading, setFollowLoading] = useState(false);
   const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  // Whether I already muted / restricted them, so the sheet offers the undo.
+  const [isMuted, setIsMuted]           = useState(false);
+  const [isRestricted, setIsRestricted] = useState(false);
   const [storyIds, setStoryIds]         = useState<string[]>([]);
   const [hasUnseenStory, setHasUnseenStory] = useState(false);
   // Their saved-story highlights (only the ones my audience may open); empty hides the row.
@@ -177,6 +182,21 @@ export default function BuyerOtherProfileScreen() {
   useEffect(() => {
     if (mode === 'owner') router.replace('/(buyer)/profile' as never);
   }, [mode, router]);
+
+  // My own mute / restrict lists (server-backed, local mirror offline).
+  useEffect(() => {
+    if (!canonicalReady || !currentUserId || devPreview) return;
+    let active = true;
+    void Promise.all([
+      getMutedUsers().catch(() => []),
+      getRestrictedUsers().catch(() => []),
+    ]).then(([mutes, restricts]) => {
+      if (!active) return;
+      setIsMuted(mutes.some((m) => m.mutedUserId === canonicalUserId));
+      setIsRestricted(restricts.some((r) => r.restrictedUserId === canonicalUserId));
+    });
+    return () => { active = false; };
+  }, [canonicalReady, canonicalUserId, currentUserId, devPreview]);
 
   // ── Load profile + stories ─────────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
@@ -244,8 +264,20 @@ export default function BuyerOtherProfileScreen() {
   };
 
   // ── Follow / unfollow ──────────────────────────────────────────────────────
-  const handleFollow = async () => {
+  // Unfollowing asks first, like the Following list (connections.tsx).
+  const handleFollow = () => {
     if (!requireSignIn()) return;
+    if (!canonicalReady || followLoading) return;
+    if (isFollowing && !followRequested) {
+      showActionSheet(`Unfollow ${displayName}?`, undefined, [
+        { text: 'Unfollow', style: 'destructive', onPress: () => { void applyFollow(); } },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+    void applyFollow();
+  };
+  const applyFollow = async () => {
     if (!canonicalReady || followLoading) return;
     const wasFollowing = isFollowing;
     // Tapping "Requested" cancels the pending request (DELETE /follow).
@@ -256,7 +288,7 @@ export default function BuyerOtherProfileScreen() {
         await api.social.unfollow(canonicalUserId);
       } catch {
         setProfile(prev => prev ? { ...prev, followRequested: true } : prev);
-        Alert.alert("Couldn't cancel request", 'Try again.');
+        showAlert("Couldn't cancel request", 'Try again.');
       } finally {
         setFollowLoading(false);
       }
@@ -315,7 +347,7 @@ export default function BuyerOtherProfileScreen() {
         isMutual: wasFollowing ? prev.isMutual : false,
         followersCount: Math.max(0, prev.followersCount + (wasFollowing ? 1 : -1)),
       }) : prev);
-      Alert.alert("Couldn't follow", 'Try again.');
+      showAlert(wasFollowing ? "Couldn't unfollow" : "Couldn't follow", 'Try again.');
     } finally {
       setFollowLoading(false);
     }
@@ -333,7 +365,7 @@ export default function BuyerOtherProfileScreen() {
       });
       router.push(`/buyer-conversation?id=${conv.id}` as any);
     } catch {
-      Alert.alert("Couldn't open conversation", 'Try again.');
+      showAlert("Couldn't open conversation", 'Try again.');
     } finally {
       setMsgLoading(false);
     }
@@ -363,13 +395,27 @@ export default function BuyerOtherProfileScreen() {
   };
   const handleMute     = async () => {
     setMoreSheetOpen(false);
-    try { await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
-    catch { Alert.alert("Couldn't mute", 'Try again.'); }
+    if (!requireSignIn() || !canonicalReady) return;
+    const undo = isMuted;
+    try {
+      if (undo) await unmuteUser(canonicalUserId);
+      else await muteUser({ userId: canonicalUserId, name: displayName, handle: displayHandle, initials: displayInitials, color });
+      setIsMuted(!undo);
+      hapticSuccess();
+      setSnackbar(undo ? `Unmuted ${displayName}` : `Muted ${displayName}`);
+    } catch { showAlert(undo ? "Couldn't unmute" : "Couldn't mute", 'Try again.'); }
   };
   const handleRestrict = async () => {
     setMoreSheetOpen(false);
-    try { await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); hapticSuccess(); }
-    catch { Alert.alert("Couldn't restrict", 'Try again.'); }
+    if (!requireSignIn() || !canonicalReady) return;
+    const undo = isRestricted;
+    try {
+      if (undo) await unrestrictUser(canonicalUserId);
+      else await restrictUser({ userId: canonicalUserId, name: displayName, handle: displayHandle, initials: displayInitials, color });
+      setIsRestricted(!undo);
+      hapticSuccess();
+      setSnackbar(undo ? `Unrestricted ${displayName}` : `Restricted ${displayName}`);
+    } catch { showAlert(undo ? "Couldn't unrestrict" : "Couldn't restrict", 'Try again.'); }
   };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
@@ -416,6 +462,15 @@ export default function BuyerOtherProfileScreen() {
   const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
     <ProfileVideoTile item={item} index={index} width={layout.tileWidth} height={layout.tileHeight} onPress={activeTab === 'Tagged' ? openTagged : openVideo} />
   ), [activeTab, layout.tileHeight, layout.tileWidth, openTagged, openVideo]);
+
+  const menuItems: ProfileMenuItem[] = [
+    { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare },
+    ...(profile?.username ? [{ key: 'copy-link', icon: 'link' as const, label: 'Copy profile link', onPress: () => { void handleCopyLink(); } }] : []),
+    { key: 'mute', icon: isMuted ? 'volume-2' : 'volume-x', label: isMuted ? `Unmute ${displayName}` : `Mute ${displayName}`, onPress: () => { void handleMute(); } },
+    { key: 'restrict', icon: isRestricted ? 'user-check' : 'user-x', label: isRestricted ? `Unrestrict ${displayName}` : `Restrict ${displayName}`, onPress: () => { void handleRestrict(); } },
+    { key: 'report', icon: 'flag', label: 'Report', destructive: true, onPress: handleReport },
+    { key: 'block', icon: 'slash', label: iBlockedThem ? `Unblock ${displayName}` : `Block ${displayName}`, destructive: true, onPress: () => { void handleBlock(); } },
+  ];
 
   const goBack = () => {
     if (router.canGoBack()) goBackOr(router);
@@ -529,7 +584,7 @@ export default function BuyerOtherProfileScreen() {
           disabled={storyIds.length === 0}
           accessibilityLabel={storyIds.length > 0 ? `View ${displayName}'s story` : 'No active stories'}
         />
-        <ProfileButton label="More" icon="more-horizontal" onPress={() => setMoreSheetOpen(true)} accessibilityLabel="More options" />
+        <ProfileButton label="More" icon="more-horizontal" onPress={() => setMoreSheetOpen(true)} disabled={loadFailed} accessibilityLabel="More options" />
       </View>
       <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
@@ -598,7 +653,8 @@ export default function BuyerOtherProfileScreen() {
         topLeft={<ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         // No inbox shortcut here: that is the owner's own messages, not part of
         // someone else's profile. The "..." opens Share / Mute / Report / Block.
-        topRight={(
+        // Hidden while the profile failed to load: there is nobody to act on yet.
+        topRight={loadFailed ? undefined : (
           <ProfileTopBarIcon
             name="more-horizontal"
             onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}
@@ -628,7 +684,7 @@ export default function BuyerOtherProfileScreen() {
         actions={actions}
         stickyHeader={{
           left: <ProfileTopBarIcon name="arrow-left" onPress={goBack} accessibilityLabel="Go back" />,
-          right: <ProfileTopBarIcon name="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="Profile options" />,
+          right: loadFailed ? undefined : <ProfileTopBarIcon name="more-horizontal" onPress={() => { hapticSelection(); setMoreSheetOpen(true); }} accessibilityLabel="Profile options" />,
         }}
         tabs={{
           // Labeled, with the post count once it is known.
@@ -701,22 +757,13 @@ export default function BuyerOtherProfileScreen() {
 
       <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
 
-      {/* ── More options sheet ── */}
-      <MenuSheet
-        visible={moreSheetOpen}
+      {/* ── More options sheet: the shared profile "..." sheet (as on seller-profile) ── */}
+      <ProfileMenuSheet
+        visible={moreSheetOpen && !loadFailed}
         onClose={() => setMoreSheetOpen(false)}
-        accessibilityLabel={`${displayName} options`}
+        title={displayName}
         testID="buyer-other-profile-more-sheet"
-        sections={[
-          [{ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare }, ...(profile?.username ? [{ key: 'copy', icon: 'link' as const, label: 'Copy profile link', onPress: () => { void handleCopyLink(); } }] : [])],
-          [
-            { key: 'mute', icon: 'volume-x', label: 'Mute', onPress: () => { void handleMute(); } },
-          ],
-          [
-            { key: 'report', icon: 'flag', label: 'Report', destructive: true, onPress: handleReport },
-            { key: 'block', icon: 'slash', label: iBlockedThem ? 'Unblock' : 'Block', destructive: true, onPress: () => { void handleBlock(); } },
-          ],
-        ]}
+        items={menuItems}
       />
     </>
   );
