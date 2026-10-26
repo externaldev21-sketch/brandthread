@@ -1,11 +1,14 @@
 /**
- * Discover → Threads feed player handoff (TikTok's Discover tap-through).
+ * Discover → Threads feed handoff (TikTok's Discover tap-through).
  *
- * A Discover tile tap opens the SAME feed player as the Threads home feed
- * (app/discover-player.tsx → app/(tabs)/feed.tsx in its creatorFeed mode),
- * starting at the tapped post and swiping on through the rest of that grid.
- * The grid's posts can't ride along in a URL, so the tap parks them here
- * under a one-off token and the player reads them back by that token.
+ * A Discover tile tap opens the real Threads feed anchored on that post
+ * (app/discover-player.tsx?postId= → app/(tabs)/feed.tsx `anchorPostId`):
+ * the tapped post first, then the feed's own For You content. The tile is
+ * remembered here by id (setDiscoverAnchorPost) for posts with no real row.
+ *
+ * Profile grids' demo tiles still use the older queue mode: the grid's posts
+ * can't ride along in a URL, so the tap parks them under a one-off token
+ * (setDiscoverPlayerQueue) and the creatorFeed player reads them back.
  *
  * Each queued post is resolved to the real post (GET /api/posts/:id — real
  * media, video source, sound, product tags) so the player gets exactly what
@@ -111,6 +114,37 @@ async function resolveOne(post: DiscoverPost, idx: number): Promise<SellerThread
     };
   } catch {
     return discoverPostToThreadPost(post);
+  }
+}
+
+// Discover tiles opened in the real Threads feed (app/discover-player.tsx
+// with `postId`), by tile id — so a post with no real backing row (preview
+// fixtures, or a failed fetch) still opens from the tile's own data.
+const anchorTiles = new Map<string, DiscoverPost>();
+
+/** Remembers the tapped tile; returns the id to pass as the route's `postId`. */
+export function setDiscoverAnchorPost(post: DiscoverPost): string {
+  anchorTiles.delete(post.id);
+  anchorTiles.set(post.id, post);
+  while (anchorTiles.size > MAX_QUEUES) anchorTiles.delete(anchorTiles.keys().next().value as string);
+  return post.id;
+}
+
+/**
+ * The tapped Discover post as a feed post — the real post when it resolves,
+ * else the remembered tile. Null when neither is known (e.g. a cold deep
+ * link to a fixture id): the feed then just opens on its normal content.
+ */
+export async function loadDiscoverAnchorPost(postId: string): Promise<SellerThreadPost | null> {
+  const tile = anchorTiles.get(postId);
+  if (tile) return resolveOne(tile, 0);
+  const apiId = discoverPostApiId(postId);
+  if (!UUID_RE.test(apiId)) return null;
+  try {
+    const raw = await serviceRequest<any>(`/api/posts/${encodeURIComponent(apiId)}`, { cache: 'no-store' });
+    return raw?.id === apiId ? mapApiPostToSellerThreadPost(raw, 0) : null;
+  } catch {
+    return null;
   }
 }
 

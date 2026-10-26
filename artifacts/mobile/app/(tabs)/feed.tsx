@@ -146,7 +146,7 @@ import { PausedPlayIcon } from '@/components/buyer-feed/PausedPlayIcon';
 import { useFeedSound } from '@/hooks/useFeedSound';
 import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
 import { persistPostAction, postActionPending, subscribePostEngagement } from '@/lib/postEngagement';
-import { loadDiscoverPlayerPage } from '@/lib/discoverPlayerQueue';
+import { loadDiscoverAnchorPost, loadDiscoverPlayerPage } from '@/lib/discoverPlayerQueue';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { PollCard } from '@/components/social/PollCard';
 import { ShopTagPill } from '@/components/buyer-feed/ShopSideTab';
@@ -2463,6 +2463,12 @@ interface FeedScreenProps {
   buyerMode?: boolean;
   showFashionPreview?: boolean;
   creatorFeed?: CreatorFeedConfig;
+  /**
+   * Discover tile tap (app/discover-player.tsx?postId=): this IS the Threads
+   * feed — same header, data and interactions — with the tapped post as its
+   * first item, then the normal For You content after it.
+   */
+  anchorPostId?: string;
 }
 
 export default function FeedScreen(props: FeedScreenProps) {
@@ -2474,6 +2480,7 @@ function FeedScreenContent({
   buyerMode = false,
   showFashionPreview = false,
   creatorFeed,
+  anchorPostId,
 }: FeedScreenProps) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
@@ -2648,6 +2655,20 @@ function FeedScreenContent({
   const [feedHasMore, setFeedHasMore] = useState(true);
   const [feedError, setFeedError] = useState(false);
   const [creatorStartIndex, setCreatorStartIndex] = useState(0);
+  // Discover tap-through: the tapped post, held apart from the paged feed so
+  // refreshes and pages never drop it from the top. Nothing renders until it
+  // resolves, so the feed opens on it rather than on cached posts.
+  const [anchorPost, setAnchorPost] = useState<SpotlightItem | null>(null);
+  const [anchorPending, setAnchorPending] = useState(!!anchorPostId);
+  useEffect(() => {
+    if (!anchorPostId) return;
+    let cancelled = false;
+    loadDiscoverAnchorPost(anchorPostId)
+      .then((post) => { if (!cancelled) setAnchorPost(post ? mapSellerPost(post) : null); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAnchorPending(false); });
+    return () => { cancelled = true; };
+  }, [anchorPostId]);
   const creatorOffsetRef = useRef(0);
   // Discover player: true once its parked grid is used up and paging has
   // moved on to the regular Threads For You feed.
@@ -3110,10 +3131,13 @@ function FeedScreenContent({
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
     if (!userId && guestMutedPhrases === null) return [];
+    if (anchorPending) return [];
     const previewPosts = __DEV__ && isPreviewDemoMode() && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? withPreviewOfficialPosts(FASHION_PREVIEW_POSTS)
       : [];
-    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts]
+    const anchor = anchorPost && feedTab === 'for-you' ? [anchorPost] : [];
+    const rest = anchor.length ? [...previewPosts, ...sellerFeedPosts].filter((post) => post.id !== anchor[0].id) : [...previewPosts, ...sellerFeedPosts];
+    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...anchor, ...rest]
       .filter((post) => userId || !matchesGuestMutedWords(
         [post.caption, ...(post.hashtags ?? [])].join(' '), guestMutedPhrases ?? [],
       ));
@@ -3130,7 +3154,7 @@ function FeedScreenContent({
     // so a live card never has to fit inside the feed's own search bar/tabs/
     // tab bar chrome.
     return regular;
-  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases, previewFeedEnabled]);
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases, previewFeedEnabled, anchorPost, anchorPending]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -3737,7 +3761,7 @@ function FeedScreenContent({
        * getToken() (see lib/api.ts), meant a solid screen with nothing
        * visible for as long as that hang lasted, even though real content
        * was already mounted underneath it the whole time. */}
-      {feedLoading && displayItems.length === 0 && (
+      {(feedLoading || anchorPending) && displayItems.length === 0 && (
         <ThreadPageSkeleton bottomClearance={bottomClearance} />
       )}
       {/*
@@ -3851,7 +3875,7 @@ function FeedScreenContent({
                 }
               />
             </View>
-          ) : !feedLoading ? (
+          ) : !feedLoading && !anchorPending ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
               <Icon name="film" size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
