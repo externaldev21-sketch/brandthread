@@ -129,7 +129,7 @@ import {
   getSellerPreviewBuyerOrders,
 } from '@/lib/previewInbox';
 import {
-  parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
+  parseQuickReplies, cannedAgentReply, claimWelcomePlayback,
   type AgentQuickReply,
 } from '@/lib/agentChat';
 import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
@@ -384,7 +384,15 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  // Brandthread Agent "typing…": true ONLY during the one-time welcome
+  // type-in or while a reply to a message the user just sent is in flight.
   const [agentTyping, setAgentTyping] = useState(false);
+  const welcomeAnimatingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const sendQueued = useCallback((entry: OutboxEntry) => sendQueuedMessage(userId ?? '', entry), [userId]);
   const { entries: outboxEntries, flush: flushOutboxNow } = useMessageOutbox(userId, conv?.id, sendQueued, !!userId && !!conv?.id && !isPreviewId(conv.id));
@@ -602,29 +610,42 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         loadedConv = isSeller ? getSellerPreviewConversation(params.id) : getPreviewConversation(params.id);
         setConv(loadedConv);
         setMessaging({ blockedByMe: false, unavailable: false });
-        setIsLoading(false);
         if (loadedConv) {
           const seeded = isSeller ? getSellerPreviewMessages(loadedConv.id) : getPreviewMessages(loadedConv.id);
-          const alreadyPlayed = await hasWelcomePlayed(loadedConv.id);
-          if (alreadyPlayed || !loadedConv.isOfficial) {
+          // This load runs on every focus. The welcome type-in plays exactly
+          // once per device: claimWelcomePlayback persists the played flag
+          // BEFORE any typing shows, so a re-focus, a mid-animation exit, or
+          // a later open never replays it.
+          if (welcomeAnimatingRef.current) return; // a running type-in owns the list
+          const playWelcome = !!loadedConv.isOfficial && await claimWelcomePlayback(loadedConv.id);
+          if (!playWelcome) {
             // Ordinary preview threads, or a Brandthread Agent thread whose
-            // welcome has already played once — show everything at once.
+            // welcome has already played — show everything at once, no typing.
             setMessages(seeded);
+            setIsLoading(false);
           } else {
-            // First time opening the Brandthread Agent preview thread: type
-            // the seeded welcome messages in one at a time, with a natural
-            // typing pause between them, then remember it played.
+            // First ever open of the Brandthread Agent preview thread: type
+            // the seeded welcome messages in one at a time.
+            welcomeAnimatingRef.current = true;
             setMessages([]);
-            for (let i = 0; i < seeded.length; i++) {
-              setAgentTyping(true);
-              await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
-              setAgentTyping(false);
-              setMessages((prev) => [...prev, seeded[i]]);
-              listScroll.requestScrollToEnd();
-              await new Promise((resolve) => setTimeout(resolve, 250));
+            setIsLoading(false);
+            try {
+              for (let i = 0; i < seeded.length; i++) {
+                if (!isMountedRef.current) return;
+                setAgentTyping(true);
+                await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
+                setAgentTyping(false);
+                setMessages((prev) => [...prev, seeded[i]]);
+                listScroll.requestScrollToEnd();
+                await new Promise((resolve) => setTimeout(resolve, 250));
+              }
+            } finally {
+              welcomeAnimatingRef.current = false;
+              if (isMountedRef.current) setAgentTyping(false);
             }
-            await markWelcomePlayed(loadedConv.id);
           }
+        } else {
+          setIsLoading(false);
         }
         return;
       }

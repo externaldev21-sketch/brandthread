@@ -2,7 +2,7 @@
  * Integration tests (real DB) for the Brandthread Agent welcome-conversation
  * lifecycle: onboarding-hook idempotency and the one-time backfill script.
  */
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import {
   db, users, conversations, conversationParticipants, messages, agentConversations,
@@ -167,6 +167,18 @@ describe("runAgentWelcomeBackfill", () => {
 describe("proactive nudge anti-spam gate", () => {
   beforeEach(async () => {
     await cleanupUser(TEST_BUYER);
+    process.env.BRANDTHREAD_AGENT_PROACTIVE_MESSAGES = "true";
+  });
+  afterEach(() => {
+    delete process.env.BRANDTHREAD_AGENT_PROACTIVE_MESSAGES;
+  });
+
+  it("blocks every nudge while the proactive-messages flag is off (the default)", async () => {
+    delete process.env.BRANDTHREAD_AGENT_PROACTIVE_MESSAGES;
+    const { conversationId } = await createWelcomeConversationOnce(TEST_BUYER, "buyer", {
+      name: "Test Buyer", handle: "", initials: "TB", color: "#8B5CF6",
+    });
+    expect(await canSendProactiveNudge(conversationId)).toBe(false);
   });
 
   it("allows a nudge for a conversation that has never been nudged", async () => {

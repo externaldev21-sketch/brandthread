@@ -62,14 +62,6 @@ export type PreviewConversationSeed = {
   requestedBy?: 'me' | 'them';
   contextOrderNumber?: string;
   contextProductName?: string;
-  /** Marked ONLY on `BRANDTHREAD_AGENT_SEED` — the inbox screen simulates a
-   *  transient local "typing…" state for it (preview-only, see
-   *  lib/previewInbox.ts's typing-simulation helper). This mirrors the real
-   *  `agentTyping` field on Conversation (services/socialTypes.ts), which the
-   *  backend also only ever sets for the Brandthread Agent's thread — it is
-   *  not a general per-conversation presence signal, so no ordinary
-   *  buyer<->seller seed sets this. */
-  simulateTyping?: boolean;
   messages?: PreviewMessageSeed[];
   /** Item 144 (seller chat buyer context panel) — SELLER-side seeds only:
    *  this buyer's other real-shaped order history with this seller, for the
@@ -108,12 +100,6 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   minutesAgo: 3,
   unreadCount: 1,
   isRequest: false,
-  // The ONLY seeded thread that simulates "typing…" — this mirrors the real
-  // backend, where `agentTyping` (services/socialTypes.ts) is only ever set
-  // for the Brandthread Agent's conversation (see agentTypingUntil in
-  // api-server's conversations.ts). An ordinary buyer<->seller thread has no
-  // real typing signal today, so preview never fakes one there either.
-  simulateTyping: true,
   messages: [
     {
       id: 'preview-msg-brandthread-1',

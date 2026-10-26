@@ -81,14 +81,12 @@ describe('previewInboxData — seed matches the real Conversation/Message shapes
     expect(PREVIEW_CONVERSATION_SEEDS.some(s => s.minutesAgo === 0)).toBe(true);
   });
 
-  it('flags exactly the Brandthread Agent thread for the simulated typing indicator, and no ordinary thread', () => {
-    // The real backend only ever sets `agentTyping` for the Agent's
-    // conversation (see its comment on Conversation in socialTypes.ts) — the
-    // preview simulation must mirror that exactly, not fake it on an
-    // ordinary buyer<->seller/buyer thread that has no real typing signal.
-    expect(BRANDTHREAD_AGENT_SEED.simulateTyping).toBe(true);
-    const typingSeeds = PREVIEW_CONVERSATION_SEEDS.filter(s => s.simulateTyping);
-    expect(typingSeeds).toHaveLength(0);
+  it('no seeded thread opts into a simulated typing indicator (agent included)', () => {
+    // The Agent may only read "typing…" while a reply to a just-sent user
+    // message is in flight — never as a seeded/idle demo state.
+    for (const seed of [BRANDTHREAD_AGENT_SEED, ...PREVIEW_CONVERSATION_SEEDS]) {
+      expect((seed as Record<string, unknown>).simulateTyping).toBeUndefined();
+    }
   });
 
   it('every message in every thread has the fields a real Message needs', () => {
@@ -157,12 +155,10 @@ describe('previewInbox module contract (source check)', () => {
     expect(src).toContain('export function getPreviewNotifications');
     expect(src).toContain('export function getPreviewMessages');
     expect(src).toContain('export function isPreviewConversationId');
-    expect(src).toContain('export function subscribePreviewTyping');
   });
 
-  it('never assumes __DEV__/preview is on without checking (no unconditional real-account use)', () => {
-    // subscribePreviewTyping and every getter must be guarded — spot check
-    // the one function most likely to run on a timer regardless of gating.
-    expect(src).toContain('if (!isPreviewInboxEnabled() || !TYPING_CONVERSATION_ID) return () => {};');
+  it('runs no timer that could flip the agent row to "typing…" on its own', () => {
+    expect(src).not.toContain('subscribePreviewTyping');
+    expect(src).not.toContain('setInterval(');
   });
 });
