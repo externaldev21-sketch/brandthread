@@ -25,6 +25,16 @@ import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
 import { optionsFor, pageById, type PushTypeValue, type Role, type SettingSection } from '@/lib/notificationSettingsModel';
 
+// Rows stored as on/off notification categories (routes/notification-prefs.ts
+// `categories`), not per-type push settings; `pushTypes` rejects these keys.
+const CATEGORY_KEYS = ['login_alerts', 'saved_alerts'] as const;
+type CategoryKey = typeof CATEGORY_KEYS[number];
+const isCategoryKey = (key: string): key is CategoryKey => (CATEGORY_KEYS as readonly string[]).includes(key);
+
+function categoryValues(categories: Record<string, boolean> | undefined): Record<CategoryKey, PushTypeValue> {
+  return Object.fromEntries(CATEGORY_KEYS.map((key) => [key, categories?.[key] === false ? 'off' : 'everyone'])) as Record<CategoryKey, PushTypeValue>;
+}
+
 function RadioMark({ selected, color, idle }: { selected: boolean; color: string; idle: string }) {
   return (
     <View style={[styles.radio, { borderColor: selected ? color : idle }]}>
@@ -47,7 +57,7 @@ export default function NotificationSettingsPage() {
     api.notificationPrefs.get()
       .then((data) => {
         setRole(data.role);
-        setValues({ ...data.pushTypes, login_alerts: data.categories.login_alerts === false ? 'off' : 'everyone' } as Record<string, PushTypeValue>);
+        setValues({ ...data.pushTypes, ...categoryValues(data.categories) } as Record<string, PushTypeValue>);
         setPromotions(data.promotionalPush ?? false);
       })
       .catch(() => setRole((r) => r ?? (appRole === 'seller' ? 'seller' : 'buyer')));
@@ -63,11 +73,15 @@ export default function NotificationSettingsPage() {
   async function choose(section: SettingSection, value: PushTypeValue) {
     if (current(section) === value) return;
     hapticSelection();
-    if (section.key === 'login_alerts') {
+    if (isCategoryKey(section.key)) {
+      const key = section.key;
       const prior = values;
-      setValues({ ...values, login_alerts: value });
+      setValues({ ...values, [key]: value });
       try {
-        await api.notificationPrefs.update({ categories: { login_alerts: value !== 'off' } });
+        await api.notificationPrefs.update({ categories: { [key]: value !== 'off' } });
+        // Login alerts also gate the sign-in email, which reads the account
+        // setting (the same pair Password & security writes).
+        if (key === 'login_alerts') await api.meSettings.update({ loginAlerts: value !== 'off' });
       } catch {
         setValues(prior);
       }
@@ -88,7 +102,8 @@ export default function NotificationSettingsPage() {
     setValues({ ...values, [section.key]: value });
     try {
       const saved = await api.notificationPrefs.update({ pushTypes: { [section.key]: value } });
-      if (saved.pushTypes) setValues(saved.pushTypes as Record<string, PushTypeValue>);
+      // Keep the category-backed rows: pushTypes doesn't carry them.
+      if (saved.pushTypes) setValues((v) => ({ ...(saved.pushTypes as Record<string, PushTypeValue>), ...Object.fromEntries(CATEGORY_KEYS.map((k) => [k, v[k]])) }));
     } catch {
       setValues(prior);
     }

@@ -258,7 +258,7 @@ export default function ShoppingPreferences() {
 
         {/* Fit */}
         <Text style={s.sectionTitle}>Preferred fit</Text>
-        <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
+        <Text style={s.sectionDesc}>Size suggestions use this when you're between two sizes.</Text>
         <View style={s.card} accessibilityRole="radiogroup" accessibilityLabel="Preferred fit">
           {FIT_OPTIONS.map((opt, i) => (
             <React.Fragment key={opt.key}>

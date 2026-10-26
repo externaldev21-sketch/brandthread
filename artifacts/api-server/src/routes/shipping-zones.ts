@@ -10,6 +10,7 @@
  * PUT    /api/shipping-zones/:id/weight-tiers    — replace a zone's weight tiers
  * GET    /api/shipping-zones/resolve             — public: resolve cost for a destination (no auth)
  */
+import { sellerScopeRefusesDestination } from "../lib/sellerAccountScope";
 import { Router } from "express";
 import crypto from "crypto";
 import { and, asc, eq } from "drizzle-orm";
@@ -62,6 +63,10 @@ router.get("/resolve", async (req, res) => {
     .where(and(eq(shippingZones.sellerId, String(sellerId)), eq(shippingZones.active, true)))
     .orderBy(asc(shippingZones.sortOrder));
 
+  if (await sellerScopeRefusesDestination(String(sellerId), String(country))) {
+    res.json({ zoneId: null, shippingCents: 0, isFree: false, zoneName: null, unavailable: true });
+    return;
+  }
   if (zoneRows.length === 0) {
     res.json({ zoneId: null, shippingCents: 0, isFree: true, zoneName: null, unavailable: false, legacy: true });
     return;

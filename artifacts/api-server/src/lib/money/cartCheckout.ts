@@ -34,6 +34,7 @@ import {
 } from "@workspace/db";
 import { flatRateShipping } from "../defaultShipping";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
+import { sellerScopeRefusesDestination } from "../sellerAccountScope";
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../planGate";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
@@ -295,6 +296,10 @@ export async function priceCartGroup(input: {
   let shippingLineName = "Shipping";
   let processingDays: number | null = null;
   let dutiesHandling: string | null = null;
+  // Account reach "United States only" (lib/sellerAccountScope.ts).
+  if (await sellerScopeRefusesDestination(sellerId, input.shipping.country)) {
+    throw new CartCheckoutError(400, "NO_SHIPPING_TO_DESTINATION", "This seller doesn't ship to that address.");
+  }
   const zones = await db.select().from(shippingZones)
     .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
   if (zones.length > 0) {

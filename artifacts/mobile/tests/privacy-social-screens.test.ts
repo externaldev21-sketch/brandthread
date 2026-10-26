@@ -21,10 +21,21 @@ describe('Privacy (buyer-privacy-settings)', () => {
     expect(src).toMatch(/count >= cap \? `\$\{cap\}\+`/);
   });
 
-  it('honors the server canBePrivate flag for the Private account row', () => {
+  it('shows the Private account row only once the server allows it (fails closed)', () => {
     expect(src).toContain('setCanBePrivate(server.canBePrivate)');
-    expect(src).toContain('const showPrivateRow = canBePrivate !== false || isPrivateNow;');
+    expect(src).toContain('const showPrivateRow = canBePrivate === true || serverPrivate === true;');
     expect(src).toMatch(/\{showPrivateRow \? \(/);
+  });
+
+  it('shows the server reason when Private account is refused, and never rolls back a saved change for a cache write', () => {
+    expect(src).toContain(`setSaveError(friendlyError(err, "Couldn't update your account privacy. Try again."));`);
+    expect(src).toContain("await cachePrivacySettings({ profileVisibility: value ? 'private' : 'public' });");
+    expect(src).not.toMatch(/updatePrivacySettings\(\{ profileVisibility/);
+  });
+
+  it('reads every server-held choice from /api/auth/privacy and saves them there in one write', () => {
+    expect(src).toContain('const value = server?.settings?.[key];');
+    expect(src).toMatch(/await api\.privacy\.update\(\{\s*dmPrivacy, readReceipts: settings\.readReceiptsEnabled, showActivityStatus: settings\.activityStatusVisible, settings: serverSettings,/);
   });
 
   it('labels the followers-only DM option "People you follow"', () => {

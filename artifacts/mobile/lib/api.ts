@@ -5608,6 +5608,8 @@ export interface BuyerMeasurementsDto { heightCm?: number; weightKg?: number; ch
 export interface BuyerSizesDto {
   tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
   measurements?: BuyerMeasurementsDto;
+  /** Display units picked on My sizes; measurements are always stored metric. */
+  units?: { length?: 'cm' | 'in'; weight?: 'kg' | 'lb' };
 }
 export interface BuyerPreferences {
   sizes: BuyerSizesDto;
@@ -5621,6 +5623,7 @@ export interface BuyerPreferencesPatch {
   sizes?: {
     tops?: string | null; bottoms?: string | null; outerwear?: string | null; shoes?: string | null;
     measurements?: { [K in keyof BuyerMeasurementsDto]?: number | null };
+    units?: { length?: 'cm' | 'in' | null; weight?: 'kg' | 'lb' | null };
   };
   likedBrandIds?: string[];
   styleInterests?: string[];

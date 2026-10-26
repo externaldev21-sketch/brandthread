@@ -176,6 +176,9 @@ export const LOCAL_ONLY_BUYER_SETTING_KEYS: readonly Key[] = [
   'sizeTops', 'sizeBottoms', 'sizeShoes', 'styleCategories',
   'dropAlerts', 'messageNotifications', 'orderUpdates', 'friendActivity',
   'twoFactor', 'biometricLock', 'saveLoginInfo',
+  // Haptics live in lib/haptics.ts (bt:haptics:enabled) and the server's strict
+  // /api/me/settings schema has no such key: syncing it would 400 the whole batch.
+  'disableHaptics',
 ];
 
 export const SYNCED_BUYER_SETTING_KEYS: readonly Key[] = (Object.keys(DEFAULT_BUYER_SETTINGS) as Key[])

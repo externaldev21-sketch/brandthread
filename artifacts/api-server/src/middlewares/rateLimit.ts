@@ -292,6 +292,13 @@ const UPLOAD_CONTENT_TYPE = /^(?:image|video|audio)\/|^application\/(?:pdf|octet
 const UPLOAD_CHUNK_PATH = /\/(?:upload-sessions|posts\/uploads)\/[^/]+\/chunks\/[^/]+$/;
 const UPLOAD_SESSION_CREATE_PATH = /\/(?:upload-sessions|posts\/uploads)\/?$/;
 const AUTH_PATH = /\/auth(?:\/|$)/;
+// Everyday account reads and Settings saves under /auth (the signed-in
+// profile, Privacy screen, profile edits, the account switcher's type lookup).
+// They are not credential attempts, so they use the ordinary read/mutation
+// limits: the 30-per-10-minutes authentication bucket was shared with app
+// start-up (/auth/me, /auth/sync), so a normal session ran it dry and toggles
+// like Private account failed with 429.
+const AUTH_ACCOUNT_SETTINGS_PATH = /\/auth\/(?:me|privacy|profile|feed-gestures-tip|account-types)$/;
 const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
 const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
 // Thread Cash sends and cash-outs move a balance to someone else or to a bank.
@@ -341,7 +348,7 @@ export function rateLimitPolicyFor(
   // so the policy must too (`/AI/chat/` is the same handler as `/ai/chat`).
   path = normalizeGatePath(path);
   if (WEBHOOK_PATH.test(path)) return RATE_LIMIT_POLICIES.webhook;
-  if (AUTH_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
+  if (AUTH_PATH.test(path) && !AUTH_ACCOUNT_SETTINGS_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
   if (CHECKOUT_PATH.test(path)) return RATE_LIMIT_POLICIES.checkout;
   if (EXPENSIVE_PATH.test(path)) return RATE_LIMIT_POLICIES.expensive;
   if (method === "PUT" && UPLOAD_CHUNK_PATH.test(path)) return RATE_LIMIT_POLICIES["upload-chunk"];

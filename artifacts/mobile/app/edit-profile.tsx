@@ -428,6 +428,10 @@ function EditProfileScreen() {
 
   const pickLogo = () => uploadSlot('logo', [1, 1], 'Update logo', '/api/seller/profile/logo/upload', setLogoUri, 'logoUrl', true);
 
+  function withScheme(url: string): string {
+    return url && !/^https?:\/\//i.test(url) ? `https://${url}` : url;
+  }
+
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof Fields, string>> = {};
     if (!fields.name.trim()) nextErrors.name = 'Brand name is required';
@@ -463,16 +467,16 @@ function EditProfileScreen() {
           brandName:   fields.name.trim(),
           username:    rawUsername,
           bio:         fields.bio.trim(),
-          website:     fields.website.trim(),
+          // The server stores full URLs; "mybrand.com" is accepted here and sent as https://mybrand.com.
+          website:     withScheme(fields.website.trim()),
           category:    fields.category.trim(),
           location:    fields.location.trim(),
           contactEmail: fields.contactEmail.trim(),
           tags,
-          socialLinks: {
-            instagram: fields.instagram.trim(),
-            tiktok:    fields.tiktok.trim(),
-          },
         });
+        // Instagram / TikTok go through the merging, normalising endpoint so
+        // links added elsewhere (other platforms) aren't wiped by this save.
+        await api.seller.saveSocialLinks({ instagram: fields.instagram.trim(), tiktok: fields.tiktok.trim() });
       }
       setInitial(fields);
       showToast('Profile updated');

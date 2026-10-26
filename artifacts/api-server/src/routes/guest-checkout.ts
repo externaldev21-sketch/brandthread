@@ -3,6 +3,7 @@
  * token is an authorization capability for post-redirect status only; the DB
  * stores a SHA-256 digest, never the capability itself.
  */
+import { sellerScopeRefusesDestination } from "../lib/sellerAccountScope";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { Router } from "express";
 import crypto from "node:crypto";
@@ -292,6 +293,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     // yet, so existing sellers keep working unchanged. This only decides the
     // shipping line item amount — Stripe payment-intent construction and the
     // seller's payout amount below are unaffected by which path priced it.
+    // Account reach "United States only" (lib/sellerAccountScope.ts).
+    if (await sellerScopeRefusesDestination(sellerId, shippingAddressValue.country)) {
+      return res.status(400).json({ error: "This seller does not ship to the selected destination" });
+    }
     const zoneRows = await db.select().from(shippingZones)
       .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
     let shippingCents = 0;

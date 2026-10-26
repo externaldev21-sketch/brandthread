@@ -93,7 +93,7 @@ export default function VacationModeScreen() {
     if (dateError) { setReturnDateError(dateError); return; }
     setSaving(true);
     try {
-      await (api as any).seller?.vacation?.update?.({
+      await api.seller.vacation.update({
         vacationMode,
         vacationMessage: message.trim() || null,
         vacationUntil:   vacationMode && returnDate.trim() ? returnDate.trim() : null,

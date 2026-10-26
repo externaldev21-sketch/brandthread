@@ -2742,6 +2742,13 @@ export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySe
     return cached;
   }
 }
+/** Device cache only, for values the caller already saved on the server. */
+export async function cachePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {
+  const k = K();
+  const next = { ...DEFAULT_PRIVACY_SETTINGS, ...(await load<Partial<PrivacySettings>>(k.privacy, {})), ...updates };
+  if (k.userId === _socialUserId) { await save(k.privacy, next); notify(); }
+  return next;
+}
 /** Save privacy-screen settings to the server (throws on failure), then refresh the cache. */
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {
   const k = K();

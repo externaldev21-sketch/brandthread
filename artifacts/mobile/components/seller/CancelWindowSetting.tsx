@@ -26,7 +26,8 @@ export function CancelWindowSetting() {
     let alive = true;
     api.seller.getCancelWindow()
       .then(res => { if (alive) setHours((res?.hours ?? null) as CancelWindowHours); })
-      .catch(() => { if (alive) setHours(null); });
+      // Unknown is not "Until shipped": keep the choices unselected and say why.
+      .catch(() => { if (alive) setError('Couldn’t load your cancellation window. Leave and reopen this screen to try again.'); });
     return () => { alive = false; };
   }, [api]);
 

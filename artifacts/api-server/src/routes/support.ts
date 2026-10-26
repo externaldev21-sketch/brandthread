@@ -17,6 +17,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { logger } from "../lib/logger";
 import { looseBody, optText, validateBody } from "../middlewares/bodySchemas";
 import { sanitizeSupportDiagnostics } from "../lib/supportDiagnostics";
+import { evidencePrefix } from "./returns";
 
 const router = Router();
 
@@ -123,9 +124,13 @@ const problemReportBody = z.object({
   orderNumber: z.string().trim().max(64).optional(),
   type: z.enum(PROBLEM_REPORT_TYPES),
   description: z.string().trim().min(1).max(5000),
-  evidenceUrls: z.array(z.string().max(2048).regex(/^https:\/\/\S+$/i)).max(10).optional(),
+  // https links, or photos the buyer uploaded through POST /api/returns/evidence
+  // (private object paths, checked against the caller's own prefix below).
+  evidenceUrls: z.array(z.string().max(2048).regex(/^(?:https:\/\/|\/objects\/)\S+$/i)).max(10).optional(),
   localEvidenceCount: z.number().int().min(0).max(50).optional(),
   contactedSeller: z.boolean().optional(),
+  // App/device details, as on POST /api/support/tickets.
+  diagnostics: z.unknown().optional(),
 });
 
 router.post("/problem-reports", requireAuth, rateLimit("report"), async (req, res) => {
@@ -136,6 +141,10 @@ router.post("/problem-reports", requireAuth, rateLimit("report"), async (req, re
     return;
   }
   const report = parsed.data;
+  if (report.evidenceUrls?.some((url) => url.startsWith("/objects/") && !url.startsWith(evidencePrefix(clerkId)))) {
+    res.status(400).json({ error: "Invalid problem report", code: "VALIDATION_ERROR" });
+    return;
+  }
   const refTag = `[ref:${report.clientReportId}]`;
 
   const existing = await db.execute(sql`
@@ -170,6 +179,7 @@ router.post("/problem-reports", requireAuth, rateLimit("report"), async (req, re
     .where(eq(users.clerkId, clerkId))
     .limit(1);
 
+  const diag = sanitizeSupportDiagnostics(report.diagnostics);
   const label = PROBLEM_TYPE_LABELS[report.type];
   const subject = orderNumber ? `${label} — order ${orderNumber}` : label;
   const lines = [
@@ -187,14 +197,15 @@ router.post("/problem-reports", requireAuth, rateLimit("report"), async (req, re
   ];
 
   const result = await db.execute(sql`
-    INSERT INTO support_tickets (clerk_id, email, name, subject, body, category)
+    INSERT INTO support_tickets (clerk_id, email, name, subject, body, category, diagnostics)
     VALUES (
       ${clerkId},
       ${user?.email ?? "unknown@brandthread.app"},
       ${user?.displayName ?? "Brandthread User"},
       ${subject.slice(0, 200)},
       ${lines.join("\n").slice(0, 8000)},
-      ${"order_problem"}
+      ${"order_problem"},
+      ${diag ? JSON.stringify(diag) : null}::jsonb
     )
     RETURNING id, status
   `);

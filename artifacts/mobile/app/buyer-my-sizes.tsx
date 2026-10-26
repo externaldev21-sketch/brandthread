@@ -65,7 +65,8 @@ export default function BuyerMySizes() {
   const insets = useSafeAreaInsets();
   const tabInset = useBuyerTabBarInset();
   const { preferences, status, update, retry } = useBuyerPreferences();
-  const [units, setUnits] = useState<Units>({ length: 'cm', weight: 'kg' });
+  // Units are saved with the account (sizes.units) so the choice sticks.
+  const [unitsOverride, setUnitsOverride] = useState<Partial<Units>>({});
   const [drafts, setDrafts] = useState<Partial<Record<MKey, string>>>({});
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,6 +89,10 @@ export default function BuyerMySizes() {
   }
 
   const sizes = preferences.sizes;
+  const units: Units = {
+    length: unitsOverride.length ?? sizes.units?.length ?? 'cm',
+    weight: unitsOverride.weight ?? sizes.units?.weight ?? 'kg',
+  };
   const editable = status === 'loaded';
 
   function pickSize(key: SizeCategory, value: string) {
@@ -114,7 +119,14 @@ export default function BuyerMySizes() {
       for (const m of MEASUREMENTS) if (m.kind !== kind && d[m.key] !== undefined) kept[m.key] = d[m.key];
       return kept;
     });
-    setUnits((u) => (kind === 'length' ? { ...u, length: next as LengthUnit } : { ...u, weight: next as WeightUnit }));
+    const prior = units[kind];
+    setUnitsOverride((u) => ({ ...u, [kind]: next }));
+    update({ sizes: { units: { [kind]: next } } })
+      .then(() => setUnitsOverride((u) => { const { [kind]: _saved, ...rest } = u; return rest; }))
+      .catch(() => {
+        setUnitsOverride((u) => ({ ...u, [kind]: prior }));
+        flash("Couldn't save. Try again.", 'error');
+      });
   };
 
   return (

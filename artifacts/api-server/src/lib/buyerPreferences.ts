@@ -5,7 +5,8 @@ import { z } from "@workspace/api-zod";
  *
  * Stable API shape (GET returns it, PUT/PATCH accept a partial of it):
  *   {
- *     sizes: { tops?, bottoms?, outerwear?, shoes?, measurements?: { heightCm?, weightKg?, chestCm?, waistCm?, hipsCm? } },
+ *     sizes: { tops?, bottoms?, outerwear?, shoes?, measurements?: { heightCm?, weightKg?, chestCm?, waistCm?, hipsCm? },
+ *              units?: { length?: 'cm' | 'in', weight?: 'kg' | 'lb' } },
  *     likedBrandIds: string[], styleInterests: string[],
  *     surveyCompletedAt: string | null, updatedAt: string | null
  *   }
@@ -39,6 +40,11 @@ export const buyerPreferencesPatchSchema = z.object({
       waistCm: measurement("waistCm").optional(),
       hipsCm: measurement("hipsCm").optional(),
     }).strict().optional(),
+    // Display units the buyer picked on My sizes (measurements stay stored in cm/kg).
+    units: z.object({
+      length: z.enum(["cm", "in"]).nullable().optional(),
+      weight: z.enum(["kg", "lb"]).nullable().optional(),
+    }).strict().optional(),
   }).strict().optional(),
   likedBrandIds: z.array(z.string().trim().min(1).max(64)).max(200).optional(),
   styleInterests: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
@@ -50,6 +56,7 @@ export type BuyerPreferencesPatch = z.infer<typeof buyerPreferencesPatchSchema>;
 export interface StoredSizes {
   tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
   measurements?: Partial<Record<MeasurementKey, number>>;
+  units?: { length?: "cm" | "in"; weight?: "kg" | "lb" };
 }
 
 export interface BuyerPreferencesDto {
@@ -82,6 +89,15 @@ export function mergeSizes(current: StoredSizes | null | undefined, patch: NonNu
       if (v === null) delete m[key]; else m[key] = v;
     }
     if (Object.keys(m).length) next.measurements = m; else delete next.measurements;
+  }
+  if (patch.units) {
+    const u: NonNullable<StoredSizes["units"]> = { ...(next.units ?? {}) };
+    for (const key of ["length", "weight"] as const) {
+      const v = patch.units[key];
+      if (v === undefined) continue;
+      if (v === null) delete u[key]; else (u as Record<string, string>)[key] = v;
+    }
+    if (Object.keys(u).length) next.units = u; else delete next.units;
   }
   return next;
 }

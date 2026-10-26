@@ -74,6 +74,21 @@ describe("appRateLimiter", () => {
     expect(rateLimitPolicyFor("GET", "/api/config/features", false)?.id).toBe("public-read");
   });
 
+  it("keeps everyday account settings under /auth out of the authentication bucket", () => {
+    // Settings saves (Private account, profile edits) and the signed-in profile
+    // read used to share the 30/10min credential bucket with app start-up.
+    expect(rateLimitPolicyFor("PATCH", "/api/v1/auth/privacy", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("GET", "/api/v1/auth/privacy", true)?.id).toBe("authenticated-read");
+    expect(rateLimitPolicyFor("PATCH", "/api/auth/profile/", true)?.id).toBe("mutation");
+    expect(rateLimitPolicyFor("GET", "/api/v1/auth/me?fresh=1", true)?.id).toBe("authenticated-read");
+    expect(rateLimitPolicyFor("GET", "/api/v1/auth/account-types", true)?.id).toBe("authenticated-read");
+    // Credential and abuse-sensitive endpoints stay strict.
+    for (const path of ["/api/v1/auth/password-reset/request", "/api/v1/auth/sessions/revoke-others", "/api/v1/auth/account/deletion-code",
+      "/api/v1/auth/username/check", "/api/v1/auth/email/check", "/api/v1/auth/data-export", "/api/v1/auth/meet"]) {
+      expect(rateLimitPolicyFor("POST", path, true)?.id, path).toBe("authentication");
+    }
+  });
+
   it("normalizes IP identities and prefers authenticated users", () => {
     expect(normalizeClientIp("::ffff:192.0.2.5")).toBe("192.0.2.5");
     const req = {

@@ -2,6 +2,7 @@
  * Buyer-facing authenticated endpoints.
  * Mounted at /api/buyer — all routes require Clerk auth.
  */
+import { sellerScopeRefusesDestination } from "../lib/sellerAccountScope";
 import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
@@ -1054,6 +1055,11 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // decides the shipping line item amount below — Stripe payment-intent
     // construction and the seller's payout amount are unaffected by which
     // path priced it.
+    // Account reach "United States only" (lib/sellerAccountScope.ts).
+    if (await sellerScopeRefusesDestination(sellerId, validatedShipping.country)) {
+      res.status(400).json({ error: "This seller does not ship to the selected destination" });
+      return;
+    }
     const sellerZoneRows = await db.select().from(shippingZones)
       .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
     let shippingCents = 0;
