@@ -29,7 +29,15 @@ import { recordPreviewOrder } from './previewOrders';
 function previewEnabled(): boolean {
   if (typeof __DEV__ !== 'undefined' && !__DEV__) return false;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return (require('./previewCatalog') as typeof import('./previewCatalog')).isPreviewCatalogEnabled();
+  if ((require('./previewCatalog') as typeof import('./previewCatalog')).isPreviewCatalogEnabled()) return true;
+  // The bag is reached by in-app navigation, which drops the URL-only
+  // `&demo=1` (lib/devPreview.ts), so a demo feed's Shop -> bag -> Checkout
+  // would fall through to real cart validation and be refused. Seeded lines
+  // can only have come from demo data, so the persisted preview role is
+  // enough here; the per-item id checks below still apply.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const preview = require('./devPreview') as typeof import('./devPreview');
+  return preview.isBuyerDevPreview() || preview.isSellerDevPreview();
 }
 
 export function isPreviewSellerId(id: string | null | undefined): boolean {

@@ -1,0 +1,13 @@
+{
+  "_comment": "Streetwear demo feed clips. scripts/seed-street-demo-media.mjs resolves each `query` to a portrait Pexels video (Pexels License: free use, no watermark, no attribution required), pins the chosen `pexelsId` / `pexelsUrl` / `creator` back into this file, and writes public/demo-media/<slug>.mp4 + assets/videos/<slug>.jpg. Re-runs reuse pinned ids. Review the contact sheet for logos before committing.",
+  "clips": [
+    { "slug": "street_01", "query": "streetwear fit check mirror", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_02", "query": "man hoodie walking city street night", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_03", "query": "screen printing t-shirt studio", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_04", "query": "woman oversized jacket urban skate", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_05", "query": "sewing machine clothing studio close up", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_06", "query": "black and white street style fashion", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_07", "query": "sneakers walking concrete close up", "pexelsId": null, "pexelsUrl": null, "creator": null },
+    { "slug": "street_08", "query": "young friends streetwear rooftop", "pexelsId": null, "pexelsUrl": null, "creator": null }
+  ]
+}
