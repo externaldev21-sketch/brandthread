@@ -68,6 +68,9 @@ export function previewOfficialPosts(): SellerThreadPost[] {
       likesCount: 18300,
       viewsCount: 64200,
       credit: { handle: 'galoreyyz', name: null, userId: null, accountType: null },
+      // Slot 1 of the demo feed: shoppable like every other seeded video. The
+      // clip is the same footage as this catalog product (lib/previewCatalog.ts).
+      productTags: [{ productId: 'preview-product-04', productName: 'Ivory Column Set', priceCents: 41000, imageUri: uri(POSTERS[0]) }],
     },
     {
       ...base,
