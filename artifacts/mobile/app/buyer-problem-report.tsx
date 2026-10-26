@@ -43,7 +43,6 @@ import { useApi } from '@/lib/api';
 
 import { collectAppDiagnostics } from '@/lib/appDiagnostics';
 
-import { buildProblemReportTicket } from '@/lib/problemReportTicket';
 
 
 export default function BuyerProblemReportScreen() {
@@ -66,18 +65,22 @@ export default function BuyerProblemReportScreen() {
   const [contactedSeller, setContactedSeller] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [evidencePhotos, setEvidencePhotos] = useState<string[]>([]);
+  const [evidencePhotos, setEvidencePhotos] = useState<Array<{ uri: string; mimeType: string | null }>>([]);
 
   async function pickEvidence() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission required', 'Please allow access to your photo library.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      // Uploaded through POST /api/returns/evidence, which takes JPEG, PNG or WebP photos.
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       quality: 0.9,
     });
     if (!result.canceled) {
-      setEvidencePhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+      setEvidencePhotos(prev => [
+        ...prev,
+        ...result.assets.filter(a => !prev.some(p => p.uri === a.uri)).map(a => ({ uri: a.uri, mimeType: a.mimeType ?? null })),
+      ].slice(0, 5));
     }
   }
 
@@ -97,27 +100,19 @@ export default function BuyerProblemReportScreen() {
     if (!isGeneralReport && !order) return;
     setSubmitting(true);
     try {
-      // Send it to the support queue with app/device details attached. Signed-out
-      // previews never call the protected endpoint and keep the local copy only.
-      const email = user?.primaryEmailAddress?.emailAddress;
-      if (isSignedIn && email) {
-        await api.support.submitTicket(buildProblemReportTicket({
-          type: problemType as BuyerProblemType,
-          description,
-          contactedSeller,
-          orderId: order?.id,
-          orderNumber: order?.orderNumber,
-          email,
-          name: user?.fullName || user?.username || email,
-          diagnostics: collectAppDiagnostics(),
-        }));
-      }
+      // One support ticket (POST /api/support/problem-reports) with the app/device
+      // details and the photos attached. Photos are uploaded first so support
+      // can see them; signed-out previews keep the local copy only.
+      const evidenceUris = isSignedIn
+        ? await Promise.all(evidencePhotos.map(async (photo) => (await api.returns.uploadEvidence(photo)).objectPath))
+        : evidencePhotos.map((photo) => photo.uri);
       await createProblemReport({
         orderId: order?.id,
         orderNumber: order?.orderNumber,
         type: problemType as BuyerProblemType,
         description: description.trim(),
-        evidenceUris: evidencePhotos,
+        evidenceUris,
+        diagnostics: collectAppDiagnostics(),
         contactedSeller,
         contactEmail: user?.primaryEmailAddress?.emailAddress ?? undefined,
         contactName: user?.fullName || user?.username || undefined,
@@ -200,8 +195,8 @@ export default function BuyerProblemReportScreen() {
         {evidencePhotos.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: SP.sm }}>
             <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              {evidencePhotos.map((uri, idx) => (
-                <View key={idx} style={{ width: 72, height: 72, borderRadius: RADIUS.sm, overflow: 'hidden', position: 'relative' }}>
+              {evidencePhotos.map(({ uri }, idx) => (
+                <View key={uri} style={{ width: 72, height: 72, borderRadius: RADIUS.sm, overflow: 'hidden', position: 'relative' }}>
                   <Image source={{ uri }} style={{ width: 72, height: 72 }} contentFit="cover" />
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove photo"
                     style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}

@@ -9,7 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { accountPrivacyFromAppSettings, mirrorAccountPrivacy } from "../lib/privacySettings";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
-import { resetRecommendations } from "../lib/userAppSettingsStore";
+import { clearForYouCache, resetRecommendations } from "../lib/userAppSettingsStore";
 import {
   mergeUserSettings, parseUserSettingsPatch, storedSizeOk, toUserSettingsDto,
 } from "../lib/userSettings";
@@ -39,6 +39,7 @@ router.patch("/", rateLimit("mutation"), async (req, res) => {
     return;
   }
   try {
+    let personalizationChanged = false;
     const result = await db.transaction(async (tx) => {
       const privacyPatch = accountPrivacyFromAppSettings(parsed.patch);
       if (Object.keys(privacyPatch).length) {
@@ -48,6 +49,10 @@ router.patch("/", rateLimit("mutation"), async (req, res) => {
         .where(eq(userSettings.userId, userId)).limit(1).for("update");
       const settings = mergeUserSettings(existing?.settings ?? {}, parsed.patch);
       if (!storedSizeOk(settings)) return null;
+      // Personalized recommendations on/off changes how For You ranks; the
+      // cached ranking must not outlive the switch.
+      const personalizedOf = (value: Record<string, unknown> | null | undefined) => value?.personalizedRecommendations !== false;
+      personalizationChanged = personalizedOf(existing?.settings as Record<string, unknown> | undefined) !== personalizedOf(settings as Record<string, unknown>);
       if (Object.keys(privacyPatch).length) {
         await tx.update(users).set({
           privacySettings: sql`COALESCE(${users.privacySettings}, '{}'::jsonb) || ${JSON.stringify(privacyPatch)}::jsonb`,
@@ -69,6 +74,7 @@ router.patch("/", rateLimit("mutation"), async (req, res) => {
       res.status(413).json({ error: "Settings payload too large" });
       return;
     }
+    if (personalizationChanged) await clearForYouCache(userId);
     const dto = toUserSettingsDto(result);
     res.json(dto);
   } catch (err) {

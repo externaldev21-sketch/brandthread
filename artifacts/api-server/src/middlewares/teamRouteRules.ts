@@ -36,7 +36,8 @@ const RULES: Record<string, TeamRouteRule> = {
   "/discount-codes": { selfPaths: ["/validate"] },
   "/seller": { selfPaths: ["/tutorial/seen", "/onboarding/data"], writes: "products" },
   // Store, catalogue and store settings.
-  "/store": { writes: "products" },
+  // The public store pages take a visitor's store-password POST (lib/storePasswordGate.ts): no store write.
+  "/store": { selfPaths: [/^\/site\/[^/]+$/, /^\/by-username\/[^/]+$/, "/host-site", /^\/public\/[^/]+\/unlock$/], writes: "products" },
   "/store/ai": { writes: "products" },
   "/bundles": { writes: "products" },
   "/integrations": { writes: "products" },

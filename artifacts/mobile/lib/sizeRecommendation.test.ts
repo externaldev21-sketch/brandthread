@@ -47,6 +47,14 @@ describe('recommendSize', () => {
     expect(r).toMatchObject({ size: 'M', confidence: 'low' });
     expect(r?.reason).toContain('Between S and M');
   });
+  it('takes the smaller neighbour for a slim preferred fit, the larger for oversized', () => {
+    const slim = recommendSize(topsIn, { sizes: { measurements: { chestCm: 94 } }, preferredFit: 'slim' }, 'tops');
+    expect(slim).toMatchObject({ size: 'S', confidence: 'low' });
+    expect(slim?.reason).toContain('slim fit you prefer');
+    const roomy = recommendSize(topsIn, { sizes: { measurements: { chestCm: 94 } }, preferredFit: 'oversized' }, 'tops');
+    expect(roomy).toMatchObject({ size: 'M', confidence: 'low' });
+    expect(recommendSize(topsIn, { sizes: { measurements: { chestCm: 94 } }, preferredFit: 'regular' }, 'tops')?.size).toBe('M');
+  });
   it('handles point values with tolerance on a cm chart', () => {
     expect(recommendSize(bottomsCm, { sizes: { measurements: { waistCm: 81.5, hipsCm: 99 } } }, 'bottoms')?.size).toBe('32');
   });

@@ -12,9 +12,10 @@ import { useLargeTitleCollapse } from '@/hooks/useLargeTitleCollapse';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { ListSkeleton } from '@/components/layout/Skeleton';
 import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/components/ui';
-import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
+import { cachePrivacySettings, getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy, DEFAULT_PRIVACY_SETTINGS } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { friendlyError } from '@/lib/friendlyError';
 
 // Brandthread's social graph is follow-based (POST /api/social/follow), so
 // the labels speak in follows. The stored keys (friends, friends_of_friends,
@@ -47,6 +48,12 @@ function formatRequestCount(count: number, cap: number = FOLLOW_REQUEST_CAP): st
   return count >= cap ? `${cap}+` : String(count);
 }
 
+// The Privacy-screen choices the server stores and enforces
+// (users.privacy_settings via PATCH /api/auth/privacy { settings }).
+const SERVER_SETTING_KEYS = [
+  'whoCanSendFriendRequests', 'whoCanSeePosts', 'whoCanSeeFriendsList', 'whoCanReplyToStories', 'whoCanMention', 'searchable',
+] as const satisfies readonly (keyof PrivacySettings)[];
+
 type PickerKey = keyof Pick<
   PrivacySettings,
   'profileVisibility' | 'whoCanSendFriendRequests' | 'whoCanSeePosts' | 'whoCanSeeFriendsList' | 'whoCanReplyToStories' | 'whoCanMention'
@@ -76,6 +83,8 @@ export default function BuyerPrivacySettings() {
   // Contact discovery is server-backed (/api/social/contacts): null until loaded.
   const [contacts, setContacts] = useState<{ enabled: boolean; optedIn: boolean } | null>(null);
   const [contactsBusy, setContactsBusy] = useState(false);
+  // GET /api/auth/privacy failed: nothing server-backed is shown as editable.
+  const [loadFailed, setLoadFailed] = useState(false);
   const backSaveFailed = useRef(false);
 
   useFocusEffect(
@@ -86,13 +95,21 @@ export default function BuyerPrivacySettings() {
         getPrivacySettings().catch(() => ({ ...DEFAULT_PRIVACY_SETTINGS })),
         api.privacy.get().catch(() => null),
       ]).then(([local, server]) => {
+        setLoadFailed(!server);
         if (server) {
           setDmPrivacy(server.dmPrivacy);
           if (typeof server.isPrivate === 'boolean') setServerPrivate(server.isPrivate);
           if (typeof server.canBePrivate === 'boolean') setCanBePrivate(server.canBePrivate);
           if (typeof server.showSavesToFollowers === 'boolean') setShowSaves(server.showSavesToFollowers);
         }
-        setSettings({ ...local,
+        // The server copy wins for every choice it holds: the local cache can be
+        // another account's or stale (it is user-scoped only after sign-in settles).
+        const fromServer: Partial<PrivacySettings> = {};
+        for (const key of SERVER_SETTING_KEYS) {
+          const value = server?.settings?.[key];
+          if (value !== undefined && typeof value === typeof DEFAULT_PRIVACY_SETTINGS[key]) (fromServer as Record<string, unknown>)[key] = value;
+        }
+        setSettings({ ...local, ...fromServer,
           ...(typeof server?.readReceipts === 'boolean' ? { readReceiptsEnabled: server.readReceipts } : {}),
           ...(typeof server?.showActivityStatus === 'boolean' ? { activityStatusVisible: server.showActivityStatus } : {}),
         });
@@ -112,18 +129,24 @@ export default function BuyerPrivacySettings() {
   async function saveSettings(showConfirmation: boolean): Promise<boolean> {
     if (!settings) return false;
     try {
-      // Save local settings (stored in AsyncStorage)
-      await updatePrivacySettings(settings);
-      // Server-side: DM privacy, and read receipts (enforced when the other
-      // person loads the chat — they stop seeing "Seen").
-      await api.privacy.update({ dmPrivacy, readReceipts: settings.readReceiptsEnabled, showActivityStatus: settings.activityStatusVisible });
+      // One server write for everything on this screen (the server enforces
+      // all of it: audiences, search, DM privacy, read receipts, activity).
+      const serverSettings: Record<string, unknown> = {};
+      for (const key of SERVER_SETTING_KEYS) serverSettings[key] = settings[key];
+      await api.privacy.update({
+        dmPrivacy, readReceipts: settings.readReceiptsEnabled, showActivityStatus: settings.activityStatusVisible, settings: serverSettings,
+      });
+      // Then the device cache, which never decides whether the save worked.
+      await cachePrivacySettings(settings).catch(() => {});
       setHasChanges(false);
       setSaveError(null);
       backSaveFailed.current = false;
       return true;
-    } catch {
+    } catch (err) {
       // Leave hasChanges set so the change isn't silently dropped.
-      setSaveError(showConfirmation ? "Couldn't save. Try again." : "Couldn't save your changes. Try again, or go back again to discard them.");
+      setSaveError(showConfirmation
+        ? friendlyError(err, "Couldn't save. Try again.")
+        : `${friendlyError(err, "Couldn't save your changes.")} Try again, or go back again to discard them.`);
       return false;
     }
   }
@@ -136,16 +159,25 @@ export default function BuyerPrivacySettings() {
     setPrivateBusy(true);
     const before = serverPrivate ?? settings?.profileVisibility === 'private';
     setServerPrivate(next);
+    let value: boolean;
     try {
       const res = await api.privacy.update({ isPrivate: next });
-      const value = typeof res.isPrivate === 'boolean' ? res.isPrivate : next;
+      value = typeof res.isPrivate === 'boolean' ? res.isPrivate : next;
       setServerPrivate(value);
-      const saved = await updatePrivacySettings({ profileVisibility: value ? 'private' : 'public' });
-      setSettings(saved);
       setSaveError(null);
-    } catch {
+    } catch (err) {
       setServerPrivate(before);
-      setSaveError("Couldn't update your account privacy. Try again.");
+      // The server's reason (e.g. only buyer accounts can be private), not a generic retry.
+      setSaveError(friendlyError(err, "Couldn't update your account privacy. Try again."));
+      setPrivateBusy(false);
+      return;
+    }
+    // The server change stands; the device cache is best effort and never rolls it back.
+    try {
+      await cachePrivacySettings({ profileVisibility: value ? 'private' : 'public' });
+      setSettings((s) => (s ? { ...s, profileVisibility: value ? 'private' : 'public' } : s));
+    } catch {
+      // ignored: the next load reads the server value
     } finally {
       setPrivateBusy(false);
     }
@@ -194,9 +226,10 @@ export default function BuyerPrivacySettings() {
   }
 
   const isPrivateNow = serverPrivate ?? settings?.profileVisibility === 'private';
-  // Hidden when the server says this account type can't go private — unless
-  // it already is, so it can still be switched off.
-  const showPrivateRow = canBePrivate !== false || isPrivateNow;
+  // Shown only once the server says this account can go private — or already
+  // is, so it can still be switched off. Unknown (load failed) means hidden,
+  // never a switch the server will refuse.
+  const showPrivateRow = canBePrivate === true || serverPrivate === true;
 
   if (!settings) {
     return (
@@ -220,6 +253,7 @@ export default function BuyerPrivacySettings() {
       />
 
       <Animated.ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl + insets.bottom }} showsVerticalScrollIndicator={false} onScroll={titleCollapse.onScroll} scrollEventThrottle={16}>
+        {loadFailed ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title="Couldn't load your privacy settings. Leave and reopen this screen to try again." titleNumberOfLines={3} disabled /></Card> : null}
         {saveError ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title={saveError} disabled /></Card> : null}
 
         {/* PROFILE VISIBILITY */}

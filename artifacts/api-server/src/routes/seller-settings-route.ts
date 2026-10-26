@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { checkoutSettingsPatchError } from "../lib/sellerCheckoutSettings";
 import { isStoreLanguage } from "../lib/storeLanguage";
+import { isAccountScope } from "../lib/sellerAccountScope";
 
 const router = Router();
 router.use(requireAuth);
@@ -42,6 +43,10 @@ router.patch("/", async (req, res) => {
   if (invalid) return res.status(400).json({ error: invalid, code: "VALIDATION_ERROR" });
   if (updates && typeof updates === "object" && "storeLanguage" in updates && !isStoreLanguage(updates.storeLanguage)) {
     return res.status(400).json({ error: "Unsupported store language", code: "INVALID_STORE_LANGUAGE" });
+  }
+  // Account reach is enforced at checkout (lib/sellerAccountScope.ts).
+  if (updates && typeof updates === "object" && "accountScope" in updates && !isAccountScope(updates.accountScope)) {
+    return res.status(400).json({ error: "accountScope must be global or us", code: "VALIDATION_ERROR" });
   }
 
   try {
@@ -90,6 +95,15 @@ router.put("/policies", async (req, res) => {
         SET policies   = ${JSON.stringify(policies)}::jsonb,
             updated_at = now()
     `);
+    // Buyers see the return policy on product pages from users.return_policy
+    // (lib/publicProductTrust.ts), so the screen's Return policy (or Refund
+    // policy, when there is no return policy) is mirrored there.
+    const policyText = (type: string) => {
+      const found = policies.find((p: unknown) => !!p && typeof p === "object" && (p as { type?: unknown }).type === type) as { content?: unknown } | undefined;
+      return typeof found?.content === "string" ? found.content.trim().slice(0, 20_000) : "";
+    };
+    const returnPolicy = policyText("return") || policyText("refund");
+    await db.execute(sql`UPDATE users SET return_policy = ${returnPolicy || null}, updated_at = now() WHERE clerk_id = ${ownerId}`);
     return res.json({ ok: true, policies });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });

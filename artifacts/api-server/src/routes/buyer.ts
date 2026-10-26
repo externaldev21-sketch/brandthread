@@ -2,6 +2,8 @@
  * Buyer-facing authenticated endpoints.
  * Mounted at /api/buyer — all routes require Clerk auth.
  */
+import { sellerScopeRefusesDestination } from "../lib/sellerAccountScope";
+import { checkoutAutomaticTax, loadSellerTaxSwitches, shippingProductData } from "../lib/sellerTaxSwitches";
 import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
@@ -1054,6 +1056,11 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // decides the shipping line item amount below — Stripe payment-intent
     // construction and the seller's payout amount are unaffected by which
     // path priced it.
+    // Account reach "United States only" (lib/sellerAccountScope.ts).
+    if (await sellerScopeRefusesDestination(sellerId, validatedShipping.country)) {
+      res.status(400).json({ error: "This seller does not ship to the selected destination" });
+      return;
+    }
     const sellerZoneRows = await db.select().from(shippingZones)
       .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
     let shippingCents = 0;
@@ -1099,13 +1106,15 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       // No rate configured → the standard rate (lib/defaultShipping.ts), not free.
       ({ cents: shippingCents, name: shippingLineName } = flatRateShipping(configuredShippingRate, afterBundlesCents));
     }
+    // Taxes & duties switches: on unless the seller explicitly turned them off.
+    const taxSwitches = await loadSellerTaxSwitches(sellerId);
     if (shippingCents > 0) {
       lineItems.push({
         price_data: {
           currency: "usd",
           unit_amount: shippingCents,
           tax_behavior: "exclusive",
-          product_data: { name: shippingLineName },
+          product_data: shippingProductData(shippingLineName, taxSwitches),
         },
         quantity: 1,
       });
@@ -1423,10 +1432,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         // Stripe remains the final authority for tax. This replaces the old
         // client-side state-rate table and keeps the charged tax aligned with
         // the seller's Stripe Tax configuration.
-        automatic_tax: {
-          enabled: true,
-          liability: { type: "account", account: seller.stripeAccountId },
-        },
+        automatic_tax: checkoutAutomaticTax(taxSwitches, seller.stripeAccountId),
         shipping_address_collection: {
           allowed_countries: [validatedShipping?.country ?? "US"],
         },

@@ -1,5 +1,8 @@
 import dns from "dns/promises";
-import { Router } from "express";
+import { handleStoreUnlock, sendStorePasswordPage, storeLockedFor, storePasswordRequired, storeUnlockToken } from "../lib/storePasswordGate";
+import { applyStoreSettingsEffects, effectiveStoreSettings, storeAnalyticsEnabled } from "../lib/storeSettingsEffects";
+import express, { Router } from "express";
+import { rateLimit } from "../middlewares/rateLimit";
 import {
   db, storefronts, storefrontVersions, storefrontCustomDomains,
   products, productVariants, storePixels, users,
@@ -297,7 +300,8 @@ export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boo
   // Growth: first-party attribution capture + (validated-ID-only) Meta/TikTok pixels.
   // Only the public site gets these, never the private preview.
   let growthHead = "";
-  if (!isPreview) {
+  // Store Settings → Analytics off: no attribution script or pixels.
+  if (!isPreview && storeAnalyticsEnabled(sf)) {
     let pixelIds: { metaPixelId: string | null; tiktokPixelId: string | null } | undefined;
     try {
       [pixelIds] = await db.select({ metaPixelId: storePixels.metaPixelId, tiktokPixelId: storePixels.tiktokPixelId })
@@ -812,18 +816,25 @@ const NOT_FOUND_PAGE = `<!DOCTYPE html>
 // products, a real cart, and checkout through the same guest-checkout
 // endpoint the rest of the app uses. Registered before requireAuth below so
 // it is genuinely public.
-router.get("/site/:slug", async (req, res): Promise<void> => {
-  const { slug } = req.params;
+// Store Settings → "Password protected" (lib/storePasswordGate.ts): each
+// public store page answers GET with the password page until the visitor has
+// unlocked it, and POST { password } at the same URL unlocks it.
+async function siteBySlug(req: express.Request) {
   const [sf] = await db
     .select()
     .from(storefronts)
-    .where(eq(storefronts.slug, slug))
+    .where(eq(storefronts.slug, String(req.params.slug ?? "")))
     .limit(1);
-  if (!sf || sf.status !== "published") {
+  return sf && sf.status === "published" ? sf : null;
+}
+router.get("/site/:slug", async (req, res): Promise<void> => {
+  const sf = await siteBySlug(req);
+  if (!sf) {
     res.set("Content-Type", "text/html");
     res.status(404).send(NOT_FOUND_PAGE);
     return;
   }
+  if (storeLockedFor(req, sf)) { sendStorePasswordPage(res, sf); return; }
   const html = await buildPreviewHtml(sf.ownerId, {
     isPreview: false, sf, optOutTracking: requestOptsOutOfTracking(req.headers),
   });
@@ -832,35 +843,67 @@ router.get("/site/:slug", async (req, res): Promise<void> => {
   res.set("Content-Type", "text/html");
   res.send(html);
 });
+router.post("/site/:slug", rateLimit("authentication"), async (req, res): Promise<void> => {
+  const sf = await siteBySlug(req);
+  if (!sf) { res.status(404).type("html").send(NOT_FOUND_PAGE); return; }
+  await handleStoreUnlock(req, res, sf);
+});
 
-// GET /api/store/public/:slug — the published storefront as JSON for the
-// app's buyer screens. Public by intent, so it must sit before requireAuth
-// (a later copy of this route below it was unreachable without a session —
-// anonymous buyers got 401). Only the public projection is returned.
 // GET /api/store/by-username/:username — the Share Store link
 // (brandthread.app/store/<username> redirects here; see mobile server/serve.js).
 router.get("/by-username/:username", async (req, res): Promise<void> => {
   const sf = await publishedStorefrontForUsername(String(req.params.username ?? ""));
   res.set("Content-Type", "text/html");
   if (!sf) { res.status(404).send(NOT_FOUND_PAGE); return; }
+  if (storeLockedFor(req, sf)) { sendStorePasswordPage(res, sf); return; }
   res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
+});
+router.post("/by-username/:username", rateLimit("authentication"), async (req, res): Promise<void> => {
+  const sf = await publishedStorefrontForUsername(String(req.params.username ?? ""));
+  if (!sf) { res.status(404).type("html").send(NOT_FOUND_PAGE); return; }
+  await handleStoreUnlock(req, res, sf);
 });
 
 // GET /api/store/host-site — a store's own host: <slug>.brandthread.app or
 // a verified custom domain (the web server redirects "/" there).
+const hostSiteStorefront = (req: express.Request) =>
+  publishedStorefrontForHost((req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host);
 router.get("/host-site", async (req, res): Promise<void> => {
-  const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
-  const sf = await publishedStorefrontForHost(host);
+  const sf = await hostSiteStorefront(req);
   if (!sf) { res.redirect(302, CANONICAL_WEB_ORIGIN); return; }
+  if (storeLockedFor(req, sf)) { sendStorePasswordPage(res, sf); return; }
   res.set("Content-Type", "text/html");
-  res.set("Cache-Control", "public, max-age=60");
+  // A protected store's page is per-visitor: never shared-cache it.
+  res.set("Cache-Control", storePasswordRequired(sf) ? "private, no-store" : "public, max-age=60");
   res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
 });
+router.post("/host-site", rateLimit("authentication"), async (req, res): Promise<void> => {
+  const sf = await hostSiteStorefront(req);
+  if (!sf) { res.redirect(303, CANONICAL_WEB_ORIGIN); return; }
+  await handleStoreUnlock(req, res, sf);
+});
 
+// GET /api/store/public/:slug — the published storefront as JSON for the
+// app's buyer screens. Public by intent, so it must sit before requireAuth
+// (a later copy of this route below it was unreachable without a session —
+// anonymous buyers got 401). Only the public projection is returned; a
+// password-protected store needs the unlock (cookie or x-store-unlock).
 router.get("/public/:slug", async (req, res): Promise<void> => {
   const sf = await publishedStorefrontForSlug(String(req.params.slug ?? ""));
   if (!sf) { res.status(404).json({ error: "Store not found" }); return; }
+  if (storeLockedFor(req, sf)) {
+    res.status(403).json({ error: "This store is password protected.", code: "STORE_PASSWORD_REQUIRED", title: sf.title, passwordProtected: true });
+    return;
+  }
   res.json({ ...publicStorefrontView(sf), ...(await safePublicBuilderData(sf.ownerId, sf)) });
+});
+// POST /api/store/public/:slug/unlock { password } → { unlockToken } for x-store-unlock.
+router.post("/public/:slug/unlock", rateLimit("authentication"), async (req, res): Promise<void> => {
+  const sf = await publishedStorefrontForSlug(String(req.params.slug ?? ""));
+  if (!sf) { res.status(404).json({ error: "Store not found" }); return; }
+  const token = typeof req.body?.password === "string" ? await storeUnlockToken(sf, req.body.password) : null;
+  if (!token) { res.status(401).json({ error: "That password isn't right.", code: "STORE_PASSWORD_INVALID" }); return; }
+  res.json({ unlockToken: token });
 });
 
 // Everything below requires a signed-in seller. Public routes must stay above.
@@ -923,6 +966,7 @@ router.get("/", async (req, res) => {
   // toOwnerStorefront strips the store password hash (exposes hasStorePassword).
   res.json({
     ...toOwnerStorefront(sf),
+    storeSettings: await effectiveStoreSettings(ownerId, sf),
     sharePreviewRevokedAt: sf.sharePreviewRevokedAt?.toISOString() ?? null,
     customDomainRoutingEnabled: customDomainRoutingEnabled(),
   });
@@ -993,13 +1037,19 @@ router.put("/", validateInput({ body: saveStoreBody }), async (req, res) => {
     }
   }
 
+  // Status, language, checkout and order-alert keys write through to the
+  // settings that are enforced (lib/storeSettingsEffects.ts).
+  if (update.storeSettings && typeof update.storeSettings === "object") {
+    Object.assign(update, await applyStoreSettingsEffects(ownerId, sf, update.storeSettings as Record<string, unknown>));
+  }
+
   const [updated] = await db
     .update(storefronts)
     .set(update as any)
     .where(eq(storefronts.id, sf.id))
     .returning();
 
-  res.json(toOwnerStorefront(updated));
+  res.json({ ...toOwnerStorefront(updated), storeSettings: await effectiveStoreSettings(ownerId, updated) });
 });
 
 // PUT /api/store/password — set or clear the storefront access password.

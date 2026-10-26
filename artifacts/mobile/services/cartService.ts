@@ -1425,7 +1425,10 @@ export async function createProblemReport(params: {
   contactedSeller: boolean;
   contactEmail?: string;
   contactName?: string;
+  /** App/device details for support (lib/appDiagnostics.ts); sent, never stored on the device. */
+  diagnostics?: object;
 }): Promise<BuyerProblemReport> {
+  const { diagnostics, ...stored } = params;
   const k = keys();
   const problems = await loadProblems(k);
   // A retry of a send that failed (same order/type/text, never confirmed)
@@ -1433,8 +1436,8 @@ export async function createProblemReport(params: {
   const retryOf = problems.find(p =>
     !p.serverTicketId && p.orderId === params.orderId && p.type === params.type && p.description === params.description);
   const report: BuyerProblemReport = retryOf
-    ? { ...retryOf, ...params }
-    : { id: uid(), ...params, escalatedToSupport: false, status: 'open', submittedAt: now() };
+    ? { ...retryOf, ...stored }
+    : { id: uid(), ...stored, escalatedToSupport: false, status: 'open', submittedAt: now() };
   const saveLocal = async () => {
     const next = problems.filter(p => p.id !== report.id);
     next.push(report);
@@ -1461,7 +1464,8 @@ export async function createProblemReport(params: {
   }
   if (!canSend) return report;
 
-  const isRemote = (u: string) => /^https:\/\//i.test(u);
+  // https links and photos already uploaded (POST /api/returns/evidence object paths).
+  const isRemote = (u: string) => /^(?:https:\/\/|\/objects\/)/i.test(u);
   const isOrderUuid = !!params.orderId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.orderId);
   const res = await serviceRequest<{ ticket?: { id?: string } | null }>('/api/support/problem-reports', {
     method: 'POST',
@@ -1474,6 +1478,7 @@ export async function createProblemReport(params: {
       evidenceUrls: params.evidenceUris.filter(isRemote).slice(0, 10),
       localEvidenceCount: params.evidenceUris.filter(u => !isRemote(u)).length,
       contactedSeller: params.contactedSeller,
+      ...(diagnostics ? { diagnostics } : {}),
       ...(params.contactEmail ? { contactEmail: params.contactEmail } : {}),
       ...(params.contactName ? { contactName: params.contactName } : {}),
     }),

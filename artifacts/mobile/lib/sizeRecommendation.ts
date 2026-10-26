@@ -23,6 +23,8 @@ export interface BuyerMeasurements {
 }
 export interface BuyerSizePreferences {
   sizes?: Partial<Record<SizeCategory, string>> & { measurements?: BuyerMeasurements };
+  /** Shopping preferences → Preferred fit: decides which neighbour wins between two sizes. */
+  preferredFit?: 'slim' | 'regular' | 'oversized' | null;
 }
 
 export interface SizeRecommendation {
@@ -146,12 +148,16 @@ export function recommendSize(
       }
       const nearest = [...scored].sort((a, b) => a.gap - b.gap);
       if (nearest[0].gap <= MAX_GAP_CM) {
-        // Between two sizes: recommend the larger neighbour so nothing is too tight.
+        // Between two sizes: the larger neighbour so nothing is too tight,
+        // unless the buyer prefers a slim fit.
         const a = nearest[0]; const b = nearest[1];
         const pair = b && b.gap - a.gap < 1.5 ? [a.row, b.row] : null;
         if (pair) {
           const order = pair.map((r) => rows.indexOf(r)).sort((x, y) => x - y);
           const [small, large] = [rows[order[0]], rows[order[1]]];
+          const fit = preferences?.preferredFit;
+          if (fit === 'slim') return { size: small.size, confidence: 'low', reason: `Between ${small.size} and ${large.size}, for the slim fit you prefer` };
+          if (fit === 'oversized') return { size: large.size, confidence: 'low', reason: `Between ${small.size} and ${large.size}, for the oversized fit you prefer` };
           return { size: large.size, confidence: 'low', reason: `Between ${small.size} and ${large.size}` };
         }
         return { size: a.row.size, confidence: 'low', reason: `Closest to your measurements` };

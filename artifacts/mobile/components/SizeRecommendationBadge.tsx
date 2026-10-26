@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useBuyerPreferences } from '@/hooks/useBuyerPreferences';
+import { useBuyerSettings } from '@/hooks/useBuyerSettings';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { buildSizeBadgeModel, type SizeBadgeModel, type SizeBadgeProduct } from '@/lib/sizeBadge';
@@ -20,10 +21,11 @@ export const DEMO_PREFERENCES: BuyerSizePreferences = { sizes: { tops: 'M', oute
 
 export function useSizeBadgeModel(product: SizeBadgeProduct | null | undefined): SizeBadgeModel | null {
   const { preferences, status } = useBuyerPreferences();
+  const { preferredFit } = useBuyerSettings();
   return useMemo(() => {
     const prefs = status === 'signed-out' && isPreviewDemoMode() ? DEMO_PREFERENCES : preferences;
-    return buildSizeBadgeModel(product, prefs);
-  }, [product, preferences, status]);
+    return buildSizeBadgeModel(product, { ...prefs, preferredFit: preferredFit || null });
+  }, [product, preferences, status, preferredFit]);
 }
 
 export function SizeRecommendationBadge({

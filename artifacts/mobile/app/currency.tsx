@@ -11,7 +11,7 @@
  * Display only: prices gain an "≈" line in this currency; every charge
  * stays in US dollars.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,9 +24,11 @@ import { ListRow } from '@/components/ui';
 import { useApi } from '@/lib/api';
 import { hapticSelection } from '@/lib/haptics';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { showAlert } from '@/lib/actionSheet';
+import { friendlyError } from '@/lib/friendlyError';
 import { FONT, FS, SP } from '@/lib/theme';
 import {
-  CURRENCIES, POPULAR_CURRENCY_CODES, filterCurrencies, setDisplayCurrency, useDisplayCurrency, type CurrencyOption,
+  CURRENCIES, POPULAR_CURRENCY_CODES, applyAccountCurrency, filterCurrencies, setDisplayCurrency, useDisplayCurrency, type CurrencyOption,
 } from '@/lib/displayCurrency';
 
 type Section = { title: string | null; data: CurrencyOption[] };
@@ -52,10 +54,26 @@ export default function CurrencyScreen() {
     ];
   }, [query]);
 
+  // The account's saved choice wins over this device's copy.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    api.fx.getDisplayCurrency().then((r) => applyAccountCurrency(r?.displayCurrency)).catch(() => {});
+  }, [api, isSignedIn]);
+
   async function choose(code: string) {
     hapticSelection();
+    const previous = currency;
     await setDisplayCurrency(code);
-    if (isSignedIn) api.fx.setDisplayCurrency(code).catch(() => {});
+    if (isSignedIn) {
+      try {
+        await api.fx.setDisplayCurrency(code);
+      } catch (err) {
+        // Not saved on the account: put the device back and say so.
+        await setDisplayCurrency(previous);
+        showAlert("Couldn't change currency", friendlyError(err, 'Try again.'));
+        return;
+      }
+    }
     goBackOr(router);
   }
 

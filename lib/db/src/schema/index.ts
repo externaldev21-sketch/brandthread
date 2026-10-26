@@ -2804,6 +2804,10 @@ export const sellerTaxConfig = pgTable('seller_tax_config', {
   chargeShippingTax:   boolean('charge_shipping_tax').notNull().default(false),
   chargeVat:           boolean('charge_vat').notNull().default(false),
   taxCalculationMode:  text('tax_calculation_mode').notNull().default('automatic'),
+  // Migration 644: set only when the seller explicitly switched tax off; checkout
+  // collects tax (and tax on shipping) unless these are true.
+  automaticTaxOptedOut: boolean('automatic_tax_opted_out').notNull().default(false),
+  shippingTaxOptedOut:  boolean('shipping_tax_opted_out').notNull().default(false),
   stripeTaxSettings:   json('stripe_tax_settings').$type<Record<string, unknown>>().notNull().default({}),
   createdAt:           timestamp('created_at').defaultNow().notNull(),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),

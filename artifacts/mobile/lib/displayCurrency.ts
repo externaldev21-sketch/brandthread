@@ -122,6 +122,8 @@ function emit(patch: Partial<State>) {
 type FxApi = {
   fx: {
     rates: () => Promise<{ enabled: boolean; available?: boolean; rates: Record<string, number> }>;
+    /** The account's saved choice (signed in only); it follows the account across devices. */
+    getDisplayCurrency?: () => Promise<{ displayCurrency: string | null }>;
   };
 };
 
@@ -133,6 +135,8 @@ export function hydrateDisplayCurrency(api: FxApi): Promise<void> {
       const saved = await AsyncStorage.getItem(DISPLAY_CURRENCY_KEY);
       if (saved && /^[A-Z]{3}$/.test(saved)) emit({ currency: saved });
     } catch { /* storage unavailable: stay on USD */ }
+    // Signed out (or offline) this rejects and the device value stands.
+    if (api.fx.getDisplayCurrency) await api.fx.getDisplayCurrency().then((r) => applyAccountCurrency(r?.displayCurrency)).catch(() => {});
     try {
       const res = await api.fx.rates();
       emit({ enabled: !!res?.enabled, rates: res?.enabled && res.available !== false ? res.rates ?? null : null });
@@ -152,13 +156,9 @@ export async function setDisplayCurrency(code: string): Promise<void> {
   } catch { /* best effort */ }
 }
 
-/** Adopt the account's saved currency (another device) when the device has none yet. */
-export async function adoptAccountCurrency(code: string | null | undefined): Promise<void> {
-  if (!code || !/^[A-Z]{3}$/.test(code)) return;
-  try {
-    const local = await AsyncStorage.getItem(DISPLAY_CURRENCY_KEY);
-    if (local) return;
-  } catch { /* fall through */ }
+/** The account's saved currency wins over the device copy (it was chosen on the account, maybe on another device). */
+export async function applyAccountCurrency(code: string | null | undefined): Promise<void> {
+  if (!code || !/^[A-Z]{3}$/.test(code) || code === state.currency) return;
   await setDisplayCurrency(code);
 }
 
