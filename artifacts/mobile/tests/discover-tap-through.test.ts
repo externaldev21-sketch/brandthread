@@ -1,6 +1,7 @@
 /**
- * Discover tile tap → the real Threads feed player (app/discover-player.tsx),
- * not the separate DiscoverPostViewer overlay.
+ * Discover tile tap → the real Threads feed anchored on that post
+ * (app/discover-player.tsx?postId= → FeedScreen `anchorPostId`), not a
+ * separate "Discover" player or the DiscoverPostViewer overlay.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,7 +21,8 @@ vi.mock('@/services/socialService', () => ({
 
 import type { DiscoverPost } from '@/lib/discoverFeed';
 import {
-  discoverPostApiId, getDiscoverPlayerQueue, loadDiscoverPlayerPage, setDiscoverPlayerQueue,
+  discoverPostApiId, getDiscoverPlayerQueue, loadDiscoverAnchorPost, loadDiscoverPlayerPage,
+  setDiscoverAnchorPost, setDiscoverPlayerQueue,
 } from '@/lib/discoverPlayerQueue';
 
 const UUID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -73,19 +75,55 @@ describe('discoverPlayerQueue', () => {
   });
 });
 
+describe('Discover anchor post', () => {
+  beforeEach(() => { serviceRequest.mockReset(); });
+
+  it('resolves the tapped tile to the real post (video)', async () => {
+    serviceRequest.mockResolvedValue({ id: UUID(7), mediaUrl: 'https://v/7.mp4', mediaType: 'video' });
+    const postId = setDiscoverAnchorPost(post(`trend_${UUID(7)}`, { savedByMe: true }));
+    expect(postId).toBe(`trend_${UUID(7)}`);
+    const anchor = await loadDiscoverAnchorPost(postId);
+    expect(anchor).toMatchObject({ id: UUID(7), contentType: 'video', mediaUris: ['https://v/7.mp4'], savedByMe: true });
+  });
+
+  it('opens preview fixtures from the tile itself, without the network', async () => {
+    const postId = setDiscoverAnchorPost(post('preview-fit-2'));
+    const anchor = await loadDiscoverAnchorPost(postId);
+    expect(anchor?.id).toBe('preview-fit-2');
+    expect(anchor?.mediaUris).toEqual(['https://img/preview-fit-2.jpg']);
+    expect(serviceRequest).not.toHaveBeenCalled();
+  });
+
+  it('is null for an unknown, unresolvable id (feed opens on its normal content)', async () => {
+    expect(await loadDiscoverAnchorPost('preview-unknown')).toBeNull();
+    serviceRequest.mockRejectedValue(new Error('offline'));
+    expect(await loadDiscoverAnchorPost(UUID(9))).toBeNull();
+  });
+});
+
 describe('Discover tap-through wiring', () => {
   const read = (rel: string) => readFileSync(join(__dirname, '..', rel), 'utf8');
 
-  it('Discover routes tile taps to the feed player instead of DiscoverPostViewer', () => {
+  it('Discover routes tile taps to the feed anchored on that post', () => {
     const src = read('app/(buyer)/discover.tsx');
     expect(src).not.toMatch(/DiscoverPostViewer/);
-    expect(src).toMatch(/setDiscoverPlayerQueue\(/);
-    expect(src).toMatch(/router\.push\(`\/discover-player\?q=/);
+    expect(src).not.toMatch(/setDiscoverPlayerQueue/);
+    expect(src).toMatch(/setDiscoverAnchorPost\(post\)/);
+    expect(src).toMatch(/router\.push\(`\/discover-player\?postId=/);
   });
 
-  it('the player route is the Threads FeedScreen in its discover mode', () => {
+  it('postId renders buyer Home\'s own FeedScreen (feed header), not a "Discover" creatorFeed', () => {
     const src = read('app/discover-player.tsx');
+    const home = read('app/(buyer)/index.tsx');
     expect(src).toMatch(/import FeedScreen from '\.\/\(tabs\)\/feed'/);
-    expect(src).toMatch(/source: 'discover'/);
+    expect(home).toMatch(/<FeedScreen showFashionPreview \/>/);
+    expect(src).toMatch(/<FeedScreen key=\{postId\} showFashionPreview anchorPostId=\{postId\} \/>/);
+  });
+
+  it('the feed puts the anchor first in For You, ahead of its normal content', () => {
+    const src = read('app/(tabs)/feed.tsx');
+    expect(src).toMatch(/const anchor = anchorPost && feedTab === 'for-you' \? \[anchorPost\] : \[\];/);
+    expect(src).toMatch(/\[\.\.\.anchor, \.\.\.rest\]/);
+    expect(src).toMatch(/if \(anchorPending\) return \[\];/);
   });
 });
