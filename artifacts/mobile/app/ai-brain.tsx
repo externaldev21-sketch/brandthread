@@ -284,7 +284,7 @@ function MessageBubble({
       delayLongPress={400}
       style={styles.assistantRow}
     >
-      <BrandthreadLogo size={18} style={styles.assistantAvatar} />
+      <BrandthreadLogo size={15} style={styles.assistantAvatar} />
       <View style={styles.assistantBubbleCol}>
         <View style={[styles.assistantBubble, hasError && styles.assistantBubbleError]}>
           {isStreaming ? (
@@ -404,7 +404,7 @@ function EmptyState({ context, onPillPress, isTablet, showPrompts = true }: Empt
       {/* No showGlow halo — Dev's rule: no translucent overlays, no grey
           fills; a translucent-white glow circle read as a grey chip behind
           the mark. Plain white/silver logo only. */}
-      <BrandthreadLogo size={isTablet ? 64 : 52} animated />
+      <BrandthreadLogo size={isTablet ? 54 : 44} animated />
       <Text style={[styles.emptyTitle, narrow && styles.emptyTitleNarrow]}>
         What are we building today?
       </Text>
@@ -510,7 +510,7 @@ function TypingIndicator({ accentColor, streamingText }: { accentColor: string; 
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.assistantRow}>
-      <BrandthreadLogo size={18} style={styles.assistantAvatar} />
+      <BrandthreadLogo size={15} style={styles.assistantAvatar} />
       <View style={styles.assistantBubbleCol}>
         <View style={styles.assistantBubble}>
           {streamingText ? (
@@ -1270,8 +1270,9 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginVertical: 4,
   },
   assistantAvatar: {
-    marginTop: 4,
-    marginRight: 8,
+    // 15pt mark centred where the 18pt one sat, so bubbles don't shift.
+    marginTop: 5.5,
+    marginRight: 11,
   },
   assistantBubbleCol: {
     flex: 1,

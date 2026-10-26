@@ -406,7 +406,7 @@ export function ShareProfileSheet({
                       backgroundColor="#FFFFFF"
                       color="#0A0A0B"
                       logo={LOGO_SOURCE}
-                      logoSize={QR_SIZE * 0.2}
+                      logoSize={QR_SIZE * 0.17}
                       logoBackgroundColor="#FFFFFF"
                       logoBorderRadius={8}
                       logoMargin={4}

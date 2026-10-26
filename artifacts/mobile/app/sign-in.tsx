@@ -357,7 +357,7 @@ export default function SignInScreen() {
 
           {/* Logo */}
           <View style={s.logoRow}>
-            <BrandthreadLogo size={36} />
+            <BrandthreadLogo size={30} />
             <Text style={s.logoText}>BRANDTHREAD</Text>
           </View>
 
@@ -425,7 +425,7 @@ export default function SignInScreen() {
             />
 
             <View style={s.logoRow}>
-              <BrandthreadLogo size={36} />
+              <BrandthreadLogo size={30} />
               <Text style={s.logoText}>BRANDTHREAD</Text>
             </View>
 
@@ -511,7 +511,7 @@ export default function SignInScreen() {
             />
 
             <View style={s.logoRow}>
-              <BrandthreadLogo size={36} />
+              <BrandthreadLogo size={30} />
               <Text style={s.logoText}>BRANDTHREAD</Text>
             </View>
 
@@ -590,7 +590,7 @@ export default function SignInScreen() {
             />
 
             <View style={s.logoRow}>
-              <BrandthreadLogo size={36} />
+              <BrandthreadLogo size={30} />
               <Text style={s.logoText}>BRANDTHREAD</Text>
             </View>
 
@@ -694,7 +694,7 @@ export default function SignInScreen() {
 
           {/* Logo */}
           <View style={s.logoRow}>
-            <BrandthreadLogo size={36} />
+            <BrandthreadLogo size={30} />
             <Text style={s.logoText}>BRANDTHREAD</Text>
           </View>
 

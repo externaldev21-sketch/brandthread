@@ -150,7 +150,7 @@ export default function PublicCollectionScreen() {
     >
       <ResponsiveContainer maxWidth={CONTENT_MAX_WIDTH} style={{ paddingHorizontal: SP.md }}>
         <View style={styles.logoRow}>
-          <BrandthreadLogo size={22} />
+          <BrandthreadLogo size={18} />
           <Text style={styles.logoText}>Brandthread</Text>
         </View>
 
