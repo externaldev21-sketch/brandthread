@@ -4,6 +4,7 @@
  * stores a SHA-256 digest, never the capability itself.
  */
 import { sellerScopeRefusesDestination } from "../lib/sellerAccountScope";
+import { loadSellerTaxSwitches, shippingProductData } from "../lib/sellerTaxSwitches";
 import { effectiveUnitPrice } from "../lib/pricing/salesRuntime";
 import { Router } from "express";
 import crypto from "node:crypto";
@@ -336,11 +337,13 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       shippingCents = !rate || (rate.freeAboveCents != null && afterBundlesCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
       shippingLineName = rate?.name ?? "Shipping";
     }
+    // Taxes & duties switches: on unless the seller explicitly turned them off.
+    const taxSwitches = await loadSellerTaxSwitches(sellerId);
     if (shippingCents) lineItems.push({ price_data: {
       currency: "usd",
       unit_amount: shippingCents,
       tax_behavior: "exclusive",
-      product_data: { name: shippingLineName },
+      product_data: shippingProductData(shippingLineName, taxSwitches),
     }, quantity: 1 });
     // ── Discount code (BT-255): validated fresh, with the same rules and the
     // same per-customer key ("guest:<email>") the order webhook records.
@@ -480,6 +483,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       couponId,
       uiMode: embedded ? "embedded" : "hosted",
       paymentIntentData: money.paymentIntentData,
+      taxSwitches,
       }),
       expires_at: Math.floor((claimedAt.valueOf() + HOSTED_CHECKOUT_SESSION_TTL_MS) / 1000),
     }, key ? { idempotencyKey: `guest_cs_${key}` } : {});

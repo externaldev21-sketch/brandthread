@@ -35,6 +35,7 @@ import {
 import { flatRateShipping } from "../defaultShipping";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../shippingZones";
 import { sellerScopeRefusesDestination } from "../sellerAccountScope";
+import { loadSellerTaxSwitches } from "../sellerTaxSwitches";
 import { getSellerVacationStatus } from "../sellerAvailability";
 import { productsBeyondSellerPlan, SELLER_PLAN_LIMIT_CODE, SELLER_PLAN_LIMIT_MESSAGE } from "../planGate";
 import { validateDiscountCode, DiscountValidationError } from "../discounts";
@@ -434,9 +435,13 @@ export async function calculateGroupTax(
   /** Loyalty + Thread Cash on this group: they lower the taxable amount, as on hosted Checkout. */
   rewardDiscountCents = 0,
 ): Promise<{ taxCents: number; calculationId: string | null }> {
+  // Taxes & duties: no tax when the seller turned automatic tax off, and no
+  // tax on shipping when they turned that off (lib/sellerTaxSwitches.ts).
+  const switches = await loadSellerTaxSwitches(group.sellerId);
+  if (!switches.automaticTax) return { taxCents: 0, calculationId: null };
   const taxable = taxableAmounts(group, rewardDiscountCents);
   const lineAmounts = taxable.lineAmounts;
-  const taxableShipping = taxable.shippingCents;
+  const taxableShipping = switches.shippingTax ? taxable.shippingCents : 0;
   if (lineAmounts.every((amount) => amount <= 0) && taxableShipping <= 0) return { taxCents: 0, calculationId: null };
   try {
     const calculation = await stripeClient.tax.calculations.create({

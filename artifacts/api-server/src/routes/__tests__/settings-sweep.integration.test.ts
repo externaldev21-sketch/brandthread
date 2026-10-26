@@ -254,6 +254,7 @@ afterAll(async () => {
   }
   await db.delete(storefronts).where(eq(storefronts.ownerId, SELLER));
   await db.delete(forYouFeedCache).where(inArray(forYouFeedCache.userId, ALL));
+  await db.execute(sql`DELETE FROM seller_tax_config WHERE seller_id IN (${sql.join(ALL.map((id) => sql`${id}`), sql`, `)})`);
   for (const table of ["support_tickets"]) await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE clerk_id IN (${sql.join(ALL.map((id) => sql`${id}`), sql`, `)})`);
   for (const table of ["seller_settings", "seller_integrations"]) await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE owner_id IN (${sql.join(ALL.map((id) => sql`${id}`), sql`, `)})`);
   await db.delete(userSettings).where(inArray(userSettings.userId, ALL));
@@ -381,6 +382,26 @@ describe("settings sweep: the control changes what it promises", () => {
     expect((await call(SELLER, "PATCH", "/api/seller/settings", { accountScope: "mars" })).status).toBe(400);
     await call(SELLER, "PATCH", "/api/seller/settings", { accountScope: "global" });
     expect((await raw(`/api/shipping-zones/resolve?sellerId=${SELLER}&country=CA`)).text).toContain('"unavailable":false');
+  }));
+
+  it("Taxes & duties › tax stays on unless the seller explicitly turns it off", () => behaviour("Taxes & duties", "Automatic tax / Charge tax on shipping", async () => {
+    const { loadSellerTaxSwitches } = await import("../../lib/sellerTaxSwitches");
+    // A seller who never opened the screen: both on, at checkout and on the screen.
+    expect(await loadSellerTaxSwitches(BUYER2)).toEqual({ automaticTax: true, shippingTax: true });
+    await db.execute(sql`DELETE FROM seller_tax_config WHERE seller_id = ${SELLER}`);
+    const fresh = (await call(SELLER, "GET", "/api/taxes/status")).body;
+    expect(fresh).toMatchObject({ stripeTaxEnabled: true, chargeShippingTax: true, automaticTaxAtCheckout: true });
+    // Opening the screen (which creates the config row) changes nothing.
+    expect(await loadSellerTaxSwitches(SELLER)).toEqual({ automaticTax: true, shippingTax: true });
+    // Explicit switch-offs are honoured at checkout and shown on the screen.
+    expect((await call(SELLER, "PATCH", "/api/taxes/config", { chargeShippingTax: false })).body.chargeShippingTax).toBe(false);
+    expect(await loadSellerTaxSwitches(SELLER)).toEqual({ automaticTax: true, shippingTax: false });
+    expect((await call(SELLER, "PATCH", "/api/taxes/config", { stripeTaxEnabled: false })).status).toBe(200);
+    expect(await loadSellerTaxSwitches(SELLER)).toEqual({ automaticTax: false, shippingTax: false });
+    expect((await call(SELLER, "GET", "/api/taxes/status")).body).toMatchObject({ stripeTaxEnabled: false, chargeShippingTax: false, automaticTaxAtCheckout: false });
+    // Switching back on clears the opt-outs.
+    await call(SELLER, "PATCH", "/api/taxes/config", { stripeTaxEnabled: true, chargeShippingTax: true });
+    expect(await loadSellerTaxSwitches(SELLER)).toEqual({ automaticTax: true, shippingTax: true });
   }));
 
   it("Shopping preferences › turning off personalization drops the cached For You ranking", () => behaviour("Shopping preferences", "Personalized recommendations", async () => {

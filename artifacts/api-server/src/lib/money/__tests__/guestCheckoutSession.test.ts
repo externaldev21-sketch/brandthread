@@ -54,6 +54,12 @@ describe("guest hosted Checkout session (BT-256)", () => {
     expect(customer.metadata).toEqual({ guest: "true", csRef: "chk_1" });
   });
 
+  it("collects tax unless the seller explicitly turned automatic tax off", () => {
+    expect(params({ taxSwitches: { automaticTax: true, shippingTax: true } }).automatic_tax)
+      .toEqual({ enabled: true, liability: { type: "account", account: "acct_seller" } });
+    expect(params({ taxSwitches: { automaticTax: false, shippingTax: true } }).automatic_tax).toEqual({ enabled: false });
+  });
+
   it("falls back to customer_email without a Customer", () => {
     const session = params({ customerId: null });
     expect(session.customer_email).toBe("ada@test.local");

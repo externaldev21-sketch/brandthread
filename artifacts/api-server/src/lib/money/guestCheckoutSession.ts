@@ -18,6 +18,7 @@
  * BT-255: a guest's discount code becomes a one-time Stripe coupon, exactly
  * like the signed-in hosted flow (routes/buyer.ts).
  */
+import { checkoutAutomaticTax, type SellerTaxSwitches } from "../sellerTaxSwitches";
 import type Stripe from "stripe";
 
 export type GuestShipping = {
@@ -79,15 +80,14 @@ export function buildGuestCheckoutSessionParams(input: {
   uiMode?: "hosted" | "embedded";
   /** paymentIntentMoney(...).paymentIntentData */
   paymentIntentData: Record<string, unknown>;
+  /** Taxes & duties switches (lib/sellerTaxSwitches.ts); omitted = tax on. */
+  taxSwitches?: SellerTaxSwitches;
 }): Stripe.Checkout.SessionCreateParams {
   const metadata = (input.paymentIntentData.metadata ?? {}) as Record<string, string>;
   return {
     mode: "payment",
     line_items: input.lineItems,
-    automatic_tax: {
-      enabled: true,
-      liability: { type: "account", account: input.sellerStripeAccountId },
-    },
+    automatic_tax: checkoutAutomaticTax(input.taxSwitches ?? { automaticTax: true, shippingTax: true }, input.sellerStripeAccountId),
     ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
     ...(input.couponId ? { discounts: [{ coupon: input.couponId }] } : {}),
     ...(input.uiMode === "embedded"

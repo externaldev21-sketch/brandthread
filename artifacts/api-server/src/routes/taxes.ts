@@ -19,6 +19,7 @@ import {
   getSellerTaxYearTotals,
 } from "../lib/sellerTaxLedger";
 import { dutiesAtCheckoutEnabled } from "../lib/intl/duties";
+import { effectiveTaxSwitches } from "../lib/sellerTaxSwitches";
 
 const router = Router();
 router.use(requireAuth);
@@ -69,17 +70,20 @@ router.get("/status", async (req, res) => {
       }
     }
 
+    // Both switches are on unless the seller explicitly turned them off
+    // (lib/sellerTaxSwitches.ts) — the same values checkout uses.
+    const switches = effectiveTaxSwitches(config);
     res.json({
-      stripeTaxEnabled:    config.stripeTaxEnabled,
+      stripeTaxEnabled:    switches.automaticTax,
       provider:            "stripe_tax",
       providerConfigured:  Boolean(stripeSettings),
       providerStatus:      stripeSettings ? "configured" : "not_configured",
-      automaticTaxAtCheckout: true,
+      automaticTaxAtCheckout: switches.automaticTax,
       complianceNote: "Stripe calculates tax when an applicable registration and destination are configured. This setting is not a nexus determination or filing registration.",
       collectDuties:       config.collectDuties,
       // Intl #109: present only while DUTIES_AT_CHECKOUT_ENABLED (with a Zonos key).
       ...(dutiesAtCheckoutEnabled() ? { dutiesAtCheckout: true, dutiesProvider: "zonos" } : {}),
-      chargeShippingTax:   config.chargeShippingTax,
+      chargeShippingTax:   switches.shippingTax,
       chargeVat:           config.chargeVat,
       taxCalculationMode:  config.taxCalculationMode,
       stripeSettings,
@@ -123,10 +127,10 @@ router.post("/enable", async (req, res) => {
 
     await db
       .insert(sellerTaxConfig)
-      .values({ sellerId, stripeTaxEnabled: true })
+      .values({ sellerId, stripeTaxEnabled: true, automaticTaxOptedOut: false })
       .onConflictDoUpdate({
         target: sellerTaxConfig.sellerId,
-        set:    { stripeTaxEnabled: true, updatedAt: new Date() },
+        set:    { stripeTaxEnabled: true, automaticTaxOptedOut: false, updatedAt: new Date() },
       });
 
     res.json({
@@ -158,9 +162,17 @@ router.patch("/config", async (req, res) => {
     // Turning tax collection back off is a local preference only — it does not
     // touch the Stripe Connect account's tax settings, so re-enabling later
     // does not require reconfiguring Stripe.
-    if (typeof stripeTaxEnabled === "boolean") patch.stripeTaxEnabled = stripeTaxEnabled;
+    // An explicit switch-off is recorded as an opt-out; checkout collects tax
+    // unless it is set (lib/sellerTaxSwitches.ts).
+    if (typeof stripeTaxEnabled === "boolean") {
+      patch.stripeTaxEnabled = stripeTaxEnabled;
+      patch.automaticTaxOptedOut = !stripeTaxEnabled;
+    }
     if (typeof collectDuties    === "boolean") patch.collectDuties    = collectDuties;
-    if (typeof chargeShippingTax === "boolean") patch.chargeShippingTax = chargeShippingTax;
+    if (typeof chargeShippingTax === "boolean") {
+      patch.chargeShippingTax = chargeShippingTax;
+      patch.shippingTaxOptedOut = !chargeShippingTax;
+    }
     if (typeof chargeVat        === "boolean") patch.chargeVat        = chargeVat;
     if (taxCalculationMode)                    patch.taxCalculationMode = taxCalculationMode;
 
@@ -170,7 +182,8 @@ router.patch("/config", async (req, res) => {
       .where(eq(sellerTaxConfig.sellerId, sellerId))
       .returning();
 
-    res.json(updated);
+    const switches = effectiveTaxSwitches(updated);
+    res.json({ ...updated, stripeTaxEnabled: switches.automaticTax, chargeShippingTax: switches.shippingTax });
   } catch (err) {
     req.log.error({ err, sellerId }, "Failed to update seller tax configuration");
     res.status(500).json({ error: "Failed to update tax config" });
