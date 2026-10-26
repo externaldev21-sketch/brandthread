@@ -589,36 +589,10 @@ export function getSellerPreviewBuyerOrders(conversationId: string): Array<{
   }));
 }
 
-// ─── Transient "typing…" simulation (preview-only, demonstrates the real
-// `agentTyping` field) ──────────────────────────────────────────────────────
-//
-// The real backend has exactly one "someone is typing" signal today:
-// `Conversation.agentTyping` (services/socialTypes.ts), set only for the
-// Brandthread Agent's thread and polled via GET /api/conversations (see
-// api-server's conversations.ts `agentTypingUntil` handling — there is no
-// websocket/presence layer, and no equivalent for ordinary human-to-human
-// buyer<->seller or buyer<->buyer conversations). This preview-only helper
-// flips the *same* seeded thread's typing state on a timer purely so the
-// inbox's "typing…" row treatment has something to demo without a live
-// backend — it is gated to `BRANDTHREAD_AGENT_SEED` (see its `simulateTyping`
-// flag) and never an ordinary seller/buyer thread, so it never suggests a
-// presence signal that doesn't really exist in production.
-
-const TYPING_CONVERSATION_ID = allSeeds().find(s => s.simulateTyping)?.id ?? null;
-const TYPING_INTERVAL_MS = 4000;
-
-/** Subscribes to the simulated typing flag; calls `cb(conversationId | null)`
- *  on each flip. Returns an unsubscribe function. No-op when the preview
- *  inbox is disabled or no seed opts into simulated typing. */
-export function subscribePreviewTyping(cb: (typingConversationId: string | null) => void): () => void {
-  if (!isPreviewInboxEnabled() || !TYPING_CONVERSATION_ID) return () => {};
-  let on = false;
-  const interval = setInterval(() => {
-    on = !on;
-    cb(on ? TYPING_CONVERSATION_ID : null);
-  }, TYPING_INTERVAL_MS);
-  return () => clearInterval(interval);
-}
+// There is deliberately no preview "typing…" simulation for the inbox: the
+// Brandthread Agent row may only read "typing…" while a reply to a message
+// the user just sent is in flight (real `Conversation.agentTyping`), never
+// on a timer or on inbox open.
 
 // ─── Auto-reply (preview-only, keeps a demo thread feeling live) ──────────
 //

@@ -61,10 +61,15 @@ export function cannedAgentReply(userText: string): { text: string; cardKind?: '
 
 const WELCOME_PLAYED_PREFIX = 'brandthread_agent_welcome_played:';
 
+// In-memory mirror of the persisted flag, so a second open in the same
+// session never waits on (or races) AsyncStorage before deciding.
+const welcomeClaimed = new Set<string>();
+
 /** True once the welcome typing-in animation has played for this seed
  *  conversation before — persisted so re-opening the thread doesn't replay
  *  it every time. */
 export async function hasWelcomePlayed(conversationId: string): Promise<boolean> {
+  if (welcomeClaimed.has(conversationId)) return true;
   try {
     return (await AsyncStorage.getItem(WELCOME_PLAYED_PREFIX + conversationId)) === 'true';
   } catch {
@@ -73,9 +78,34 @@ export async function hasWelcomePlayed(conversationId: string): Promise<boolean>
 }
 
 export async function markWelcomePlayed(conversationId: string): Promise<void> {
+  welcomeClaimed.add(conversationId);
   try {
     await AsyncStorage.setItem(WELCOME_PLAYED_PREFIX + conversationId, 'true');
   } catch {
-    // Best-effort — worst case the animation replays once more.
+    // Best-effort — the in-memory flag still stops a replay this session.
   }
+}
+
+/** The single gate for the welcome type-in: resolves true for exactly one
+ *  caller per conversation per device, and marks it played BEFORE the caller
+ *  starts animating — so leaving mid-animation, re-focusing the screen, or a
+ *  second concurrent load never replays it. Every later call resolves false. */
+export async function claimWelcomePlayback(conversationId: string): Promise<boolean> {
+  if (welcomeClaimed.has(conversationId)) return false;
+  welcomeClaimed.add(conversationId);
+  let played = false;
+  try {
+    played = (await AsyncStorage.getItem(WELCOME_PLAYED_PREFIX + conversationId)) === 'true';
+  } catch {
+    // Unreadable storage: treat as not played, but the in-memory claim above
+    // still limits it to once this session.
+  }
+  if (played) return false;
+  await markWelcomePlayed(conversationId);
+  return true;
+}
+
+/** Test-only: forget the in-memory claims (AsyncStorage is mocked separately). */
+export function resetWelcomeClaimsForTests(): void {
+  welcomeClaimed.clear();
 }

@@ -84,7 +84,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
-  subscribePreviewTyping, setPreviewConversationPinned,
+  setPreviewConversationPinned,
   getSellerPreviewConversations, isSellerPreviewConversationId,
 } from '@/lib/previewInbox';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -434,7 +434,6 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   }, [isSearchBarOpen, searchHeaderFade]);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
-  const [typingConvId, setTypingConvId] = useState<string | null>(null);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // "Suggested" section (Instagram/Threads-style people-to-message list) —
@@ -586,18 +585,6 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // the tray itself (avatars/stories) still renders normally.
     }
   }, [userId, isSeller, isPreviewSession, sellerFreshPreview]);
-
-  // Preview-only overlay for the "typing…" row treatment: real accounts get
-  // it purely from `conv.agentTyping` below (polled via GET /api/conversations
-  // — the only real "someone is typing" signal that exists today, and only
-  // ever true for the Brandthread Agent thread; there is no presence/typing
-  // mechanism for ordinary human buyer<->seller or buyer<->buyer threads).
-  // This just simulates that same field, on that same seeded Agent thread,
-  // for the seeded dev/preview inbox — a no-op outside that environment.
-  useEffect(() => {
-    const unsub = subscribePreviewTyping(setTypingConvId);
-    return unsub;
-  }, []);
 
   const showSnackbar = useCallback((message: string) => {
     if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
@@ -1351,13 +1338,12 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     const participant = participantOf(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
-    // Real signal: `conv.agentTyping` (only ever true for the Brandthread
-    // Agent thread — see the field's comment on Conversation in
-    // services/socialTypes.ts). `typingConvId` is the preview-only overlay
-    // above, which flips the exact same seeded Agent thread's state so the
-    // row treatment demos the same real field rather than a fake parallel
-    // mechanism — it is never set for an ordinary buyer<->seller/buyer row.
-    const isTyping = conv.agentTyping === true || typingConvId === conv.id;
+    // "typing…" replaces the preview ONLY while the server says a Brandthread
+    // Agent reply to a message the user just sent is in flight
+    // (`conv.agentTyping`, from conversations.agentTypingUntil — set when the
+    // user's message lands, cleared when the reply does). Nothing local or
+    // timer-driven ever sets it: no idle typing, none on inbox open.
+    const isTyping = conv.agentTyping === true;
 
     const swipeActions: InboxSwipeAction[] = [
       {

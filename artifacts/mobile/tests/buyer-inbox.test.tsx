@@ -355,7 +355,6 @@ vi.mock('@/lib/previewInbox', async (importOriginal) => ({
   getPreviewNotifications: () => [],
   getPreviewMessages: () => [],
   isPreviewConversationId: () => false,
-  subscribePreviewTyping: () => () => {},
   setPreviewConversationPinned: () => {},
 }));
 
@@ -544,6 +543,15 @@ describe('buyer inbox', () => {
 
     const quietRow = renderer.root.findByProps({ testID: 'inbox-conversation-quiet-thread' });
     expect(quietRow.findAllByProps({ testID: 'inbox-typing-quiet-thread' }, { deep: false })).toHaveLength(0);
+  });
+
+  it('never shows "typing…" on the pinned Brandthread Agent row when no reply is in flight', async () => {
+    getConversationsMock.mockResolvedValue([
+      conversation('agent-thread', 0, { isOfficial: true, isPinned: true, lastMessage: 'Welcome to Brandthread.' }),
+    ]);
+    renderer = await renderScreen();
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(renderer.root.findAllByProps({ testID: 'inbox-typing-agent-thread' }, { deep: false })).toHaveLength(0);
   });
 
   it('filters conversations by name, handle and last-message text', async () => {

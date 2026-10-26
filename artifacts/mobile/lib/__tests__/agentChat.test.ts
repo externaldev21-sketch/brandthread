@@ -11,6 +11,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed, BUYER_QUICK_REPLIES,
+  claimWelcomePlayback, resetWelcomeClaimsForTests,
 } from '../agentChat';
 
 describe('parseQuickReplies', () => {
@@ -63,6 +64,7 @@ describe('cannedAgentReply', () => {
 describe('welcome-played persistence', () => {
   beforeEach(() => {
     for (const key of Object.keys(asyncStorageStore)) delete asyncStorageStore[key];
+    resetWelcomeClaimsForTests();
   });
 
   it('is false before markWelcomePlayed is called', async () => {
@@ -73,5 +75,33 @@ describe('welcome-played persistence', () => {
     await markWelcomePlayed('conv-1');
     expect(await hasWelcomePlayed('conv-1')).toBe(true);
     expect(await hasWelcomePlayed('conv-2')).toBe(false);
+  });
+});
+
+describe('claimWelcomePlayback (welcome types in exactly once)', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(asyncStorageStore)) delete asyncStorageStore[key];
+    resetWelcomeClaimsForTests();
+  });
+
+  it('grants the first open and persists the flag before the animation starts', async () => {
+    expect(await claimWelcomePlayback('conv-1')).toBe(true);
+    expect(asyncStorageStore['brandthread_agent_welcome_played:conv-1']).toBe('true');
+  });
+
+  it('refuses every later open, including one in the same session', async () => {
+    expect(await claimWelcomePlayback('conv-1')).toBe(true);
+    expect(await claimWelcomePlayback('conv-1')).toBe(false);
+    expect(await claimWelcomePlayback('conv-1')).toBe(false);
+  });
+
+  it('grants only one of two concurrent opens (focus + refocus race)', async () => {
+    const results = await Promise.all([claimWelcomePlayback('conv-1'), claimWelcomePlayback('conv-1')]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('refuses after an app restart when the persisted flag is already set', async () => {
+    asyncStorageStore['brandthread_agent_welcome_played:conv-1'] = 'true';
+    expect(await claimWelcomePlayback('conv-1')).toBe(false);
   });
 });

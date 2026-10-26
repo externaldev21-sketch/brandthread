@@ -354,8 +354,16 @@ export async function runAgentWelcomeBackfill(
  *  setting (see PR description). */
 export const PROACTIVE_NUDGE_MIN_INTERVAL_MS = 1000 * 60 * 60 * 24 * 3; // 3 days
 
-/** True when a proactive nudge is allowed right now for this conversation. */
+/** The agent sends nothing unprompted (no nudges, no "update blasts")
+ *  unless this is explicitly turned on. Defaults OFF. */
+export function agentProactiveMessagesEnabled(): boolean {
+  return process.env.BRANDTHREAD_AGENT_PROACTIVE_MESSAGES === "true";
+}
+
+/** True when a proactive nudge is allowed right now for this conversation.
+ *  Always false while agentProactiveMessagesEnabled() is off. */
 export async function canSendProactiveNudge(conversationId: string): Promise<boolean> {
+  if (!agentProactiveMessagesEnabled()) return false;
   const [row] = await db
     .select({ agentLastNudgeAt: conversations.agentLastNudgeAt })
     .from(conversations)
