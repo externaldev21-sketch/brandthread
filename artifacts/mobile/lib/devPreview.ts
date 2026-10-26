@@ -11,7 +11,7 @@
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
  *   - the explicitly selected role survives reloads and new browser tabs
- *   - a fresh preview browser defaults to buyer; explicit guest tests the auth wall
+ *   - a fresh preview browser defaults to seller; explicit guest tests the auth wall
  *
  * Expo Router drops the query on in-app navigation. Dev builds retain the
  * browser-local choice in both development and exported preview builds.
@@ -28,8 +28,8 @@ import { Platform } from 'react-native';
 import { DEV_BUYER_PREVIEW, DEV_SELLER_PREVIEW, NAVIGATION_ISOLATION_TEST } from './buildFlags';
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
-// Ignore the retired seller-first session key, including in already-open tabs.
-const PREVIEW_ROLE_KEY = 'bt:previewRole:explicit-v1';
+// Start the owner's seller-first review without reviving the prior buyer selection.
+const PREVIEW_ROLE_KEY = 'bt:previewRole:seller-review-v2';
 
 export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | null {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return null;
@@ -54,7 +54,7 @@ export function setDevWebPreviewRole(role: PreviewRole | null): void {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined' || isProductionPreviewHost()) return;
   try {
     // An explicit guest marker must survive navigation to onboarding without
-    // the query; removing the key would re-enable the default buyer immediately.
+    // the query; removing the key would re-enable the default seller immediately.
     window.localStorage.setItem(PREVIEW_ROLE_KEY, role ?? 'guest');
     // Retire the old tab-only selection so it cannot revive after guest mode.
     window.sessionStorage?.removeItem(PREVIEW_ROLE_KEY);
@@ -94,7 +94,7 @@ export function isProductionPreviewHost(hostnameOverride?: string): boolean {
 
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
- * precedence, then the saved browser selection, with buyer as the preview default.
+ * precedence, then the saved browser selection, with seller as the preview default.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.

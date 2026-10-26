@@ -19,7 +19,7 @@ Do not alter signed-in layouts, fonts, tab bars or seller swipe/glow.
 
 Explicit buyer/seller preview identity persists across preview URLs without
 requiring a role query on each visit. This bypass is development/fast-preview
-only. A fresh preview browser (or clearing its saved role) defaults to buyer,
+only. The owner's current review defaults to seller until instructed otherwise; a fresh preview browser (or clearing its saved role) defaults to seller,
 never Welcome. Only bt_preview=guest selects signed-out Welcome testing;
 retain that explicit selection across auth redirects until buyer/seller is
 chosen again. URL selection wins over storage. Demo population still requires
