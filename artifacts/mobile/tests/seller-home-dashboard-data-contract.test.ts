@@ -9,12 +9,15 @@ const source = fs.readFileSync(
 
 describe('seller home dashboard data contract', () => {
   it('waits for the authenticated seller and reloads analytics when the range changes', () => {
-    expect(source).toContain('if (sellerPreview)');
-    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
+    expect(source).toContain('[analyticsUserId, range, retryTick, source, storeContextTick]');
     // analyticsUserId = the signed-in user, or a fixed id in the dev preview (which has no account).
     expect(source).toContain('sellerHomeAnalyticsKey(analyticsUserId, range)');
     expect(source).toContain('const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId');
-    expect(source).toContain('allPreviewSellerOrders()');
+    // Preview answers the same calls from the seeded demo store: one code path.
+    expect(source).toContain('previewMode ? previewDashboardSource(previewMode) : apiDashboardSource(api)');
+    expect(source).toContain('source.analyticsHome(range as SellerHomeTimeRange)');
+    expect(source).not.toContain('buildPreviewSellerAnalytics(');
+    expect(source).not.toContain('allPreviewSellerOrders(');
     expect(source).toContain('setSnapshot({ key: requestKey');
   });
 
@@ -118,7 +121,7 @@ describe('seller home dashboard data contract', () => {
     // store (same signed-in account) used to leave the dashboard showing the
     // previously active store's numbers, because only loadFinanceBalance
     // reacted to subscribeStoreContext.
-    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
+    expect(source).toContain('[analyticsUserId, range, retryTick, source, storeContextTick]');
     expect(source).toContain('[loadSecondaryData, retryTick, storeContextTick]');
     // The stale snapshot/top-products/recent-orders must be dropped
     // immediately on a store switch, not left on screen until the refetch
@@ -130,5 +133,19 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain('<RefreshControl');
     expect(source).toContain('refreshing={refreshing}');
     expect(source).toContain('onRefresh={onRefresh}');
+    // Every number on screen, balances included.
+    expect(source).toContain('await Promise.all([loadSecondaryData(), loadFinanceBalance(), reloadThreadCash()])');
+  });
+
+  it('derives every below-the-hero number through one shared function over the source', () => {
+    expect(source).toContain('deriveDashboardSecondary({');
+    expect(source).toContain("toShip: filterOrders(orders.map(apiRowToOrder), 'unfulfilled').length");
+    expect(source).toContain('lowStockCount: productStats.lowStock');
+  });
+
+  it('never shows a made-up $0.00 when a balance failed to load', () => {
+    expect(source).toContain("financeBalance?.available.formatted ?? '—'");
+    expect(source).toContain("threadCash.balanceCents == null ? '—'");
+    expect(source).not.toContain("financeBalance?.available.formatted ?? '$0.00'");
   });
 });

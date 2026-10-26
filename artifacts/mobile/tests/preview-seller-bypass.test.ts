@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const layoutSource = readFileSync(path.resolve(__dirname, '../app/_layout.tsx'), 'utf8');
 const indexSource = readFileSync(path.resolve(__dirname, '../app/index.tsx'), 'utf8');
 const dashboardSource = readFileSync(path.resolve(__dirname, '../components/SellerHomeCommerceDashboard.tsx'), 'utf8');
+const previewSource = readFileSync(path.resolve(__dirname, '../lib/sellerDashboardSource.ts'), 'utf8');
 
 describe('development app preview routing', () => {
   it('starts the temporary default web preview as buyer and preserves explicit preview roles', () => {
@@ -29,10 +30,12 @@ describe('development app preview routing', () => {
 
   it('uses populated seller analytics and balances instead of protected APIs in preview', () => {
     expect(dashboardSource).toContain('const sellerPreview = isSellerDevPreview();');
-    expect(dashboardSource).toContain("from '@/lib/previewSellerChartData'");
-    expect(dashboardSource).toContain("buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh')");
-    expect(dashboardSource).toContain("formatted: '$4,281.22'");
-    expect(dashboardSource).toContain("formatted: '$1,842.50'");
+    expect(dashboardSource).toContain("const previewMode = sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null;");
+    expect(dashboardSource).toContain('previewMode ? previewDashboardSource(previewMode) : apiDashboardSource(api)');
+    expect(previewSource).toContain("await import('./previewSellerChartData')");
+    expect(previewSource).toContain('buildPreviewSellerAnalytics(range as Parameters<typeof buildPreviewSellerAnalytics>[0], mode, now())');
+    expect(previewSource).toContain("formatted: '$4,281.22'");
+    expect(previewSource).toContain("formatted: '$1,842.50'");
   });
 
   it('enters seller preview only when explicitly enabled in native development', () => {

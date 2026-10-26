@@ -18,6 +18,12 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
  * slim 36px button that sizes to its own label — the old `alignSelf:
  * 'stretch'` + 44px PrimaryButton rendered its label flush against the
  * rounded right edge and clipped the last glyph ("Add a produc").
+ *
+ * The card is a filled surface, so its copy sits on an equal inner inset;
+ * with no side padding the title and body ran into the rounded corners and
+ * read as cut off (owner, 390x844). Copy wraps to as many lines as it needs,
+ * the button grows with the text size, and the actions wrap below each
+ * other when Larger text makes them wider than the card.
  */
 export function SellerDashboardSetupCard({
   theme,
@@ -70,7 +76,7 @@ export function SellerDashboardSetupCard({
       <View style={styles.cardContent}>
       <Text style={[styles.title, { color: theme.text }]}>List your first product</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
-        Your sales, orders, and store activity will show up here as soon as your first product goes live.
+        Sales and orders show up here once your first product is live.
       </Text>
       </View>
       </PressableScale>
@@ -88,17 +94,17 @@ export function SellerDashboardSetupCard({
 
 const styles = StyleSheet.create({
   card: {
-    // No border, so no side inset either: the copy lines up with the page gutter.
-    paddingVertical: SP.md,
-    paddingTop: SP.sm,
+    // A filled card: equal inset on every side so no glyph touches the rounded edge.
+    padding: SP.md,
     borderRadius: RADIUS.lg,
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     gap: SP.xs,
   },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: SP.md, rowGap: SP.sm },
   link: { fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
   cardContent: {
     gap: SP.xs,
+    minWidth: 0,
   },
   title: {
     fontFamily: FONT.bold,
@@ -112,10 +118,12 @@ const styles = StyleSheet.create({
     marginBottom: SP.xs,
   },
   // Sized to its own label (never stretched or fixed-width), slim 36px —
-  // the shared PrimaryButton supplies the equal 16px side padding.
+  // the shared PrimaryButton supplies the equal 16px side padding. A min
+  // height, not a fixed one, so Larger text never clips the label.
   button: {
     alignSelf: 'flex-start',
-    height: 36,
+    minHeight: 36,
+    height: undefined,
   },
 });
 

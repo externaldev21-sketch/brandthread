@@ -305,6 +305,28 @@ describe("GET /api/analytics/home — previous period is a real, distinct compar
   });
 });
 
+describe("GET /api/analytics/home — Today compares against the same hours yesterday", () => {
+  it("counts yesterday's early hours, not yesterday's late evening", async () => {
+    const now = new Date();
+    // A seller whose local time is between 06:00 and 07:00 right now, so the
+    // test means the same thing whenever it runs (tz = minutes east of UTC).
+    let tzHours = (6 - now.getUTCHours() + 24) % 24;
+    if (tzHours > 14) tzHours -= 24;
+    const tz = tzHours * 60;
+    const localMidnight = Math.floor((now.getTime() + tz * 60_000) / DAY) * DAY - tz * 60_000;
+    // 00:10 local yesterday: inside "the same hours yesterday" (00:00–07:00).
+    await makeOrder({ totalCents: 300, createdAt: new Date(localMidnight - DAY + 10 * 60 * 1000) });
+    // 23:50 local yesterday: the evening before; the old window counted it.
+    await makeOrder({ totalCents: 5000, createdAt: new Date(localMidnight - 10 * 60 * 1000) });
+
+    const body = await (await fetch(`${base}/api/analytics/home?range=today&tz=${tz}`)).json() as any;
+    expect(body.previous.totalCents).toBe(300);
+    expect(body.previous.orderCount).toBe(1);
+
+    await db.delete(orders).where(eq(orders.ownerId, sellerId));
+  });
+});
+
 describe("GET /api/analytics/home — rolling 7d/30d/90d (seller Dashboard Today/7D/30D/90D)", () => {
   it.each([["7d", 7], ["30d", 30], ["90d", 90]] as const)(
     "range=%s returns exactly %i daily buckets and compares against the prior window",
