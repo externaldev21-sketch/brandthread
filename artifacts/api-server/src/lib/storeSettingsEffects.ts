@@ -17,6 +17,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db, storefronts, users } from "@workspace/db";
 import { STORE_LANGUAGES, type CheckoutMode, type StoreLanguage } from "./sellerCheckoutSettings";
+import { logger } from "./logger";
 
 type Settings = Record<string, unknown>;
 
@@ -103,15 +104,20 @@ export async function effectiveStoreSettings(
   if (live && !LIVE_STATUSES.has(String(stored.storeStatus))) out.storeStatus = "published";
   if (!live && LIVE_STATUSES.has(String(stored.storeStatus))) out.storeStatus = "unpublished";
 
-  const seller = await readSellerSettings(ownerId);
-  if ((STORE_LANGUAGES as readonly unknown[]).includes(seller.storeLanguage)) out.language = seller.storeLanguage;
-  if (typeof seller.checkoutMode === "string") {
-    out.checkoutRequireAccount = seller.checkoutMode === "accounts_required";
-    out.checkoutGuestAllowed = seller.checkoutMode !== "accounts_required";
+  // The overlay never fails a load or a save: on a read error the stored values stand.
+  try {
+    const seller = await readSellerSettings(ownerId);
+    if ((STORE_LANGUAGES as readonly unknown[]).includes(seller.storeLanguage)) out.language = seller.storeLanguage;
+    if (typeof seller.checkoutMode === "string") {
+      out.checkoutRequireAccount = seller.checkoutMode === "accounts_required";
+      out.checkoutGuestAllowed = seller.checkoutMode !== "accounts_required";
+    }
+    const [row] = await db.select({ prefs: users.notificationPreferences }).from(users).where(eq(users.clerkId, ownerId)).limit(1);
+    const newOrders = (row?.prefs as Settings | null | undefined)?.new_orders;
+    if (typeof newOrders === "boolean") out.orderNotifications = newOrders;
+  } catch (err) {
+    logger.warn({ err, ownerId }, "store settings overlay read failed; showing stored values");
   }
-  const [row] = await db.select({ prefs: users.notificationPreferences }).from(users).where(eq(users.clerkId, ownerId)).limit(1);
-  const newOrders = (row?.prefs as Settings | null | undefined)?.new_orders;
-  if (typeof newOrders === "boolean") out.orderNotifications = newOrders;
   return out;
 }
 

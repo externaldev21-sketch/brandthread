@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { db, storefronts } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import crypto from "node:crypto";
 import { verifyStorePassword } from "../../lib/storeSettingsSecurity";
 
@@ -54,6 +54,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(storefronts).where(inArray(storefronts.ownerId, [TEST_OWNER, OTHER_OWNER]));
+  await db.execute(sql`DELETE FROM seller_settings WHERE owner_id IN (${TEST_OWNER}, ${OTHER_OWNER})`);
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -66,7 +67,9 @@ describe("store settings + password", () => {
     expect(put.status).toBe(200);
     expect(put.body.storeSettings.storePassword).toBeUndefined();
     const get = await request("GET", "/api/store");
-    expect(get.body.storeSettings).toEqual({ currency: "EUR", contactEmail: "me@brand.com", checkoutGuestAllowed: false });
+    // Guest checkout off writes through to checkoutMode "accounts_required"
+    // (lib/storeSettingsEffects.ts), so the view reports accounts as required too.
+    expect(get.body.storeSettings).toEqual({ currency: "EUR", contactEmail: "me@brand.com", checkoutGuestAllowed: false, checkoutRequireAccount: true });
     expect(get.body.hasStorePassword).toBe(false);
     expect(get.body.storePasswordHash).toBeUndefined();
     expect(typeof get.body.customDomainRoutingEnabled).toBe("boolean");
