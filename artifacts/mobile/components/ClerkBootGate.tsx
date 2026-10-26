@@ -46,7 +46,7 @@ function BootTimedOut() {
   const [retrying, setRetrying] = useState(false);
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <BrandthreadLogo size={96} />
+      <BrandthreadLogo size={80} />
       <Text style={[styles.title, { color: theme.text }]}>Taking longer than expected</Text>
       <Text style={[styles.body, { color: theme.muted }]}>
         We couldn’t reach the sign-in service. Check your connection and try again.

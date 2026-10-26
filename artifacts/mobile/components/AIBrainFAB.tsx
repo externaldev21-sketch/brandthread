@@ -183,7 +183,7 @@ export default function AIBrainFAB({
               end={{ x: 1, y: 1 }}
               style={[styles.gradient, { shadowColor: theme.shadowColor }]}
             >
-              <BrandthreadLogo size={22} opacity={1} />
+              <BrandthreadLogo size={18} opacity={1} />
             </LinearGradient>
           </>
         ) : (
