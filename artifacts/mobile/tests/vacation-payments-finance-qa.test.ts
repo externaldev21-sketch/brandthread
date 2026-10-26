@@ -35,7 +35,7 @@ describe('vacation-mode.tsx', () => {
   it('QA-0173: Save is blocked while loading, after a load error, and in signed-out preview', () => {
     expect(s).toContain('const saveDisabled = saving || loading || loadError || skipProtectedReads;');
     expect(s).toContain('disabled={saveDisabled}');
-    before(s, 'async function handleSave()', 'if (loading || loadError || skipProtectedReads) return;', 'vacation?.update');
+    before(s, 'async function handleSave()', 'if (loading || loadError || skipProtectedReads) return;', 'seller.vacation.update(');
   });
 
   it('signed-out preview never calls the protected vacation API', () => {
