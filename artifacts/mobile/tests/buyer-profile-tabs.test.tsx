@@ -22,7 +22,7 @@ const {
   getPrivacySettingsMock: vi.fn(),
   subscribeSocialMock: vi.fn(),
   loadBuyerProfileMock: vi.fn(),
-  routerMock: { push: vi.fn(), replace: vi.fn() },
+  routerMock: { push: vi.fn(), replace: vi.fn(), navigate: vi.fn() },
   apiMock: { social: { myStories: vi.fn(), profile: vi.fn(), likedPosts: vi.fn() }, threadCash: { get: vi.fn() } },
   getBuyerOrdersWithStatusMock: vi.fn(),
 }));
@@ -582,7 +582,8 @@ describe('buyer profile tabs', () => {
       node => node.props.testID === 'profile-menu-sheet-orders' && typeof node.props.onPress === 'function',
     )[0];
     await act(async () => { row.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/buyer-orders');
+    // /buyer-orders never existed (it rendered "Not found"); the Orders screen is the hidden (buyer) tab.
+    expect(routerMock.navigate).toHaveBeenCalledWith('/(buyer)/orders');
   });
 
   it('has no bell (Activity is a tab) and no "Buyer" role chip', async () => {

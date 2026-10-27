@@ -128,7 +128,7 @@ import { StatusBarScrollEdge, useSceneBottomClearance } from '@/components/layou
 import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 import { FONT, MUTED } from '@/lib/theme';
 import { preloadAppearanceAssets } from '@/lib/appearanceAssets';
-import { consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
+import { clearAnimationOverride, consumeAnimationOverride } from '@/lib/navigationAnimationOverride';
 import { setRequestGuard } from '@workspace/api-client-react';
 import { emitThreadCashChanged, isThreadCashNotification } from '@/lib/threadCashEvents';
 import { hydrateHapticsPreference } from '@/lib/hapticsPreference';
@@ -1420,6 +1420,8 @@ function RootLayoutNav() {
   }, [pathname]);
 
   useEffect(() => markNavigationCommit(pathname || '/'), [pathname, navigationKey]);
+  // The "next push has no transition" flag is for that one push only.
+  useEffect(() => clearAnimationOverride(), [navigationKey]);
 
   return <RootLayoutRuntime featurePaused={!!feature && !isEnabled(feature)} />;
 }

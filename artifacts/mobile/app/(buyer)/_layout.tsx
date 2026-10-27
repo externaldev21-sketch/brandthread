@@ -126,6 +126,12 @@ function BuyerTabLayout() {
 
   return (
     <Tabs
+      // Back retraces the tabs actually visited. The default ('firstRoute')
+      // sent every back from a tab-level screen (Analytics, Edit profile,
+      // Bag, Inbox…) to Home/Dashboard instead of the tab it was opened
+      // from, and a tab group pushed over a stack screen (product → Bag)
+      // popped to that copy's Home instead of back to the product.
+      backBehavior="history"
       // false keeps every tab's native view attached to the hierarchy at all
       // times instead of tearing it down and re-creating it on each revisit.
       // Combined with freezeOnBlur (state/JS stays mounted too), a tab switch

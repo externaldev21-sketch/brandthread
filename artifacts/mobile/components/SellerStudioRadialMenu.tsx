@@ -595,7 +595,6 @@ export default function SellerStudioRadialMenu({
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
       setEntering(false);
-      setCardIndexJS(0);
       setCoachDemoDismissed(false);
       lastStepAtRef.current = 0;
     }

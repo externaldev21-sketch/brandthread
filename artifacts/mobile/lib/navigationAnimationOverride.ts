@@ -41,3 +41,15 @@ export function consumeAnimationOverride<T>(fallback: T): T | 'none' {
   }
   return fallback;
 }
+
+/**
+ * Drops an override nobody consumed. Only a handful of destinations read it
+ * (their `Stack.Screen` options call consumeAnimationOverride); a Studio
+ * card that opens any other screen left it armed, and the NEXT unrelated
+ * push of one of those few screens — seconds or minutes later — snapped in
+ * with no transition. The root layout calls this once every navigation has
+ * committed, after the destination's options were resolved.
+ */
+export function clearAnimationOverride(): void {
+  pendingOverride = null;
+}
