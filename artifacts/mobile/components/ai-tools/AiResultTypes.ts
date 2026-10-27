@@ -16,6 +16,8 @@ export interface AiResultSlot {
   /** The generated "after" image, once done. */
   imageUri?: string;
   error?: string;
+  /** False when retrying cannot help (e.g. AI photos aren't switched on yet); the tile then offers no Retry. */
+  retryable?: boolean;
   /** Short label under the tile, e.g. "Reference 1" or "Shot 1". */
   label: string;
 }

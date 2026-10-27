@@ -20,7 +20,7 @@ import type { Server } from "node:http";
 import fs from "node:fs/promises";
 
 const state = vi.hoisted(() => ({
-  calls: [] as Array<{ files: string[]; prompt: string }>,
+  calls: [] as Array<{ files: string[]; prompt: string; task?: string; aspectRatio?: string }>,
   failRefIndex: -1,   // -1 = none fail; otherwise the refIndex that throws
   qualityFailIndex: -1,
   authEnabled: true,
@@ -46,36 +46,29 @@ vi.mock("@workspace/integrations-openai-ai-server/image", () => {
     }
   }
   return {
-    buildFashionPrompt: (_op: string, brief: string, context: string) =>
-      `photoshoot. ${context} ${brief}`,
-    generateWithVisualQa: async (input: {
-      prompt: string;
-      generate: (prompt: string) => Promise<Buffer>;
-    }) => {
-      return input.generate(input.prompt);
-    },
+    buildFashionPrompt: (_op: string, brief: string, context: string) => `photoshoot. ${context} ${brief}`,
+    generateWithVisualQa: async () => Buffer.from(""),
+    editImages: async () => Buffer.from(""),
     ImageQualityError: MockImageQualityError,
     ImageQualityUnavailableError: class ImageQualityUnavailableError extends Error {},
-    editImages: async (files: string[], prompt: string) => {
-      // Extract payload after PNG signature (8 bytes) for each file
-      const contents = await Promise.all(
-        files.map(async (f) => (await fs.readFile(f)).subarray(8).toString("utf8")),
-      );
-      state.calls.push({ files: contents, prompt });
-      // contents[0] = mockup, contents[1] = reference
-      // Determine which refIndex this is from the filename.
-      // We identify by ref content.
-      const refContent = contents[1] ?? "";
-      // Parse refIndex from content like "ref-N"
-      const match = /^ref-(\d+)$/.exec(refContent);
+  };
+});
+
+// The route's contract is tested against the shared image engine's boundary;
+// the engine itself (prompts, providers) is covered in lib/aiImageEngine tests.
+vi.mock("../../lib/aiImageEngine", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/aiImageEngine")>();
+  const { ImageQualityError } = await import("@workspace/integrations-openai-ai-server/image");
+  return {
+    ...actual,
+    generateShot: async (input: { productImages: Buffer[]; referenceImages: Buffer[]; brief?: string; task: string; aspectRatio?: string }) => {
+      const files = [...input.productImages, ...input.referenceImages].map((b) => b.subarray(8).toString("utf8"));
+      state.calls.push({ files, prompt: input.brief ?? "", task: input.task, aspectRatio: input.aspectRatio });
+      const match = /^ref-(\d+)$/.exec(files[1] ?? "");
       const refIdx = match ? Number(match[1]) : -1;
-      if (state.failRefIndex >= 0 && refIdx === state.failRefIndex) {
-        throw new Error("provider failure for ref");
-      }
-      if (state.qualityFailIndex >= 0 && refIdx === state.qualityFailIndex) {
-        throw new MockImageQualityError(["garment shifted"]);
-      }
-      return Buffer.from(`result-${refContent}`);
+      if (state.failRefIndex >= 0 && refIdx === state.failRefIndex) throw new Error("provider failure for ref");
+      if (state.qualityFailIndex >= 0 && refIdx === state.qualityFailIndex) throw new (ImageQualityError as any)(["garment shifted"]);
+      return { image: Buffer.from(`result-${files[1]}`), mime: "image/jpeg", provider: "gemini", model: "gemini-test" };
     },
   };
 });
@@ -258,10 +251,16 @@ describe("mockup-to-model: one output per reference, stable order", () => {
       expect(typeof r.b64_json).toBe("string");
       expect(r.b64_json.length).toBeGreaterThan(0);
     }
-    // Each generation call must have included the mockup as the first image
+    // Each generation call sends the mockup as the product (ground truth) and
+    // exactly one reference, through the shared engine's mockup_to_model task.
     for (const call of state.calls) {
       expect(call.files[0]).toBe("mockup");
+      expect(call.files).toHaveLength(2);
+      expect(call.task).toBe("mockup_to_model");
+      expect(call.prompt).toBe("Editorial lookbook.");
+      expect(call.aspectRatio).toBe("4:5");
     }
+    expect(body.results[0].mime).toBe("image/jpeg");
   });
 });
 
@@ -414,5 +413,26 @@ describe("mockup-to-model: retry", () => {
     const body = await res.json() as any;
     expect(body.retryable).toBe(true);
     state.qualityFailIndex = -1;
+  });
+});
+
+describe("mockup-to-model: no image key configured", () => {
+  it("answers 503 naming the one key to add instead of per-reference failures", async () => {
+    const engine = await import("../../lib/aiImageEngine");
+    const spy = vi.spyOn(engine, "generateShot").mockRejectedValue(new engine.ImageEngineNotConfiguredError());
+    try {
+      const res = await fetch(`${base}/api/photography/mockup-to-model`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mockup: pngDataUrl("mockup"), references: refs(2) }),
+      });
+      expect(res.status).toBe(503);
+      const body = await res.json() as any;
+      expect(body.code).toBe("ai_image_engine_not_configured");
+      expect(body.missingKey).toBe("GEMINI_API_KEY");
+      expect(body.retryable).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

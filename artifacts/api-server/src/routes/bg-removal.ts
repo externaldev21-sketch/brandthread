@@ -12,6 +12,7 @@ import {
   ImageQualityUnavailableError,
 } from "@workspace/integrations-openai-ai-server/image";
 import { objectStorageClient } from "../lib/objectStorage";
+import { removeBackground } from "../lib/bgRemoval";
 
 const router = Router();
 router.use(requireAuth);
@@ -116,7 +117,7 @@ async function serveFromGCS(
 // ─── POST /api/bg-removal/remove ────────────────────────────────────────────
 
 router.post("/remove", async (req, res) => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "";
+  const userId: string = (req as any).clerkUserId ?? "";
 
   const { image } = req.body ?? {};
   if (typeof image !== "string") {
@@ -137,59 +138,29 @@ router.post("/remove", async (req, res) => {
   }
 
   const uuid = randomUUID();
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bg-replace-"));
-  const tmpFile = path.join(tmpDir, `${uuid}.png`);
-
   try {
-    await fs.writeFile(tmpFile, decoded.buffer);
+    // Real matting, not a redraw: the self-hosted segmenter predicts an alpha
+    // matte and applies it to the seller's own pixels (lib/bgRemoval).
+    const cutout = await removeBackground(decoded.buffer);
+    if (cutout.coverage < 0.002) {
+      res.status(422).json({ error: "We couldn't find a clear subject in this photo. Try one where the product or person stands out." });
+      return;
+    }
 
-    const prompt = buildFashionPrompt(
-      "background_remove",
-      "Remove the background completely and output a transparent PNG.",
-      "Keep only the main subject/product in the same position and framing with clean, precise edges. Add no background, shadow, texture, or new detail.",
-    );
-    const resultBuffer = await generateWithVisualQa({
-      operation: "background_replace",
-      prompt,
-      brief: "Remove the background and preserve the original subject.",
-      references: [decoded.buffer],
-      generate: (retryPrompt) => editImages(
-        [tmpFile],
-        retryPrompt,
-        undefined,
-        { background: "transparent" },
-      ),
-    });
-
-    const resultSize = resultBuffer.length;
-    const b64Json = resultBuffer.toString("base64");
-    const createdAt = new Date().toISOString();
-
-    // Save to GCS (non-blocking — failure is non-fatal)
-  const storageKey = (req.params as any).storageKey as string | undefined;
-
+    const storageKey = userId ? await saveToGCS(cutout.png, userId, uuid) : null;
     res.json({
-      b64_json: b64Json,
-      storageKey: storageKey ?? null,
-      size: resultSize,
+      b64_json: cutout.png.toString("base64"),
+      storageKey,
+      size: cutout.png.length,
       mime: "image/png",
-      createdAt,
+      width: cutout.width,
+      height: cutout.height,
+      createdAt: new Date().toISOString(),
       id: uuid,
     });
-  } catch (err: any) {
-    // Check for provider-specific rejection
-    const msg = err?.message ?? "";
-    if (err instanceof ImageQualityError) {
-      res.status(422).json({ error: "The cutout did not preserve the subject accurately enough. Please try again.", retryable: true });
-    } else if (err instanceof ImageQualityUnavailableError) {
-      res.status(502).json({ error: "Background-removal verification is temporarily unavailable. Please try again.", retryable: true });
-    } else if (msg.includes("Could not process image") || msg.includes("invalid")) {
-      res.status(422).json({ error: "The provider could not process this image. Please try a different photo." });
-    } else {
-      res.status(502).json({ error: "Background removal failed. Please try again." });
-    }
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  } catch (err) {
+    req.log?.error({ err }, "Background removal failed");
+    res.status(502).json({ error: "Background removal failed. Please try again.", retryable: true });
   }
 });
 
@@ -198,7 +169,7 @@ router.post("/remove", async (req, res) => {
 // Image 1 is always the locked source subject. Image 2, when supplied, is the
 // replacement background reference.
 router.post("/replace", async (req, res) => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "";
+  const userId: string = (req as any).clerkUserId ?? "";
 
   const { image, backgroundImage, prompt, color, bgType } = req.body ?? {};
   const source = decodeDataUrl(image);
@@ -266,7 +237,7 @@ router.post("/replace", async (req, res) => {
 // The storageKey is URL-encoded in the path.
 
 router.get("/results/*storageKey", async (req, res) => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "";
+  const userId: string = (req as any).clerkUserId ?? "";
   if (!userId) {
     res.status(401).json({ error: "Authentication required." });
     return;

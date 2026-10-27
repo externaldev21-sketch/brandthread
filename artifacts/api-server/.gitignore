@@ -5,3 +5,6 @@ backups/
 
 dist-loadtest/
 loadtest/results/
+
+# Background-removal model weights (downloaded by build.mjs / on first use)
+.models/

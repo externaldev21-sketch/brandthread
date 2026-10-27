@@ -7,6 +7,14 @@ import fs from "node:fs/promises";
 const state = vi.hoisted(() => ({
   editCalls: [] as Array<{ contents: string[]; prompt: string; options?: unknown }>,
   generationCalls: [] as string[],
+  segmented: [] as string[],
+}));
+
+vi.mock("../../lib/bgRemoval", () => ({
+  removeBackground: async (image: Buffer) => {
+    state.segmented.push(image.subarray(8).toString("utf8"));
+    return { png: Buffer.from("cutout"), width: 10, height: 10, coverage: 0.4, model: "birefnet-general-lite" };
+  },
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -129,8 +137,10 @@ describe("Design reference image routes", () => {
     expect(state.editCalls[0].prompt).toContain("Keep the foreground subject or product exactly");
   });
 
-  it("uses transparent image editing for background removal", async () => {
+  it("removes backgrounds with the self-hosted segmenter, never an image-generation redraw", async () => {
     state.editCalls = [];
+    state.generationCalls = [];
+    state.segmented = [];
     const response = await fetch(`${base}/api/bg-removal/remove`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -138,9 +148,9 @@ describe("Design reference image routes", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(state.editCalls).toHaveLength(1);
-    expect(state.editCalls[0].contents).toEqual(["remove-me"]);
-    expect(state.editCalls[0].options).toEqual({ background: "transparent" });
+    expect(state.segmented).toEqual(["remove-me"]);
+    expect(state.editCalls).toEqual([]);
+    expect(state.generationCalls).toEqual([]);
   });
 
   it("rejects HEIC before it can be mislabeled for the image provider", async () => {

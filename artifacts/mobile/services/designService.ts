@@ -1658,7 +1658,7 @@ export async function generateMockupToModel(req: {
   const references = await Promise.all(req.referenceUris.map(imageUriToDataUrl));
 
   const data = await serviceRequest<{
-    results: Array<{ refIndex: number; b64_json: string }>;
+    results: Array<{ refIndex: number; b64_json: string; mime?: string }>;
     errors?: Array<{ refIndex: number; error: string; retryable: boolean }>;
   }>('/api/photography/mockup-to-model', {
     method: 'POST',
@@ -1673,7 +1673,7 @@ export async function generateMockupToModel(req: {
   return {
     results: data.results.map(r => ({
       refIndex: r.refIndex,
-      imageUri: `data:image/png;base64,${r.b64_json}`,
+      imageUri: `data:${r.mime ?? 'image/png'};base64,${r.b64_json}`,
     })),
     errors: data.errors ?? [],
   };
@@ -1689,7 +1689,7 @@ export async function retryMockupToModelRef(req: {
 }): Promise<{ refIndex: number; imageUri: string }> {
   const mockup = await imageUriToDataUrl(req.mockupUri);
   const reference = await imageUriToDataUrl(req.referenceUri);
-  const data = await serviceRequest<{ refIndex: number; b64_json: string }>(
+  const data = await serviceRequest<{ refIndex: number; b64_json: string; mime?: string }>(
     '/api/photography/mockup-to-model/retry',
     {
       method: 'POST',
@@ -1702,7 +1702,7 @@ export async function retryMockupToModelRef(req: {
       ...(req.signal ? { signal: req.signal } : {}),
     },
   );
-  return { refIndex: data.refIndex, imageUri: `data:image/png;base64,${data.b64_json}` };
+  return { refIndex: data.refIndex, imageUri: `data:${data.mime ?? 'image/png'};base64,${data.b64_json}` };
 }
 
 // generatePhotoshoot — accepts an object (used by design-ai-photoshoot.tsx)
@@ -1734,49 +1734,80 @@ export async function generatePhotoshoot(req: {
   return makeResult(prompt, 'editorial' as AIStyleKind, imageUris);
 }
 
-// generatePhotoshootShot — one shot, with real per-slot progress (used by
-// design-ai-photoshoot.tsx's 2-screen rebuild). Unlike generatePhotoshoot()
-// above, this takes arbitrary product + creative-reference photo URIs
-// directly (no productId lookup) so the seller's own creative reference
-// photos — not just the product's existing images — drive the scene,
-// model, pose and lighting, per Dev's explicit spec. Reuses the existing,
-// unmodified /photography/generate endpoint (it already accepts a generic
-// `images` array): no backend changes needed for this.
-//
-// The endpoint caps the combined image count (product + reference photos)
-// at PHOTOSHOOT_MAX_IMAGES (artifacts/api-server/src/routes/photography.ts's
-// MAX_IMAGES). design-ai-photoshoot.tsx caps its pickers to the same total.
-// `ratio` picks the output canvas (square / portrait / landscape) server side.
-export const PHOTOSHOOT_MAX_IMAGES = 4;
+// AI Photoshoot (design-ai-photoshoot.tsx). The seller's product photos are
+// the ground truth for the garment and their creative reference photos are
+// art direction; they travel to /api/photography/generate as separate,
+// labelled lists so the shared image engine never confuses the two. Budgets
+// match the server: up to 4 product photos and 6 references.
+export const PHOTOSHOOT_MAX_PRODUCT_PHOTOS = 4;
+export const PHOTOSHOOT_MAX_REFERENCE_PHOTOS = 6;
+
+export interface PreparedPhotoshootPhotos {
+  productImages: string[];
+  referenceImages: string[];
+}
+
+/** Long edge the photos are sent at: the engine works at 2K, more only costs upload time. */
+const UPLOAD_MAX_EDGE = 2048;
+
+/** A photo as a data URL, re-encoded to a 2048px JPEG on device when possible. */
+async function uploadDataUrl(uri: string): Promise<string> {
+  if (!uri.startsWith('data:')) {
+    try {
+      const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+      const out = await manipulateAsync(uri, [{ resize: { width: UPLOAD_MAX_EDGE } }], { compress: 0.9, format: SaveFormat.JPEG, base64: true });
+      if (out.base64) return `data:image/jpeg;base64,${out.base64}`;
+    } catch {
+      // Fall through to the original bytes (the server still caps each at 8 MB).
+    }
+  }
+  return imageUriToDataUrl(uri);
+}
+
+/** Reads every photo once per run, so a 4-shot run doesn't re-encode them four times. */
+export async function preparePhotoshootPhotos(req: { productImageUris: string[]; referenceUris: string[] }): Promise<PreparedPhotoshootPhotos> {
+  if (req.productImageUris.length === 0) throw new Error('Select at least one product photo.');
+  if (req.productImageUris.length > PHOTOSHOOT_MAX_PRODUCT_PHOTOS) {
+    throw new Error(`Use at most ${PHOTOSHOOT_MAX_PRODUCT_PHOTOS} product photos.`);
+  }
+  if (req.referenceUris.length > PHOTOSHOOT_MAX_REFERENCE_PHOTOS) {
+    throw new Error(`Use at most ${PHOTOSHOOT_MAX_REFERENCE_PHOTOS} reference photos.`);
+  }
+  const [productImages, referenceImages] = await Promise.all([
+    Promise.all(req.productImageUris.map(uploadDataUrl)),
+    Promise.all(req.referenceUris.map(uploadDataUrl)),
+  ]);
+  return { productImages, referenceImages };
+}
+
+/** One shot of a run. `shotIndex`/`shotCount` let the engine vary framing across the set. */
 export async function generatePhotoshootShot(req: {
-  productImageUris: string[];
-  referenceUris: string[];
+  photos: PreparedPhotoshootPhotos;
   prompt?: string;
   sceneStyle?: SceneStyleKind;
   modelStyle?: ModelStyleKind;
   lightingStyle?: LightingStyleKind;
   ratio?: ImageRatioKind;
+  shotIndex?: number;
+  shotCount?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
-  const allUris = [...req.productImageUris, ...req.referenceUris];
-  if (allUris.length === 0) throw new Error('Select at least one product photo.');
-  if (allUris.length > PHOTOSHOOT_MAX_IMAGES) {
-    throw new Error(`Use at most ${PHOTOSHOOT_MAX_IMAGES} photos in total (product and reference photos).`);
-  }
-  const images = await Promise.all(allUris.map(imageUriToDataUrl));
-  const describedPrompt = [
-    req.prompt?.trim(),
-    req.sceneStyle ? `Scene: ${req.sceneStyle}.` : '',
-    req.modelStyle ? `Model: ${req.modelStyle}.` : '',
-    req.lightingStyle ? `Lighting: ${req.lightingStyle}.` : '',
-    req.ratio ? `Aspect ratio: ${req.ratio}.` : '',
-    'Use the uploaded creative reference photos (if any) to match scene, model, pose, and lighting — preserve the product exactly (logo, print, color, fabric texture unchanged).',
-  ].filter(Boolean).join(' ');
-  return callGenerateAPI('/api/photography/generate', {
-    images,
-    prompt: describedPrompt,
-    mode: 'photoshoot',
-    ...(req.ratio ? { ratio: req.ratio } : {}),
+  const data = await serviceRequest<{ b64_json: string; mime?: string }>('/api/photography/generate', {
+    method: 'POST',
+    body: JSON.stringify({
+      productImages: req.photos.productImages,
+      referenceImages: req.photos.referenceImages,
+      ...(req.prompt?.trim() ? { prompt: req.prompt.trim() } : {}),
+      ...(req.sceneStyle ? { sceneStyle: req.sceneStyle } : {}),
+      ...(req.modelStyle ? { modelStyle: req.modelStyle } : {}),
+      ...(req.lightingStyle ? { lightingStyle: req.lightingStyle } : {}),
+      ...(req.ratio ? { ratio: req.ratio } : {}),
+      shotIndex: req.shotIndex ?? 0,
+      shotCount: req.shotCount ?? 1,
+    }),
+    ...(req.signal ? { signal: req.signal } : {}),
   });
+  return `data:${data.mime ?? 'image/png'};base64,${data.b64_json}`;
 }
 
 // applyPromptEdit — accepts an object (used by design-prompt-edit.tsx)

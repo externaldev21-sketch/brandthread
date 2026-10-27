@@ -1,10 +1,17 @@
+/**
+ * POST /api/photography/generate (AI Photoshoot) against the shared image
+ * engine's boundary: product photos and creative references arrive labelled
+ * and separate, the seller's ratio/brief/style choices reach the engine, the
+ * caps match the app's pickers, and a missing image key is a 503 naming it.
+ */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
 const state = vi.hoisted(() => ({
-  editCalls: [] as Array<{ files: number; options: unknown }>,
+  shots: [] as Array<Record<string, unknown> & { productImages: Buffer[]; referenceImages: Buffer[] }>,
+  notConfigured: false,
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
@@ -16,25 +23,34 @@ vi.mock("../../middlewares/requireAuth", () => ({
 
 vi.mock("@workspace/integrations-openai-ai-server/image", () => ({
   buildFashionPrompt: (_op: string, brief: string) => brief,
-  generateWithVisualQa: async (input: { prompt: string; generate: (prompt: string) => Promise<Buffer> }) =>
-    input.generate(input.prompt),
+  generateWithVisualQa: async () => Buffer.from(""),
+  editImages: async () => Buffer.from(""),
   ImageQualityError: class ImageQualityError extends Error {},
   ImageQualityUnavailableError: class ImageQualityUnavailableError extends Error {},
-  editImages: async (files: string[], _prompt: string, _out?: string, options?: unknown) => {
-    state.editCalls.push({ files: files.length, options });
-    return Buffer.from("shot");
-  },
 }));
+
+vi.mock("../../lib/aiImageEngine", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/aiImageEngine")>();
+  return {
+    ...actual,
+    generateShot: async (input: any) => {
+      if (state.notConfigured) throw new actual.ImageEngineNotConfiguredError();
+      state.shots.push(input);
+      return { image: Buffer.from("shot"), mime: "image/jpeg", provider: "gemini", model: "gemini-test" };
+    },
+  };
+});
 
 import photographyRouter, { photoshootSizeForRatio } from "../photography";
 
 let server: Server;
 let base = "";
 
-function pngDataUrl() {
+function pngDataUrl(label = "product") {
   const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  return `data:image/png;base64,${Buffer.concat([sig, Buffer.from("product")]).toString("base64")}`;
+  return `data:image/png;base64,${Buffer.concat([sig, Buffer.from(label)]).toString("base64")}`;
 }
+const text = (b: Buffer) => b.subarray(8).toString("utf8");
 
 async function generate(body: object) {
   return fetch(`${base}/api/photography/generate`, {
@@ -59,7 +75,8 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  state.editCalls = [];
+  state.shots = [];
+  state.notConfigured = false;
 });
 
 describe("photoshootSizeForRatio", () => {
@@ -78,23 +95,80 @@ describe("photoshootSizeForRatio", () => {
   });
 });
 
-describe("POST /api/photography/generate ratio", () => {
-  it("passes the ratio's output size to the image edit call", async () => {
-    const res = await generate({ images: [pngDataUrl()], prompt: "studio", ratio: "9:16" });
+describe("POST /api/photography/generate", () => {
+  it("sends product photos and creative references to the engine as separate, labelled inputs", async () => {
+    const res = await generate({
+      productImages: [pngDataUrl("tee-front"), pngDataUrl("tee-back")],
+      referenceImages: [pngDataUrl("rooftop-ref")],
+      prompt: "Golden-hour rooftop, editorial",
+      ratio: "9:16",
+      modelStyle: "female",
+      sceneStyle: "street",
+      lightingStyle: "golden_hour",
+      shotIndex: 1,
+      shotCount: 4,
+    });
     expect(res.status).toBe(200);
-    expect(state.editCalls).toHaveLength(1);
-    expect(state.editCalls[0].options).toEqual({ size: "1024x1536" });
+    const body = await res.json() as any;
+    expect(body.mime).toBe("image/jpeg");
+    expect(Buffer.from(body.b64_json, "base64").toString()).toBe("shot");
+    expect(state.shots).toHaveLength(1);
+    const shot = state.shots[0]!;
+    expect(shot.task).toBe("photoshoot");
+    expect(shot.productImages.map(text)).toEqual(["tee-front", "tee-back"]);
+    expect(shot.referenceImages.map(text)).toEqual(["rooftop-ref"]);
+    expect(shot).toMatchObject({
+      brief: "Golden-hour rooftop, editorial",
+      aspectRatio: "9:16",
+      modelStyle: "female",
+      sceneStyle: "street",
+      lightingStyle: "golden_hour",
+      shotIndex: 1,
+      shotCount: 4,
+    });
   });
 
-  it("keeps the provider default size when no ratio is sent", async () => {
-    const res = await generate({ images: [pngDataUrl()], prompt: "studio" });
-    expect(res.status).toBe(200);
-    expect(state.editCalls[0].options).toBeUndefined();
+  it("honours every ratio chip the app offers", async () => {
+    for (const ratio of ["1:1", "4:5", "9:16"]) {
+      await generate({ productImages: [pngDataUrl()], ratio });
+    }
+    expect(state.shots.map((s) => s.aspectRatio)).toEqual(["1:1", "4:5", "9:16"]);
   });
 
-  it("still rejects more than 4 images in total", async () => {
-    const res = await generate({ images: Array.from({ length: 5 }, pngDataUrl), ratio: "1:1" });
+  it("drops an unknown ratio or style instead of passing it through", async () => {
+    await generate({ productImages: [pngDataUrl()], ratio: "7:3", sceneStyle: "<script>" });
+    expect(state.shots[0]!.aspectRatio).toBeUndefined();
+    expect(state.shots[0]!.sceneStyle).toBeUndefined();
+  });
+
+  it("still accepts the legacy { images } body as product photos", async () => {
+    const res = await generate({ images: [pngDataUrl("legacy")], prompt: "studio" });
+    expect(res.status).toBe(200);
+    expect(state.shots[0]!.productImages.map(text)).toEqual(["legacy"]);
+    expect(state.shots[0]!.referenceImages).toEqual([]);
+  });
+
+  it("allows 4 product photos plus 6 references, and refuses more of either", async () => {
+    const ok = await generate({ productImages: Array.from({ length: 4 }, () => pngDataUrl()), referenceImages: Array.from({ length: 6 }, () => pngDataUrl("r")) });
+    expect(ok.status).toBe(200);
+    const tooManyRefs = await generate({ productImages: [pngDataUrl()], referenceImages: Array.from({ length: 7 }, () => pngDataUrl("r")) });
+    expect(tooManyRefs.status).toBe(400);
+    const tooManyProducts = await generate({ productImages: Array.from({ length: 5 }, () => pngDataUrl()) });
+    expect(tooManyProducts.status).toBe(400);
+    expect(state.shots).toHaveLength(1);
+  });
+
+  it("requires at least one product photo", async () => {
+    const res = await generate({ referenceImages: [pngDataUrl("r")] });
     expect(res.status).toBe(400);
-    expect(state.editCalls).toHaveLength(0);
+    expect(state.shots).toHaveLength(0);
+  });
+
+  it("answers 503 with the missing key name when no image model is configured", async () => {
+    state.notConfigured = true;
+    const res = await generate({ productImages: [pngDataUrl()] });
+    expect(res.status).toBe(503);
+    const body = await res.json() as any;
+    expect(body).toMatchObject({ code: "ai_image_engine_not_configured", missingKey: "GEMINI_API_KEY", retryable: false });
   });
 });

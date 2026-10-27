@@ -15,7 +15,7 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts"), path.resolve(artifactDir, "src/worker.ts")],
+    entryPoints: [path.resolve(artifactDir, "src/index.ts"), path.resolve(artifactDir, "src/worker.ts"), path.resolve(artifactDir, "src/bgRemovalWorker.ts")],
     platform: "node",
     bundle: true,
     format: "esm",
@@ -30,6 +30,8 @@ async function buildAll() {
     external: [
       "*.node",
       "sharp",
+      // native runtime for the self-hosted background-removal model (lib/bgRemoval)
+      "onnxruntime-node",
       "better-sqlite3",
       "sqlite3",
       "canvas",
@@ -128,7 +130,22 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
+// Downloads the background-removal model next to the build so the first
+// request after a deploy doesn't wait on it. Non-fatal: the server falls back
+// to downloading it on first use (lib/bgRemoval/segmenter.ts).
+async function prefetchBgRemovalModel() {
+  if (process.env.BG_REMOVAL_SKIP_PREFETCH === "1") return;
+  try {
+    const { ensureBgModel, bgModelName } = await import("./dist/bgRemovalWorker.mjs");
+    const started = Date.now();
+    const file = await ensureBgModel();
+    process.stdout.write(`${JSON.stringify({ level: "info", msg: "Background-removal model ready", model: bgModelName(), file, ms: Date.now() - started })}\n`);
+  } catch (err) {
+    process.stderr.write(`${JSON.stringify({ level: "warn", msg: "Background-removal model prefetch failed; it will download on first use", err: String(err) })}\n`);
+  }
+}
+
+buildAll().then(prefetchBgRemovalModel).catch((err) => {
   const error = err instanceof Error
     ? { name: err.name, message: err.message, stack: err.stack }
     : { message: "Unknown build failure" };
