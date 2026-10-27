@@ -19,8 +19,8 @@ const serverPlans = {
   reminderDaysBefore: 2,
   commissionPercent: 5,
   plans: [
-    wire('starter', 1999, 10, 1, 100, 0, 0),
-    wire('growth', 4900, 50, 3, 500, 5000, 1),
+    wire('starter', 1999, 5, 1, 100, 0, 0),
+    wire('growth', 4900, 25, 3, 500, 5000, 1),
     wire('pro', 12900, null, null, 2000, 25000, 2),
   ],
 };
@@ -31,14 +31,14 @@ const [starter, growth, pro] = cfg.tiers as [PlanTier, PlanTier, PlanTier];
 describe('plan cards come only from the shared config', () => {
   it('reads prices, caps and features from the server', () => {
     expect(cfg.tiers.map((t) => [t.id, t.amountCents, t.limits.activeProducts])).toEqual([
-      ['starter', 1999, 10], ['growth', 4900, 50], ['pro', 12900, null],
+      ['starter', 1999, 5], ['growth', 4900, 25], ['pro', 12900, null],
     ]);
     expect(cfg.commissionPercent).toBe(5);
   });
 
   it('the product count is the headline', () => {
-    expect(productHeadline(starter.limits)).toBe('List up to 10 products');
-    expect(productHeadline(growth.limits)).toBe('List up to 50 products');
+    expect(productHeadline(starter.limits)).toBe('List up to 5 products');
+    expect(productHeadline(growth.limits)).toBe('List up to 25 products');
     expect(productHeadline(pro.limits)).toBe('Unlimited products');
     expect(productHeadline({ activeProducts: 1 })).toBe('List up to 1 product');
   });
@@ -65,7 +65,7 @@ describe('plan cards come only from the shared config', () => {
   it('"Compare all features" has every difference, in tier order', () => {
     const rows = compareRows(cfg.tiers, cfg.commissionPercent);
     const byLabel = Object.fromEntries(rows.map((r) => [r.label, r.values]));
-    expect(byLabel['Active products']).toEqual(['10', '50', 'Unlimited']);
+    expect(byLabel['Active products']).toEqual(['5', '25', 'Unlimited']);
     expect(byLabel['Staff seats']).toEqual(['1', '3', 'Unlimited']);
     expect(byLabel['Live selling']).toEqual([false, true, true]);
     expect(byLabel['Marketing emails a month']).toEqual(['—', '5,000', '25,000']);
@@ -82,27 +82,27 @@ describe('plan cards come only from the shared config', () => {
 
   it('never invents a value the server did not send (AI credits never become "unlimited")', () => {
     const partial = parseSellerPlanConfig({ ...serverPlans, plans: serverPlans.plans.map((p) => ({ id: p.id, amountCents: p.amountCents, productLimit: p.productLimit, staffSeats: p.staffSeats, aiCreditsMonthly: null })) });
-    expect(partial.tiers[0].limits).toEqual({ activeProducts: 10, staffSeats: 1 });
+    expect(partial.tiers[0].limits).toEqual({ activeProducts: 5, staffSeats: 1 });
     expect(keyDifferences(partial.tiers[0], null)).toEqual(['1 staff seat']);
     expect(compareRows(partial.tiers, null).map((r) => r.label)).toEqual(['Active products', 'Staff seats']);
   });
 
   it('falls back to the bundled tiers when the server sends no limits', () => {
     const old = parseSellerPlanConfig({ plans: [{ id: 'starter', amountCents: 1999 }, { id: 'growth', amountCents: 4900 }, { id: 'pro', amountCents: 12900 }] });
-    expect(old.tiers.map((t) => t.limits.activeProducts)).toEqual([10, 50, null]);
+    expect(old.tiers.map((t) => t.limits.activeProducts)).toEqual([5, 25, null]);
     expect(old.tiers.map((t) => t.amountCents)).toEqual([1999, 4900, 12900]);
-    expect(DEFAULT_SELLER_PLAN_CONFIG.tiers.map((t) => t.limits.activeProducts)).toEqual([10, 50, null]);
+    expect(DEFAULT_SELLER_PLAN_CONFIG.tiers.map((t) => t.limits.activeProducts)).toEqual([5, 25, null]);
   });
 });
 
 describe('publish-at-cap upgrade sheet', () => {
-  it("uses Dev's sentence with the numbers from config", () => {
-    expect(productCapCopy(cfg.tiers, 'starter', 10)).toMatchObject({
-      body: "You've listed 10 of 10 products on Starter. Upgrade to Growth to list up to 50. You can still save this as a draft.",
+  it("uses the owner's sentence with the numbers from config", () => {
+    expect(productCapCopy(cfg.tiers, 'starter', 5)).toMatchObject({
+      body: "You've reached your Starter limit of 5 products — upgrade to Growth to list more. You can still save this as a draft.",
       next: { id: 'growth' },
     });
-    expect(productCapCopy(cfg.tiers, 'growth', 50)?.body).toBe(
-      "You've listed 50 of 50 products on Growth. Upgrade to Pro to list unlimited products. You can still save this as a draft.",
+    expect(productCapCopy(cfg.tiers, 'growth', 25)?.body).toBe(
+      "You've reached your Growth limit of 25 products — upgrade to Pro to list more. You can still save this as a draft.",
     );
   });
   it('no sheet on an unlimited plan', () => {

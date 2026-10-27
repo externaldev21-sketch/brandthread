@@ -70,7 +70,7 @@ export const PLAN_CATALOGUE: Record<SellerPlanId, SellerPlan> = {
     name: "Brandthread Starter Plan",
     label: "Starter",
     lookupKey: "brandthread_starter_monthly",
-    limits: { products: envCap("SELLER_PLAN_STARTER_PRODUCTS", 10), teamSeats: 1 },
+    limits: { products: envCap("SELLER_PLAN_STARTER_PRODUCTS", 5), teamSeats: 1 },
     features: {
       analytics: "basic",
       analyticsExport: false,
@@ -90,7 +90,7 @@ export const PLAN_CATALOGUE: Record<SellerPlanId, SellerPlan> = {
     name: "Brandthread Growth Plan",
     label: "Growth",
     lookupKey: "brandthread_growth_monthly",
-    limits: { products: envCap("SELLER_PLAN_GROWTH_PRODUCTS", 50), teamSeats: 3 },
+    limits: { products: envCap("SELLER_PLAN_GROWTH_PRODUCTS", 25), teamSeats: 3 },
     features: {
       analytics: "advanced",
       analyticsExport: false,

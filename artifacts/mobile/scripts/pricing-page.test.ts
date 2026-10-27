@@ -87,7 +87,7 @@ describe('formatting helpers', () => {
 
   it('labels limits from the catalogue', () => {
     const [starter, growth, pro] = catalogue.plans;
-    expect(pricing.keyRows(starter, catalogue)).toContain('Up to 10 products');
+    expect(pricing.keyRows(starter, catalogue)).toContain('Up to 5 products');
     expect(pricing.keyRows(starter, catalogue)).toContain('Owner account only');
     expect(pricing.keyRows(growth, catalogue)).toContain('Up to 3 team members');
     expect(pricing.keyRows(pro, catalogue)).toContain('Unlimited team members');

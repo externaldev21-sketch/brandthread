@@ -55,8 +55,8 @@ export function sendPlanLookupUnavailable(req: Request, res: Response, error: un
 }
 
 /**
- * The upgrade copy for a hit limit (Dev's wording):
- * "You've listed 10 of 10 products on Starter. Upgrade to Growth to list up to 50."
+ * The upgrade copy for a hit limit:
+ * "You've reached your Starter limit of 5 products — upgrade to Growth to list more."
  */
 export function planLimitMessage(input: {
   resource: LimitedResource;
@@ -71,9 +71,9 @@ export function planLimitMessage(input: {
   const next = input.nextPlan ? PLAN_CATALOGUE[input.nextPlan] : null;
   const nextLimit = next ? next.limits[input.resource] : undefined;
   if (input.resource === "products") {
-    const head = `You've listed ${input.used} of ${input.limit} product${input.limit === 1 ? "" : "s"} on ${current}.`;
-    if (!next) return head;
-    return `${head} Upgrade to ${next.label} to list ${nextLimit === null ? "unlimited products" : `up to ${nextLimit}`}.`;
+    const head = `You've reached your ${current} limit of ${input.limit} product${input.limit === 1 ? "" : "s"}`;
+    if (!next) return `${head}.`;
+    return `${head} — upgrade to ${next.label} to list more.`;
   }
   const head = `${current} includes ${input.limit} staff seat${input.limit === 1 ? "" : "s"}.`;
   if (!next) return head;

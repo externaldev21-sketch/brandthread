@@ -36,11 +36,11 @@ describe("seller trial reminder day", () => {
     const used = buildTrialReminderMessage({ productsUsed: 3, ordersUsed: 7, plan: "growth", trialEndsAt: end });
     expect(used.title).toBe("Your free trial ends Jan 6");
     expect(used.body).toBe("You've built 3 products and 7 orders so far. Your Growth plan starts on Jan 6 at $49/month. Cancel anytime before then and you won't be charged.");
-    expect(used.entitledFeatures).toContain("up to 50 live products");
+    expect(used.entitledFeatures).toContain("up to 25 live products");
 
     const fresh = buildTrialReminderMessage({ plan: "starter", trialEndsAt: end });
     expect(fresh.body).toBe("Your Starter plan starts on Jan 6 at $19.99/month. Cancel anytime before then and you won't be charged.");
-    expect(fresh.entitledFeatures).toContain("up to 10 live products");
+    expect(fresh.entitledFeatures).toContain("up to 5 live products");
     expect(buildTrialReminderMessage({ plan: "pro", trialEndsAt: end }).entitledFeatures).toContain("unlimited products");
   });
 

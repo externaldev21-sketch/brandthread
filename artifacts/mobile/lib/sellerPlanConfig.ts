@@ -37,12 +37,12 @@ export interface SellerPlanConfig {
 const FALLBACK_TIERS: PlanTier[] = [
   {
     id: 'starter', name: 'Starter', amountCents: 0,
-    limits: { activeProducts: 10, staffSeats: 1 },
+    limits: { activeProducts: 5, staffSeats: 1 },
     features: { analytics: 'basic', liveSelling: false, dropsPreorders: false, boostSlots: false, customDomain: false, manufacturerHub: false, payoutSpeed: 'standard', prioritySupport: false },
   },
   {
     id: 'growth', name: 'Growth', amountCents: 0,
-    limits: { activeProducts: 50, staffSeats: 3 },
+    limits: { activeProducts: 25, staffSeats: 3 },
     features: { analytics: 'advanced', liveSelling: true, dropsPreorders: true, boostSlots: true, customDomain: true, manufacturerHub: true, payoutSpeed: 'standard', prioritySupport: false },
   },
   {

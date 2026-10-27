@@ -8,8 +8,8 @@ const limitError = (body: Record<string, unknown>) => new ApiError(403, JSON.str
 // The exact body lib/planAccess.ts sendPlanLimitReached sends for a Starter seller at the cap.
 const starterAtCap = {
   error: 'Plan limit reached', code: 'PLAN_LIMIT_REACHED', resource: 'products',
-  currentPlan: 'starter', requiredPlan: 'growth', limit: 25,
-  message: 'Your Starter plan includes 25 products. Upgrade to add more.',
+  currentPlan: 'starter', requiredPlan: 'growth', limit: 5, nextLimit: 25,
+  message: "You've reached your Starter limit of 5 products — upgrade to Growth to list more.",
 };
 
 describe('PLAN_LIMITS', () => {
@@ -28,12 +28,12 @@ describe('PLAN_LIMITS', () => {
 
 describe('parseProductLimitHit', () => {
   it('reads the 403 body', () => {
-    expect(parseProductLimitHit(limitError(starterAtCap))).toEqual({ currentPlan: 'starter', requiredPlan: 'growth', limit: 25 });
+    expect(parseProductLimitHit(limitError(starterAtCap))).toEqual({ currentPlan: 'starter', requiredPlan: 'growth', limit: 5, nextLimit: 25 });
   });
 
   it('keeps nextLimit when the server sends it and treats "none" as no plan', () => {
-    expect(parseProductLimitHit(limitError({ ...starterAtCap, currentPlan: 'none', requiredPlan: 'starter', limit: 0, nextLimit: 25 })))
-      .toEqual({ currentPlan: null, requiredPlan: 'starter', limit: 0, nextLimit: 25 });
+    expect(parseProductLimitHit(limitError({ ...starterAtCap, currentPlan: 'none', requiredPlan: 'starter', limit: 0, nextLimit: 5 })))
+      .toEqual({ currentPlan: null, requiredPlan: 'starter', limit: 0, nextLimit: 5 });
   });
 
   it('ignores team-seat limits, other codes and non-API errors', () => {
@@ -45,14 +45,14 @@ describe('parseProductLimitHit', () => {
 });
 
 describe('buildProductLimitUnlocks', () => {
-  it('Starter at 25 → Growth: unlimited products, 3 seats, the Growth features, $49/mo', () => {
+  it('Starter at 5 → Growth: 25 products, 3 seats, the Growth features, $49/mo', () => {
     const u = buildProductLimitUnlocks(parseProductLimitHit(limitError(starterAtCap))!)!;
-    expect(u.title).toBe("You've reached 25 products");
+    expect(u.title).toBe("You've reached your Starter limit of 5 products");
     expect(u.cta).toBe('Upgrade to Growth');
     expect(u.price).toBe('$49/mo');
     expect(u.href).toBe('/plans?highlight=growth&source=product-limit');
     expect(u.rows).toEqual([
-      { label: 'Up to 50 products', now: 'Now 25' },
+      { label: 'Up to 25 products', now: 'Now 5' },
       { label: '3 team seats', now: 'Now 1' },
       { label: 'AI logos, mockups, product photography, and lifestyle imagery' },
       { label: 'Background removal and replacement' },
@@ -61,28 +61,29 @@ describe('buildProductLimitUnlocks', () => {
   });
 
   it('every feature row comes from the catalogue, never "Everything in …"', () => {
-    const u = buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 25 })!;
+    const u = buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 5 })!;
     const growth = SELLER_PLANS.find((p) => p.id === 'growth')!;
     for (const row of u.rows.filter((r) => !r.now)) expect(growth.features).toContain(row.label);
     expect(u.rows.some((r) => /^Everything in/.test(r.label))).toBe(false);
   });
 
   it('prefers the server nextLimit over the local copy', () => {
-    const u = buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 10, nextLimit: 50 })!;
-    expect(u.title).toBe("You've reached 10 products");
-    expect(u.rows[0]).toEqual({ label: 'Up to 50 products', now: 'Now 10' });
+    const u = buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 5, nextLimit: 40 })!;
+    expect(u.title).toBe("You've reached your Starter limit of 5 products");
+    expect(u.rows[0]).toEqual({ label: 'Up to 40 products', now: 'Now 5' });
   });
 
   it('Growth → Pro lists Pro seats and features', () => {
-    const u = buildProductLimitUnlocks({ currentPlan: 'growth', requiredPlan: 'pro', limit: 50, nextLimit: null })!;
+    const u = buildProductLimitUnlocks({ currentPlan: 'growth', requiredPlan: 'pro', limit: 25, nextLimit: null })!;
     expect(u.cta).toBe('Upgrade to Pro');
     expect(u.price).toBe('$129/mo');
-    expect(u.rows[0]).toEqual({ label: 'Unlimited products', now: 'Now 50' });
+    expect(u.rows[0]).toEqual({ label: 'Unlimited products', now: 'Now 25' });
     expect(u.rows[1]).toEqual({ label: 'Unlimited team seats', now: 'Now 3' });
     expect(u.rows.map((r) => r.label)).toContain('Live shopping tools');
   });
 
   it('a single product reads in the singular', () => {
-    expect(buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 1 })!.title).toBe("You've reached 1 product");
+    expect(buildProductLimitUnlocks({ currentPlan: 'starter', requiredPlan: 'growth', limit: 1 })!.title).toBe("You've reached your Starter limit of 1 product");
+    expect(buildProductLimitUnlocks({ currentPlan: null, requiredPlan: 'starter', limit: 0, nextLimit: 5 })!.title).toBe("You've reached 0 products");
   });
 });

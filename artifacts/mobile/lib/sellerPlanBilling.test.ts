@@ -72,7 +72,7 @@ describe('plan prices and facts come from perks / the catalogue', () => {
     expect(planFacts(growth)).toEqual([
       { label: 'Commission', value: '4% per sale' },
       { label: 'AI credits', value: '4,000 per month' },
-      { label: 'Products', value: 'Unlimited' },
+      { label: 'Products', value: '25' },
       { label: 'Team seats', value: '3' },
     ]);
     expect(planFacts(null)).toEqual([]);
@@ -91,7 +91,7 @@ describe('plan changes', () => {
       { label: 'Price', from: '$79/mo', to: '$29/mo' },
       { label: 'Commission', from: '4%', to: '5%' },
       { label: 'AI credits', from: '4,000/mo', to: '1,000/mo' },
-      { label: 'Products', from: 'Unlimited', to: '25' },
+      { label: 'Products', from: '25', to: '5' },
       { label: 'Team seats', from: '3', to: 'None' },
     ]);
     expect(planChangeRows('growth', 'pro', null)).toEqual([{ label: 'Price', from: '$49/mo', to: '$129/mo' }]);
@@ -108,7 +108,7 @@ describe('plan changes', () => {
   });
 
   it('warns about the lower plan product cap only when it shrinks', () => {
-    expect(productCapWarning('growth', 'starter', DEMO_PERKS)).toContain('up to 25 live products');
+    expect(productCapWarning('growth', 'starter', DEMO_PERKS)).toContain('up to 5 live products');
     expect(productCapWarning('starter', 'growth', DEMO_PERKS)).toBeNull();
     expect(productCapWarning('growth', 'starter', null)).toBeNull();
   });

@@ -95,7 +95,7 @@ describe("buildPlanPerks", () => {
       expect(perk.productLimit).toBe(PLAN_CATALOGUE[perk.planId].limits.products);
       expect(perk.teamSeats).toBe(PLAN_CATALOGUE[perk.planId].limits.teamSeats);
     }
-    expect(perks.find((p) => p.planId === "starter")).toMatchObject({ productLimit: 10, teamSeats: 1 });
+    expect(perks.find((p) => p.planId === "starter")).toMatchObject({ productLimit: 5, teamSeats: 1 });
     expect(perks.find((p) => p.planId === "pro")).toMatchObject({ productLimit: null, teamSeats: null });
   });
 
