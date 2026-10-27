@@ -113,6 +113,7 @@ const AUDITED = [
   'app/location/[placeId].tsx',
   'app/locations.tsx',
   'app/loyalty.tsx',
+  'app/manufacturer-category.tsx',
   'app/manufacturer-hub.tsx',
   'app/manufacturer-messages.tsx',
   'app/manufacturer-profile.tsx',

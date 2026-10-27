@@ -3,8 +3,8 @@
  * Mounted at /api/manufacturers/public
  *
  * GET  /              list active public manufacturers (search, country, specialty,
- *                     minYears, maxMoq, verified, hasPhotos, sort)
- * GET  /facets        countries and specialties in the live directory, with counts
+ *                     category, minYears, maxMoq, verified, hasPhotos, sort)
+ * GET  /facets        countries, specialties and categories in the live directory, with counts
  * POST /apply         legacy anonymous application — stays private and pending; the
  *                     portal's authenticated signup (POST /manufacturers/register) is listed once verified
  * GET  /:id           get a single public manufacturer profile
@@ -20,6 +20,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { setPublicCacheHeaders } from "../lib/httpCache";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { contactFieldsForViewer } from "../lib/manufacturerTrust";
+import { MANUFACTURER_CATEGORIES, categorizeManufacturer, manufacturerCategoryPattern } from "@workspace/manufacturer-flow";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -133,6 +134,9 @@ async function serializePublicManufacturer(
     contactHidden: true,
     verified: true,
     isVerified: !!mfr.verifiedAt,
+    // Derived from the manufacturer's own specialty/description text (see
+    // lib/manufacturer-flow/src/categories.ts) — no stored column to backfill.
+    categories: categorizeManufacturer(mfr.specialty, mfr.description),
     rating: summary?.rating ?? null,
     reviewCount: summary?.reviewCount ?? 0,
     reviews: reviews ?? [],
@@ -167,17 +171,26 @@ const HAS_PHOTOS = sql`jsonb_array_length(COALESCE(${manufacturers.photos}::json
 router.get("/facets", async (req, res) => {
   try {
     const live = and(eq(manufacturers.isPublicDirectory, true), eq(manufacturers.status, "active"), eq(manufacturers.verificationStatus, "verified"));
-    const [countries, specialties, [total]] = await Promise.all([
+    const [countries, specialties, [total], categoryText] = await Promise.all([
       db.select({ name: manufacturers.country, count: sql<number>`count(*)::integer` })
         .from(manufacturers).where(live).groupBy(manufacturers.country).orderBy(sql`count(*) DESC`, manufacturers.country),
       db.select({ name: manufacturers.specialty, count: sql<number>`count(*)::integer` })
         .from(manufacturers).where(live).groupBy(manufacturers.specialty).orderBy(sql`count(*) DESC`, manufacturers.specialty),
       db.select({ count: sql<number>`count(*)::integer` }).from(manufacturers).where(live),
+      db.select({ specialty: manufacturers.specialty, description: manufacturers.description }).from(manufacturers).where(live),
     ]);
+    const categoryCounts = new Map<string, number>();
+    for (const row of categoryText) {
+      for (const key of categorizeManufacturer(row.specialty, row.description)) {
+        categoryCounts.set(key, (categoryCounts.get(key) ?? 0) + 1);
+      }
+    }
     res.json({
       total: total?.count ?? 0,
       countries: countries.filter((row) => row.name?.trim()),
       specialties: specialties.filter((row) => row.name?.trim()),
+      // Every picker category, in picker order, including empty ones.
+      categories: MANUFACTURER_CATEGORIES.map((category) => ({ key: category.key, count: categoryCounts.get(category.key) ?? 0 })),
     });
   } catch (err) {
     req.log.error({ err }, "Failed to load manufacturer directory facets");
@@ -188,7 +201,7 @@ router.get("/facets", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     setPublicCacheHeaders(res);
-    const { q, country, specialty, verified, hasPhotos, sort } = req.query as Record<string, string>;
+    const { q, country, specialty, category, verified, hasPhotos, sort } = req.query as Record<string, string>;
     const searchTerm = normalizeSearchTerm(q);
     const countryTerm = normalizeSearchTerm(country, 80);
     const specialtyTerm = normalizeSearchTerm(specialty, 100);
@@ -223,6 +236,13 @@ router.get("/", async (req, res) => {
 
     if (specialtyTerm) {
       conditions.push(ilike(manufacturers.specialty, containsSearchPattern(specialtyTerm)));
+    }
+
+    if (typeof category === "string" && category) {
+      const pattern = manufacturerCategoryPattern(category, "postgres");
+      if (!pattern) return void res.status(400).json({ error: "Unknown category", code: "VALIDATION_ERROR" });
+      // Same word-start keyword match the app uses (categorizeManufacturer).
+      conditions.push(sql`(${manufacturers.specialty} || ' ' || coalesce(${manufacturers.description}, '')) ~* ${pattern}`);
     }
 
     const page = parsePagination(req.query, { limit: 100 });

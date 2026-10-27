@@ -86,7 +86,10 @@ describe('seller setup destination navigation', () => {
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
       ['app/create-post.tsx', "completeSetupTaskAfter('first_post', run)", "'first_post'"],
-      ['app/manufacturer-hub.tsx', '() => saveManufacturer(mfg.id)', "'connect_manufacturer'"],
+      // Saving now happens on the find-by-category results; the hub landing
+      // also completes the task once a relationship exists.
+      ['app/manufacturer-category.tsx', '() => saveManufacturer(mfg.id)', "'connect_manufacturer'"],
+      ['app/manufacturer-hub.tsx', 'sources.relationships.length > 0', "completeSetupTaskWhen('connect_manufacturer'"],
     ] as const;
 
     for (const [file, successSignal, completionSignal] of completionSignals) {

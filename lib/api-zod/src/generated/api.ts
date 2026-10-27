@@ -360,6 +360,7 @@ export const ListPublicManufacturersQueryParams = zod.object({
   "q": zod.coerce.string().optional(),
   "country": zod.coerce.string().optional(),
   "specialty": zod.coerce.string().optional(),
+  "category": zod.enum(['cut-and-sew', 'knitwear', 'denim', 'screen-printing', 'embroidery', 'dye-and-wash', 'leather-and-footwear', 'accessories', 'labels-and-packaging']).optional().describe('Picker category key (lib\/manufacturer-flow categories), matched against specialty and description. Unknown keys return 400.'),
   "minYears": zod.coerce.number().min(listPublicManufacturersQueryMinYearsMin).optional(),
   "maxMoq": zod.coerce.number().min(1).optional(),
   "verified": zod.coerce.boolean().optional(),
@@ -386,6 +387,7 @@ export const ListPublicManufacturersResponseItem = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
@@ -408,7 +410,11 @@ export const GetManufacturerDirectoryFacetsResponse = zod.object({
   "specialties": zod.array(zod.object({
   "name": zod.string(),
   "count": zod.number()
-}))
+})),
+  "categories": zod.array(zod.object({
+  "key": zod.string(),
+  "count": zod.number()
+})).optional().describe('Every picker category in picker order, with how many live manufacturers match it.')
 })
 
 
@@ -435,6 +441,7 @@ export const GetPublicManufacturerResponse = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
@@ -803,6 +810,7 @@ export const GetPartnerManufacturerResponse = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
@@ -842,6 +850,7 @@ export const ListManufacturerRelationshipsResponseItem = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
@@ -883,6 +892,7 @@ export const CreateManufacturerRelationshipResponse = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
@@ -922,6 +932,7 @@ export const ListMyManufacturerRelationshipsResponseItem = zod.object({
   "website": zod.string().nullish(),
   "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
+  "categories": zod.array(zod.string()).optional().describe('Picker category keys derived from specialty and description.'),
   "rating": zod.number().nullish(),
   "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),

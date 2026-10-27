@@ -54,6 +54,8 @@ export type DirectoryFacets = {
   total: number;
   countries: Array<{ name: string; count: number }>;
   specialties: Array<{ name: string; count: number }>;
+  /** Every picker category with its live count (absent from servers before the category picker). */
+  categories?: Array<{ key: string; count: number }>;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

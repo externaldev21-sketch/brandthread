@@ -27,13 +27,15 @@ import { mapPublicManufacturer } from './manufacturerDirectoryMapper';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { resolveAccountKey } from '@/lib/accountStorage';
 import { getPreviewManufacturer, getPreviewManufacturers } from '@/lib/previewManufacturers';
+import { manufacturerCategoryKeys } from '@/lib/manufacturerCategories';
 
 export { mapPublicManufacturer } from './manufacturerDirectoryMapper';
 
 /** Legacy device-wide key; stored per account (first signed-in account claims it). */
 const DRAFTS_KEY = 'mfg:local-quote-drafts:v2';
 const draftsKey = () => resolveAccountKey(DRAFTS_KEY, 'claim');
-const previewFavoriteManufacturerIds = new Set<string>(['preview-mfg-porto-knit']);
+// Demo favorites double as the demo seller's manufacturers (relationships).
+const previewFavoriteManufacturerIds = new Set<string>(['preview-mfg-porto-knit', 'preview-mfg-okayama-denim', 'preview-mfg-la-garment']);
 
 function now(): string {
   return new Date().toISOString();
@@ -147,6 +149,8 @@ export async function searchManufacturers(opts: {
   query?: string; country?: string; category?: string; moqMax?: number;
   unitPriceMaxCents?: number; leadTimeDaysMax?: number; verifiedOnly?: boolean;
   ratingMin?: number; material?: string; minYears?: number; hasPhotos?: boolean; sort?: DirectorySort;
+  /** A "Find a manufacturer" picker key, e.g. 'denim' (lib/manufacturer-flow categories). */
+  categoryKey?: string;
 }): Promise<Manufacturer[]> {
   if (isSellerDevPreview()) {
     if (!isPreviewDemoMode()) return [];
@@ -157,6 +161,7 @@ export async function searchManufacturers(opts: {
     );
     if (opts.country) results = results.filter((item) => item.country === opts.country);
     if (opts.category) results = results.filter((item) => item.categories.includes(opts.category!) || item.specialties.includes(opts.category!));
+    if (opts.categoryKey) results = results.filter((item) => manufacturerCategoryKeys(item).includes(opts.categoryKey!));
     if (opts.minYears !== undefined) results = results.filter((item) => item.yearsInBusiness >= opts.minYears!);
     if (opts.moqMax !== undefined) results = results.filter((item) => item.moq <= opts.moqMax!);
     if (opts.unitPriceMaxCents !== undefined) results = results.filter((item) => item.unitPriceMinCents <= opts.unitPriceMaxCents!);
@@ -175,6 +180,7 @@ export async function searchManufacturers(opts: {
   if (opts.query) params.set('q', opts.query);
   if (opts.country) params.set('country', opts.country);
   if (opts.category) params.set('specialty', opts.category);
+  if (opts.categoryKey) params.set('category', opts.categoryKey);
   // Server-side filters keep results complete (no client-side truncation).
   if (opts.minYears) params.set('minYears', String(opts.minYears));
   if (opts.moqMax !== undefined) params.set('maxMoq', String(opts.moqMax));
@@ -265,12 +271,13 @@ export async function unfavoriteManufacturer(manufacturerId: string): Promise<vo
   await serviceRequest(`/api/manufacturers/favorites/${encodeURIComponent(manufacturerId)}`, { method: 'DELETE' });
 }
 
-function previewPortoRelationship(): ManufacturerRelationship | undefined {
-  const manufacturer = getPreviewManufacturer('preview-mfg-porto-knit');
+function previewRelationship(manufacturerId: string, index = 0): ManufacturerRelationship | undefined {
+  const manufacturer = getPreviewManufacturer(manufacturerId);
   if (!manufacturer || !previewFavoriteManufacturerIds.has(manufacturer.id)) return undefined;
-  const updatedAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  // Saved earlier = touched longer ago, so the list keeps a stable order.
+  const updatedAt = new Date(Date.now() - (2 + index * 3) * 86_400_000).toISOString();
   return {
-    id: 'preview-relationship-porto-knit',
+    id: `preview-relationship-${manufacturer.id.replace(/^preview-mfg-/, '')}`,
     sellerId: '',
     manufacturerId: manufacturer.id,
     status: 'connected',
@@ -302,8 +309,8 @@ function previewPortoRelationship(): ManufacturerRelationship | undefined {
 export async function saveManufacturer(manufacturerId: string): Promise<ManufacturerRelationship> {
   if (isSellerDevPreview()) {
     previewFavoriteManufacturerIds.add(manufacturerId);
-    if (isPreviewDemoMode() && manufacturerId === 'preview-mfg-porto-knit') {
-      const relationship = previewPortoRelationship();
+    if (isPreviewDemoMode()) {
+      const relationship = previewRelationship(manufacturerId);
       if (relationship) return relationship;
     }
     throw new Error('Manufacturer relationship is unavailable in this preview.');
@@ -323,8 +330,9 @@ export const unsaveManufacturer = unfavoriteManufacturer;
 export async function getRelationships(): Promise<ManufacturerRelationship[]> {
   if (isSellerDevPreview()) {
     if (!isPreviewDemoMode()) return [];
-    const relationship = previewPortoRelationship();
-    return relationship ? [relationship] : [];
+    return [...previewFavoriteManufacturerIds]
+      .map((id, index) => previewRelationship(id, index))
+      .filter((relationship): relationship is ManufacturerRelationship => !!relationship);
   }
   const rows = await serviceRequest<any[]>('/api/manufacturers/relationships');
   if (!Array.isArray(rows)) throw new Error('Manufacturer relationships returned an invalid response.');

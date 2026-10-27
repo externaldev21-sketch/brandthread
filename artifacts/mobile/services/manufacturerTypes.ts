@@ -86,6 +86,8 @@ export interface Manufacturer {
   productionCapacity: string; // e.g. "5,000 units/month"
   specialties: string[];
   categories: string[];
+  /** "Find a manufacturer" picker keys (lib/manufacturer-flow categories), when the API derived them. */
+  categoryKeys?: string[];
   capabilities: ManufacturerCapability[];
   certifications: ManufacturerCertification[];
   materials: string[];

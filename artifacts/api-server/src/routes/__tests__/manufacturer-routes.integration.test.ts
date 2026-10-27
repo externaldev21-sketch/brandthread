@@ -162,6 +162,29 @@ describe("Task 252 manufacturer route integration", () => {
     expect((await retry.json() as { id: string }).id).toBe(result.id);
   });
 
+  it("derives categories from specialty/description and filters the directory by category", async () => {
+    const denim = await seedManufacturer({ businessName: `${prefix} Indigo Mill`, specialty: "Selvedge Denim, Jeans", description: "Enzyme wash in house" });
+    const knit = await seedManufacturer({ businessName: `${prefix} Knit Lab`, specialty: "Sweaters, Merino", description: "Fully fashioned knits" });
+    await seedManufacturer({ businessName: `${prefix} Vintage Capsule`, specialty: "Vintage capsule collections", description: null });
+    const q = encodeURIComponent(prefix);
+
+    const denimList = await request(`/api/manufacturers/public?q=${q}&category=denim`);
+    expect(denimList.status).toBe(200);
+    const denimRows = await denimList.json() as Array<{ id: string; categories: string[] }>;
+    expect(denimRows.map((row) => row.id)).toEqual([denim.id]);
+    expect(denimRows[0].categories).toEqual(["denim", "dye-and-wash"]);
+
+    const washRows = await (await request(`/api/manufacturers/public?q=${q}&category=dye-and-wash`)).json() as Array<{ id: string }>;
+    expect(washRows.map((row) => row.id)).toEqual([denim.id]);
+    const knitRows = await (await request(`/api/manufacturers/public?q=${q}&category=knitwear`)).json() as Array<{ id: string }>;
+    expect(knitRows.map((row) => row.id)).toEqual([knit.id]);
+    expect((await request(`/api/manufacturers/public?category=not-a-category`)).status).toBe(400);
+
+    const facets = await (await request("/api/manufacturers/public/facets")).json() as { categories: Array<{ key: string; count: number }> };
+    expect(facets.categories.map((row) => row.key).slice(0, 3)).toEqual(["cut-and-sew", "knitwear", "denim"]);
+    expect(facets.categories.find((row) => row.key === "denim")!.count).toBeGreaterThanOrEqual(1);
+  });
+
   it("creates seller quote requests, validates active manufacturers, isolates sellers, and updates owned requests", async () => {
     const mfr = await seedManufacturer();
     auth.userId = users.sellerA;

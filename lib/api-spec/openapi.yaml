@@ -255,6 +255,10 @@ paths:
         - { name: q, in: query, schema: { type: string } }
         - { name: country, in: query, schema: { type: string } }
         - { name: specialty, in: query, schema: { type: string } }
+        - name: category
+          in: query
+          description: Picker category key (lib/manufacturer-flow categories), matched against specialty and description. Unknown keys return 400.
+          schema: { type: string, enum: [cut-and-sew, knitwear, denim, screen-printing, embroidery, dye-and-wash, leather-and-footwear, accessories, labels-and-packaging] }
         - { name: minYears, in: query, schema: { type: integer, minimum: 0 } }
         - { name: maxMoq, in: query, schema: { type: integer, minimum: 1 } }
         - { name: verified, in: query, schema: { type: boolean } }
@@ -1482,6 +1486,10 @@ components:
         website: { type: ["string", "null"] }
         timeZone: { type: ["string", "null"] }
         isVerified: { type: boolean }
+        categories:
+          type: array
+          description: Picker category keys derived from specialty and description.
+          items: { type: string }
         rating: { type: ["number", "null"] }
         reviewCount: { type: integer }
         responseTime: { type: ["string", "null"] }
@@ -1509,6 +1517,15 @@ components:
             required: [name, count]
             properties:
               name: { type: string }
+              count: { type: integer }
+        categories:
+          type: array
+          description: Every picker category in picker order, with how many live manufacturers match it.
+          items:
+            type: object
+            required: [key, count]
+            properties:
+              key: { type: string }
               count: { type: integer }
 
     ManufacturerInviteResolution:
