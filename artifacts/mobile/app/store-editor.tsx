@@ -1281,7 +1281,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.md },
   sectionsTopRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm,
+    // paddingBottom: the first section card scrolls up to this row's edge;
+    // without it the card sat flush under "Add section".
+    paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.sm, gap: SP.sm,
   },
   addSectionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,

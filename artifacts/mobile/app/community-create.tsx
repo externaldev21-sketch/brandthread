@@ -153,6 +153,8 @@ const styles = StyleSheet.create({
   inviteBlock: { marginTop: SP.sm, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.md, letterSpacing: -0.2 },
   inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  inviteField: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: COMP.minTouchTarget, paddingHorizontal: SP.md, borderRadius: RADIUS.md },
-  inviteInput: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base },
+  // minWidth 0: on web a text input will not shrink below its intrinsic
+  // width, which pushed the field under the Open button.
+  inviteField: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm, height: COMP.minTouchTarget, paddingHorizontal: SP.md, borderRadius: RADIUS.md },
+  inviteInput: { flex: 1, minWidth: 0, fontFamily: FONT.regular, fontSize: FS.base },
 });

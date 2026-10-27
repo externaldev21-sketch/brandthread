@@ -81,7 +81,7 @@ export default function ExportReport() {
       <ScreenHeader title="Export" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: bottom }} showsVerticalScrollIndicator={false}>
         <SectionTitle>Date range</SectionTitle>
-        <View style={{ marginBottom: SP.sm }}><SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} /></View>
+        <SellerDashboardRangePills range={range} onRangeChange={setRange} theme={theme} />
         <SectionTitle>Include</SectionTitle>
         <Card>
           {SECTIONS.map((sec, i) => {

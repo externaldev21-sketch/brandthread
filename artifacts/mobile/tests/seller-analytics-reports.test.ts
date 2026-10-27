@@ -17,7 +17,7 @@ import { previewBuckets, previewInsights } from '@/lib/previewSellerInsights';
 
 // The service and the Reports list pull in react-native (Platform, views),
 // which vitest cannot parse; only the plain data they export is needed here.
-vi.mock('react-native', () => ({ Platform: { OS: 'web' }, View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (o: unknown) => o } }));
+vi.mock('react-native', () => ({ Platform: { OS: 'web', select: (o: Record<string, unknown>) => o.web ?? o.default }, View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (o: unknown) => o } }));
 vi.mock('expo-haptics', () => ({ selectionAsync: () => undefined }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: () => undefined }) }));
 vi.mock('@expo/vector-icons', () => ({ Feather: 'Feather' }));

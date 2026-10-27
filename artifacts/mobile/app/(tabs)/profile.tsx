@@ -948,6 +948,10 @@ const s = StyleSheet.create({
   dashboardRow: {
     backgroundColor: CARD, borderColor: BORDER, borderWidth: 1,
     borderRadius: RADIUS.md, marginBottom: SP.sm,
+    // ListRow has no side padding of its own (it lives inside padded
+    // cards); this bordered row needs its own, or the icon tile sits on
+    // the border and the rounded corner clips it.
+    paddingHorizontal: SP.md,
   },
   actionRow: { flexDirection: 'row', gap: SP.sm },
   actionFlex: { flex: 1, minWidth: 0 },

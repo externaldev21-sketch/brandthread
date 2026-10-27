@@ -1212,7 +1212,9 @@ const fiS = StyleSheet.create({
                   paddingHorizontal: SP.md, minHeight: COMP.inputH },
   focusedRow:   { borderColor: BORDER_FOCUS },
   multilineRow: { alignItems: 'flex-start', paddingVertical: SP.sm, minHeight: 100 },
-  input:        { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
+  // minWidth 0: on web a text input will not shrink below its intrinsic
+  // width, so two FormInputs side by side (RFQ quantity/price) overlapped.
+  input:        { flex: 1, minWidth: 0, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
   multilineInput: { textAlignVertical: 'top', minHeight: 90 },
 });
 

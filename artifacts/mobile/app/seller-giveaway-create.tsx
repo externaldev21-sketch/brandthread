@@ -281,7 +281,7 @@ export default function SellerGiveawayCreate() {
           {field('Eligibility', eligibility, setEligibility, { placeholder: 'e.g. Open to people aged 18 or older', maxLength: GIVEAWAY_LIMITS.eligibility })}
           {field('Official rules', rules, setRules, { multiline: true, onEdit: () => setRulesEdited(true), maxLength: GIVEAWAY_LIMITS.rules })}
           {templateFailed && !rulesEdited && !rules.trim()
-            ? <RetryRow label="Couldn't load the rules template" onRetry={() => { setTemplateFailed(false); setTemplateAttempt((n) => n + 1); }} />
+            ? <RetryRow label="Couldn't load the rules template" style={{ marginTop: SP.sm }} onRetry={() => { setTemplateFailed(false); setTemplateAttempt((n) => n + 1); }} />
             : null}
           {rulesEdited ? <Button label="Reset rules to template" variant="tertiary" onPress={() => setRulesEdited(false)} /> : null}
           {error ? <Text style={[styles.error, { color: c.destructive }]}>{error}</Text> : null}
