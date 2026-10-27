@@ -43,6 +43,16 @@ const CUSTOMERS = [
   ['Priya Nair', 'Austin', 'TX', '78702', 'US'], ['Leo Martin', 'Portland', 'OR', '97209', 'US'], ['Ava Rossi', 'Brooklyn', 'NY', '11211', 'US'],
   ['Noah Kim', 'Seattle', 'WA', '98103', 'US'], ['Zoe Adams', 'Miami', 'FL', '33137', 'US'],
 ] as const;
+// International customers for the dashboard order globe: each day also gets
+// two of these (no randomness, see worldOrdersForDay), so the globe's recent
+// window always holds ~10 orders spread across these 10 cities.
+const WORLD_CUSTOMERS = [
+  ['Yuki Tanaka', 'Tokyo', '13', '150-0001', 'JP'], ['Camille Laurent', 'Paris', '11', '75003', 'FR'],
+  ['Olivia Brown', 'Sydney', '02', '2000', 'AU'], ['Lucas Souza', 'São Paulo', '27', '01310-100', 'BR'],
+  ['Lena Fischer', 'Berlin', '16', '10115', 'DE'], ['Ethan Wong', 'Toronto', '08', 'M5V 2T6', 'CA'],
+  ['Ji-woo Park', 'Seoul', '11', '04524', 'KR'], ['Omar Haddad', 'Dubai', '03', '00000', 'AE'],
+  ['Sofía García', 'Mexico City', 'CMX', '06700', 'MX'], ['Thandi Nkosi', 'Cape Town', '11', '8001', 'ZA'],
+] as const;
 
 export interface PreviewSellerOrder {
   id: string;
@@ -128,10 +138,50 @@ export function ordersForDay(y: number, m: number, d: number, now: Date): Previe
   return [...generatedOrdersForDay(y, m, d, now), ...fixturesForDay(y, m, d, now)];
 }
 
+/** Two international orders per day at fixed hours; any 5 days cover all of WORLD_CUSTOMERS. Index 900+ keeps ids apart from the random ones. */
+function worldOrdersForDay(y: number, m: number, d: number, idx: number, now: Date): PreviewSellerOrder[] {
+  const out: PreviewSellerOrder[] = [];
+  for (let j = 0; j < 2; j += 1) {
+    const slot = (idx * 2 + j) % WORLD_CUSTOMERS.length;
+    const created = new Date(y, m, d, 7 + ((idx * 5 + j * 7) % 15), (idx * 13 + j * 29) % 60, 0);
+    if (created.getTime() > now.getTime()) continue;
+    const customer = WORLD_CUSTOMERS[slot];
+    const product = CATALOG[(idx + j) % CATALOG.length];
+    const i = 900 + j;
+    const subtotalCents = product.priceCents;
+    const shippingCents = 1800;
+    const totalCents = subtotalCents + shippingCents;
+    const status = statusFor(now.getTime() - created.getTime(), 0.5);
+    const createdIso = created.toISOString();
+    const shipped = status === 'shipped' || status === 'delivered';
+    out.push({
+      id: `preview-demo-order-${idx}-${i}`,
+      orderNumber: `BT-${(idx - EPOCH_DAY) * 10 + i + 1000}`,
+      status, createdAt: createdIso, updatedAt: createdIso, paidAt: createdIso,
+      totalCents, subtotalCents, shippingCents, taxCents: 0, ...demoFees(totalCents), itemCount: 1,
+      customerName: customer[0], customerEmail: `${customer[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]+/g, '.')}@example.com`,
+      shippingAddress: { name: customer[0], street: `${20 + slot * 7} Market Street`, city: customer[1], state: customer[2], zip: customer[3], country: customer[4] },
+      items: [{
+        id: `preview-seller-item-${idx}-${i}-0`, productId: product.id, productName: product.name,
+        variantLabel: VARIANTS[slot % VARIANTS.length], quantity: 1, priceCents: product.priceCents,
+      }],
+      trackingNumber: shipped ? `1Z999AA1${String(idx % 100000).padStart(5, '0')}${String(i).padStart(2, '0')}` : null,
+      carrier: shipped ? 'DHL' : null,
+      shippedAt: shipped ? new Date(created.getTime() + 1.5 * DAY_MS).toISOString() : null,
+      visitors: 9,
+    });
+  }
+  return out;
+}
+
 function generatedOrdersForDay(y: number, m: number, d: number, now: Date): PreviewSellerOrder[] {
   const idx = dayIndex(y, m, d);
   const age = (now.getTime() - new Date(y, m, d).getTime()) / DAY_MS; // days before now
   if (age < 0 || age > HISTORY_DAYS) return [];
+  return [...randomOrdersForDay(y, m, d, idx, age, now), ...worldOrdersForDay(y, m, d, idx, now)];
+}
+
+function randomOrdersForDay(y: number, m: number, d: number, idx: number, age: number, now: Date): PreviewSellerOrder[] {
   const rand = mulberry32(idx * 2654435761);
   const dow = new Date(y, m, d).getDay();
   const growth = 0.3 + 0.7 * (1 - Math.min(1, age / HISTORY_DAYS)); // the store keeps growing

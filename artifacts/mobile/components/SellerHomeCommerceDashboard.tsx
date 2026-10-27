@@ -60,9 +60,7 @@ import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabe
 
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 
-import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
-
-import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
+import { apiDashboardSource, previewDashboardSource, type DashboardFinanceBalance, type SellerDashboardSource } from '@/lib/sellerDashboardSource';
 
 import { formatCents } from '@/lib/money';
 
@@ -70,9 +68,7 @@ import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 
 import { computeMetricChange } from '@/lib/sellerMetricChange';
 
-import { optionalList } from '@/lib/optionalList';
-
-import { countOrderReturns, deriveHubStats, deriveInventoryStats, describeDashboardDelta, isNewSeller, mergeTopProductImages, normalizeRecentOrder, type DashboardActionCounts, type RecentOrderSummary, type TopProductSummary } from '@/lib/sellerDashboardStats';
+import { deriveDashboardSecondary, isNewSeller, type DashboardActionCounts, type RecentOrderSummary, type TopProductSummary } from '@/lib/sellerDashboardStats';
 
 // Reused (not reimplemented) so the "orders to ship" tile can never drift
 // from what the Orders screen itself counts as unfulfilled — see item 31 /
@@ -122,7 +118,7 @@ import { SellerDashboardQuickActions } from '@/components/SellerDashboardQuickAc
 import { SellerDashboardPayoutCard } from '@/components/SellerDashboardPayoutCard';
 import { SellerDashboardActivityFeed } from '@/components/SellerDashboardActivityFeed';
 import { SellerDashboardSectionTitle } from '@/components/SellerDashboardSectionTitle';
-import { SellerLiveMap } from '@/components/SellerLiveMap';
+import { SellerOrderGlobe } from '@/components/SellerOrderGlobe';
 import { useSellerLiveMap } from '@/hooks/useSellerLiveMap';
 import {
   HOME_RANGE_COMPARISON,
@@ -131,8 +127,6 @@ import {
   groupBucketsByWeek,
   mergeDashboardActivity,
   type DashboardActivityItem,
-  type NextPayoutEstimate,
-  type PayoutScheduleSummary,
   type SellerHomeDashboardRange,
 } from '@/lib/sellerDashboardHome';
 
@@ -145,22 +139,7 @@ type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 // render loop, though here it doesn't set state so it isn't infinite).
 const EMPTY_BUCKETS: SellerHomeAnalyticsSnapshot['data']['buckets'] = [];
 
-interface FinanceBalance {
-  available: { amount: number; currency: string; formatted: string };
-  pending: { amount: number; currency: string; formatted: string };
-  connected: boolean;
-  payoutsEnabled?: boolean;
-  bankConnected?: boolean;
-  processingCashout?: {
-    idempotencyKey: string;
-    amount: number;
-    currency: string;
-    formatted: string;
-  } | null;
-  /** Real next payout (Stripe's pending payout, or the schedule's next run). */
-  nextPayoutEstimate?: NextPayoutEstimate | null;
-  payoutSchedule?: PayoutScheduleSummary | null;
-}
+type FinanceBalance = DashboardFinanceBalance;
 
 interface PersistedCashoutAttempt {
   idempotencyKey: string;
@@ -259,6 +238,14 @@ export default function SellerHomeCommerceDashboard({
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
   const sellerPreview = isSellerDevPreview();
+  // One code path for every number below: the real API for a signed-in
+  // seller, or the seeded demo store answering the same calls in the same
+  // shapes for the signed-out preview (lib/sellerDashboardSource.ts).
+  const previewMode = sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null;
+  const source: SellerDashboardSource = useMemo(
+    () => (previewMode ? previewDashboardSource(previewMode) : apiDashboardSource(api)),
+    [api, previewMode],
+  );
   const analyticsUserId = sellerPreview ? userId ?? PREVIEW_ANALYTICS_USER : userId;
   // Scroll content must end ABOVE the floating bar — tab bar height + bottom
   // safe inset + 16 (shared helper, same rule app-wide).
@@ -359,9 +346,11 @@ export default function SellerHomeCommerceDashboard({
     updateSellerTodayWidget({
       salesCents: snapshot.data.totalCents,
       ordersCount: snapshot.data.orderCount,
-      toShipCount: snapshot.data.toFulfill,
+      // The same count as the dashboard's "Orders to ship" (Orders' own
+      // Unfulfilled filter) once it has loaded, so the widget never disagrees.
+      toShipCount: actionInputs?.toShip ?? snapshot.data.toFulfill,
     });
-  }, [analyticsUserId, range, sellerPreview, snapshot]);
+  }, [actionInputs?.toShip, analyticsUserId, range, sellerPreview, snapshot]);
 
   // Live map: realtime only while this screen is focused (socket closes on blur).
   const [screenFocused, setScreenFocused] = useState(false);
@@ -371,7 +360,7 @@ export default function SellerHomeCommerceDashboard({
   }, []));
   const liveMap = useSellerLiveMap({
     enabled: screenFocused && !!userId,
-    preview: sellerPreview ? (isPreviewDemoMode() ? 'demo' : 'fresh') : null,
+    preview: previewMode,
   });
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
@@ -417,18 +406,8 @@ export default function SellerHomeCommerceDashboard({
 
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
-    if (sellerPreview) {
-      // Signed-out web previews use the same range-aware chart contract as
-      // the live dashboard, without querying a seller account.
-      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
-      setAnalyticsError(false);
-      setSnapshot({
-        key: sellerHomeAnalyticsKey(analyticsUserId ?? 'demo-seller', range),
-        data: next,
-      });
-      setLoading(false);
-      return;
-    }
+    // Preview: analyticsUserId is the fixed preview id, and `source` answers
+    // from the seeded demo store; everything after this is the same path.
     if (!analyticsUserId) {
       setLoading(false);
       return;
@@ -437,7 +416,7 @@ export default function SellerHomeCommerceDashboard({
     const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
 
-    api.analytics.home(range as SellerHomeTimeRange)
+    source.analyticsHome(range as SellerHomeTimeRange)
       .then((next) => {
         if (!active) return;
         setAnalyticsError(false);
@@ -453,41 +432,12 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]);
+  }, [analyticsUserId, range, retryTick, source, storeContextTick]);
 
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
-    if (sellerPreview) {
-      // Dev preview: derive everything locally from the same demo order set the
-      // Orders tab lists (lib/previewSellerOrders.ts) - never call the API.
-      const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
-      const byProduct = new Map<string, TopProductSummary>();
-      for (const order of previewOrders) {
-        for (const item of order.items) {
-          const row = byProduct.get(item.productId) ?? { productId: item.productId, name: item.productName, imageUrl: null, unitsSold: 0, revenueCents: 0 };
-          row.unitsSold += item.quantity;
-          row.revenueCents += item.priceCents * item.quantity;
-          byProduct.set(item.productId, row);
-        }
-      }
-      setSecondaryError(false);
-      setEverSoldCount(previewOrders.length);
-      setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
-      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
-      // Photos from the same demo catalog the Products tab lists.
-      const { getPreviewSellerProducts } = await import('@/lib/previewSellerProducts');
-      const previewCatalog = isPreviewDemoMode()
-        ? getPreviewSellerProducts().map((product) => ({
-          id: product.id,
-          images: [...product.media].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder).map((m) => m.uri),
-        }))
-        : [];
-      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), previewCatalog));
-      setActivityItems(mergeDashboardActivity({ orders: previewOrders.slice(0, 10) }));
-      return;
-    }
-    if (!userId) {
+    if (!userId && !sellerPreview) {
       setActivityItems([]);
       setTopProducts([]);
       setRecentOrders([]);
@@ -497,97 +447,60 @@ export default function SellerHomeCommerceDashboard({
     }
     setSecondaryError(false);
     try {
-      const [ordersRaw, inventoryRaw, [quotes, samples, threads], productAnalytics, catalog] = await Promise.all([
-        api.orders.list() as Promise<any[]>,
-        api.inventory.list() as Promise<any[]>,
+      const [orders, productAnalytics, catalog, productStats, returns, conversations, quotes, samples, threads] = await Promise.all([
+        source.orders(),
+        source.productAnalytics(),
+        source.products(),
+        source.productStats(),
+        source.returns(),
+        source.conversations(),
         // Manufacturer hub tiles are optional: threads are Growth-only, and a
         // 403 there must not blank the orders and inventory tiles (BT-398).
-        Promise.all([
-          optionalList(() => api.sellerHub.quoteRequests.list()),
-          optionalList(() => api.manufacturers.sampleOrders.list()),
-          optionalList(() => api.manufacturers.threads.list()),
-        ]) as Promise<[any[], any[], any[]]>,
-        api.analytics.products() as Promise<any[]>,
-        api.products.list() as Promise<any[]>,
+        source.quoteRequests(),
+        source.sampleOrders(),
+        source.manufacturerThreads(),
       ]);
-
-      const orders = Array.isArray(ordersRaw) ? ordersRaw : [];
-      const inventory = Array.isArray(inventoryRaw) ? inventoryRaw : [];
-      const hub = deriveHubStats(
-        Array.isArray(quotes) ? quotes : [],
-        Array.isArray(samples) ? samples : [],
-        Array.isArray(threads) ? threads : [],
-      );
-      const inv = deriveInventoryStats(inventory);
-
-      setEverSoldCount(orders.length);
-      setRecentOrders(orders.slice(0, 5).map(normalizeRecentOrder));
-      // Same normalizer + same filter Orders' "Unfulfilled" chip uses, over
-      // this same fetched list — the tile and the screen can't disagree.
-      const toShip = filterOrders(orders.map(apiRowToOrder), 'unfulfilled').length;
-      setActionInputs({
-        unreadMessages: hub.unreadMessages,
-        lowStockCount: inv.lowStockCount,
-        returns: countOrderReturns(orders),
-        toShip,
+      const derived = deriveDashboardSecondary({
+        orders,
+        // Same normalizer + same filter Orders' "Unfulfilled" chip uses, over
+        // this same fetched list — the tile and the screen can't disagree.
+        toShip: filterOrders(orders.map(apiRowToOrder), 'unfulfilled').length,
+        productAnalytics,
+        catalog,
+        // The Products tab's own Low Stock count (the row deep-links there).
+        lowStockCount: productStats.lowStock,
+        returns,
+        conversations,
+        quotes,
+        samples,
+        threads,
       });
-
-      const top = Array.isArray(productAnalytics)
-        ? productAnalytics
-          .filter((p) => Number(p?.revenueCents ?? 0) > 0)
-          .map((p) => ({
-            productId: String(p.productId),
-            name: String(p.name ?? 'Untitled product'),
-            unitsSold: Number(p.unitsSold ?? 0),
-            revenueCents: Number(p.revenueCents ?? 0),
-          }))
-        : [];
-      setTopProducts(mergeTopProductImages(top, Array.isArray(catalog) ? catalog : []));
+      setEverSoldCount(derived.everSoldCount);
+      setRecentOrders(derived.recentOrders);
+      setActionInputs(derived.actionInputs);
+      setTopProducts(derived.topProducts);
 
       // Recent activity: real orders (already fetched) plus real followers
       // and reviews. Either of those failing only drops its rows.
-      const [followersResult, reviewsResult] = await Promise.allSettled([
-        api.social.followers(),
-        api.reviews.mine(),
-      ]);
+      const [followersResult, reviewsResult] = await Promise.allSettled([source.followers(), source.reviews()]);
       setActivityItems(mergeDashboardActivity({
         orders: orders.slice(0, 10),
-        followers: followersResult.status === 'fulfilled' && Array.isArray(followersResult.value) ? followersResult.value.slice(0, 10) : [],
-        reviews: reviewsResult.status === 'fulfilled' && Array.isArray(reviewsResult.value) ? reviewsResult.value.slice(0, 10) : [],
+        followers: followersResult.status === 'fulfilled' ? followersResult.value.slice(0, 10) : [],
+        reviews: reviewsResult.status === 'fulfilled' ? reviewsResult.value.slice(0, 10) : [],
       }));
     } catch (error) {
       if (__DEV__) console.warn('[seller-dashboard] secondary data unavailable', error);
       setSecondaryError(true);
     }
-  }, [api, sellerPreview, userId]);
+  }, [sellerPreview, source, userId]);
 
   useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick, storeContextTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
-    if (sellerPreview) {
-      setFinanceBalance({
-        available: { amount: 428122, currency: 'usd', formatted: '$4,281.22' },
-        pending: { amount: 184250, currency: 'usd', formatted: '$1,842.50' },
-        connected: true,
-        payoutsEnabled: true,
-        bankConnected: true,
-        processingCashout: null,
-        // Demo only: a weekly schedule paying out next Friday.
-        ...(isPreviewDemoMode() ? {
-          nextPayoutEstimate: (() => {
-            const date = new Date();
-            date.setDate(date.getDate() + (((5 - date.getDay()) + 7) % 7 || 7));
-            date.setHours(12, 0, 0, 0);
-            return { kind: 'scheduled', date: date.toISOString(), amount: 428122, formatted: '$4,281.22' };
-          })(),
-          payoutSchedule: { interval: 'weekly' },
-        } : {}),
-      });
-      setFinanceLoading(false);
-      return;
-    }
-    if (!userId || isLoadingRole || currentRole !== 'owner') {
+    // Owner-only. The signed-out preview has no team role; its source answers
+    // with the demo store's seeded balance (fresh: none).
+    if (!sellerPreview && (!userId || isLoadingRole || currentRole !== 'owner')) {
       setFinanceBalance(null);
       setFinanceLoading(isLoadingRole);
       return;
@@ -595,14 +508,14 @@ export default function SellerHomeCommerceDashboard({
     setFinanceBalance(null);
     setFinanceLoading(true);
     try {
-      const next = await api.finance.balance() as FinanceBalance;
+      const next = await source.financeBalance();
       if (balanceGenerationRef.current === generation) setFinanceBalance(next);
     } catch {
       if (balanceGenerationRef.current === generation) setFinanceBalance(null);
     } finally {
       if (balanceGenerationRef.current === generation) setFinanceLoading(false);
     }
-  }, [api, currentRole, isLoadingRole, sellerPreview, userId]);
+  }, [currentRole, isLoadingRole, sellerPreview, source, userId]);
 
   useEffect(() => { void loadFinanceBalance(); }, [loadFinanceBalance]);
 
@@ -649,12 +562,15 @@ export default function SellerHomeCommerceDashboard({
     router.push(route as never);
   }, [router]);
 
+  // Pull to refresh reloads every number on screen, balances included (the
+  // 30s poll leaves Stripe balances alone).
+  const reloadThreadCash = threadCash.reload;
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setRetryTick((n) => n + 1);
-    await loadSecondaryData();
+    await Promise.all([loadSecondaryData(), loadFinanceBalance(), reloadThreadCash()]);
     setRefreshing(false);
-  }, [loadSecondaryData]);
+  }, [loadFinanceBalance, loadSecondaryData, reloadThreadCash]);
 
   const requestCashOut = useCallback(() => {
     if (!isSignedIn) return;
@@ -1071,7 +987,8 @@ export default function SellerHomeCommerceDashboard({
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.balanceLabel, { color: theme.muted }]}>Available balance</Text>
                     <Text style={[styles.balanceValue, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                      {financeLoading ? '···' : financeBalance?.available.formatted ?? '$0.00'}
+                      {/* A failed load shows a dash, never a made-up $0.00. */}
+                      {financeLoading ? '···' : financeBalance?.available.formatted ?? '—'}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -1104,7 +1021,7 @@ export default function SellerHomeCommerceDashboard({
                   <Text style={[styles.threadCashLabel, { color: theme.muted }]}>Thread Cash</Text>
                   <View style={{ flex: 1 }} />
                   <Text style={[styles.threadCashValue, { color: THREAD_CASH_GREEN_MID }]}>
-                    {threadCash.loading ? '···' : formatCents(threadCash.balanceCents ?? 0)}
+                    {threadCash.loading ? '···' : threadCash.balanceCents == null ? '—' : formatCents(threadCash.balanceCents)}
                   </Text>
                   <Icon name="chevron-right" size={16} color={theme.subtle} />
                 </TouchableOpacity>
@@ -1201,7 +1118,13 @@ export default function SellerHomeCommerceDashboard({
                 <SellerDashboardQuickActions theme={theme} onNavigate={nav} />
               </View>
               <View style={styles.section}>
-                <SellerLiveMap data={liveMap.data} ping={liveMap.ping} theme={theme} />
+                <SellerOrderGlobe
+                  data={liveMap.data}
+                  ping={liveMap.ping}
+                  theme={theme}
+                  active={screenFocused}
+                  onOpenOrder={(id) => nav(`/order-detail?id=${encodeURIComponent(id)}`)}
+                />
               </View>
             </>
           )}

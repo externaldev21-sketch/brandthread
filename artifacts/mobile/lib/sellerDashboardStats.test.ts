@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  countOrderReturns,
+  countPendingReturns,
+  countSoldOrders,
+  countUnreadBuyerMessages,
+  deriveDashboardSecondary,
   deriveHubStats,
   deriveInventoryStats,
   deriveOrderStats,
@@ -85,20 +88,66 @@ describe('describeDashboardDelta', () => {
   });
 });
 
-describe('hasNoActionNeeded / countOrderReturns', () => {
+describe('hasNoActionNeeded / countPendingReturns', () => {
   it('is true only when every action count is zero', () => {
     expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 0 })).toBe(true);
     expect(hasNoActionNeeded({ toShip: 1, toAnswer: 0, lowStock: 0, returns: 0 })).toBe(false);
     expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 2 })).toBe(false);
   });
 
-  it('counts only orders with a real, non-empty returns array', () => {
+  it('counts return requests still awaiting a decision (GET /api/returns status pending)', () => {
     const rows = [
-      { id: 'a', returns: [{ id: 'r1' }] },
-      { id: 'b', returns: [] },
-      { id: 'c' },
+      { id: 'a', status: 'pending' },
+      { id: 'b', status: 'approved' },
+      { id: 'c', status: 'refunded' },
+      { id: 'd', status: 'pending' },
     ];
-    expect(countOrderReturns(rows)).toBe(1);
+    expect(countPendingReturns(rows)).toBe(2);
+  });
+});
+
+describe('dashboard secondary numbers', () => {
+  it('counts unread buyer messages by the inbox rule (no requests, archived or buyer↔buyer)', () => {
+    expect(countUnreadBuyerMessages([
+      { unreadCount: 2 },
+      { unreadCount: 3, isRequest: true },
+      { unreadCount: 1, isArchived: true },
+      { unreadCount: 4, type: 'buyer_to_buyer' },
+      { unreadCount: 1, type: 'buyer_to_seller' },
+    ])).toBe(3);
+  });
+
+  it('only counts paid, non-cancelled orders as sold', () => {
+    expect(countSoldOrders([
+      { paidAt: '2026-10-01T00:00:00Z', status: 'pending' },
+      { paidAt: null, status: 'pending' },
+      { paidAt: '2026-10-01T00:00:00Z', status: 'cancelled' },
+    ])).toBe(1);
+  });
+
+  it('derives every below-the-hero number from the source responses', () => {
+    const out = deriveDashboardSecondary({
+      orders: [
+        { id: 'o2', orderNumber: '#1002', customerName: 'Ana', itemCount: 2, totalCents: 5000, status: 'pending', paidAt: '2026-10-02T00:00:00Z' },
+        { id: 'o1', orderNumber: '#1001', customerName: 'Ben', itemCount: 1, totalCents: 2000, status: 'cancelled', paidAt: null },
+      ],
+      toShip: 1,
+      productAnalytics: [
+        { productId: 'p1', name: 'Coat', unitsSold: 2, revenueCents: 4000 },
+        { productId: 'p2', name: 'Unsold', unitsSold: 0, revenueCents: 0 },
+      ],
+      catalog: [{ id: 'p1', images: ['https://img/coat.jpg'] }],
+      lowStockCount: 3,
+      returns: [{ status: 'pending' }, { status: 'denied' }],
+      conversations: [{ unreadCount: 2 }],
+      quotes: [],
+      samples: [],
+      threads: [{ unreadCount: 1 }],
+    });
+    expect(out.everSoldCount).toBe(1);
+    expect(out.recentOrders.map((o) => o.orderNumber)).toEqual(['#1002', '#1001']);
+    expect(out.topProducts).toEqual([{ productId: 'p1', name: 'Coat', unitsSold: 2, revenueCents: 4000, imageUrl: 'https://img/coat.jpg' }]);
+    expect(out.actionInputs).toEqual({ unreadMessages: 3, lowStockCount: 3, returns: 1, toShip: 1 });
   });
 });
 

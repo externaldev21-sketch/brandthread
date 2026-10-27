@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ordersForDay, type PreviewSellerOrder } from './previewSellerOrders';
 import { buildPreviewSellerAnalytics, type PreviewSellerChartRange } from './previewSellerChartData';
 import { bucketLabel } from './sellerHomeChartLabels';
 
@@ -47,8 +48,30 @@ describe('buildPreviewSellerAnalytics — demo mode (populated)', () => {
       const data = buildPreviewSellerAnalytics(range, 'demo', NOW);
       expect(data.totalCents).toBeGreaterThan(0);
       expect(data.orderCount).toBeGreaterThan(0);
-      expect(data.previous.totalCents).toBeGreaterThan(0);
+      // "All time" has no prior period (same as the API), so no comparison.
+      if (range === 'all') expect(data.previous.totalCents).toBe(0);
+      else expect(data.previous.totalCents).toBeGreaterThan(0);
     }
+  });
+
+  it('counts only paid, non-cancelled demo orders, like the API', () => {
+    const data = buildPreviewSellerAnalytics('30d', 'demo', NOW);
+    const sales: PreviewSellerOrder[] = [];
+    for (let back = 0; back < 30; back += 1) {
+      const day = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - back);
+      sales.push(...ordersForDay(day.getFullYear(), day.getMonth(), day.getDate(), NOW).filter((o) => o.paidAt && o.status !== 'cancelled'));
+    }
+    expect(data.orderCount).toBe(sales.length);
+    expect(data.totalCents).toBe(sales.reduce((sum, o) => sum + o.totalCents, 0));
+  });
+
+  it("compares Today against the same hours yesterday, from the seeded orders (never a made-up ratio)", () => {
+    const data = buildPreviewSellerAnalytics('today', 'demo', NOW);
+    const cutoff = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - 1, NOW.getHours() + 1).getTime();
+    const yesterday = ordersForDay(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - 1, NOW)
+      .filter((o) => o.paidAt && o.status !== 'cancelled' && new Date(o.createdAt).getTime() < cutoff);
+    expect(data.previous.orderCount).toBe(yesterday.length);
+    expect(data.previous.totalCents).toBe(yesterday.reduce((sum, o) => sum + o.totalCents, 0));
   });
 
   it('the data series actually differs in shape between ranges (not the same dataset redrawn)', () => {

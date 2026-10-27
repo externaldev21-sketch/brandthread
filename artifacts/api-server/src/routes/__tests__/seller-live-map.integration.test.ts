@@ -18,7 +18,7 @@ import crypto from "node:crypto";
 import express from "express";
 import WS from "ws";
 import { inArray } from "drizzle-orm";
-import { db, orders, users } from "@workspace/db";
+import { db, orderItems, orders, users } from "@workspace/db";
 
 const suffix = crypto.randomBytes(5).toString("hex");
 const SELLER = `livemap-seller-${suffix}`;
@@ -53,9 +53,15 @@ const ADDRESS = (city: string, state: string, country = "US") => ({
   country,
 });
 
-async function makeOrder(ownerId: string, paidAt: Date | null, address: ReturnType<typeof ADDRESS> | null, status = "pending") {
+async function makeOrder(
+  ownerId: string,
+  paidAt: Date | null,
+  address: ReturnType<typeof ADDRESS> | null,
+  status = "pending",
+  lines: Array<{ name: string; priceCents: number; quantity?: number }> = [],
+) {
   counter += 1;
-  await db.insert(orders).values({
+  const [row] = await db.insert(orders).values({
     ownerId,
     orderNumber: `LM-${suffix}-${counter}`,
     status,
@@ -64,7 +70,13 @@ async function makeOrder(ownerId: string, paidAt: Date | null, address: ReturnTy
     paidAt,
     createdAt: paidAt ?? new Date(),
     ...(address ? { shippingAddress: address } : {}),
-  });
+  }).returning({ id: orders.id, orderNumber: orders.orderNumber });
+  if (lines.length) {
+    await db.insert(orderItems).values(lines.map((l) => ({
+      orderId: row.id, productName: l.name, quantity: l.quantity ?? 1, priceCents: l.priceCents,
+    })));
+  }
+  return row;
 }
 
 function get(path: string, as = SELLER) {
@@ -127,18 +139,50 @@ describe("GET /api/seller/live-map/today", () => {
     expect(austin.lastAt).toBe(new Date(now - 30_000).toISOString());
   });
 
-  it("never returns anything finer than city", async () => {
+  it("never returns anything finer than city (no street, zip or buyer name)", async () => {
     await makeOrder(SELLER, new Date(Date.now() - 1000), ADDRESS("Austin", "TX"));
     const res = await get("/api/seller/live-map/today?tz=0");
     const body = await res.json() as any;
-    expect(Object.keys(body).sort()).toEqual(["cities", "total"]);
+    expect(Object.keys(body).sort()).toEqual(["cities", "recent", "total"]);
     for (const c of body.cities) {
       expect(Object.keys(c).sort()).toEqual(["city", "count", "country", "key", "lastAt", "lat", "lng", "region"]);
     }
+    for (const r of body.recent) {
+      expect(Object.keys(r).sort()).toEqual([
+        "amountCents", "at", "city", "country", "id", "item", "itemCount", "key", "lat", "lng", "orderNumber", "region",
+      ]);
+    }
     const raw = JSON.stringify(body);
-    for (const secret of ["Secret Lane", "Apt 4", "78701", "Jane Buyer", "4200", "LM-"]) {
+    for (const secret of ["Secret Lane", "Apt 4", "78701", "Jane Buyer"]) {
       expect(raw).not.toContain(secret);
     }
+  });
+
+  it("lists recent orders (7 days, newest first) with number, main item, amount and place for the globe popover", async () => {
+    const now = Date.now();
+    const a = await makeOrder(SELLER, new Date(now - 2 * 86_400_000), ADDRESS("Tokyo", "", "JP"), "shipped", [
+      { name: "Wool Overcoat", priceCents: 24000 },
+    ]);
+    const b = await makeOrder(SELLER, new Date(now - 60_000), ADDRESS("Paris", "", "FR"), "pending", [
+      { name: "Silk Scarf", priceCents: 1500, quantity: 2 },
+      { name: "Tailored Long Coat", priceCents: 3800 },
+    ]);
+    // Outside the window, cancelled, unpaid, unplaceable, another seller: none get a dot.
+    await makeOrder(SELLER, new Date(now - 8 * 86_400_000), ADDRESS("Austin", "TX"));
+    await makeOrder(SELLER, new Date(now - 5_000), ADDRESS("Denver", "CO"), "cancelled");
+    await makeOrder(SELLER, null, ADDRESS("Denver", "CO"));
+    await makeOrder(SELLER, new Date(now - 5_000), ADDRESS("Atlantis", "", "Narnia"));
+    await makeOrder(OTHER, new Date(now - 5_000), ADDRESS("Seattle", "WA"));
+
+    const body = await (await get("/api/seller/live-map/today?tz=0")).json() as any;
+    expect(body.recent.map((r: any) => r.id)).toEqual([b.id, a.id]);
+    expect(body.recent[0]).toMatchObject({
+      orderNumber: b.orderNumber, item: "Tailored Long Coat", itemCount: 2, amountCents: 4200,
+      city: "Paris", country: "FR", at: new Date(now - 60_000).toISOString(),
+    });
+    expect(body.recent[0].lat).toBeCloseTo(48.85, 0);
+    expect(body.recent[1]).toMatchObject({ orderNumber: a.orderNumber, item: "Wool Overcoat", itemCount: 1, city: "Tokyo", country: "JP" });
+    expect(body.recent[1].lng).toBeCloseTo(139.69, 0);
   });
 
   it("excludes cancelled orders", async () => {
@@ -180,10 +224,12 @@ describe("GET /api/seller/live-map/today", () => {
     expect(utcBody.cities.some((c: any) => c.key === "US:TX:austin")).toBe(justBefore.getTime() >= utcMidnight);
   });
 
-  it("returns an empty map for a seller with no orders today", async () => {
+  it("returns an empty today for a seller with no orders today (the globe still shows the last 7 days)", async () => {
     await makeOrder(SELLER, new Date(Date.now() - 3 * 86_400_000), ADDRESS("Austin", "TX"));
     const body = await (await get("/api/seller/live-map/today?tz=0")).json() as any;
-    expect(body).toEqual({ total: 0, cities: [] });
+    expect(body.total).toBe(0);
+    expect(body.cities).toEqual([]);
+    expect(body.recent.map((r: any) => r.city)).toEqual(["Austin"]);
   });
 
   it("requires auth", async () => {

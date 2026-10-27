@@ -268,7 +268,14 @@ router.get("/home", async (req, res) => {
   // real period-over-period change instead of a fabricated one. For "all",
   // there is by definition no meaningful prior period, so it is intentionally
   // skipped below rather than compared against an empty/fabricated window.
-  const { start: previousStart, end: previousEnd } = previousPeriod(start, end);
+  //
+  // Today is "so far today vs the same hours yesterday": its window is capped
+  // at the current hour, so the generic same-length-window-just-before rule
+  // would compare this morning against YESTERDAY EVENING (at 10:20, today
+  // 00:00–11:00 vs yesterday 13:00–24:00). Shift it by exactly one day instead.
+  const { start: previousStart, end: previousEnd } = range === "today"
+    ? { start: yesterday, end: new Date(yesterday.getTime() + (end.getTime() - start.getTime())) }
+    : previousPeriod(start, end);
 
   const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow, sourceRows, threadCashRow] = await Promise.all([
     db.select({

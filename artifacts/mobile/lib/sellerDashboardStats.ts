@@ -87,8 +87,76 @@ export function hasNoActionNeeded(counts: DashboardActionCounts): boolean {
 }
 
 /** Real return count from already-fetched order rows (`order.returns` is populated by the orders API). */
-export function countOrderReturns(rows: any[]): number {
-  return rows.filter((order) => Array.isArray(order.returns) && order.returns.length > 0).length;
+/**
+ * "N returns to review": buyer return requests still awaiting the seller's
+ * decision (GET /api/returns, status 'pending'). This used to count
+ * `order.returns` on GET /api/orders rows, a field that endpoint never sends,
+ * so the tile was always 0.
+ */
+export function countPendingReturns(rows: any[]): number {
+  return rows.filter((row) => row?.status === 'pending').length;
+}
+
+/**
+ * Unread buyer messages, by the seller inbox's own rule (MessagesInbox's
+ * header count): buyer↔seller threads only, requests and archived excluded,
+ * summing each thread's unreadCount.
+ */
+export function countUnreadBuyerMessages(conversations: any[]): number {
+  return conversations.reduce((sum, c) => (
+    !c || c.type === 'buyer_to_buyer' || c.isRequest || c.isArchived ? sum : sum + Math.max(0, Number(c.unreadCount ?? 0) || 0)
+  ), 0);
+}
+
+/** Paid, non-cancelled orders: the same orders the sales hero and Top products count. */
+export function countSoldOrders(orders: any[]): number {
+  return orders.filter((o) => (o?.paidAt ?? o?.paid_at) && o?.status !== 'cancelled').length;
+}
+
+/**
+ * Everything below the hero that comes from orders/products/inbox, from one
+ * set of source responses (lib/sellerDashboardSource.ts), for real sellers
+ * and the preview alike. `toShip` is passed in: it reuses the Orders
+ * screen's own Unfulfilled filter (see SellerHomeCommerceDashboard.tsx).
+ */
+export function deriveDashboardSecondary(input: {
+  orders: any[];
+  toShip: number;
+  productAnalytics: any[];
+  catalog: Array<{ id?: string; images?: unknown }>;
+  lowStockCount: number;
+  returns: any[];
+  conversations: any[];
+  quotes: any[];
+  samples: any[];
+  threads: any[];
+}): {
+  everSoldCount: number;
+  recentOrders: RecentOrderSummary[];
+  topProducts: TopProductSummary[];
+  actionInputs: { unreadMessages: number; lowStockCount: number; returns: number; toShip: number };
+} {
+  const hub = deriveHubStats(input.quotes, input.samples, input.threads);
+  const top = input.productAnalytics
+    .filter((p) => Number(p?.revenueCents ?? 0) > 0)
+    .map((p) => ({
+      productId: String(p.productId),
+      name: String(p.name ?? 'Untitled product'),
+      unitsSold: Number(p.unitsSold ?? 0),
+      revenueCents: Number(p.revenueCents ?? 0),
+    }));
+  return {
+    everSoldCount: countSoldOrders(input.orders),
+    recentOrders: input.orders.slice(0, 5).map(normalizeRecentOrder),
+    topProducts: mergeTopProductImages(top, input.catalog).slice(0, 5),
+    actionInputs: {
+      // Buyers and manufacturers, as the To do row says ("Buyers and manufacturers waiting on you").
+      unreadMessages: hub.unreadMessages + countUnreadBuyerMessages(input.conversations),
+      lowStockCount: input.lowStockCount,
+      returns: countPendingReturns(input.returns),
+      toShip: input.toShip,
+    },
+  };
 }
 
 export interface TopProductSummary {

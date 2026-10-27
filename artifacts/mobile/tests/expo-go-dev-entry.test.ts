@@ -12,6 +12,8 @@ const icons = readFileSync(resolve(__dirname, '../contexts/AppIconContext.tsx'),
 const flags = readFileSync(resolve(__dirname, '../contexts/FeatureFlagContext.tsx'), 'utf8');
 const subscription = readFileSync(resolve(__dirname, '../hooks/useSubscriptionPlan.ts'), 'utf8');
 const dashboardContent = readFileSync(resolve(__dirname, '../components/SellerHomeCommerceDashboard.tsx'), 'utf8');
+const dashboardSourceModule = readFileSync(resolve(__dirname, '../lib/sellerDashboardSource.ts'), 'utf8');
+const previewSourceBody = dashboardSourceModule.slice(dashboardSourceModule.indexOf('export function previewDashboardSource'));
 
 describe('Expo Go development entry', () => {
   it('uses native dev-role routing while retaining web preview and normal auth gates', () => {
@@ -41,7 +43,9 @@ describe('Expo Go development entry', () => {
     expect(icons).toContain('if (!userId) {');
     expect(flags).toContain('if (!isSignedIn) return;');
     expect(subscription).toContain('if (!isSignedIn || !userId) {');
-    expect(dashboardContent).toContain('if (sellerPreview) {');
-    expect(dashboardContent).toContain('const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];');
+    // Seller demo data stays local: the preview's dashboard source answers
+    // from the seeded store and never reaches the API client.
+    expect(dashboardContent).toContain('previewMode ? previewDashboardSource(previewMode) : apiDashboardSource(api)');
+    expect(previewSourceBody).not.toMatch(/\bapi\./);
   });
 });

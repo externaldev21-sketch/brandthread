@@ -30,7 +30,7 @@
  * as it does for the real API's buckets.
  */
 import { EMPTY_TRAFFIC_SOURCES, type SellerHomeAnalytics } from './sellerHomeAnalytics';
-import { ordersForDay, type PreviewSellerOrder } from './previewSellerOrders';
+import { allPreviewSellerOrders, ordersForDay, type PreviewSellerOrder } from './previewSellerOrders';
 
 export type PreviewSellerChartRange = 'today' | 'week' | 'month' | 'year' | 'all' | '7d' | '30d' | '90d';
 
@@ -90,11 +90,65 @@ function makeBucket(iso: string, mode: PreviewSellerChartMode, baseCents: number
  * the count/total of real rows the Orders tab lists. Buckets after `now` are
  * empty (the set never contains future orders).
  */
+/** The API's sales predicate (routes/analytics.ts): paid and not cancelled. */
+function countsAsSale(order: PreviewSellerOrder): boolean {
+  return !!order.paidAt && order.status !== 'cancelled';
+}
+
 function bucketFromOrders(iso: string, orders: PreviewSellerOrder[]): Bucket {
-  const totalCents = orders.reduce((sum, o) => sum + o.totalCents, 0);
+  const sales = orders.filter(countsAsSale);
+  const totalCents = sales.reduce((sum, o) => sum + o.totalCents, 0);
+  // Every placed order came from a visit, cancelled or not.
   const visitorCount = orders.reduce((sum, o) => sum + o.visitors, 0);
-  // ~4% refunds so netCents is a real, distinct number from gross.
-  return { bucket: iso, totalCents, netCents: Math.round(totalCents * 0.96), orderCount: orders.length, visitorCount: Math.max(orders.length, visitorCount) };
+  // The demo store has no refunds, so net equals gross.
+  return { bucket: iso, totalCents, netCents: totalCents, orderCount: sales.length, visitorCount: Math.max(sales.length, visitorCount) };
+}
+
+/** Sales and visits of the demo orders created in [start, end), with the same rules as a bucket. */
+function totalsBetween(start: Date, end: Date, now: Date): SellerHomeAnalytics['previous'] {
+  const orders: PreviewSellerOrder[] = [];
+  for (let day = new Date(start.getFullYear(), start.getMonth(), start.getDate()); day < end; day.setDate(day.getDate() + 1)) {
+    for (const order of ordersForDay(day.getFullYear(), day.getMonth(), day.getDate(), now)) {
+      const at = new Date(order.createdAt).getTime();
+      if (at >= start.getTime() && at < end.getTime()) orders.push(order);
+    }
+  }
+  const { totalCents, netCents, orderCount, visitorCount } = bucketFromOrders('', orders);
+  return { totalCents, netCents, orderCount, visitorCount };
+}
+
+/**
+ * The comparison window, by the API's rules: Today is the same hours
+ * yesterday; every other range is the same-length window right before it.
+ */
+function previousWindow(range: PreviewSellerChartRange, now: Date): { start: Date; end: Date } | null {
+  const y = now.getFullYear(); const m = now.getMonth(); const d = now.getDate();
+  const endOfToday = new Date(y, m, d + 1);
+  const rollingDays = ROLLING_DAYS[range];
+  let start: Date;
+  let end: Date;
+  if (rollingDays) {
+    start = new Date(y, m, d - (rollingDays - 1));
+    end = endOfToday;
+  } else if (range === 'today') {
+    const startToday = new Date(y, m, d);
+    const hourEnd = new Date(y, m, d, now.getHours() + 1);
+    const yesterday = new Date(y, m, d - 1);
+    return { start: yesterday, end: new Date(yesterday.getTime() + (hourEnd.getTime() - startToday.getTime())) };
+  } else if (range === 'week') {
+    start = mostRecentSunday(now);
+    end = endOfToday;
+  } else if (range === 'month') {
+    start = new Date(y, m, 1);
+    end = endOfToday;
+  } else if (range === 'year') {
+    start = new Date(y, 0, 1);
+    end = new Date(y, m + 1, 1);
+  } else {
+    return null; // 'all' has no prior period
+  }
+  const length = end.getTime() - start.getTime();
+  return { start: new Date(start.getTime() - length), end: start };
 }
 
 function ordersInDays(y: number, m: number, firstDay: number, lastDay: number, now: Date): PreviewSellerOrder[] {
@@ -232,30 +286,10 @@ export function buildPreviewSellerAnalytics(
   const orderCount = buckets.reduce((sum, b) => sum + b.orderCount, 0);
   const visitorCount = buckets.reduce((sum, b) => sum + b.visitorCount, 0);
 
-  const rollingDays = ROLLING_DAYS[range];
-  const previous = mode === 'fresh'
-    ? { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 }
-    : rollingDays
-      // Rolling windows compare against the real demo orders of the N days
-      // right before the window (the same rule as the API's previousPeriod).
-      ? (() => {
-        const prior = rollingDemoBuckets(rollingDays, now, rollingDays);
-        return {
-          totalCents: prior.reduce((sum, b) => sum + b.totalCents, 0),
-          netCents: prior.reduce((sum, b) => sum + b.netCents, 0),
-          orderCount: prior.reduce((sum, b) => sum + b.orderCount, 0),
-          visitorCount: prior.reduce((sum, b) => sum + b.visitorCount, 0),
-        };
-      })()
-    : (() => {
-      const previousTotalCents = Math.round(totalCents * (0.72 + mulberry32(SEED_BY_RANGE[range] + 1)() * 0.35));
-      return {
-        totalCents: previousTotalCents,
-        netCents: Math.round(previousTotalCents * 0.96),
-        orderCount: Math.max(0, Math.round(orderCount * 0.85)),
-        visitorCount: Math.max(0, Math.round(visitorCount * 0.88)),
-      };
-    })();
+  const window = mode === 'demo' ? previousWindow(range, now) : null;
+  const previous = window
+    ? totalsBetween(window.start, window.end, now)
+    : { totalCents: 0, netCents: 0, orderCount: 0, visitorCount: 0 };
 
   // A deterministic (seeded, not Math.random) split of the same visitorCount
   // above into the four real source categories — a plausible-looking demo
@@ -275,7 +309,8 @@ export function buildPreviewSellerAnalytics(
     // Deterministic, small — Live gifting is a real but occasional revenue
     // stream, never the dominant number on the chart.
     threadCashReceivedCents: mode === 'fresh' ? 0 : Math.round(totalCents * 0.015),
-    toFulfill: mode === 'fresh' ? 0 : Math.max(0, Math.round(orderCount * 0.08)),
+    // Paid orders still pending/processing, across the whole demo store (the API's rule).
+    toFulfill: mode === 'fresh' ? 0 : allPreviewSellerOrders(now).filter((o) => countsAsSale(o) && (o.status === 'pending' || o.status === 'processing')).length,
     toCapture: 0,
     previous,
     trafficSources,

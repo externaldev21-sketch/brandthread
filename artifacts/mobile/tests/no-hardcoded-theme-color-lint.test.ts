@@ -140,6 +140,9 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // mirrored from the API server) and the QR dark/light pair — colour data,
   // not app chrome.
   'lib/storeSiteDesign.ts',
+  // The dashboard order globe's fixed black/white/silver palette (owner's
+  // brand globe, the same on every app theme): the one file that holds it.
+  'components/globe/globeColors.ts',
   'app/(buyer)/edit-profile.tsx',
   'components/inbox/MessagesInbox.tsx',
   'app/(tabs)/feed.tsx',
