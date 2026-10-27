@@ -27,7 +27,7 @@
   {
     "name": "colour layer reordered below the ink",
     "ok": true,
-    "detail": "uid_1793086563849_2 > uid_1793086579080_3 > uid_1793086556510_1"
+    "detail": "uid_1793086760956_2 > uid_1793086776038_3 > uid_1793086753271_1"
   },
   {
     "name": "two-finger tap undoes the last stroke",
@@ -57,7 +57,7 @@
   {
     "name": "PNG export is full print resolution 4500×5400",
     "ok": true,
-    "detail": "4500×5400 in 5936ms"
+    "detail": "4500×5400 in 6246ms"
   },
   {
     "name": "PNG keeps alpha: empty canvas is transparent",
@@ -67,7 +67,7 @@
   {
     "name": "PNG keeps the artwork opaque",
     "ok": true,
-    "detail": "opaque 28400 / transparent 203199 samples; red rgba 232,49,47,255"
+    "detail": "opaque 28378 / transparent 203181 samples; red rgba 232,49,47,255"
   },
   {
     "name": "design is composited on the tee mockup",
@@ -77,7 +77,7 @@
   {
     "name": "Add to product hands the mockup to the product picker",
     "ok": true,
-    "detail": "http://127.0.0.1:33543/products?pickForMockup=1&projectId=proj_1793086544765_1"
+    "detail": "http://127.0.0.1:42831/products?pickForMockup=1&projectId=proj_1793086741609_1"
   },
   {
     "name": "gallery thumbnail renders the painted layers",
