@@ -81,7 +81,7 @@ test('Brush Library renders as a full-screen two-pane picker, not a bottom sheet
   expect(box!.height).toBeGreaterThan(750);
 
   // Two-pane structure: a real category sidebar, all 5 real categories.
-  for (const cat of ['Sketching', 'Inking', 'Painting', 'Airbrushing', 'Marker']) {
+  for (const cat of ['Sketching', 'Inking', 'Drawing', 'Painting', 'Artistic', 'Calligraphy', 'Airbrushing']) {
     await expect(page.locator(`[data-testid="brush-category-${cat}"]`)).toBeVisible();
   }
 
@@ -117,7 +117,7 @@ test('Selecting a different category filters the right pane for real', async () 
   await page.locator('[data-testid="brush-category-Painting"]').click();
   await page.waitForTimeout(200);
   await expect(page.getByText('Flat Brush', { exact: true })).toBeVisible();
-  await expect(page.getByText('Soft Brush', { exact: true })).toBeVisible();
+  await expect(page.getByText('Gouache', { exact: true })).toBeVisible();
   await expect(page.getByText('Studio Pen', { exact: true })).toHaveCount(0);
 
   await assertNoTextOrBoxOverflow(page, '[data-testid="brush-library"]');
@@ -145,11 +145,11 @@ test('Tapping a brush row actually selects it as the active brush', async () => 
   await page.locator('[data-testid="brush-category-Painting"]').click();
   await page.waitForTimeout(200);
 
-  // b7 = "Flat Brush" — not the default active brush (b4, Studio Pen).
-  const card = page.locator('[data-testid="brush-row-card-b7"]');
+  // "Flat Brush" — not the default active brush (Studio Pen).
+  const card = page.locator('[data-testid="brush-row-card-flat-brush"]');
   const bgBefore = await card.evaluate((el: Element) => getComputedStyle(el).backgroundColor);
 
-  await page.locator('[data-testid="brush-select-b7"]').click();
+  await page.locator('[data-testid="brush-select-flat-brush"]').click();
   await page.waitForTimeout(200);
 
   const bgAfter = await card.evaluate((el: Element) => getComputedStyle(el).backgroundColor);
@@ -176,10 +176,10 @@ test('Swipe-left on a brush row reveals real Duplicate/Delete actions that actua
   await page.locator('[data-testid="brush-category-Painting"]').click();
   await page.waitForTimeout(200);
 
-  await expect(page.getByText('Soft Brush Copy', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Round Brush Copy', { exact: true })).toHaveCount(0);
 
-  // Swipe the "Soft Brush" (b8) row left to reveal Share/Duplicate/Delete.
-  const row = page.locator('[data-testid="brush-row-b8"]');
+  // Swipe the "Round Brush" row left to reveal Share/Duplicate/Delete.
+  const row = page.locator('[data-testid="brush-row-round-brush"]');
   const box = await row.boundingBox();
   expect(box).not.toBeNull();
   const startX = box!.x + box!.width - 20;
@@ -190,17 +190,17 @@ test('Swipe-left on a brush row reveals real Duplicate/Delete actions that actua
   await page.mouse.up();
   await page.waitForTimeout(300);
 
-  await page.locator('[data-testid="brush-duplicate-b8"]').click();
+  await page.locator('[data-testid="brush-duplicate-round-brush"]').click();
   await page.waitForTimeout(300);
 
   // Real duplicate: a NEW row with the expected name, inserted right after
   // the original — not a fake toast or a no-op.
-  await expect(page.getByText('Soft Brush Copy', { exact: true })).toBeVisible();
+  await expect(page.getByText('Round Brush Copy', { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, '03-swipe-actions.png') });
 
   // The newly-created copy has its own id; find it and swipe-delete it to
   // confirm Delete also really mutates the list (not just Duplicate).
-  const copyRow = page.locator('[data-testid="brush-library-list"] >> text=Soft Brush Copy');
+  const copyRow = page.locator('[data-testid="brush-library-list"] >> text=Round Brush Copy');
   const copyBox = await copyRow.boundingBox();
   expect(copyBox).not.toBeNull();
   const cStartX = copyBox!.x + 150;
@@ -214,12 +214,12 @@ test('Swipe-left on a brush row reveals real Duplicate/Delete actions that actua
   const deleteButtons = page.locator('[data-testid^="brush-delete-"]');
   // The swiped-open row's own delete button is the only one with pointer
   // events enabled; click via the row's testID directly once we know its id
-  // isn't b8 (the original, untouched).
+  // isn't round-brush (the original, untouched).
   const allRows = await page.locator('[data-testid="brush-library-list"] [data-testid^="brush-row-"]').all();
   let copyId: string | null = null;
   for (const r of allRows) {
     const text = await r.textContent();
-    if (text?.includes('Soft Brush Copy')) {
+    if (text?.includes('Round Brush Copy')) {
       copyId = (await r.getAttribute('data-testid'))!.replace('brush-row-', '');
       break;
     }
@@ -232,7 +232,7 @@ test('Swipe-left on a brush row reveals real Duplicate/Delete actions that actua
   await page.locator('[data-testid="web-alert-button-1"]').click();
   await page.waitForTimeout(300);
 
-  await expect(page.getByText('Soft Brush Copy', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Round Brush Copy', { exact: true })).toHaveCount(0);
 
   await assertNoTextOrBoxOverflow(page, '[data-testid="brush-library"]');
 
