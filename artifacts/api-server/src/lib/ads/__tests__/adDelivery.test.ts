@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AD_COST_PER_IMPRESSION_CENTS, adDestination, budgetExhausted, campaignToCandidate, ctaLabel, ctrPercent,
-  fillDailySeries, flightDays, isAdSurface, pauseRefusal, resumeRefusal, stopRefusal,
+  fillDailySeries, fillHourlySeries, flightDays, pacingSnapshot, isAdSurface, pauseRefusal, resumeRefusal, stopRefusal,
   type AdCampaignForDelivery,
 } from "../adDelivery";
 import {
@@ -82,15 +82,15 @@ describe("ad campaign eligibility (shared Sponsored policy)", () => {
     expect(reason(campaign(), { sessionSeenBoostIds: new Set(["c1"]) })).toBe("seen_this_session");
   });
 
-  it("paces evenly over the flight with a small opening burst", () => {
+  it("paces evenly hour by hour: about one hour of budget ahead of the even line, never more", () => {
+    // 10-day flight → 240 hourly slots → ~41.7¢ an hour, jittered ±20%.
     const fresh = campaign({ startsAt: NOW, endsAt: new Date(NOW.getTime() + 10 * DAY), budgetCents: 10_000 });
-    // 10% burst = 1000 cents may deliver immediately …
-    expect(reason({ ...fresh, spentCents: 998 })).toBeNull();
-    // … but not more until time passes.
-    expect(reason({ ...fresh, spentCents: 1_000 })).toBe("pacing");
+    expect(reason({ ...fresh, spentCents: 30 })).toBeNull();
+    // Nothing delivers all at once: past ~1.2 hours of budget it waits for time to pass.
+    expect(reason({ ...fresh, spentCents: 52 })).toBe("pacing");
     const halfway = { ...fresh, startsAt: new Date(NOW.getTime() - 5 * DAY), endsAt: new Date(NOW.getTime() + 5 * DAY) };
-    expect(reason({ ...halfway, spentCents: 5_900 })).toBeNull();
-    expect(reason({ ...halfway, spentCents: 6_000 })).toBe("pacing");
+    expect(reason({ ...halfway, spentCents: 5_030 })).toBeNull();
+    expect(reason({ ...halfway, spentCents: 5_052 })).toBe("pacing");
   });
 });
 
@@ -173,5 +173,45 @@ describe("destinations, labels and results shaping", () => {
         { date: "2026-10-06", impressions: 4, clicks: 0, spendCents: 8 },
         { date: "2026-10-07", impressions: 0, clicks: 1, spendCents: 0 },
       ]);
+  });
+});
+
+describe("fillHourlySeries", () => {
+  it("zero-fills every hour of the flight so far, keeping the last 48", () => {
+    const start = new Date("2026-06-10T10:20:00Z");
+    const end = new Date("2026-06-10T13:05:00Z");
+    const series = fillHourlySeries(start, end,
+      new Map([["2026-06-10T11:00:00.000Z", { impressions: 7, spendCents: 14 }]]),
+      new Map([["2026-06-10T11:00:00.000Z", 1]]));
+    expect(series.map((p) => p.hour)).toEqual([
+      "2026-06-10T10:00:00.000Z", "2026-06-10T11:00:00.000Z", "2026-06-10T12:00:00.000Z", "2026-06-10T13:00:00.000Z",
+    ]);
+    expect(series[1]).toEqual({ hour: "2026-06-10T11:00:00.000Z", impressions: 7, spendCents: 14, clicks: 1 });
+    expect(series[0].impressions).toBe(0);
+    const long = fillHourlySeries(start, new Date(start.getTime() + 100 * 3_600_000), new Map(), new Map());
+    expect(long).toHaveLength(48);
+  });
+});
+
+describe("pacingSnapshot", () => {
+  const startsAt = new Date("2026-06-10T00:00:00Z");
+  const endsAt = new Date("2026-06-12T00:00:00Z"); // 48h
+  const base = { status: "active", budgetCents: 26_000, startsAt, endsAt, completedAt: null };
+
+  it("compares spend with the even line", () => {
+    const now = new Date("2026-06-11T00:00:00Z"); // halfway
+    expect(pacingSnapshot({ ...base, spentCents: 13_000 }, now)).toMatchObject({
+      status: "on_pace", elapsedShare: 0.5, deliveredShare: 0.5, targetSpentCents: 13_000, hourlyBudgetCents: 542,
+    });
+    expect(pacingSnapshot({ ...base, spentCents: 9_000 }, now).status).toBe("behind");
+    expect(pacingSnapshot({ ...base, spentCents: 15_000 }, now).status).toBe("ahead");
+  });
+
+  it("reports paused, finished and not-started states", () => {
+    const now = new Date("2026-06-11T00:00:00Z");
+    expect(pacingSnapshot({ ...base, status: "paused", spentCents: 0 }, now).status).toBe("paused");
+    expect(pacingSnapshot({ ...base, status: "completed", spentCents: 0, completedAt: now }, new Date("2026-06-20T00:00:00Z")))
+      .toMatchObject({ status: "finished", elapsedShare: 0.5 });
+    expect(pacingSnapshot({ ...base, startsAt: null, endsAt: null, spentCents: 0 }, now).status).toBe("not_started");
   });
 });

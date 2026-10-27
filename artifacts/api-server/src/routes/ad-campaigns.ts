@@ -3,6 +3,7 @@
  *
  * POST   /api/ad-campaigns                         — create draft
  * GET    /api/ad-campaigns                         — list seller's campaigns
+ * GET    /api/ad-campaigns/reach-model             — live reach inputs (CPM + audience) for the sliders
  * GET    /api/ad-campaigns/:id                     — get one (owner only)
  * PATCH  /api/ad-campaigns/:id                     — update draft (pre-payment)
  * DELETE /api/ad-campaigns/:id                     — cancel draft
@@ -13,7 +14,7 @@
  * POST   /api/ad-campaigns/:id/pay/verify          — verify payment after redirect; activates idempotently
  * POST   /api/ad-campaigns/:id/pause               — pause an active campaign (stops serving)
  * POST   /api/ad-campaigns/:id/resume              — resume a paused campaign (budget left, before endsAt)
- * POST   /api/ad-campaigns/:id/stop                — stop for good (completed, seller_stopped)
+ * POST   /api/ad-campaigns/:id/stop                — stop for good (completed, seller_stopped) + refund the undelivered remainder
  * GET    /api/ad-campaigns/:id/results             — delivered results (impressions, reach, clicks, spend, …)
  *
  * Delivery into buyer feeds lives in routes/ads-serve.ts + lib/ads/.
@@ -23,9 +24,15 @@
  *   2. Webhook handler     — checkout.session.completed / async_payment_succeeded
  * Never activated on client redirect alone. Never on PaymentIntent events.
  *
- * Reach estimate formula (shared, documented):
- *   low  = floor(budgetCents / 100 * 35)   // ~35 impressions per $1
- *   high = floor(budgetCents / 100 * 65)   // ~65 impressions per $1
+ * Budget: the seller sets a DAILY budget and a duration; budgetCents is the
+ * TOTAL (daily × days) — what Checkout charges and what delivery paces over
+ * the flight. A failed or expired checkout returns the campaign to draft.
+ *
+ * Reach estimate: lib/ads/reachEstimate.ts — total budget ÷ platform CPM
+ * against the real reachable buyer audience, with saturation (soft cap).
+ *
+ * Refunds: completing with budget left (stopped early, or the flight ended
+ * under-delivered) refunds the remainder pro-rata via Stripe (lib/ads/adRefunds.ts).
  */
 
 import express, { Router } from "express";
@@ -34,13 +41,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, adCampaigns, products } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
-import { requireStripe } from "../lib/stripe";
+import { requireStripe, stripe as stripeClient } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { acceptUploadSession } from "../lib/uploadSessions";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 import { pauseRefusal, resumeRefusal, stopRefusal } from "../lib/ads/adDelivery";
 import { adCampaignResults, adResultsSummaries, completeEndedAdCampaigns } from "../lib/ads/adDeliveryService";
+import { estimateCampaignReach } from "../lib/ads/reachEstimate";
+import { loadReachModel } from "../lib/ads/reachAudience";
+import { refundUndeliveredAdBudget, type RefundOutcome } from "../lib/ads/adRefunds";
 
 const router = Router();
 router.use(requireAuth);
@@ -49,27 +59,22 @@ const storage = new ObjectStorageService();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const AD_CAMPAIGN_BUDGET_MIN_CENTS  = 500;      // $5
-export const AD_CAMPAIGN_BUDGET_MAX_CENTS  = 100_000;  // $1000
+export const AD_CAMPAIGN_DAILY_BUDGET_MIN_CENTS = 500;      // $5 / day
+export const AD_CAMPAIGN_DAILY_BUDGET_MAX_CENTS = 100_000;  // $1,000 / day
 export const AD_CAMPAIGN_DURATION_MIN_DAYS = 1;
 export const AD_CAMPAIGN_DURATION_MAX_DAYS = 30;
+/** Total (daily × days) bounds */
+export const AD_CAMPAIGN_BUDGET_MIN_CENTS  = AD_CAMPAIGN_DAILY_BUDGET_MIN_CENTS;
+export const AD_CAMPAIGN_BUDGET_MAX_CENTS  = AD_CAMPAIGN_DAILY_BUDGET_MAX_CENTS * AD_CAMPAIGN_DURATION_MAX_DAYS; // $30,000
 export const AD_CAMPAIGN_MAX_PHOTOS        = 5;
 
 /**
- * Shared reach estimate formula. Called from route and exposed so the mobile
- * client can display an identical live preview while sliding.
- *
- * Formula:  low = floor(budgetCents/100 * 35)
- *           high = floor(budgetCents/100 * 65)
- *
- * This estimate is a planning aid and is NEVER reported as delivered impressions.
+ * Reach estimate for a TOTAL budget over `durationDays`, against the live
+ * audience model. A planning aid — NEVER reported as delivered impressions.
  */
-export function estimateReach(budgetCents: number): { low: number; high: number } {
-  const dollars = budgetCents / 100;
-  return {
-    low:  Math.floor(dollars * 35),
-    high: Math.floor(dollars * 65),
-  };
+export async function estimateReach(totalBudgetCents: number, durationDays: number): Promise<{ low: number; high: number }> {
+  const { low, high } = estimateCampaignReach({ totalBudgetCents, durationDays, model: await loadReachModel() });
+  return { low, high };
 }
 
 /** Validate a return URL supplied by the mobile client for Checkout redirect. */
@@ -165,6 +170,26 @@ router.get("/", async (req, res) => {
   });
 });
 
+// ─── GET /api/ad-campaigns/reach-model ───────────────────────────────────────
+// The inputs of the reach formula, so the app can recompute the estimate live
+// while the seller drags the budget/duration sliders (services/adReach.ts).
+
+router.get("/reach-model", async (req, res) => {
+  try {
+    const model = await loadReachModel();
+    return res.json({
+      ...model,
+      dailyBudgetMinCents: AD_CAMPAIGN_DAILY_BUDGET_MIN_CENTS,
+      dailyBudgetMaxCents: AD_CAMPAIGN_DAILY_BUDGET_MAX_CENTS,
+      durationMinDays: AD_CAMPAIGN_DURATION_MIN_DAYS,
+      durationMaxDays: AD_CAMPAIGN_DURATION_MAX_DAYS,
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "Failed to load ad reach model");
+    return res.status(500).json({ error: "Failed to load reach estimate" });
+  }
+});
+
 // ─── GET /api/ad-campaigns/:id ────────────────────────────────────────────────
 
 router.get("/:id", async (req, res) => {
@@ -188,7 +213,7 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
 
   const {
     headline, description, ctaKind, ctaDestinationKind, ctaDestinationId,
-    formats, budgetCents, durationDays,
+    formats, budgetCents, dailyBudgetCents, durationDays,
   } = req.body as Record<string, any>;
 
   // Validate CTA
@@ -224,7 +249,16 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
     }
   }
 
-  // Validate budget
+  // Validate daily budget (preferred: the total becomes daily × days)
+  if (dailyBudgetCents !== undefined && dailyBudgetCents !== null) {
+    if (!Number.isInteger(dailyBudgetCents) || dailyBudgetCents < AD_CAMPAIGN_DAILY_BUDGET_MIN_CENTS || dailyBudgetCents > AD_CAMPAIGN_DAILY_BUDGET_MAX_CENTS) {
+      return res.status(400).json({
+        error: `dailyBudgetCents must be a whole number of cents between ${AD_CAMPAIGN_DAILY_BUDGET_MIN_CENTS} and ${AD_CAMPAIGN_DAILY_BUDGET_MAX_CENTS}`,
+      });
+    }
+  }
+
+  // Validate total budget (store purchases are sold in fixed totals)
   if (budgetCents !== undefined) {
     if (!Number.isInteger(budgetCents) || budgetCents < AD_CAMPAIGN_BUDGET_MIN_CENTS || budgetCents > AD_CAMPAIGN_BUDGET_MAX_CENTS) {
       return res.status(400).json({
@@ -242,8 +276,17 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
     }
   }
 
-  const effectiveBudget = budgetCents ?? campaign.budgetCents;
-  const reach = estimateReach(effectiveBudget);
+  // The total is always derived server-side when a daily budget is in play:
+  // an explicit total (store tier) clears the daily figure; otherwise the
+  // stored daily budget follows duration changes.
+  const effectiveDuration: number = durationDays ?? campaign.durationDays;
+  const effectiveDaily: number | null =
+    dailyBudgetCents !== undefined ? dailyBudgetCents
+      : budgetCents !== undefined ? null
+      : campaign.dailyBudgetCents;
+  const effectiveBudget: number = effectiveDaily != null ? effectiveDaily * effectiveDuration : (budgetCents ?? campaign.budgetCents);
+  const budgetTouched = dailyBudgetCents !== undefined || budgetCents !== undefined || durationDays !== undefined;
+  const reach = budgetTouched ? await estimateReach(effectiveBudget, effectiveDuration) : null;
   const effectiveFormats = formats ?? campaign.formats;
 
   const updates: Partial<typeof adCampaigns.$inferInsert> = {
@@ -254,8 +297,9 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
     ...(ctaDestinationKind !== undefined ? { ctaDestinationKind } : {}),
     ...(ctaDestinationId !== undefined   ? { ctaDestinationId }   : {}),
     ...(formats !== undefined       ? { formats }             : {}),
-    ...(budgetCents !== undefined   ? {
-      budgetCents,
+    ...(reach ? {
+      budgetCents:        effectiveBudget,
+      dailyBudgetCents:   effectiveDaily,
       estimatedReachLow:  reach.low,
       estimatedReachHigh: reach.high,
     } : {}),
@@ -507,7 +551,7 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
     if (!campaign.ctaKind) {
       return res.status(422).json({ error: "Select a call-to-action before paying" });
     }
-    if (!campaign.budgetCents || campaign.budgetCents < AD_CAMPAIGN_BUDGET_MIN_CENTS) {
+    if (!campaign.budgetCents || campaign.budgetCents < AD_CAMPAIGN_BUDGET_MIN_CENTS || campaign.budgetCents > AD_CAMPAIGN_BUDGET_MAX_CENTS) {
       return res.status(422).json({ error: "Set a valid budget before paying" });
     }
 
@@ -572,6 +616,9 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
 
     // ── Create new Checkout Session ────────────────────────────────────────
     const budgetDollars = (campaign.budgetCents / 100).toFixed(2);
+    const budgetLine = campaign.dailyBudgetCents
+      ? `$${(campaign.dailyBudgetCents / 100).toFixed(2)}/day × ${campaign.durationDays} days = $${budgetDollars}`
+      : `${campaign.durationDays}-day ad · $${budgetDollars} budget`;
     const productName = campaign.headline
       ? `Brandthread ad · ${campaign.headline}`
       : `Brandthread ad campaign`;
@@ -592,7 +639,7 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
               unit_amount: campaign.budgetCents,
               product_data: {
                 name: productName,
-                description: `${campaign.durationDays}-day ad · $${budgetDollars} budget · ${(campaign.formats as string[]).join(", ")}`,
+                description: `${budgetLine}. Delivered gradually over the campaign; any undelivered budget is refunded.`,
               },
             },
           },
@@ -603,6 +650,9 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
           kind:           "ad_campaign",
           adCampaignId:  campaign.id,
           sellerId:       owner,
+        },
+        payment_intent_data: {
+          metadata: { kind: "ad_campaign", adCampaignId: campaign.id, sellerId: owner },
         },
       },
       {
@@ -698,6 +748,8 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
     }
 
     if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
+      // An expired checkout can never complete: the campaign goes back to draft.
+      if (session.status === "expired") await returnCampaignToDraft(session.id);
       return res.status(402).json({
         error: "Payment has not been completed",
         paymentStatus: session.payment_status,
@@ -707,10 +759,7 @@ router.post("/:id/pay/verify", express.json({ limit: "4kb" }), async (req, res) 
 
     // Activate idempotently
     const paidAt = new Date();
-    const activated = await activateAdCampaignBySessionId(
-      campaign.stripeCheckoutSessionId,
-      paidAt,
-    );
+    const activated = await activateAdCampaignBySessionId(session, paidAt);
     const result = activated ?? campaign;
     return res.json({ campaign: await hydrateCampaign(result) });
   } catch (err) {
@@ -780,7 +829,15 @@ router.post("/:id/stop", requirePermission("marketing"), async (req, res) => {
     ))
     .returning();
   if (!updated) return res.status(409).json({ error: "Campaign changed; refresh and try again", code: "conflict" });
-  return res.json({ campaign: await hydrateCampaign(updated) });
+  // Cancelled early: give back what was never delivered (pro-rata, via Stripe).
+  // A failure here doesn't undo the stop — the lifecycle sweep retries it.
+  let refund: RefundOutcome | null = null;
+  if (updated.paymentRail === "stripe" && stripeClient) {
+    refund = await refundUndeliveredAdBudget(updated.id, stripeClient, now);
+    if (refund.status === "failed") req.log?.warn?.({ campaignId: updated.id, error: refund.error }, "Ad campaign refund failed; will retry");
+  }
+  const [fresh] = await db.select().from(adCampaigns).where(eq(adCampaigns.id, updated.id)).limit(1);
+  return res.json({ campaign: await hydrateCampaign(fresh ?? updated), refund });
 });
 
 // ─── GET /api/ad-campaigns/:id/results ───────────────────────────────────────
@@ -819,10 +876,17 @@ async function hydrateCampaign(campaign: typeof adCampaigns.$inferSelect) {
 
 // ─── Internal: activate campaign by Checkout Session ID ───────────────────────
 
+type PaidCheckoutSession = {
+  id: string;
+  amount_total?: number | null;
+  payment_intent?: string | { id: string } | null;
+};
+
 async function activateAdCampaignBySessionId(
-  checkoutSessionId: string,
+  session: PaidCheckoutSession,
   paidAt: Date,
 ): Promise<typeof adCampaigns.$inferSelect | null> {
+  const checkoutSessionId = session.id;
   const [campaign] = await db
     .select()
     .from(adCampaigns)
@@ -835,7 +899,8 @@ async function activateAdCampaignBySessionId(
 
   const startsAt = paidAt;
   const endsAt   = new Date(paidAt.getTime() + campaign.durationDays * 86_400_000);
-  const reach    = estimateReach(campaign.budgetCents);
+  const reach    = await estimateReach(campaign.budgetCents, campaign.durationDays);
+  const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
 
   const [updated] = await db
     .update(adCampaigns)
@@ -846,6 +911,9 @@ async function activateAdCampaignBySessionId(
       endsAt,
       estimatedReachLow:  reach.low,
       estimatedReachHigh: reach.high,
+      paymentRail:        "stripe",
+      paidAmountCents:    session.amount_total ?? campaign.budgetCents,
+      stripePaymentIntentId: paymentIntentId,
       updatedAt:          new Date(),
     })
     .where(
@@ -896,27 +964,41 @@ export default router;
 // with metadata.kind === 'ad_campaign'.
 
 export async function activateAdCampaignFromCheckoutSession(
-  session: { id: string; payment_status: string; metadata?: Record<string, string> | null },
+  session: PaidCheckoutSession & { payment_status: string; metadata?: Record<string, string> | null },
   paidAt: Date,
 ): Promise<void> {
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
   if (session.metadata?.kind !== "ad_campaign") return;
-  await activateAdCampaignBySessionId(session.id, paidAt);
+  await activateAdCampaignBySessionId(session, paidAt);
+}
+
+/**
+ * Failed or expired payment: the campaign stays a draft the seller can edit
+ * and pay again. The dead session is detached (and the version bumped) so the
+ * next /pay creates a fresh Checkout Session rather than reusing this one.
+ */
+async function returnCampaignToDraft(checkoutSessionId: string): Promise<void> {
+  await db
+    .update(adCampaigns)
+    .set({
+      status: "draft",
+      stripeCheckoutSessionId: null,
+      checkoutSessionVersion: sql`${adCampaigns.checkoutSessionVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(adCampaigns.stripeCheckoutSessionId, checkoutSessionId),
+        eq(adCampaigns.status, "pending_payment"),
+      ),
+    );
 }
 
 export async function markAdCampaignCheckoutFailed(
   session: { id: string; metadata?: Record<string, string> | null },
 ): Promise<void> {
   if (session.metadata?.kind !== "ad_campaign") return;
-  await db
-    .update(adCampaigns)
-    .set({ status: "failed", updatedAt: new Date() })
-    .where(
-      and(
-        eq(adCampaigns.stripeCheckoutSessionId, session.id),
-        eq(adCampaigns.status, "pending_payment"),
-      ),
-    );
+  await returnCampaignToDraft(session.id);
 }
 
 // Kept for backwards-compat if old PI events arrive; no-ops for ad campaigns

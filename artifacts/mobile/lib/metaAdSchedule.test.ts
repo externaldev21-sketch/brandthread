@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  validateMetaAdSchedule, isMetaAdScheduleValid, metaAdLatestStart,
-  tidyInterestResults, META_INTEREST_MAX_SELECTED,
+  validateMetaAdSchedule, isMetaAdScheduleValid, metaAdLatestStart, metaAdLatestEnd, metaAdScheduleTimes,
+  tidyInterestResults, META_INTEREST_MAX_SELECTED, META_AD_MAX_FLIGHT_DAYS,
 } from './metaAdSchedule';
 
 // Local noon on 2026-10-24, so day maths never straddles midnight.
@@ -39,12 +39,43 @@ describe('validateMetaAdSchedule', () => {
     expect(v(false, '2027-10-25').startDate).toMatch(/within a year/);
   });
 
-  it('checks the end date against the start', () => {
+  it('needs the end date after the start date', () => {
     expect(v(false, '2026-11-01', '2026-11-05').endDate).toBeNull();
-    expect(v(false, '2026-11-01', '2026-11-01').endDate).toBeNull();
-    expect(v(false, '2026-11-01', '2026-10-30').endDate).toMatch(/before the start/);
-    expect(v(true, '', '2026-10-01').endDate).toMatch(/past/);
+    expect(v(false, '2026-11-01', '2026-11-01').endDate).toMatch(/after the start/);
+    expect(v(false, '2026-11-01', '2026-10-30').endDate).toMatch(/after the start/);
+    expect(v(true, '', '2026-10-24').endDate).toMatch(/after today/);
+    expect(v(true, '', '2026-10-01').endDate).toMatch(/after today/);
     expect(v(true, '', 'soon').endDate).toMatch(/real date/);
+  });
+
+  it(`caps the flight at ${META_AD_MAX_FLIGHT_DAYS} days`, () => {
+    expect(v(false, '2026-11-01', '2027-01-30').endDate).toBeNull(); // 90 days
+    expect(v(false, '2026-11-01', '2027-01-31').endDate).toMatch(/up to 90 days/);
+    expect(metaAdLatestEnd('2026-11-01', false, NOW)).toEqual(new Date(2027, 0, 30));
+    expect(metaAdLatestEnd('', true, NOW)).toEqual(new Date(2027, 0, 22));
+  });
+
+  it('requires an end date for a lifetime budget', () => {
+    expect(validateMetaAdSchedule({ startNow: true, startDate: '', endDate: '', budgetType: 'lifetime' }, NOW).endDate)
+      .toMatch(/lifetime budget needs an end date/);
+    expect(validateMetaAdSchedule({ startNow: true, startDate: '', endDate: '', budgetType: 'daily' }, NOW).endDate).toBeNull();
+  });
+});
+
+describe('metaAdScheduleTimes', () => {
+  it('sends nothing for start now / no end', () => {
+    expect(metaAdScheduleTimes({ startNow: true, startDate: '2026-11-01', endDate: '' }, NOW)).toEqual({});
+  });
+
+  it('sends a future start as local midnight and the end as the end of that local day', () => {
+    expect(metaAdScheduleTimes({ startNow: false, startDate: '2026-11-01', endDate: '2026-11-05' }, NOW)).toEqual({
+      startTime: new Date(2026, 10, 1).toISOString(),
+      endTime: new Date(2026, 10, 5, 23, 59, 59).toISOString(),
+    });
+  });
+
+  it('never sends a start in the past when today is picked', () => {
+    expect(metaAdScheduleTimes({ startNow: false, startDate: '2026-10-24', endDate: '' }, NOW).startTime).toBe(NOW.toISOString());
   });
 });
 

@@ -12,14 +12,81 @@
  * are responsible for decrypting via src/lib/metaCrypto.ts and for persisting
  * results.
  */
+import crypto from "node:crypto";
 import { withRetry } from "./retry";
 
-function graphVersion(): string {
-  return process.env.META_GRAPH_API_VERSION?.trim() || "v21.0";
+/**
+ * Graph / Marketing API version every call is pinned to. Meta retires each
+ * Marketing API version roughly a year after the next one ships, so bump this
+ * (or set META_GRAPH_API_VERSION) when Meta's changelog marks it deprecated.
+ */
+export const META_GRAPH_API_VERSION_DEFAULT = "v24.0";
+
+export function graphVersion(): string {
+  return process.env.META_GRAPH_API_VERSION?.trim() || META_GRAPH_API_VERSION_DEFAULT;
 }
 
 function graphBase(): string {
   return `https://graph.facebook.com/${graphVersion()}`;
+}
+
+/**
+ * Permissions the Facebook Login dialog asks for. Every one of these needs
+ * Advanced Access (App Review) before sellers outside the app's own roles can
+ * grant it — see the Meta setup checklist.
+ */
+export const META_OAUTH_SCOPES = [
+  "ads_management",
+  "ads_read",
+  "business_management",
+  "pages_show_list",
+  "pages_read_engagement",
+  "instagram_basic",
+  "pages_manage_ads",
+] as const;
+
+/** Without these the connection can't list accounts or create ads at all. */
+export const META_REQUIRED_SCOPES = ["ads_management", "business_management", "pages_show_list"] as const;
+
+/**
+ * The Facebook Login dialog URL. With META_LOGIN_CONFIG_ID set (a Facebook
+ * Login for Business configuration), Meta takes the permission set from that
+ * configuration and `scope` is not sent.
+ */
+export function buildOAuthDialogUrl(params: {
+  appId: string;
+  redirectUri: string;
+  state: string;
+  configId?: string;
+}): string {
+  const query: Record<string, string> = {
+    client_id: params.appId,
+    redirect_uri: params.redirectUri,
+    state: params.state,
+    response_type: "code",
+  };
+  if (params.configId) query.config_id = params.configId;
+  else query.scope = META_OAUTH_SCOPES.join(",");
+  return `https://www.facebook.com/${graphVersion()}/dialog/oauth?${new URLSearchParams(query).toString()}`;
+}
+
+/**
+ * appsecret_proof (HMAC-SHA256 of the access token keyed by the app secret).
+ * Sent with every token-bearing call so the app can turn on "Require App
+ * Secret" in Meta's dashboard — a leaked token alone is then useless.
+ */
+function appSecretProof(accessToken: string): string | undefined {
+  const secret = process.env.META_APP_SECRET;
+  if (!secret || !accessToken) return undefined;
+  return crypto.createHmac("sha256", secret).update(accessToken).digest("hex");
+}
+
+function withAppSecretProofUrl(url: string): string {
+  const parsed = new URL(url);
+  const token = parsed.searchParams.get("access_token");
+  const proof = token ? appSecretProof(token) : undefined;
+  if (proof) parsed.searchParams.set("appsecret_proof", proof);
+  return parsed.toString();
 }
 
 // ─── Error type + plain-English mapping ────────────────────────────────────
@@ -44,6 +111,15 @@ export class MetaGraphError extends Error {
     this.metaErrorCode = params.metaErrorCode;
     this.metaErrorSubcode = params.metaErrorSubcode;
     this.userMessage = params.userMessage;
+  }
+
+  /**
+   * Code 190 is Meta's "invalid OAuth access token" family — expired (subcode
+   * 463), invalidated (467), password changed (460), app removed (458)… None
+   * of them recover without the seller logging in to Meta again.
+   */
+  get requiresReconnect(): boolean {
+    return this.metaErrorCode === 190;
   }
 }
 
@@ -122,7 +198,7 @@ async function parseMetaErrorBody(res: Response): Promise<MetaGraphError> {
 async function metaGet(url: string, label: string): Promise<any> {
   return withRetry(
     async () => {
-      const res = await fetch(url);
+      const res = await fetch(withAppSecretProofUrl(url));
       if (!res.ok) throw await parseMetaErrorBody(res);
       return res.json();
     },
@@ -142,10 +218,11 @@ async function metaGet(url: string, label: string): Promise<any> {
  * safely because of that resume behavior — never because this function retries.
  */
 async function metaPost(url: string, body: Record<string, unknown>): Promise<any> {
+  const proof = typeof body.access_token === "string" ? appSecretProof(body.access_token) : undefined;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(proof ? { ...body, appsecret_proof: proof } : body),
   });
   if (!res.ok) throw await parseMetaErrorBody(res);
   return res.json();
@@ -177,19 +254,49 @@ export async function exchangeCodeForToken(params: {
   return { accessToken: body.access_token, expiresIn: body.expires_in ?? 0 };
 }
 
+/**
+ * Exchanges a user token for a long-lived (~60 day) one via fb_exchange_token.
+ * Also used to try to extend a long-lived token near its expiry. `expiresIn`
+ * is null when Meta leaves it out — callers then ask debugToken() for the
+ * real expiry rather than assuming a fresh 60 days.
+ */
 export async function getLongLivedToken(
-  shortLivedToken: string,
-): Promise<{ accessToken: string; expiresIn: number }> {
+  userToken: string,
+): Promise<{ accessToken: string; expiresIn: number | null }> {
   const appId = process.env.META_APP_ID ?? "";
   const appSecret = process.env.META_APP_SECRET ?? "";
   const url = `${graphBase()}/oauth/access_token?${qs({
     grant_type: "fb_exchange_token",
     client_id: appId,
     client_secret: appSecret,
-    fb_exchange_token: shortLivedToken,
+    fb_exchange_token: userToken,
   })}`;
   const body = await metaGet(url, "metaGraph.getLongLivedToken");
-  return { accessToken: body.access_token, expiresIn: body.expires_in ?? 5_184_000 /* ~60 days */ };
+  return {
+    accessToken: body.access_token,
+    expiresIn: typeof body.expires_in === "number" && body.expires_in > 0 ? body.expires_in : null,
+  };
+}
+
+/**
+ * Meta's own view of a user token (GET /debug_token with the app token):
+ * whether it is valid, when it expires, and which permissions the seller
+ * actually granted (they can untick some in the Login dialog).
+ */
+export async function debugToken(
+  inputToken: string,
+): Promise<{ isValid: boolean; expiresAt: Date | null; scopes: string[] }> {
+  const appToken = `${process.env.META_APP_ID ?? ""}|${process.env.META_APP_SECRET ?? ""}`;
+  const url = `${graphBase()}/debug_token?${qs({ input_token: inputToken, access_token: appToken })}`;
+  const body = await metaGet(url, "metaGraph.debugToken");
+  const data = body?.data ?? {};
+  const expiresAtSeconds = Number(data.expires_at);
+  return {
+    isValid: data.is_valid === true,
+    // 0 means "never expires" (not expected for user tokens).
+    expiresAt: Number.isFinite(expiresAtSeconds) && expiresAtSeconds > 0 ? new Date(expiresAtSeconds * 1000) : null,
+    scopes: Array.isArray(data.scopes) ? data.scopes.filter((v: unknown): v is string => typeof v === "string") : [],
+  };
 }
 
 export async function getMe(accessToken: string): Promise<{ id: string; name: string }> {
@@ -316,7 +423,11 @@ export async function createCampaign(
     name: params.name,
     objective: params.objective,
     status: params.status,
+    // Apparel ads aren't housing / employment / credit / politics.
     special_ad_categories: [],
+    // Budgets live on the ad set (no campaign budget). Newer API versions
+    // require saying whether ad sets may share budget when that's the case.
+    is_adset_budget_sharing_enabled: false,
     access_token: accessToken,
   });
   return { id: body.id };
@@ -413,6 +524,7 @@ export async function uploadAdVideo(
 export interface CreateAdCreativeParams {
   name: string;
   pageId: string;
+  /** Instagram account id the ad runs as (sent as `instagram_user_id`). */
   instagramActorId?: string;
   primaryText?: string;
   headline?: string;
@@ -447,7 +559,8 @@ export async function createAdCreative(
 
   const objectStorySpec: Record<string, unknown> = {
     page_id: params.pageId,
-    ...(params.instagramActorId ? { instagram_actor_id: params.instagramActorId } : {}),
+    // `instagram_actor_id` was replaced by `instagram_user_id` in v22.0.
+    ...(params.instagramActorId ? { instagram_user_id: params.instagramActorId } : {}),
     ...(linkData ? { link_data: linkData } : {}),
     ...(videoData ? { video_data: videoData } : {}),
   };

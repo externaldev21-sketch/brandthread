@@ -11,7 +11,9 @@
  * namespace).
  */
 
-import type { MetaAdObjective, MetaCampaignStatus, MetaReachEstimate } from '@/lib/api';
+import type {
+  MetaAdObjective, MetaAdsConnection, MetaAdsConnectionState, MetaCampaignStatus, MetaReachEstimate,
+} from '@/lib/api';
 import { BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS } from '@/services/adCampaignService';
 
 // Re-export the shared whole-dollar budget step list / bounds — Meta Ads uses
@@ -94,6 +96,63 @@ export function buildMetaAdsReturnUrl(webOrigin?: string): string {
   }
   return 'brandthread://meta-ads-connect';
 }
+
+/** What brandthread://meta-ads-connect?… (auth session result or deep link) carries. */
+export type MetaOAuthReturn =
+  | { kind: 'code'; code: string; state: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'success' };
+
+export function parseMetaOAuthReturn(url: string): MetaOAuthReturn | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url.replace(/^brandthread:\/\//, 'https://x/'));
+  } catch {
+    return null;
+  }
+  return metaOAuthReturnFromParams({
+    oauth: parsed.searchParams.get('oauth') ?? undefined,
+    code: parsed.searchParams.get('code') ?? undefined,
+    state: parsed.searchParams.get('state') ?? undefined,
+    message: parsed.searchParams.get('message') ?? undefined,
+  });
+}
+
+export function metaOAuthReturnFromParams(params: {
+  oauth?: string; code?: string; state?: string; message?: string;
+}): MetaOAuthReturn | null {
+  if (params.oauth === 'code' && params.code && params.state) {
+    return { kind: 'code', code: params.code, state: params.state };
+  }
+  if (params.oauth === 'error' || params.oauth === 'code') {
+    return { kind: 'error', message: params.message || 'Meta declined the connection. Please try again.' };
+  }
+  if (params.oauth === 'success') return { kind: 'success' };
+  return null;
+}
+
+// ─── Connection state ──────────────────────────────────────────────────────
+
+/**
+ * The server's explicit `state`, or the same answer derived from the older
+ * `configured` / `connected` / `status` fields.
+ */
+export function metaConnectionState(conn: MetaAdsConnection): MetaAdsConnectionState {
+  if (conn.state) return conn.state;
+  if (conn.configured === false) return 'not_configured';
+  if (conn.status === 'needs_reauth') return 'needs_reconnect';
+  if (conn.connected && conn.status === 'connected') return 'connected';
+  if (conn.status === 'pending_selection') return 'pending_selection';
+  return 'not_connected';
+}
+
+/** A request failed because the seller's Meta login expired or was revoked (409 META_RECONNECT_REQUIRED). */
+export function isMetaReconnectError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'META_RECONNECT_REQUIRED';
+}
+
+/** Heading + body for a failed connection check (network / 5xx) — never the Connect CTA. */
+export const META_CONNECTION_CHECK_FAILED = "Couldn't reach Meta or Brandthread. Check your connection and try again.";
 
 // ─── Reach estimate formatting (Meta's delivery estimate is the only source;
 // the app never computes a reach number itself) ────────────────────────────

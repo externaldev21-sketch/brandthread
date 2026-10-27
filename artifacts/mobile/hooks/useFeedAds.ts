@@ -14,6 +14,9 @@
  *
  * Signed-out (and any `enabled: false` caller) never calls the API — ads are
  * a signed-in-only feature, and a failure simply means no ads.
+ *
+ * Demo preview (`&demo=1`, no backend): the demo campaign (lib/demoAdCampaign)
+ * fills the first slot the server would offer — after the 6th organic item.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -24,11 +27,15 @@ import {
   absolutePlacements, adDestinationHref, mergeFeedAds, newAdSessionId,
   type SponsoredFeedItem,
 } from '@/lib/feedAds';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { demoFeedAd } from '@/lib/demoAdCampaign';
 
 /** One id per app launch: the server never repeats a campaign within it. */
 const APP_AD_SESSION_ID = newAdSessionId();
 /** Upper bound on organic items sent per serve request (server accepts <= 60). */
 const MAX_PAGE = 60;
+/** Server placement: one ad per 6 organic items, never first — the first slot follows item index 5. */
+const DEMO_AD_AFTER_INDEX = 5;
 
 export type UseFeedAdsResult<T> = {
   items: Array<T | SponsoredFeedItem>;
@@ -52,6 +59,7 @@ export function useFeedAds<T>({
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const active = enabled && isSignedIn === true;
+  const [demo] = useState(() => isPreviewDemoMode());
 
   const [placements, setPlacements] = useState<ReadonlyMap<number, FeedAd>>(() => new Map());
   const servedUpTo = useRef(0);
@@ -102,9 +110,18 @@ export function useFeedAds<T>({
       });
   }, [active, api, surface, organic.length, tick, resetSignature]);
 
+  const demoPlacements = useMemo(
+    () => (demo && enabled && organic.length > DEMO_AD_AFTER_INDEX
+      ? new Map([[DEMO_AD_AFTER_INDEX, demoFeedAd(surface, DEMO_AD_AFTER_INDEX)]])
+      : null),
+    [demo, enabled, organic.length, surface],
+  );
+
   const items = useMemo(
-    () => (active ? mergeFeedAds(organic, placements) : (organic as Array<T | SponsoredFeedItem>)),
-    [active, organic, placements],
+    () => (active ? mergeFeedAds(organic, placements)
+      : demoPlacements ? mergeFeedAds(organic, demoPlacements)
+      : (organic as Array<T | SponsoredFeedItem>)),
+    [active, organic, placements, demoPlacements],
   );
 
   const confirmImpression = useCallback((ad: FeedAd) => {

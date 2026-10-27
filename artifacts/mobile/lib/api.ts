@@ -1175,11 +1175,41 @@ export interface AdResultsSummary {
   remainingCents: number;
 }
 
+export type AdPacingStatus = 'not_started' | 'on_pace' | 'behind' | 'ahead' | 'paused' | 'finished';
+
 export interface AdCampaignResults extends AdResultsSummary {
   bySurface: { surface: AdSurface; impressions: number; clicks: number; spendCents: number }[];
   daily: { date: string; impressions: number; clicks: number; spendCents: number }[];
+  /** Last 48 hours of delivery, one point per hour (ISO hour). */
+  hourly?: { hour: string; impressions: number; clicks: number; spendCents: number }[];
+  /** Delivery vs the even-pacing line. */
+  pacing?: {
+    status: AdPacingStatus;
+    elapsedShare: number;
+    deliveredShare: number;
+    targetSpentCents: number;
+    hourlyBudgetCents: number;
+  };
+  refund?: { refundedCents: number; status: string | null; rail: string | null };
   attribution: { windowDays: number; orders: number; revenueCents: number };
 }
+
+/** GET /api/ad-campaigns/reach-model — inputs for the live reach estimate (services/adReach.ts). */
+export interface AdReachModel {
+  cpmCents: number;
+  audience: { total: number; dailyActive: number; source: 'measured' | 'floor' };
+  dailyBudgetMinCents: number;
+  dailyBudgetMaxCents: number;
+  durationMinDays: number;
+  durationMaxDays: number;
+}
+
+/** Outcome of the pro-rata refund issued when a campaign is stopped early. */
+export type AdRefundOutcome =
+  | { status: 'refunded'; amountCents: number; refundStatus: 'succeeded' | 'pending' }
+  | { status: 'nothing_to_refund' }
+  | { status: 'not_refundable'; reason: string }
+  | { status: 'failed'; error: string };
 
 export type AdDestination =
   | { kind: 'product'; productId: string; sellerId: string }
@@ -1221,7 +1251,10 @@ export interface AdCampaign {
   ctaDestinationKind: AdCtaDestinationKind | null;
   ctaDestinationId: string | null;
   formats: AdFormatKind[];
+  /** Campaign TOTAL in cents (daily × days when dailyBudgetCents is set) */
   budgetCents: number;
+  /** Seller-chosen daily budget; null for total-only (store-tier) campaigns */
+  dailyBudgetCents?: number | null;
   durationDays: number;
   estimatedReachLow: number;
   estimatedReachHigh: number;
@@ -1243,6 +1276,11 @@ export interface AdCampaign {
   surfaces?: AdSurface[];
   /** Present on the list endpoint */
   results?: AdResultsSummary | null;
+  /** 'stripe' (refundable pro-rata) | 'store' (App Store / Play) */
+  paymentRail?: 'stripe' | 'store' | null;
+  paidAmountCents?: number | null;
+  refundedCents?: number;
+  refundStatus?: 'processing' | 'succeeded' | 'pending' | 'failed' | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1259,11 +1297,25 @@ export interface AdCampaignCheckoutSession {
 
 export type MetaAdsConnectionStatus = 'pending_selection' | 'connected' | 'needs_reauth' | 'disconnected';
 
+/**
+ * What the server says about the seller's Meta link. Only 'not_connected'
+ * offers Connect Meta; 'needs_reconnect' (token expired / revoked) offers
+ * Reconnect. A failed request is never one of these — screens show a retry.
+ */
+export type MetaAdsConnectionState =
+  | 'not_configured' | 'not_connected' | 'pending_selection' | 'connected' | 'needs_reconnect';
+
 export interface MetaAdsConnection {
+  /** Absent only from older servers — read it through metaConnectionState(). */
+  state?: MetaAdsConnectionState;
   connected: boolean;
   configured?: boolean;
   configurationError?: string;
   status?: MetaAdsConnectionStatus;
+  /** Server is pointed at a Meta sandbox ad account (no real delivery or spend). */
+  sandbox?: boolean;
+  /** Why a reconnect is needed, when state is 'needs_reconnect'. */
+  reconnectReason?: string;
   businessName?: string;
   adAccountName?: string;
   adAccountCurrency?: string;
@@ -1368,8 +1420,10 @@ export interface MetaCampaignDraftInput {
   mediaObjectPaths: string[];
   budgetType: 'daily' | 'lifetime';
   budgetCents: number;
-  startTime?: string;
-  endTime?: string;
+  /** ISO; null / absent = start now. */
+  startTime?: string | null;
+  /** ISO; null / absent = no end date (null clears a saved one). */
+  endTime?: string | null;
   advantagePlus?: boolean;
   placements?: Record<string, unknown>;
   targetingSpec?: MetaTargetingSpec;
@@ -5180,10 +5234,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ctaDestinationKind: AdCtaDestinationKind;
         ctaDestinationId: string;
         formats: AdFormatKind[];
+        /** Total-only budget (store tiers); prefer dailyBudgetCents */
         budgetCents: number;
+        dailyBudgetCents: number;
         durationDays: number;
       }>) =>
         patch<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}`, body),
+      reachModel: () =>
+        freshGet<AdReachModel>('/api/ad-campaigns/reach-model'),
       cancel: (id: string) =>
         del<{ ok: boolean }>(`/api/ad-campaigns/${encodeURIComponent(id)}`),
       uploadMedia: (
@@ -5242,13 +5300,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ status: string; transactionId?: string }>(`/api/iap-promotions/campaign/${encodeURIComponent(id)}/apply-credit`, {}),
       /** Delivered results: impressions, unique reach, clicks, CTR, spend, by surface, daily. */
       results: (id: string) =>
-        get<{ campaign: AdCampaign; results: AdCampaignResults }>(`/api/ad-campaigns/${encodeURIComponent(id)}/results`),
+        // Never cached: the results screen polls while delivery trickles in.
+        freshGet<{ campaign: AdCampaign; results: AdCampaignResults }>(`/api/ad-campaigns/${encodeURIComponent(id)}/results`),
       pause: (id: string) =>
         post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/pause`, {}),
       resume: (id: string) =>
         post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/resume`, {}),
       stop: (id: string) =>
-        post<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}/stop`, {}),
+        post<{ campaign: AdCampaign; refund?: AdRefundOutcome | null }>(`/api/ad-campaigns/${encodeURIComponent(id)}/stop`, {}),
     },
     /**
      * Sponsored ad delivery into buyer feeds (signed-in only). `serve` returns
@@ -5275,15 +5334,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
      * never touches ad spend here (unlike adCampaigns' Stripe-funded boosts).
      */
     metaAds: {
-      /** Current connection state — call before showing any Meta Ads screen. */
+      /** Current connection state — call before showing any Meta Ads screen. Never cached. */
       connection: () =>
-        get<MetaAdsConnection>('/api/meta-ads/connection'),
+        freshGet<MetaAdsConnection>('/api/meta-ads/connection'),
       /** Returns the Meta OAuth URL to open with WebBrowser.openAuthSessionAsync. */
       oauthStart: () =>
-        get<{ authUrl: string }>('/api/meta-ads/oauth/start'),
+        freshGet<{ authUrl: string }>('/api/meta-ads/oauth/start'),
+      /**
+       * Finishes OAuth: the callback hands `code` + `state` back in the
+       * brandthread://meta-ads-connect?oauth=code deep link and the signed-in
+       * app posts them here (the server exchanges the code for a token).
+       */
+      oauthComplete: (code: string, state: string) =>
+        post<MetaAdsConnection>('/api/meta-ads/oauth/complete', { code, state }),
       /** Meta Business Manager businesses available to the connected user. */
       businesses: () =>
-        get<{ businesses: MetaBusiness[] }>('/api/meta-ads/businesses'),
+        freshGet<{ businesses: MetaBusiness[] }>('/api/meta-ads/businesses'),
       /** Ad accounts under a given business. */
       adAccounts: (businessId: string) =>
         get<{ adAccounts: MetaAdAccount[] }>(`/api/meta-ads/businesses/${encodeURIComponent(businessId)}/ad-accounts`),

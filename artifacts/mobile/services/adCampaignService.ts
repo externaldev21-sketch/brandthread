@@ -15,11 +15,11 @@
  *   validateDetailsStage   → validateCtaStage (CTA + product selection)
  *   validatePlacementStage → validateBudgetStage (formats + budget + duration)
  *
- * Reach estimate formula (mirrors server):
- *   low  = floor(budgetCents / 100 * 35)   // ~35 impressions per $1
- *   high = floor(budgetCents / 100 * 65)   // ~65 impressions per $1
+ * Budget: the seller picks a DAILY budget (BUDGET_STEPS, $5–$1,000/day) and a
+ * duration; the campaign total is daily × days (totalBudgetCents).
  *
- * This estimate is a planning aid. It is never reported as delivered impressions.
+ * Reach estimate: services/adReach.ts (budget-true, mirrors the server). It
+ * is a planning aid and is never reported as delivered impressions.
  * No OUTPUT_COUNT or VARIATION_COUNT is exposed by this service.
  */
 
@@ -31,26 +31,24 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 
-// ─── Shared reach estimate (matches server formula exactly) ──────────────────
+// ─── Budget / Duration constraints (mirror routes/ad-campaigns.ts) ───────────
 
-export function estimateReach(budgetCents: number): { low: number; high: number } {
-  const dollars = budgetCents / 100;
-  return {
-    low:  Math.floor(dollars * 35),
-    high: Math.floor(dollars * 65),
-  };
-}
-
-// ─── Budget / Duration constraints ───────────────────────────────────────────
-
-export const BUDGET_MIN_CENTS  = 500;      // $5
-export const BUDGET_MAX_CENTS  = 100_000;  // $1000
+/** Daily budget bounds — the slider sets dollars per day. */
+export const BUDGET_MIN_CENTS  = 500;      // $5 / day
+export const BUDGET_MAX_CENTS  = 100_000;  // $1,000 / day
 export const DURATION_MIN_DAYS = 1;
 export const DURATION_MAX_DAYS = 30;
+/** Campaign total cap: the biggest daily budget for the longest flight ($30,000). */
+export const TOTAL_BUDGET_MAX_CENTS = BUDGET_MAX_CENTS * DURATION_MAX_DAYS;
+
+/** What the seller is charged: daily budget × days. */
+export function totalBudgetCents(dailyBudgetCents: number, durationDays: number): number {
+  return Math.max(0, Math.round(dailyBudgetCents)) * Math.max(0, Math.round(durationDays));
+}
 export const MAX_PHOTOS        = 5;
 export const MAX_VIDEO_DURATION_SECONDS = 60;
 
-// Whole-dollar increments: $5, $10, $15, … up to $1000
+// Daily budget slider: whole-dollar increments $5, $10, $15, … up to $1000 a day
 // Generates an array of valid budget steps in cents
 export function buildBudgetSteps(): number[] {
   const steps: number[] = [];
@@ -248,7 +246,7 @@ export function validateFormatStage(campaign: Partial<AdCampaign>): StageValidat
 export function validateBudgetStage(campaign: Partial<AdCampaign>): StageValidation {
   const errors: string[] = [];
 
-  if (!campaign.budgetCents || campaign.budgetCents < BUDGET_MIN_CENTS) {
+  if (!campaign.budgetCents || campaign.budgetCents < BUDGET_MIN_CENTS || campaign.budgetCents > TOTAL_BUDGET_MAX_CENTS) {
     errors.push('Set a valid budget');
   }
   if (!campaign.durationDays || campaign.durationDays < DURATION_MIN_DAYS) {

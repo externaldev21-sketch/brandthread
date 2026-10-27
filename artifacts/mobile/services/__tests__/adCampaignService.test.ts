@@ -27,7 +27,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  estimateReach,
+  totalBudgetCents,
+  TOTAL_BUDGET_MAX_CENTS,
   validateMediaStage,
   validateDescriptionStage,
   validateCtaStage,
@@ -122,38 +123,23 @@ describe("5-step flow contract", () => {
   });
 });
 
-// ─── Reach estimate ───────────────────────────────────────────────────────────
+// ─── Daily budget × days ─────────────────────────────────────────────────────
+// (The reach estimate itself lives in services/adReach.ts — see adReach.test.ts.)
 
-describe("estimateReach", () => {
-  it("returns low=35 high=65 per dollar ($1 = 100 cents)", () => {
-    const { low, high } = estimateReach(100);
-    expect(low).toBe(35);
-    expect(high).toBe(65);
+describe("totalBudgetCents", () => {
+  it("is the daily budget times the number of days", () => {
+    expect(totalBudgetCents(13_000, 2)).toBe(26_000);
+    expect(totalBudgetCents(13_000, 25)).toBe(325_000);
   });
 
-  it("is consistent with server formula for $5 (minimum budget)", () => {
-    const { low, high } = estimateReach(500);
-    expect(low).toBe(175);
-    expect(high).toBe(325);
+  it("caps at the biggest daily budget for the longest flight", () => {
+    expect(totalBudgetCents(BUDGET_MAX_CENTS, 30)).toBe(TOTAL_BUDGET_MAX_CENTS);
+    expect(TOTAL_BUDGET_MAX_CENTS).toBe(3_000_000);
   });
 
-  it("low is always less than high for all valid budgets", () => {
-    for (const cents of [500, 2500, 10_000, 100_000]) {
-      const { low, high } = estimateReach(cents);
-      expect(low).toBeLessThan(high);
-    }
-  });
-
-  it("uses Math.floor, not round ($2.50 → 87 not 88)", () => {
-    // 2.5 * 35 = 87.5 → Math.floor = 87
-    expect(estimateReach(250).low).toBe(87);
-  });
-
-  it("is proportional to budget (doubles with doubled budget)", () => {
-    const r1 = estimateReach(1000);
-    const r2 = estimateReach(2000);
-    expect(r2.low).toBe(r1.low * 2);
-    expect(r2.high).toBe(r1.high * 2);
+  it("validateBudgetStage accepts a long, large total but rejects one past the cap", () => {
+    expect(validateBudgetStage({ budgetCents: 325_000, durationDays: 25 }).valid).toBe(true);
+    expect(validateBudgetStage({ budgetCents: TOTAL_BUDGET_MAX_CENTS + 100, durationDays: 30 }).valid).toBe(false);
   });
 });
 

@@ -20,6 +20,7 @@
     "benchmark:ai-providers": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts",
     "benchmark:ai-providers:mock": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts --mock",
     "seed:review-accounts": "tsx ./scripts/seedReviewAccounts.ts",
+    "seed:demo-ad-campaign": "tsx ./scripts/seedDemoAdCampaign.ts",
     "verify:reviewer-sign-in": "tsx ./scripts/verifyReviewerSignIn.ts",
     "admin:reset-accounts": "tsx ./scripts/reset-accounts.ts",
     "import:manufacturers": "tsx ./scripts/importManufacturers.ts"

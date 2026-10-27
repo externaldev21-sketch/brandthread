@@ -11,9 +11,12 @@
  * reskinned to the app's black / white / silver palette.
  *
  * Data: GET /api/ad-campaigns/:id/results (billed viewable impressions, unique
- * reach, clicks, CTR, spend, by surface, daily, orders within 7 days of a click).
+ * reach, clicks, CTR, spend, by surface, daily + last-48-hours hourly delivery,
+ * pacing vs the even line, refund, orders within 7 days of a click). While the
+ * campaign is running the screen re-polls every 20s, so the paced delivery is
+ * seen trickling in. Demo preview reads lib/demoAdCampaign.ts instead.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -28,9 +31,24 @@ import { useColors } from '@/hooks/useColors';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import type { AdCampaign, AdCampaignResults, AdSurface } from '@/lib/api';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { DEMO_AD_CAMPAIGN_ID, demoAdCampaignResults } from '@/lib/demoAdCampaign';
+import type { AdCampaign, AdCampaignResults, AdPacingStatus, AdRefundOutcome, AdSurface } from '@/lib/api';
 
 type ChartMetric = 'impressions' | 'clicks' | 'spend';
+type ChartRange = 'hourly' | 'daily';
+
+/** How often a running campaign's results are re-read while the screen is open. */
+const LIVE_POLL_MS = 20_000;
+
+const PACING_LABELS: Record<AdPacingStatus, string> = {
+  not_started: 'Starting soon',
+  on_pace: 'On pace',
+  behind: 'Behind pace — waiting on shopper traffic',
+  ahead: 'Ahead of pace',
+  paused: 'Paused',
+  finished: 'Finished',
+};
 
 const SURFACE_LABELS: Record<AdSurface, string> = {
   following: 'Following',
@@ -78,7 +96,10 @@ export default function AdCampaignResultsScreen() {
   const s = useMemo(() => createStyles(colors), [colors]);
   const api = useApi();
   const { isSignedIn } = useAuth();
-  const { campaignId } = useLocalSearchParams<{ campaignId?: string }>();
+  // `id` is accepted too, so a link with either param opens this campaign.
+  const params = useLocalSearchParams<{ campaignId?: string; id?: string }>();
+  const campaignId = params.campaignId ?? params.id;
+  const [demo] = useState(() => isPreviewDemoMode() && campaignId === DEMO_AD_CAMPAIGN_ID);
 
   const [campaign, setCampaign] = useState<AdCampaign | null>(null);
   const [results, setResults] = useState<AdCampaignResults | null>(null);
@@ -87,8 +108,18 @@ export default function AdCampaignResultsScreen() {
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<null | 'pause' | 'resume' | 'stop'>(null);
   const [metric, setMetric] = useState<ChartMetric>('impressions');
+  const [range, setRange] = useState<ChartRange>('hourly');
+  const [focused, setFocused] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
+    if (demo) {
+      const res = demoAdCampaignResults();
+      setCampaign(res.campaign);
+      setResults(res.results);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (!campaignId || !isSignedIn) { setLoading(false); return; }
     if (isRefresh) setRefreshing(true);
     try {
@@ -102,17 +133,35 @@ export default function AdCampaignResultsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [api, campaignId, isSignedIn]);
+  }, [api, campaignId, demo, isSignedIn]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    void load();
+    return () => setFocused(false);
+  }, [load]));
+
+  // Live: while it's delivering and on screen, keep reading the engine's numbers.
+  const live = campaign?.status === 'active';
+  useEffect(() => {
+    if (!focused || !live) return;
+    const timer = setInterval(() => { void load(true); }, demo ? 5_000 : LIVE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [focused, live, load, demo]);
 
   const runAction = useCallback(async (action: 'pause' | 'resume' | 'stop') => {
     if (!campaign || busy) return;
+    if (demo) return;
     if (action === 'stop' && !(await confirmStop())) return;
     setBusy(action);
     try {
       const res = await api.adCampaigns[action](campaign.id);
       setCampaign(res.campaign);
+      const refund = action === 'stop' ? (res as { refund?: AdRefundOutcome | null }).refund : null;
+      if (refund?.status === 'refunded') {
+        const msg = `${formatCents(refund.amountCents)} of undelivered budget is on its way back to your card.`;
+        if (Platform.OS === 'web') { if (typeof window !== 'undefined') window.alert?.(msg); } else Alert.alert('Refund issued', msg);
+      }
       void load(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Couldn't update the campaign.";
@@ -120,12 +169,24 @@ export default function AdCampaignResultsScreen() {
     } finally {
       setBusy(null);
     }
-  }, [api, busy, campaign, load]);
+  }, [api, busy, campaign, demo, load]);
 
-  const chartPoints = useMemo(() => (results?.daily ?? []).map((d) => ({
-    label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: 'UTC' }),
-    value: metric === 'impressions' ? d.impressions : metric === 'clicks' ? d.clicks : d.spendCents,
-  })), [results, metric]);
+  const hasHourly = (results?.hourly?.length ?? 0) > 0;
+  const chartRange: ChartRange = hasHourly ? range : 'daily';
+  const chartPoints = useMemo(() => {
+    const pick = (d: { impressions: number; clicks: number; spendCents: number }) =>
+      metric === 'impressions' ? d.impressions : metric === 'clicks' ? d.clicks : d.spendCents;
+    if (chartRange === 'hourly') {
+      return (results?.hourly ?? []).map((h) => ({
+        label: new Date(h.hour).toLocaleTimeString('en-US', { hour: 'numeric' }),
+        value: pick(h),
+      }));
+    }
+    return (results?.daily ?? []).map((d) => ({
+      label: new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: 'UTC' }),
+      value: pick(d),
+    }));
+  }, [results, metric, chartRange]);
 
   const header = <ScreenHeader title="Campaign results" />;
 
@@ -227,14 +288,60 @@ export default function AdCampaignResultsScreen() {
           <CardDivider />
           <View style={s.row}>
             <Text style={s.rowLabel}>Duration</Text>
-            <Text style={s.rowValue}>{campaign.durationDays} {campaign.durationDays === 1 ? 'day' : 'days'}</Text>
+            <Text style={s.rowValue}>
+              {campaign.dailyBudgetCents ? `${formatCents(campaign.dailyBudgetCents)}/day × ` : ''}
+              {campaign.durationDays} {campaign.durationDays === 1 ? 'day' : 'days'}
+            </Text>
           </View>
           <CardDivider />
           <View style={s.row}>
             <Text style={s.rowLabel}>Time</Text>
             <Text style={s.rowValue}>{shortDate(campaign.startsAt)} – {shortDate(campaign.completedAt ?? campaign.endsAt)}</Text>
           </View>
+          {(results.refund?.refundedCents ?? 0) > 0 || results.refund?.status === 'failed' || results.refund?.status === 'processing' ? (
+            <>
+              <CardDivider />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Refunded</Text>
+                <Text style={s.rowValue} testID="campaign-refund">
+                  {results.refund?.status === 'failed' || results.refund?.status === 'processing'
+                    ? 'Refund in progress'
+                    : `${formatCents(results.refund?.refundedCents ?? 0)}${results.refund?.status === 'pending' ? ' · pending' : ''}`}
+                </Text>
+              </View>
+            </>
+          ) : null}
         </Card>
+
+        {/* Delivery pace — spend so far against the even line through the flight */}
+        {results.pacing && campaign.startsAt ? (
+          <>
+            <SectionTitle note={live ? 'Updates live as your ad is delivered' : undefined}>Delivery</SectionTitle>
+            <Card padded>
+              <View style={s.paceHead}>
+                {live ? <View style={s.liveDot} /> : null}
+                <Text style={s.paceStatus} testID="pacing-status">{PACING_LABELS[results.pacing.status]}</Text>
+              </View>
+              <View style={{ marginTop: SP.md, gap: 6 }}>
+                <View style={s.surfaceHead}>
+                  <Text style={s.surfaceLabel}>Budget delivered</Text>
+                  <Text style={s.surfaceValue}>{Math.round(results.pacing.deliveredShare * 100)}%</Text>
+                </View>
+                <ProgressBar pct={results.pacing.deliveredShare * 100} color={colors.foreground} />
+              </View>
+              <View style={{ marginTop: SP.md, gap: 6 }}>
+                <View style={s.surfaceHead}>
+                  <Text style={s.surfaceLabel}>Time elapsed</Text>
+                  <Text style={s.surfaceValue}>{Math.round(results.pacing.elapsedShare * 100)}%</Text>
+                </View>
+                <ProgressBar pct={results.pacing.elapsedShare * 100} color={colors.mutedForeground} />
+              </View>
+              <Text style={s.surfaceMeta}>
+                {`About ${formatCents(results.pacing.hourlyBudgetCents)} an hour, spread evenly across ${campaign.durationDays} ${campaign.durationDays === 1 ? 'day' : 'days'}. Target by now: ${formatCents(results.pacing.targetSpentCents)}.`}
+              </Text>
+            </Card>
+          </>
+        ) : null}
 
         {/* Performance */}
         <SectionTitle>Performance</SectionTitle>
@@ -258,6 +365,25 @@ export default function AdCampaignResultsScreen() {
           })}
         </View>
         <Card padded>
+          {hasHourly ? (
+            <View style={s.rangeRow} accessibilityRole="radiogroup">
+              {(['hourly', 'daily'] as const).map((r) => {
+                const selected = chartRange === r;
+                return (
+                  <Pressable
+                    key={r}
+                    onPress={() => setRange(r)}
+                    style={[s.rangeChip, selected && s.rangeChipSelected]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={r === 'hourly' ? 'Last 48 hours' : 'By day'}
+                  >
+                    <Text style={[s.rangeText, selected && s.rangeTextSelected]}>{r === 'hourly' ? 'Last 48 hours' : 'By day'}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <AnalyticsBarChart
             points={chartPoints}
             color={colors.foreground}
@@ -330,4 +456,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   surfaceLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: colors.foreground },
   surfaceValue: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
   surfaceMeta: { fontSize: FS.meta, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 6 },
+  paceHead: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.foreground },
+  paceStatus: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+  rangeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+  rangeChip: {
+    paddingHorizontal: SP.md, paddingVertical: 6, minHeight: 32, justifyContent: 'center',
+    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: colors.border,
+  },
+  rangeChipSelected: { borderColor: colors.foreground, backgroundColor: colors.elevated },
+  rangeText: { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
+  rangeTextSelected: { color: colors.foreground },
 });

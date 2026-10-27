@@ -2,11 +2,12 @@
  * Brandthread — Manage Meta ad campaigns
  * Route: /meta-ads-manage
  *
- * Not connected → EmptyState routing to /meta-ads-connect.
- * Connected → campaign list with status, insights, and per-campaign
+ * Connection check failed (network / 5xx) → ErrorState with Retry (never the
+ * Connect CTA). Not connected → EmptyState routing to /meta-ads-connect.
+ * Login expired → Reconnect Meta. Connected → campaign list with status, insights, and per-campaign
  * pause/resume, edit budget, duplicate actions.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -17,7 +18,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/BottomSheet';
 import { hapticSuccess } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -31,8 +32,11 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { friendlyError } from '@/lib/friendlyError';
-import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents, META_OBJECTIVE_OPTIONS } from '@/services/metaAdsService';
-import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
+import {
+  metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents, META_OBJECTIVE_OPTIONS,
+  metaConnectionState, isMetaReconnectError, META_CONNECTION_CHECK_FAILED,
+} from '@/services/metaAdsService';
+import type { MetaAdsConnectionState, MetaCampaign, MetaCampaignInsights } from '@/lib/api';
 import { radius } from '@/constants/radii';
 import { formatMoney } from '@/lib/format';
 
@@ -47,7 +51,8 @@ export default function MetaAdsManageScreen() {
   const colors = useColors();
 
   const [checking, setChecking] = useState(true);
-  const [connected, setConnected] = useState(false);
+  const [connState, setConnState] = useState<MetaAdsConnectionState>('not_connected');
+  const connected = connState === 'connected';
   // The connection check itself failed (network / 5xx) — distinct from a
   // successful "not connected" answer, which is the only case offering Connect.
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -78,12 +83,11 @@ export default function MetaAdsManageScreen() {
     setChecking(true);
     setCheckError(null);
     try {
-      const conn = await api.metaAds.connection();
-      const isConnected = !!conn.connected && conn.status === 'connected';
-      setConnected(isConnected);
-      if (isConnected) { setLoading(true); await loadCampaigns(); setLoading(false); }
+      const state = metaConnectionState(await api.metaAds.connection());
+      setConnState(state);
+      if (state === 'connected') { setLoading(true); await loadCampaigns(); setLoading(false); }
     } catch (err) {
-      setCheckError(friendlyError(err, "Couldn't check your Meta connection."));
+      setCheckError(friendlyError(err, META_CONNECTION_CHECK_FAILED));
     } finally {
       setChecking(false);
     }
@@ -94,6 +98,13 @@ export default function MetaAdsManageScreen() {
     void checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Coming back from Connect / Reconnect: check again so the list appears.
+  const focusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!focusedOnce.current) { focusedOnce.current = true; return; }
+    if (!connected && !checking) void checkConnection();
+  }, [connected, checking, checkConnection]));
 
   async function onRefresh() {
     setRefreshing(true);
@@ -107,8 +118,9 @@ export default function MetaAdsManageScreen() {
     try {
       const { campaign } = row.status === 'active' ? await api.metaAds.pause(row.id) : await api.metaAds.resume(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, ...campaign } : r)) ?? prev);
-    } catch {
-      Alert.alert(`Couldn't ${row.status === 'active' ? 'pause' : 'resume'} campaign`, 'Try again.');
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setConnState('needs_reconnect'); return; }
+      Alert.alert(`Couldn't ${row.status === 'active' ? 'pause' : 'resume'} campaign`, friendlyError(err, 'Try again.'));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -121,8 +133,8 @@ export default function MetaAdsManageScreen() {
     try {
       const { campaign } = await api.metaAds.duplicate(row.id);
       setRows((prev) => (prev ? [campaign, ...prev] : prev));
-    } catch {
-      Alert.alert("Couldn't duplicate campaign", 'Try again.');
+    } catch (err) {
+      Alert.alert("Couldn't duplicate campaign", friendlyError(err, 'Try again.'));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -135,8 +147,9 @@ export default function MetaAdsManageScreen() {
     try {
       const { insights } = await api.metaAds.refreshInsights(row.id);
       setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, insights } : r)) ?? prev);
-    } catch {
-      Alert.alert("Couldn't refresh insights", 'Try again later.');
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setConnState('needs_reconnect'); return; }
+      Alert.alert("Couldn't refresh insights", friendlyError(err, 'Try again later.'));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -163,8 +176,9 @@ export default function MetaAdsManageScreen() {
       setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, ...campaign } : r)) ?? prev);
       hapticSuccess();
       setEditingBudget(null);
-    } catch {
-      Alert.alert("Couldn't update budget", 'Try again.');
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setEditingBudget(null); setConnState('needs_reconnect'); return; }
+      Alert.alert("Couldn't update budget", friendlyError(err, 'Try again.'));
     } finally {
       setBusyId(null);
       setBusyAction(null);
@@ -195,13 +209,32 @@ export default function MetaAdsManageScreen() {
     return (
       <BrandthreadScreen noSafeTop>
         <ScreenHeader title="Meta Ads" onBack={() => goBackOr(router)} />
-        <EmptyState
-          icon="link"
-          title="Connect Meta to run ads"
-          description="Connect your Facebook & Instagram account to start running ads through Brandthread."
-          action={{ label: 'Connect Meta', onPress: () => router.push('/meta-ads-connect') }}
-          style={{ marginTop: SP.xl }}
-        />
+        {connState === 'needs_reconnect' ? (
+          <EmptyState
+            icon="refresh-cw"
+            title="Reconnect Meta"
+            description="Your Meta login expired. Your campaigns keep running on Meta — reconnect to see results and manage them here."
+            action={{ label: 'Reconnect Meta', onPress: () => router.push('/meta-ads-connect') }}
+            style={{ marginTop: SP.xl }}
+          />
+        ) : connState === 'not_configured' ? (
+          <EmptyState
+            icon="link"
+            title="Meta / Instagram not configured"
+            description="Facebook and Instagram ads are not configured for this app yet."
+            style={{ marginTop: SP.xl }}
+          />
+        ) : (
+          <EmptyState
+            icon="link"
+            title={connState === 'pending_selection' ? 'Finish connecting Meta' : 'Connect Meta to run ads'}
+            description={connState === 'pending_selection'
+              ? 'Pick the ad account and Facebook Page to run ads from.'
+              : 'Connect your Facebook & Instagram account to start running ads through Brandthread.'}
+            action={{ label: connState === 'pending_selection' ? 'Finish connecting' : 'Connect Meta', onPress: () => router.push('/meta-ads-connect') }}
+            style={{ marginTop: SP.xl }}
+          />
+        )}
       </BrandthreadScreen>
     );
   }

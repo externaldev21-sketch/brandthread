@@ -5,13 +5,15 @@
  * Eligibility, the per-viewer frequency cap, pacing and slot placement are the
  * shared Sponsored policy in ../promotions/sponsored.ts (one ad per 6 organic
  * items and never first, max 3 serves of a campaign per viewer per rolling
- * 24h, never repeated within a session, even pacing with a 10% opening burst,
+ * 24h, never repeated within a session, even hourly pacing with ±20% jitter,
  * $20 CPM). This module only maps campaigns onto that policy and holds the
  * ad-specific rules (surfaces, CTA destinations, lifecycle, results shaping).
  * Nothing here touches the database.
  */
 import {
+  PACING_SLOT_MS,
   SPONSORED_COST_PER_IMPRESSION_CENTS,
+  flightElapsed,
   type SponsoredCandidate,
 } from "../promotions/sponsored";
 
@@ -183,4 +185,74 @@ export function fillDailySeries(
     spendCents: impressions.get(date)?.spendCents ?? 0,
     clicks: clicks.get(date) ?? 0,
   }));
+}
+
+export type HourlyPoint = { hour: string; impressions: number; clicks: number; spendCents: number };
+
+/**
+ * Every hour slot (ISO, truncated to the hour) from `start` to `end`, keeping
+ * only the most recent `maxHours`, zero-filled from sparse per-hour rows.
+ */
+export function fillHourlySeries(
+  start: Date,
+  end: Date,
+  impressions: ReadonlyMap<string, { impressions: number; spendCents: number }>,
+  clicks: ReadonlyMap<string, number>,
+  maxHours = 48,
+): HourlyPoint[] {
+  const first = Math.floor(start.getTime() / PACING_SLOT_MS);
+  const last = Math.floor(end.getTime() / PACING_SLOT_MS);
+  const out: HourlyPoint[] = [];
+  for (let h = Math.max(first, last - maxHours + 1); h <= last; h += 1) {
+    const hour = new Date(h * PACING_SLOT_MS).toISOString();
+    out.push({
+      hour,
+      impressions: impressions.get(hour)?.impressions ?? 0,
+      spendCents: impressions.get(hour)?.spendCents ?? 0,
+      clicks: clicks.get(hour) ?? 0,
+    });
+  }
+  return out;
+}
+
+export type PacingStatus = "not_started" | "on_pace" | "behind" | "ahead" | "paused" | "finished";
+
+export type PacingSnapshot = {
+  status: PacingStatus;
+  /** 0..1 share of the flight elapsed */
+  elapsedShare: number;
+  /** 0..1 share of the budget delivered */
+  deliveredShare: number;
+  /** Where even pacing says spend should be by now */
+  targetSpentCents: number;
+  /** Budget per hour if delivered evenly over the whole flight */
+  hourlyBudgetCents: number;
+};
+
+/** How delivery compares with the even-pacing line right now. */
+export function pacingSnapshot(
+  c: { status: string; budgetCents: number; spentCents: number; startsAt: Date | null; endsAt: Date | null; completedAt: Date | null },
+  now: Date,
+): PacingSnapshot {
+  const deliveredShare = c.budgetCents > 0 ? Math.min(1, c.spentCents / c.budgetCents) : 0;
+  if (!c.startsAt || !c.endsAt) {
+    return { status: "not_started", elapsedShare: 0, deliveredShare, targetSpentCents: 0, hourlyBudgetCents: 0 };
+  }
+  const flightHours = Math.max(1, (c.endsAt.getTime() - c.startsAt.getTime()) / PACING_SLOT_MS);
+  const hourlyBudgetCents = Math.round(c.budgetCents / flightHours);
+  const at = c.completedAt && c.completedAt < now ? c.completedAt : now;
+  const elapsedShare = flightElapsed(c.startsAt, c.endsAt, at);
+  const targetSpentCents = Math.floor(c.budgetCents * elapsedShare);
+  let status: PacingStatus;
+  if (c.status === "completed") status = "finished";
+  else if (c.status === "paused") status = "paused";
+  else if (now < c.startsAt) status = "not_started";
+  else {
+    // Within one hour of budget either side of the line counts as on pace.
+    const gap = c.spentCents - targetSpentCents;
+    status = gap < -Math.max(hourlyBudgetCents, SPONSORED_COST_PER_IMPRESSION_CENTS) * 2 ? "behind"
+      : gap > Math.max(hourlyBudgetCents, SPONSORED_COST_PER_IMPRESSION_CENTS) * 2 ? "ahead"
+      : "on_pace";
+  }
+  return { status, elapsedShare, deliveredShare, targetSpentCents, hourlyBudgetCents };
 }

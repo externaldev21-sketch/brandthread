@@ -16,8 +16,9 @@ import { planSponsoredSlots } from "../promotions/sponsored";
 import {
   AD_ATTRIBUTION_WINDOW_DAYS, AD_COST_PER_IMPRESSION_CENTS, AD_SERVE_TOKEN_TTL_MS,
   AD_SURFACES, adDestination, budgetExhausted, campaignToCandidate, ctaLabel, ctrPercent,
-  fillDailySeries, flightDays,
-  type AdCampaignForDelivery, type AdDestination, type AdSurface, type DailyPoint,
+  fillDailySeries, fillHourlySeries, flightDays, pacingSnapshot,
+  type AdCampaignForDelivery, type AdDestination, type AdSurface, type DailyPoint, type HourlyPoint,
+  type PacingSnapshot,
 } from "./adDelivery";
 
 const CANDIDATE_LIMIT = 100;
@@ -436,6 +437,10 @@ export type AdSurfaceResults = { surface: AdSurface; impressions: number; clicks
 export type AdCampaignResults = AdResultsSummary & {
   bySurface: AdSurfaceResults[];
   daily: DailyPoint[];
+  /** Last 48 hours of the flight, per hour — the trickle as it happens */
+  hourly: HourlyPoint[];
+  pacing: PacingSnapshot;
+  refund: { refundedCents: number; status: string | null; rail: string | null };
   attribution: { windowDays: number; orders: number; revenueCents: number };
 };
 
@@ -446,7 +451,8 @@ export async function adCampaignResults(campaign: typeof adCampaigns.$inferSelec
     .from(adImpressions)
     .where(and(eq(adImpressions.campaignId, id), isNotNull(adImpressions.viewedAt)));
 
-  const [surfaceImp, surfaceClicks, dailyImp, dailyClicks, attribution] = await Promise.all([
+  const hourWindowStart = new Date(now.getTime() - 49 * 3_600_000);
+  const [surfaceImp, surfaceClicks, dailyImp, dailyClicks, attribution, hourlyImp, hourlyClicks] = await Promise.all([
     db.select({
       surface: adImpressions.surface,
       impressions: sql<number>`count(*)::int`,
@@ -468,6 +474,19 @@ export async function adCampaignResults(campaign: typeof adCampaigns.$inferSelec
       clicks: sql<number>`count(*)::int`,
     }).from(adClicks).where(eq(adClicks.campaignId, id)).groupBy(sql`1`),
     attributedOrders(campaign),
+    db.select({
+      hour: sql<string>`to_char(date_trunc('hour', ${adImpressions.viewedAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:00:00.000"Z"')`,
+      impressions: sql<number>`count(*)::int`,
+      spend: sql<number>`coalesce(sum(${adImpressions.billedCents}), 0)::int`,
+    }).from(adImpressions)
+      .where(and(eq(adImpressions.campaignId, id), gte(adImpressions.viewedAt, hourWindowStart)))
+      .groupBy(sql`1`),
+    db.select({
+      hour: sql<string>`to_char(date_trunc('hour', ${adClicks.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:00:00.000"Z"')`,
+      clicks: sql<number>`count(*)::int`,
+    }).from(adClicks)
+      .where(and(eq(adClicks.campaignId, id), gte(adClicks.createdAt, hourWindowStart)))
+      .groupBy(sql`1`),
   ]);
 
   const impBySurface = new Map(surfaceImp.map((r) => [r.surface, r]));
@@ -490,10 +509,25 @@ export async function adCampaignResults(campaign: typeof adCampaigns.$inferSelec
     );
   }
 
+  let hourly: HourlyPoint[] = [];
+  if (campaign.startsAt) {
+    const flightEnd = campaign.completedAt ?? campaign.endsAt ?? now;
+    const end = flightEnd < now ? flightEnd : now;
+    hourly = fillHourlySeries(
+      campaign.startsAt,
+      end < campaign.startsAt ? campaign.startsAt : end,
+      new Map(hourlyImp.map((r) => [r.hour, { impressions: Number(r.impressions), spendCents: Number(r.spend) }])),
+      new Map(hourlyClicks.map((r) => [r.hour, Number(r.clicks)])),
+    );
+  }
+
   return {
     ...summarize(campaign, Number(reachRow?.reach ?? 0)),
     bySurface,
     daily,
+    hourly,
+    pacing: pacingSnapshot(campaign, now),
+    refund: { refundedCents: campaign.refundedCents, status: campaign.refundStatus, rail: campaign.paymentRail },
     attribution,
   };
 }
