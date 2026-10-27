@@ -857,6 +857,9 @@ export async function createProject(
     backgroundHex: canvas.backgroundHex ?? '#FFFFFF',
     backgroundImageUri: canvas.backgroundImageUri,
     backgroundOpacity: canvas.backgroundOpacity,
+    ...(canvas.dpi ? { dpi: canvas.dpi } : {}),
+    ...(canvas.presetId ? { presetId: canvas.presetId } : {}),
+    ...(canvas.backgroundHidden ? { backgroundHidden: true } : {}),
   };
   const project: DesignProject = {
     id: uid('proj'),

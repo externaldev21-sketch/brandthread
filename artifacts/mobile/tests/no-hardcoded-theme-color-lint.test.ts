@@ -143,6 +143,18 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   // The dashboard order globe's fixed black/white/silver palette (owner's
   // brand globe, the same on every app theme): the one file that holds it.
   'components/globe/globeColors.ts',
+  // Design Studio raster paint engine: black/white here are PIXEL data
+  // (eraser/mask colours, transparent clears, JPEG matte), never UI chrome.
+  'lib/paint/canvas2dBackend.ts',
+  'lib/paint/engine.ts',
+  'lib/paint/platform.ts',
+  'lib/paint/skiaBackend.ts',
+  'lib/paint/strokeRecord.ts',
+  // Artwork, not chrome: the garment mockup's fabric shading and the
+  // Procreate tool / brush-set glyph cut-outs.
+  'components/design/GarmentMockup.tsx',
+  'components/design-studio/BrushSetGlyph.tsx',
+  'components/design-studio/ProcreateToolIcons.tsx',
   'app/(buyer)/edit-profile.tsx',
   'components/inbox/MessagesInbox.tsx',
   'app/(tabs)/feed.tsx',

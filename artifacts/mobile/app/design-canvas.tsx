@@ -24,8 +24,8 @@ import React, {
 } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder, Pressable, ScrollView, TextInput, Modal, Dimensions, Share,
-  Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent,
-  LayoutAnimation, UIManager, Linking,
+  Platform, AppState, AppStateStatus, Image as RNImage, GestureResponderEvent, type ViewStyle,
+  LayoutAnimation, UIManager, Linking, ActivityIndicator,
 } from 'react-native';
 
 // Android needs this opt-in for LayoutAnimation (iOS/web animate by default).
@@ -120,14 +120,31 @@ import type {
 } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import CanvasHost, { type CanvasHostHandle } from '@/components/design-studio/CanvasHost';
+import { PaintbrushGlyph, SmudgeGlyph, EraserGlyph, LayersGlyph } from '@/components/design-studio/ProcreateToolIcons';
 import CanvasGestureLayer from '@/components/design-studio/CanvasGestureLayer';
+import PaintSurface from '@/components/design-studio/PaintSurface';
+import RasterLayerView from '@/components/design-studio/RasterLayerView';
+import Checkerboard from '@/components/design/Checkerboard';
+import { PaintEngine } from '@/lib/paint/engine';
+import { getPlatformBackend, encodeSurface } from '@/lib/paint/platform';
+import { parseHex as hexToRgb } from '@/lib/paint/canvas2dBackend';
+import { composeExport, type ExportItem } from '@/lib/paint/composeExport';
+import { brushDiameter, type BrushPreset } from '@/lib/paint/brushPresets';
+import { renderBrushDab } from '@/lib/paint/brushPreview';
+import { setDesignArtwork } from '@/lib/designHandoff';
+import { drawPathFromRecord, fillRecord, mergeRecord } from '@/lib/paint/strokeRecord';
+import { newSeed } from '@/lib/paint/rng';
+import {
+  CanvasGestureModel, IDENTITY_VIEWPORT, applyPinch, settleViewport, stageToArtboard,
+  type Viewport,
+} from '@/lib/paint/canvasGestureModel';
+import { useBrushLibrary, type PaintTool } from '@/hooks/useBrushLibrary';
+import {
+  addBrush, addSet, deleteBrushPreset, deleteSet, duplicateBrushPreset, duplicateSet, renameSet,
+} from '@/lib/paint/brushLibrary';
 import LayersPanelComponent from '@/components/design-studio/LayersPanel';
 import ColorPickerComponent from '@/components/design-studio/ColorPicker';
 import BrushLibraryComponent from '@/components/design-studio/BrushLibrary';
-import type { BrushKind as EngineBrushKind } from '@/lib/brushEngine';
-import {
-  type BrushDef, duplicateBrush, deleteBrush, nextActiveBrushAfterDelete,
-} from '@/lib/brushLibraryModel';
 import {
   UndoModel, type UndoCommand,
 } from '@/lib/undoModel';
@@ -153,34 +170,6 @@ import { TopToast } from '@/components/ui/TopToast';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FONT_FAMILIES = ['System', 'serif', 'monospace', FONT.regular, 'Georgia'];
-
-// BrushDef/duplicateBrush/deleteBrush/nextActiveBrushAfterDelete now live in
-// lib/brushLibraryModel.ts (dependency-free, so they're unit-testable under
-// vitest) — the Brush Library sheet needs real add/duplicate/delete, not
-// just this fixed read-only list.
-const DEFAULT_BRUSHES: BrushDef[] = [
-  { id: 'b1',  name: 'HB Pencil',  category: 'Sketching', widthMult: 0.6,  opacityMult: 0.85, linecap: 'round' },
-  { id: 'b2',  name: '6B Pencil',  category: 'Sketching', widthMult: 1.2,  opacityMult: 0.75, linecap: 'round' },
-  { id: 'b3',  name: 'Technical',  category: 'Sketching', widthMult: 0.4,  opacityMult: 1.0,  linecap: 'round' },
-  { id: 'b4',  name: 'Studio Pen', category: 'Inking',    widthMult: 1.0,  opacityMult: 1.0,  linecap: 'round' },
-  { id: 'b5',  name: 'Dry Ink',    category: 'Inking',    widthMult: 1.4,  opacityMult: 0.9,  linecap: 'square' },
-  { id: 'b6',  name: 'Syrup',      category: 'Inking',    widthMult: 2.5,  opacityMult: 0.95, linecap: 'round' },
-  { id: 'b7',  name: 'Flat Brush', category: 'Painting',  widthMult: 3.0,  opacityMult: 0.7,  linecap: 'square' },
-  { id: 'b8',  name: 'Soft Brush', category: 'Painting',  widthMult: 4.0,  opacityMult: 0.4,  linecap: 'round' },
-  { id: 'b9',  name: 'Old Brush',  category: 'Painting',  widthMult: 2.0,  opacityMult: 0.6,  linecap: 'butt'   },
-  { id: 'b10', name: 'Soft Air',   category: 'Airbrushing', widthMult: 5.0, opacityMult: 0.25, linecap: 'round' },
-  { id: 'b11', name: 'Hard Air',   category: 'Airbrushing', widthMult: 3.5, opacityMult: 0.45, linecap: 'round' },
-  { id: 'b12', name: 'Marker',     category: 'Marker',    widthMult: 2.8,  opacityMult: 0.88, linecap: 'square' },
-  { id: 'b13', name: 'Neon',       category: 'Marker',    widthMult: 3.2,  opacityMult: 0.7,  linecap: 'round' },
-];
-
-const SMUDGE_BRUSH: BrushDef = {
-  id: 'smudge',
-  name: 'Smudge', category: 'Smudge', widthMult: 3.0, opacityMult: 0.3, linecap: 'round',
-};
-const ERASER_BRUSH: BrushDef = {
-  id: 'eraser', name: 'Eraser', category: 'Eraser', widthMult: 3.0, opacityMult: 1.0, linecap: 'round',
-};
 
 // react-native-svg supported blend modes
 const BLEND_MODES: BlendModeKind[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
@@ -228,7 +217,7 @@ function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 type ActiveTopTool = 'brush' | 'smudge' | 'eraser' | 'select' | 'transform' | 'adjustments' | 'crop' | 'none';
 type ActiveSheet =
   | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'canvasInfo'
-  | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | null;
+  | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | 'shareImage' | null;
 
 // Wrench tab type — Procreate's own Actions tabs are Add / Canvas / Guides /
 // Share / Video / Preferences / Help. 'video' is deliberately absent: its
@@ -294,6 +283,33 @@ const DEFAULT_GUIDE_SETTINGS: GuideSettings = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+type LayerRun = { kind: 'drawing'; key: string; layer: DesignLayer } | { kind: 'svg'; key: string; layers: DesignLayer[] };
+
+/**
+ * A drawing layer whose look depends on the SVG pipeline — adjustments
+ * (HSB, curves, blur, …), Distort / Warp / Liquify, or a clipping mask —
+ * renders as an SVG image of its engine pixels so those keep applying.
+ */
+function drawingNeedsSvg(l: DesignLayer): boolean {
+  if (l.type !== 'drawing') return false;
+  const t = l.transform;
+  return buildAdjustmentStages(l.adjustments, 1).stages.length > 0
+    || !!t.affineSvgMatrix
+    || Math.abs(t.liquifyDx ?? 0) > 0.01 || Math.abs(t.liquifyDy ?? 0) > 0.01
+    || !!l.clippingMask;
+}
+
+/** Splits the (non-template) layer stack into raster drawing layers and runs of consecutive SVG-rendered layers, bottom → top. */
+function buildLayerRuns(all: DesignLayer[]): LayerRun[] {
+  const runs: LayerRun[] = [];
+  for (const l of [...all].filter(x => !x.isTemplate).sort((a, b) => a.order - b.order)) {
+    if (l.type === 'drawing' && !drawingNeedsSvg(l)) { runs.push({ kind: 'drawing', key: l.id, layer: l }); continue; }
+    const last = runs[runs.length - 1];
+    if (last && last.kind === 'svg') last.layers.push(l); else runs.push({ kind: 'svg', key: `run_${l.id}`, layers: [l] });
+  }
+  return runs;
+}
 
 export default function DesignCanvasScreen() {
   useHideTabBar();
@@ -556,9 +572,16 @@ export default function DesignCanvasScreen() {
   canvasSizeRef.current  = canvasSize;
 
   // ── Brush state ────────────────────────────────────────────────────────────
-  const [brushes, setBrushes]           = useState<BrushDef[]>(DEFAULT_BRUSHES);
-  const [activeBrushId, setActiveBrushId] = useState('b4'); // Studio Pen, matches the old default index 3
-  const [brushSize, setBrushSize]       = useState(10);
+  // Brush library (sets + brushes) and the brush chosen for each of
+  // Paint / Smudge / Erase — persisted on device (hooks/useBrushLibrary.ts).
+  const brushLib = useBrushLibrary();
+  const brushLibRef = useRef(brushLib);
+  brushLibRef.current = brushLib;
+  // Which tool the Brushes panel is choosing for (Procreate opens the library
+  // for whichever of paint/smudge/erase you tapped).
+  const [brushLibTool, setBrushLibTool] = useState<PaintTool>('brush');
+  // Size slider positions (1..80 = 1%..100% of the brush's max size).
+  const [brushSize, setBrushSize]       = useState(36);
   const [brushOpacity, setBrushOpacity] = useState(1.0);
   // Black ink by default: the default artboard is white (#FFFFFF), so a
   // white default made the first stroke/text invisible.
@@ -571,30 +594,17 @@ export default function DesignCanvasScreen() {
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
   const sizeSliderHeightRef = useRef(200);
 
-  const brushesRef       = useRef(brushes);
-  const activeBrushIdRef = useRef(activeBrushId);
   const brushSizeRef    = useRef(brushSize);
   const brushOpacityRef = useRef(brushOpacity);
   const drawColorRef    = useRef(drawColor);
   const eraserSizeRef   = useRef(eraserSize);
   const smudgeSizeRef   = useRef(smudgeSize);
 
-  brushesRef.current       = brushes;
-  activeBrushIdRef.current = activeBrushId;
   brushSizeRef.current    = brushSize;
   brushOpacityRef.current = brushOpacity;
   drawColorRef.current    = drawColor;
   eraserSizeRef.current   = eraserSize;
   smudgeSizeRef.current   = smudgeSize;
-
-  // ── Draw state ─────────────────────────────────────────────────────────────
-  // Live in-progress stroke rendering + point smoothing now live inside
-  // CanvasHost (lib/brushEngine.ts) — this screen only needs the resulting
-  // committed DrawPath (handleEngineStrokeEnd) and the live cursor position.
-  // Pressure tracking: last native force value for pressure-curve mapping
-  const lastStrokeForceRef = useRef<number | undefined>(undefined);
-  // Brush cursor position (display px), null when not actively drawing
-  const [brushCursorPos, setBrushCursorPos] = useState<{ x: number; y: number } | null>(null);
 
   // Export SVG ref
   const exportSvgRef = useRef<Svg>(null);
@@ -811,7 +821,7 @@ export default function DesignCanvasScreen() {
         ...proj,
         name:   projectNameRef.current,
         canvas: canvasWithExt as DesignCanvas,
-        layers: capturedLayers,
+        layers: withRasterPreviews(capturedLayers),
       });
       if (dirtyGenRef.current === capturedGen) {
         savedGenRef.current = capturedGen;
@@ -824,6 +834,38 @@ export default function DesignCanvasScreen() {
       throw error;
     }
   }, []); // stable — all values read from refs
+
+  /**
+   * Attaches each painted drawing layer's flattened pixels (a ≤640px PNG) as
+   * data.rasterPreview so read-only surfaces — gallery thumbnails, previews,
+   * versions, the mockup — show the real artwork without running the brush
+   * engine. Cached per stroke list, so unchanged layers aren't re-encoded.
+   */
+  const rasterPreviewCacheRef = useRef(new WeakMap<DrawPath[], string>());
+  function withRasterPreviews(ls: DesignLayer[]): DesignLayer[] {
+    const engine = paintEngineRef.current;
+    const backend = getPlatformBackend();
+    if (!engine || !backend) return ls;
+    return ls.map(l => {
+      if (l.type !== 'drawing') return l;
+      const d = l.data as DesignDrawingLayer;
+      if (!d.paths.some(p => p.stroke)) {
+        // Vector-only (legacy) layers render fine as SVG; drop any stale preview.
+        return d.rasterPreview ? { ...l, data: { ...d, rasterPreview: undefined } } : l;
+      }
+      let uri = rasterPreviewCacheRef.current.get(d.paths);
+      if (!uri) {
+        if (!engine.hasLayer(l.id)) return l;
+        try {
+          uri = encodeSurface(backend, engine.content(l.id), { format: 'png', maxSide: 640 });
+        } catch {
+          return l;
+        }
+        rasterPreviewCacheRef.current.set(d.paths, uri);
+      }
+      return { ...l, data: { ...d, rasterPreview: uri } };
+    });
+  }
 
   // ─── Serialized save coordinator ───────────────────────────────────────────
   /**
@@ -982,7 +1024,12 @@ export default function DesignCanvasScreen() {
     // Preserve selectedLayerId for select/transform/adjustments — the user
     // should be able to switch between these tools without losing their layer.
     // Only clear selection when switching to a pure drawing/utility tool.
-    if (tool === 'brush' || tool === 'smudge' || tool === 'eraser' || tool === 'crop' || tool === 'none') {
+    // Paint tools keep the selected layer when it's a drawing layer — in
+    // Procreate you paint on whichever layer is selected in the Layers panel.
+    if (tool === 'brush' || tool === 'smudge' || tool === 'eraser') {
+      const sel = layersRef.current.find(l => l.id === selectedLayerIdRef.current);
+      if (!sel || sel.type !== 'drawing') setSelectedLayerId(null);
+    } else if (tool === 'crop' || tool === 'none') {
       setSelectedLayerId(null);
     }
     // For transform: initialise quad/mesh from current selected layer if not set.
@@ -998,10 +1045,23 @@ export default function DesignCanvasScreen() {
     }
   }
 
-  function resolveActiveBrush(): BrushDef {
-    if (activeTopToolRef.current === 'eraser') return ERASER_BRUSH;
-    if (activeTopToolRef.current === 'smudge') return SMUDGE_BRUSH;
-    return brushesRef.current.find(b => b.id === activeBrushIdRef.current) ?? brushesRef.current[0];
+  function activePaintTool(): PaintTool {
+    const t = activeTopToolRef.current;
+    return t === 'eraser' ? 'eraser' : t === 'smudge' ? 'smudge' : 'brush';
+  }
+
+  function resolveActiveBrush(): BrushPreset {
+    return brushLibRef.current.brushFor(activePaintTool());
+  }
+
+  /** Procreate: tap a paint tool to pick it; tap it again (already active) to open its brush library. */
+  function handlePaintToolPress(tool: PaintTool) {
+    if (activeTopToolRef.current === tool) {
+      setBrushLibTool(tool);
+      openSheet('brushLib');
+      return;
+    }
+    selectTool(tool);
   }
 
   function resolveActiveSize(): number {
@@ -1122,84 +1182,213 @@ export default function DesignCanvasScreen() {
   // resulting `d` string from display → logical coordinates (the space every
   // other layer's DrawPath.d already lives in) before it's committed.
 
-  /** Maps the Procreate-style BRUSH_LIBRARY category to a brushEngine.BrushKind. */
-  function engineBrushKindFor(def: BrushDef): EngineBrushKind {
-    switch (def.category) {
-      case 'Sketching':   return 'pencil';
-      case 'Inking':       return def.name === 'Syrup' ? 'paint' : 'ink';
-      case 'Painting':     return 'paint';
-      case 'Airbrushing':  return 'airbrush';
-      case 'Marker':        return 'marker';
-      default:              return 'ink';
-    }
-  }
+  // ─── Raster paint engine ───────────────────────────────────────────────────
+  // lib/paint/engine.ts: every drawing layer is a pixel surface rendered from
+  // its stroke records (DrawPath.stroke). The engine is rebuilt only when the
+  // canvas itself changes size; layer edits / undo / redo are synced below.
+  const paintBackend = useMemo(() => getPlatformBackend(), []);
+  const engineW = project?.canvas.width || 1080;
+  const engineH = project?.canvas.height || 1080;
+  const projectIdForEngine = project?.id ?? null;
+  const paintEngine = useMemo(
+    () => (paintBackend && projectIdForEngine ? new PaintEngine(paintBackend, engineW, engineH) : null),
+    [paintBackend, projectIdForEngine, engineW, engineH],
+  );
+  const paintEngineRef = useRef(paintEngine);
+  paintEngineRef.current = paintEngine;
+  useEffect(() => () => { paintEngine?.retainLayers(new Set()); }, [paintEngine]);
 
-  /** Rescales every M/L coordinate pair in an SVG path `d` string by dividing x by sx and y by sy. */
-  function rescalePathXY(d: string, sx: number, sy: number): string {
-    if (sx === 1 && sy === 1) return d;
-    return d.replace(/([ML])(-?[\d.]+),(-?[\d.]+)/g, (_m, cmd: string, xs: string, ys: string) => {
-      const x = parseFloat(xs) / (sx || 1);
-      const y = parseFloat(ys) / (sy || 1);
-      return `${cmd}${x.toFixed(2)},${y.toFixed(2)}`;
+  useEffect(() => {
+    if (!paintEngine) return;
+    const ids = new Set<string>();
+    for (const l of layers) {
+      if (l.type !== 'drawing') continue;
+      ids.add(l.id);
+      paintEngine.sync(l.id, (l.data as DesignDrawingLayer).paths);
+    }
+    paintEngine.retainLayers(ids);
+  }, [paintEngine, layers]);
+
+  // Engine pixels as images for drawing layers that render through the SVG
+  // pipeline (drawingNeedsSvg) and for clipping-mask sources. Refreshed after
+  // each sync; cached per stroke list so untouched layers aren't re-encoded.
+  const [rasterUris, setRasterUris] = useState<Record<string, string>>({});
+  const rasterUriCacheRef = useRef(new WeakMap<DrawPath[], string>());
+  useEffect(() => {
+    if (!paintEngine || !paintBackend) return;
+    const needed = layers.filter(l => l.type === 'drawing' && (drawingNeedsSvg(l)
+      || layers.some(o => o.clippingMask && o.order > l.order)));
+    const next: Record<string, string> = {};
+    for (const l of needed) {
+      const paths = (l.data as DesignDrawingLayer).paths;
+      if (!paintEngine.hasLayer(l.id)) continue;
+      let uri = rasterUriCacheRef.current.get(paths);
+      if (!uri) {
+        try { uri = encodeSurface(paintBackend, paintEngine.content(l.id), { format: 'png' }); } catch { continue; }
+        rasterUriCacheRef.current.set(paths, uri);
+      }
+      next[l.id] = uri;
+    }
+    setRasterUris(prev => {
+      const keys = Object.keys(next);
+      if (keys.length === Object.keys(prev).length && keys.every(k => prev[k] === next[k])) return prev;
+      return next;
     });
+  }, [paintEngine, paintBackend, layers]);
+
+  // ─── Canvas viewport (pinch zoom / rotate / pan) ───────────────────────────
+  const [viewport, setViewport] = useState<Viewport>(IDENTITY_VIEWPORT);
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const pinchStartRef = useRef<Viewport>(IDENTITY_VIEWPORT);
+  const canvasFitRef = useRef(canvasFit);
+  canvasFitRef.current = canvasFit;
+
+  function stageToLogical(pt: { x: number; y: number }) {
+    const fit = canvasFitRef.current;
+    const local = stageToArtboard(viewportRef.current, pt, { x: fit.offsetX, y: fit.offsetY, w: fit.width, h: fit.height });
+    const k = fit.scale > 0 ? fit.scale : 1;
+    return { x: local.x / k, y: local.y / k };
   }
 
-  function handleEngineLivePoint(pt: { x: number; y: number } | null) {
-    setBrushCursorPos(pt);
+  function handlePinch(v: { scale: number; rotation: number; dx: number; dy: number; cx: number; cy: number; phase: 'start' | 'move' | 'end' }) {
+    if (v.phase === 'start') { pinchStartRef.current = viewportRef.current; return; }
+    if (v.phase === 'end') { setViewport(prev => settleViewport(prev)); return; }
+    const fit = canvasFitRef.current;
+    setViewport(applyPinch(pinchStartRef.current, v, { x: fit.offsetX + fit.width / 2, y: fit.offsetY + fit.height / 2 }));
   }
 
-  /** Commits a stroke produced by CanvasHost (display-space) into the active drawing layer (logical space). */
-  function handleEngineStrokeEnd(displayPath: DrawPath) {
-    setBrushCursorPos(null);
-    const sx = dispScaleXRef.current || 1;
-    const sy = dispScaleYRef.current || 1;
-    const brush = resolveActiveBrush();
-    const avgScale = (sx + sy) / 2 || 1;
+  // ─── Strokes ───────────────────────────────────────────────────────────────
+  const strokeRef = useRef<{ layerId: string; before: DesignLayer[]; createdLayer: boolean } | null>(null);
 
-    const newPath: DrawPath = {
-      ...displayPath,
-      d: rescalePathXY(displayPath.d, sx, sy),
-      width: displayPath.width / avgScale,
-      tool: brush.name,
-    };
-
+  function beginPaintStroke(pt: { x: number; y: number; p: number; t: number }) {
+    const engine = paintEngineRef.current;
+    const tool = activeTopToolRef.current;
+    if (!engine || (tool !== 'brush' && tool !== 'eraser' && tool !== 'smudge')) return;
     const current = layersRef.current;
-    const targetId = resolveActiveDrawingLayerId(current);
-
-    if (targetId) {
-      const target = current.find(l => l.id === targetId)!;
-      const d = target.data as DesignDrawingLayer;
-      const next = current.map(l =>
-        l.id === targetId
-          ? { ...l, data: { ...d, paths: [...d.paths, newPath] } }
-          : l,
-      );
-      pushUndo(current, next);
-      setLayers(next);
-      selectedLayerIdRef.current = targetId;
-      setSelectedLayerId(targetId);
-    } else {
-      // No writable drawing layer — create one sized to logical canvas
-      const lw = projectRef.current?.canvas.width  || 1080;
-      const lh = projectRef.current?.canvas.height || 1080;
+    let targetId = resolveActiveDrawingLayerId(current);
+    let created = false;
+    if (!targetId) {
+      // Procreate always has a layer to paint on: make one on first touch.
       const maxOrder = current.reduce((m, l) => Math.max(m, l.order), 0);
-      const newLayer: DesignLayer = {
-        id: uid(), name: 'Drawing', type: 'drawing',
+      const now = new Date().toISOString();
+      const fresh: DesignLayer = {
+        id: uid(), name: `Layer ${current.filter(l => l.type === 'drawing').length + 1}`, type: 'drawing',
         visible: true, locked: false, order: maxOrder + 1,
-        transform: { x: 0, y: 0, width: lw, height: lh, rotation: 0, scaleX: 1, scaleY: 1 },
-        data: { kind: 'drawing', paths: [newPath], brushType: brush.name } as DesignDrawingLayer,
-        opacity: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        transform: { x: 0, y: 0, width: engine.logicalWidth, height: engine.logicalHeight, rotation: 0, scaleX: 1, scaleY: 1 },
+        data: { kind: 'drawing', paths: [] } as DesignDrawingLayer,
+        opacity: 1, createdAt: now, updatedAt: now,
       };
-      const next = [...current, newLayer];
-      pushUndo(current, next);
-      setLayers(next);
-      setSelectedLayerId(newLayer.id);
+      const withLayer = [...current, fresh];
+      layersRef.current = withLayer;
+      setLayers(withLayer);
+      engine.layer(fresh.id);
+      targetId = fresh.id;
+      created = true;
     }
+    const layer = layersRef.current.find(l => l.id === targetId)!;
+    const brush = resolveActiveBrush();
+    const mode = tool === 'eraser' ? 'erase' : tool === 'smudge' ? 'smudge' : 'paint';
+    const diameter = brushDiameter(brush.params, resolveActiveSize() / 80, Math.max(engine.logicalWidth, engine.logicalHeight));
+    const at = stageToLogical(pt);
+    strokeRef.current = { layerId: targetId, before: current, createdLayer: created };
+    engine.beginStroke(targetId, {
+      v: 1, mode, brushId: brush.id, brushName: brush.name, params: brush.params,
+      color: drawColorRef.current, diameter, opacity: brushOpacityRef.current, seed: newSeed(),
+      alphaLock: mode !== 'erase' && !!layer.alphaLocked,
+    }, { x: at.x, y: at.y, p: pt.p, t: pt.t });
+  }
 
+  function movePaintStroke(pts: { x: number; y: number; p: number; t: number }[]) {
+    const engine = paintEngineRef.current;
+    if (!engine || !strokeRef.current) return;
+    engine.addSamples(pts.map(p => ({ ...stageToLogical(p), p: p.p, t: p.t })));
+  }
+
+  function endPaintStroke() {
+    const engine = paintEngineRef.current;
+    const s = strokeRef.current;
+    strokeRef.current = null;
+    if (!engine || !s) return;
+    const rec = engine.endStroke();
+    if (!rec) {
+      if (s.createdLayer) { layersRef.current = s.before; setLayers(s.before); }
+      return;
+    }
+    const now = new Date().toISOString();
+    const next = layersRef.current.map(l => {
+      if (l.id !== s.layerId) return l;
+      const d = l.data as DesignDrawingLayer;
+      return { ...l, data: { ...d, paths: [...d.paths, drawPathFromRecord(rec)] }, updatedAt: now };
+    });
+    pushUndo(s.before, next);
+    layersRef.current = next;
+    setLayers(next);
+    selectedLayerIdRef.current = s.layerId;
+    setSelectedLayerId(s.layerId);
     markDirty();
   }
+
+  function cancelPaintStroke() {
+    const s = strokeRef.current;
+    strokeRef.current = null;
+    paintEngineRef.current?.cancelStroke();
+    if (s?.createdLayer) { layersRef.current = s.before; setLayers(s.before); }
+  }
+
+  // ─── Touch-and-hold eyedropper ─────────────────────────────────────────────
+  const [holdSample, setHoldSample] = useState<{ x: number; y: number; color: string } | null>(null);
+
+  /** The composited colour under a logical point (background + visible drawing layers). */
+  function sampleCanvasColor(x: number, y: number): string | null {
+    const engine = paintEngineRef.current;
+    if (!engine || !paintBackend) return null;
+    const proj = projectRef.current;
+    let r = 0, g = 0, b = 0, a = 0;
+    if (proj && !proj.canvas.backgroundHidden) {
+      const [br, bg2, bb] = hexToRgb(proj.canvas.backgroundHex || '#FFFFFF');
+      r = br; g = bg2; b = bb; a = 1;
+    }
+    for (const l of [...layersRef.current].sort((p, q) => p.order - q.order)) {
+      if (!l.visible || l.type !== 'drawing' || !engine.hasLayer(l.id)) continue;
+      const [pr, pg, pb, pa] = paintBackend.readPixel(engine.display(l.id), x * engine.scale, y * engine.scale);
+      const al = (pa / 255) * (l.opacity ?? 1);
+      if (al <= 0) continue;
+      r = pr * al + r * (1 - al); g = pg * al + g * (1 - al); b = pb * al + b * (1 - al); a = al + a * (1 - al);
+    }
+    if (a <= 0.01) return null;
+    const h = (n: number) => Math.round(Math.max(0, Math.min(255, n / a))).toString(16).padStart(2, '0');
+    return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
+  }
+
+  function handleHold(pt: { x: number; y: number }, phase: 'start' | 'move' | 'end') {
+    const at = stageToLogical(pt);
+    const color = sampleCanvasColor(at.x, at.y) ?? approximateColorAtPoint(at.x, at.y);
+    if (phase === 'start') Haptics.selectionAsync();
+    if (phase !== 'end') { setHoldSample(color ? { x: pt.x, y: pt.y, color } : null); return; }
+    setHoldSample(null);
+    if (color) { applyColor(color); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+  }
+
+  // One gesture model for the canvas's lifetime; callbacks read the latest closures.
+  const paintHandlersRef = useRef({
+    begin: beginPaintStroke, move: movePaintStroke, end: endPaintStroke, cancel: cancelPaintStroke,
+    undo: () => {}, redo: () => {}, pinch: handlePinch, hold: handleHold,
+  });
+  const gestureModel = useMemo(() => new CanvasGestureModel({
+    strokeBegin: pt => paintHandlersRef.current.begin(pt),
+    strokeMove: pts => paintHandlersRef.current.move(pts),
+    strokeEnd: () => paintHandlersRef.current.end(),
+    strokeCancel: () => paintHandlersRef.current.cancel(),
+    undo: () => paintHandlersRef.current.undo(),
+    redo: () => paintHandlersRef.current.redo(),
+    viewport: v => paintHandlersRef.current.pinch(v),
+    hold: (pt, phase) => paintHandlersRef.current.hold(pt, phase),
+  }), []);
+  paintHandlersRef.current = {
+    begin: beginPaintStroke, move: movePaintStroke, end: endPaintStroke, cancel: cancelPaintStroke,
+    undo: handleUndo, redo: handleRedo, pinch: handlePinch, hold: handleHold,
+  };
 
   // ─── startHandle — called by Pressable overlays before pan responder fires ──
   // This sets the kind so transformPanResponder.onPanResponderGrant picks it up.
@@ -1711,7 +1900,7 @@ export default function DesignCanvasScreen() {
     const lh = project?.canvas.height || 1080;
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
     const newLayer: DesignLayer = {
-      id: uid(), name: 'Layer', type: 'drawing',
+      id: uid(), name: `Layer ${layers.filter(l => l.type === 'drawing').length + 1}`, type: 'drawing',
       visible: true, locked: false, order: maxOrder + 1,
       transform: { x: 0, y: 0, width: lw, height: lh, rotation: 0, scaleX: 1, scaleY: 1 },
       data: { kind: 'drawing', paths: [] } as DesignDrawingLayer,
@@ -1792,13 +1981,49 @@ export default function DesignCanvasScreen() {
   /** Toggles the pinned "Background colour" row's visibility checkbox — flips
    * the real canvas backgroundOpacity between 0 and 1, which both the live
    * canvas and the export SVG's background Rect read (see bgOpacity above). */
+  /** Procreate's Background colour checkbox: hidden = transparent canvas (checkerboard; PNG keeps alpha). */
   function handleToggleCanvasBackgroundVisible() {
     setProject(p => {
       if (!p) return p;
-      const current = p.canvas.backgroundOpacity ?? 1;
-      return { ...p, canvas: { ...p.canvas, backgroundOpacity: current === 0 ? 1 : 0 } };
+      const hidden = !!p.canvas.backgroundHidden || (p.canvas.backgroundOpacity ?? 1) === 0;
+      return { ...p, canvas: { ...p.canvas, backgroundHidden: !hidden, backgroundOpacity: hidden ? 1 : p.canvas.backgroundOpacity } };
     });
     markDirty();
+  }
+
+  /** Layer menu → Fill Layer: the current colour over the whole layer (alpha lock keeps it to painted pixels). */
+  function handleFillLayer(id: string) {
+    mutateLayer(prev => prev.map(l => {
+      if (l.id !== id || l.type !== 'drawing') return l;
+      const d = l.data as DesignDrawingLayer;
+      return { ...l, data: { ...d, paths: [...d.paths, drawPathFromRecord(fillRecord(drawColorRef.current, !!l.alphaLocked))] }, updatedAt: new Date().toISOString() };
+    }));
+  }
+
+  /** Layer menu → Clear: empties a drawing layer (undoable). */
+  function handleClearLayer(id: string) {
+    mutateLayer(prev => prev.map(l => (l.id === id && l.type === 'drawing'
+      ? { ...l, data: { ...(l.data as DesignDrawingLayer), paths: [], rasterPreview: undefined }, updatedAt: new Date().toISOString() }
+      : l)));
+  }
+
+  /** Small thumbnail of a drawing layer's live pixels for the Layers panel (cached per stroke list). */
+  const layerThumbCacheRef = useRef(new WeakMap<DrawPath[], string>());
+  function layerThumbnail(layer: DesignLayer): string | null {
+    if (layer.type !== 'drawing') return null;
+    const engine = paintEngineRef.current;
+    const backend = getPlatformBackend();
+    const paths = (layer.data as DesignDrawingLayer).paths;
+    if (!engine || !backend || !engine.hasLayer(layer.id) || paths.length === 0) return null;
+    const hit = layerThumbCacheRef.current.get(paths);
+    if (hit) return hit;
+    try {
+      const uri = encodeSurface(backend, engine.content(layer.id), { format: 'png', maxSide: 120 });
+      layerThumbCacheRef.current.set(paths, uri);
+      return uri;
+    } catch {
+      return null;
+    }
   }
 
   function handleRenameLayer(id: string, name: string) {
@@ -1854,9 +2079,15 @@ export default function DesignCanvasScreen() {
     }
     const topPaths = (top.data as DesignDrawingLayer).paths;
     const belowPaths = (below.data as DesignDrawingLayer).paths;
+    // The top layer lands as ONE nested record (its own surface, opacity and
+    // blend mode), so its eraser strokes never cut into the layer below —
+    // the same pixels you saw before merging. A hidden top layer merges as nothing.
+    const mergedPaths = top.visible && topPaths.length > 0
+      ? [...belowPaths, drawPathFromRecord(mergeRecord(topPaths, top.opacity ?? 1, top.blendMode))]
+      : belowPaths;
     const merged: DesignLayer = {
       ...below, id: uid(), name: below.name, order: below.order,
-      data: { kind: 'drawing', paths: [...belowPaths, ...topPaths] } as DesignDrawingLayer,
+      data: { kind: 'drawing', paths: mergedPaths } as DesignDrawingLayer,
       updatedAt: new Date().toISOString(),
     };
     mutateLayer(prev => [...prev.filter(l => l.id !== top.id && l.id !== below.id), merged]);
@@ -2610,7 +2841,12 @@ export default function DesignCanvasScreen() {
    *     the call rejects rather than silently falling back to screen size.
    *   - No quality option — PNG is always lossless.
    */
-  function captureFullResolutionPngBase64(desc: MasterDescriptor): Promise<string> {
+  async function captureFullResolutionPngBase64(desc: MasterDescriptor): Promise<string> {
+    if (paintEngineRef.current) {
+      // Raster pipeline: every layer re-rendered at full print resolution.
+      const { uri } = await composeDesign({ transparent: !!projectRef.current?.canvas.backgroundHidden, format: 'png' }, desc);
+      return uri.slice(uri.indexOf(',') + 1);
+    }
     return new Promise((resolve, reject) => {
       const svg = exportSvgRef.current;
       if (!svg || typeof svg.toDataURL !== 'function') {
@@ -2625,6 +2861,133 @@ export default function DesignCanvasScreen() {
         resolve(b64);
       }, { width: desc.width, height: desc.height });
     });
+  }
+
+  // ─── Full-resolution compose (raster engine) ───────────────────────────────
+  // Text / image / shape layers are rasterised by their own off-screen SVGs
+  // (one per run of consecutive non-drawing layers, rendered at the export
+  // size), drawing layers are replayed from their stroke records at 1:1 by
+  // lib/paint/composeExport.ts, and everything is composited in z-order with
+  // each layer's opacity + blend mode. No background → real alpha.
+  const exportRunRefs = useRef(new Map<string, Svg | null>());
+
+  function svgRunToPng(key: string, w: number, h: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const svg = exportRunRefs.current.get(key) as unknown as { toDataURL?: (cb: (b64: string) => void, o: { width: number; height: number }) => void } | null;
+      if (!svg?.toDataURL) { reject(new Error('Canvas is not ready for export yet.')); return; }
+      svg.toDataURL(b64 => (b64 ? resolve(`data:image/png;base64,${b64}`) : reject(new Error('Layer capture was empty.'))), { width: w, height: h });
+    });
+  }
+
+  async function composeDesign(
+    opts: { transparent: boolean; format: 'png' | 'jpeg' },
+    desc: MasterDescriptor = buildMasterDescriptor(),
+  ): Promise<{ uri: string; width: number; height: number }> {
+    const backend = getPlatformBackend();
+    const proj = projectRef.current;
+    if (!backend || !proj) throw new Error('Export is not available on this device.');
+    const items: ExportItem[] = [];
+    for (const run of buildLayerRuns(layersRef.current)) {
+      if (run.kind === 'drawing') {
+        const l = run.layer;
+        if (!l.visible) continue;
+        const t = l.transform;
+        items.push({
+          kind: 'raster', id: l.id, paths: (l.data as DesignDrawingLayer).paths,
+          opacity: l.opacity ?? 1, blendMode: l.blendMode,
+          box: { x: t.x, y: t.y, w: t.width, h: t.height },
+        });
+      } else if (run.layers.some(l => l.visible)) {
+        items.push({ kind: 'image', uri: await svgRunToPng(run.key, desc.width, desc.height) });
+      }
+    }
+    const bgColor = proj.canvas.backgroundHex && proj.canvas.backgroundHex !== 'transparent' ? proj.canvas.backgroundHex : null;
+    const background = opts.transparent ? null : (bgColor ?? (opts.format === 'jpeg' ? '#FFFFFF' : null));
+    const out = await composeExport(backend, {
+      logicalWidth: proj.canvas.width, logicalHeight: proj.canvas.height,
+      crop: { x: desc.cropX, y: desc.cropY, w: desc.width, h: desc.height },
+      background, items,
+    });
+    try {
+      const uri = encodeSurface(backend, out, {
+        format: opts.format, quality: clampJpegQuality(MASTER_JPEG_QUALITY), jpegMatte: background ?? '#FFFFFF',
+      });
+      return { uri, width: desc.width, height: desc.height };
+    } finally {
+      backend.dispose(out);
+    }
+  }
+
+  /** Procreate's Share Image list: PNG (transparent) / PNG / JPEG → Exporting → share sheet (native) or download (web). */
+  async function handleShareImage(kind: 'png-transparent' | 'png' | 'jpeg') {
+    if (exporting || !project) return;
+    const exportingProjectId = project.id;
+    closeSheet();
+    setExporting(true);
+    try {
+      await new Promise<void>(r => setTimeout(r, 60)); // let "Exporting" paint first
+      const format = kind === 'jpeg' ? 'jpeg' : 'png';
+      const transparent = kind === 'png-transparent' || (kind === 'png' && !!projectRef.current?.canvas.backgroundHidden);
+      const { uri, width, height } = await composeDesign({ transparent, format });
+      const slug = (projectName || 'design').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 40);
+      const filename = `${slug}${kind === 'png-transparent' ? '_transparent' : ''}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+      const asset: MasterExportAsset = {
+        uri, mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png', width, height, format,
+        lossless: format === 'png', quality: format === 'jpeg' ? clampJpegQuality(MASTER_JPEG_QUALITY) : undefined,
+      };
+      if (Platform.OS === 'web') {
+        triggerWebDownload(uri, filename);
+        void syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
+        return;
+      }
+      const file = new File(Paths.cache, `${Date.now()}_${filename}`);
+      file.write(uri.slice(uri.indexOf(',') + 1), { encoding: EncodingType.Base64 });
+      await verifyExportDimensionsNative(file.uri, { width, height, cropX: 0, cropY: 0, hasCrop: false }, RNImage.getSize.bind(RNImage));
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: asset.mimeType, dialogTitle: `Share ${projectName}`, UTI: format === 'jpeg' ? 'public.jpeg' : 'public.png',
+        });
+      } else {
+        const saved = await saveImageToMediaLibrary(file.uri);
+        if (saved === 'saved') showAlert('Saved to Photos', `${filename} (${width} × ${height}) saved.`);
+        else showAlert('Sharing unavailable', saved === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save the export.');
+      }
+      void syncVerifiedDesignAsset(exportingProjectId, { ...asset, uri: file.uri }, 'master').catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error('[design-canvas] share image failed', err);
+      showAlert('Export failed', "Couldn't export your design. Try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  /**
+   * "Use on mockup": exports the design as a transparent PNG (background left
+   * out, so empty canvas shows the garment) and opens Mockup Preview with it.
+   */
+  async function handleUseOnMockup() {
+    if (exporting || !project) return;
+    closeSheet();
+    setExporting(true);
+    try {
+      await new Promise<void>(r => setTimeout(r, 60));
+      const { uri, width, height } = await composeDesign({ transparent: true, format: 'png' });
+      let artUri = uri;
+      if (Platform.OS !== 'web') {
+        const file = new File(Paths.cache, `mockup_art_${project.id}_${Date.now()}.png`);
+        file.write(uri.slice(uri.indexOf(',') + 1), { encoding: EncodingType.Base64 });
+        artUri = file.uri;
+      }
+      setDesignArtwork({ projectId: project.id, uri: artUri, width, height, createdAt: Date.now() });
+      await coordinatedSave().catch(() => {});
+      router.push(`/design-mockup-preview?projectId=${encodeURIComponent(project.id)}` as never);
+    } catch (err) {
+      console.error('[design-canvas] use on mockup failed', err);
+      showAlert('Couldn’t prepare your design', 'Something went wrong exporting the artwork. Try again.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   /**
@@ -2690,6 +3053,9 @@ export default function DesignCanvasScreen() {
           reject(new Error('JPEG encoding is unavailable in this browser.'));
           return;
         }
+        // JPEG has no alpha: matte transparent pixels white (a canvas defaults to black).
+        context.fillStyle = '#FFFFFF';
+        context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0);
         const jpegDataUrl = canvas.toDataURL('image/jpeg', quality);
         // Verify JPEG dimensions
@@ -2700,169 +3066,6 @@ export default function DesignCanvasScreen() {
       image.onerror = () => reject(new Error('Could not prepare the canvas for JPEG export.'));
       image.src = pngDataUrl;
     });
-  }
-
-  async function handleExport(format: 'png' | 'jpeg') {
-    if (exporting || !project) return;
-    const exportingProjectId = project.id;
-    closeSheet();
-    await new Promise<void>(r => setTimeout(r, 220));
-    setExporting(true);
-    try {
-      // 1. Resolve and validate exact output dimensions from project (never display).
-      const desc = buildMasterDescriptor();
-
-      // 2. Capture at exact logical dimensions.
-      const base64 = await captureFullResolutionPngBase64(desc);
-
-      // 3. Build the MasterExportAsset descriptor for downstream.
-      let asset: MasterExportAsset;
-
-      if (Platform.OS === 'web') {
-        // Encode (verifies dimensions internally)
-        const dataUrl = await webExportDataUrl(base64, format, desc);
-        asset = {
-          uri: dataUrl,
-          mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
-          width: desc.width,
-          height: desc.height,
-          format,
-          lossless: format === 'png',
-          quality: format === 'jpeg' ? clampJpegQuality(MASTER_JPEG_QUALITY) : undefined,
-        };
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `${(projectName || 'design').replace(/\s+/g, '_')}.${format === 'jpeg' ? 'jpg' : 'png'}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        void syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
-        return;
-      }
-
-      // Native: write PNG (no actions array = no resize/crop/downsample)
-      let localUri = await writePngToDocument(base64);
-      let mimeType: 'image/png' | 'image/jpeg' = 'image/png';
-
-      if (format === 'jpeg') {
-        // PNG → JPEG re-encode: empty actions array guarantees no resize.
-        const quality = clampJpegQuality(MASTER_JPEG_QUALITY);
-        const jpegResult = await ImageManipulator.manipulateAsync(
-          localUri,
-          [],  // ← MUST be empty: absolutely no resize/crop/downsample
-          { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
-        );
-        try { new File(localUri).delete(); } catch { /* best-effort */ }
-        localUri = jpegResult.uri;
-        mimeType = 'image/jpeg';
-        // Verify JPEG dimensions (no re-encode in getSize)
-        await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
-      } else {
-        // Verify PNG dimensions
-        await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
-      }
-
-      asset = {
-        uri: localUri,
-        mimeType,
-        width: desc.width,
-        height: desc.height,
-        format,
-        lossless: format === 'png',
-        quality: format === 'jpeg' ? clampJpegQuality(MASTER_JPEG_QUALITY) : undefined,
-      };
-
-      const uti = format === 'jpeg' ? 'public.jpeg' : 'public.png';
-      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
-
-      if (mediaSaveResult !== 'saved') {
-        const sharingAvailable = await Sharing.isAvailableAsync();
-        if (sharingAvailable) {
-          await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Export ${projectName}`, UTI: uti });
-        } else {
-          showAlert(
-            mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
-            mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow media-library access in Settings to save the export.',
-          );
-        }
-        return;
-      }
-
-      const sharingAvailable = await Sharing.isAvailableAsync();
-      if (sharingAvailable) {
-        await Sharing.shareAsync(asset.uri, { mimeType: asset.mimeType, dialogTitle: `Share ${projectName}`, UTI: uti });
-      } else {
-        const suffix = desc.hasCrop ? ' (cropped)' : '';
-        showAlert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
-      }
-
-      await syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
-      try { new File(asset.uri).delete(); } catch { /* best-effort */ }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: unknown) {
-      console.error('[design-canvas] export failed', err);
-      showAlert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  async function handleShare() {
-    closeSheet();
-    if (exporting) return;
-    await new Promise<void>(r => setTimeout(r, 220));
-    setExporting(true);
-    try {
-      // Resolve exact dimensions — never display fallback
-      const desc = buildMasterDescriptor();
-      const base64 = await captureFullResolutionPngBase64(desc);
-
-      if (Platform.OS === 'web') {
-        const dataUrl = `data:image/png;base64,${base64}`;
-        // Verify PNG dimensions on web
-        await verifyExportDimensionsWeb(dataUrl, desc);
-        const asset: MasterExportAsset = {
-          uri: dataUrl,
-          mimeType: 'image/png',
-          width: desc.width,
-          height: desc.height,
-          format: 'png',
-          lossless: true,
-        };
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `${(projectName || 'design').replace(/\s+/g, '_')}_share.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        void syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
-        return;
-      }
-
-      const localUri = await writePngToDocument(base64, '_share');
-      // Verify PNG dimensions on native
-      await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
-
-      const asset: MasterExportAsset = {
-        uri: localUri,
-        mimeType: 'image/png',
-        width: desc.width,
-        height: desc.height,
-        format: 'png',
-        lossless: true,
-      };
-
-      const available = await Sharing.isAvailableAsync();
-      if (!available) { showAlert('Sharing unavailable', 'System share sheet is not available.'); return; }
-      await Sharing.shareAsync(asset.uri, { mimeType: 'image/png', dialogTitle: `Share ${projectName}`, UTI: 'public.png' });
-      await syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
-      try { new File(asset.uri).delete(); } catch { /* best-effort */ }
-    } catch (err: unknown) {
-      console.error('[design-canvas] share failed', err);
-      showAlert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
-    } finally {
-      setExporting(false);
-    }
   }
 
   // ─── Color helpers ─────────────────────────────────────────────────────────
@@ -3006,26 +3209,83 @@ export default function DesignCanvasScreen() {
   const layerOptionsLayer = useMemo(() =>
     layers.find(l => l.id === layerOptionsTarget) ?? null, [layers, layerOptionsTarget]);
 
-  const activeBrush = brushes.find(b => b.id === activeBrushId) ?? brushes[0];
+  const activeBrush = brushLib.brushFor(activeTopTool === 'eraser' ? 'eraser' : activeTopTool === 'smudge' ? 'smudge' : 'brush');
 
+  // ─── Brush library operations (Brushes panel) ──────────────────────────────
   function handleSelectBrush(id: string) {
-    setActiveBrushId(id);
+    brushLib.setToolBrush(brushLibTool, id);
   }
   function handleDuplicateBrush(id: string) {
-    const { brushes: next, newId } = duplicateBrush(brushesRef.current, id);
-    setBrushes(next);
-    if (newId) setActiveBrushId(newId); // select the new copy, matching Procreate's own duplicate behaviour
+    const { state, id: newId } = duplicateBrushPreset(brushLib.library, id);
+    brushLib.setLibrary(state);
+    if (newId) brushLib.setToolBrush(brushLibTool, newId);
   }
   function handleDeleteBrush(id: string) {
-    const before = brushesRef.current;
-    const { brushes: next, deleted } = deleteBrush(before, id);
-    if (!deleted) return; // refused (would have emptied the whole library) — leave state untouched
-    setBrushes(next);
-    if (id === activeBrushIdRef.current) {
-      setActiveBrushId(nextActiveBrushAfterDelete(before, id, next));
+    const next = deleteBrushPreset(brushLib.library, id);
+    if (next === brushLib.library) return;
+    brushLib.setLibrary(next);
+    (['brush', 'smudge', 'eraser'] as PaintTool[]).forEach(t => {
+      if (brushLib.tools[t] === id) brushLib.setToolBrush(t, next.brushes[0].id);
+    });
+  }
+  function handleNewSet(): string {
+    const { state, set } = addSet(brushLib.library);
+    brushLib.setLibrary(state);
+    return set;
+  }
+  function handleNewBrush(set: string) {
+    const { state, id } = addBrush(brushLib.library, set, brushLib.brushFor(brushLibTool));
+    brushLib.setLibrary(state);
+    brushLib.setToolBrush(brushLibTool, id);
+  }
+  function handleRenameSet(from: string, to: string) {
+    brushLib.setLibrary(renameSet(brushLib.library, from, to));
+  }
+  function handleDuplicateSet(set: string) {
+    brushLib.setLibrary(duplicateSet(brushLib.library, set).state);
+  }
+  function handleDeleteSet(set: string) {
+    const next = deleteSet(brushLib.library, set);
+    if (next === brushLib.library) return;
+    brushLib.setLibrary(next);
+    (['brush', 'smudge', 'eraser'] as PaintTool[]).forEach(t => {
+      if (!next.brushes.some(b => b.id === brushLib.tools[t])) brushLib.setToolBrush(t, next.brushes[0].id);
+    });
+  }
+  /** Shares a set (or one brush) as a Brandthread brush file — re-importable via Import. */
+  function handleShareBrushes(set: string, brushId?: string) {
+    const brushes = brushLib.library.brushes.filter(b => (brushId ? b.id === brushId : b.category === set));
+    const payload = JSON.stringify({ format: 'brandthread-brushes', version: 1, set, brushes });
+    if (Platform.OS === 'web') {
+      triggerWebDownload(`data:application/json;charset=utf-8,${encodeURIComponent(payload)}`, `${(brushId ? brushes[0]?.name : set) ?? 'brushes'}.brushset.json`);
+      return;
+    }
+    Share.share({ message: payload, title: set }).catch(() => {});
+  }
+  async function handleImportBrushes() {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
+      if (res.canceled || !res.assets?.[0]) return;
+      const asset = res.assets[0];
+      const text = Platform.OS === 'web' ? await (await fetch(asset.uri)).text() : await new File(asset.uri).text();
+      const parsed = JSON.parse(text) as { format?: string; set?: string; brushes?: BrushPreset[] };
+      if (parsed.format !== 'brandthread-brushes' || !Array.isArray(parsed.brushes) || parsed.brushes.length === 0) {
+        showAlert('Not a brush file', 'Import brush files shared from the Brushes panel.');
+        return;
+      }
+      const { state, set } = addSet(brushLib.library);
+      const named = renameSet(state, set, parsed.set ? `${parsed.set} (Imported)` : set);
+      const setName = named.sets[0];
+      const imported = parsed.brushes
+        .filter(b => b && b.params && typeof b.params.tip === 'string')
+        .map((b, i) => ({ ...b, id: `import-${Date.now().toString(36)}-${i}`, category: setName }));
+      brushLib.setLibrary({ ...named, brushes: [...named.brushes, ...imported] });
+    } catch {
+      showAlert("Couldn't import", 'That file could not be read as a brush set.');
     }
   }
   const activeSize  = activeTopTool === 'eraser' ? eraserSize : activeTopTool === 'smudge' ? smudgeSize : brushSize;
+  const isPaintTool = activeTopTool === 'brush' || activeTopTool === 'smudge' || activeTopTool === 'eraser';
 
   // Logical → display scale
   const logicalW = project?.canvas.width  || 1080;
@@ -3062,6 +3322,97 @@ export default function DesignCanvasScreen() {
    *   - Ink path group references mask via mask="url(#maskId)"
    * Stroke widths are stored in logical units; scaled by xScale/yScale for display.
    */
+  /**
+   * renderRasterStack — the on-screen compositor when the raster paint engine
+   * is available: the Background colour layer (or a transparency checkerboard
+   * when it's hidden, like Procreate), then each layer bottom-to-top. Drawing
+   * layers mount their live paint surface; consecutive text/image/shape
+   * layers share one SVG. Opacity, visibility and blend mode are view styles.
+   */
+  function renderRasterStack() {
+    const engine = paintEngine!;
+    const runs: ({ kind: 'drawing'; layer: DesignLayer } | { kind: 'svg'; layers: DesignLayer[] })[] = [];
+    for (const l of sortedLayers) {
+      if (l.type === 'drawing' && !drawingNeedsSvg(l)) { runs.push({ kind: 'drawing', layer: l }); continue; }
+      const last = runs[runs.length - 1];
+      if (last && last.kind === 'svg') last.layers.push(l); else runs.push({ kind: 'svg', layers: [l] });
+    }
+    const bgHidden = !!project?.canvas.backgroundHidden;
+    const isolate = { isolation: 'isolate' } as unknown as ViewStyle;
+    return (
+      <View style={[StyleSheet.absoluteFill, isolate, { overflow: 'hidden' }]} pointerEvents="none" testID="raster-stack">
+        {bgHidden ? (
+          <Checkerboard tile={Math.max(6, Math.round(canvasSize.w / 48))} light="#FFFFFF" dark="#D4D4D4" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: bgHex, opacity: bgOpacity }]} />
+        )}
+        {runs.map(run => {
+          if (run.kind === 'drawing') {
+            const l = run.layer;
+            const t = l.transform;
+            return (
+              <RasterLayerView
+                key={l.id}
+                engine={engine}
+                layerId={l.id}
+                testID={`raster-layer-${l.id}`}
+                style={[
+                  {
+                    position: 'absolute',
+                    left: t.x * dispScaleX, top: t.y * dispScaleY,
+                    width: t.width * dispScaleX, height: t.height * dispScaleY,
+                    opacity: l.opacity ?? 1,
+                    display: l.visible ? 'flex' : 'none',
+                    transform: [
+                      { rotate: `${t.rotation ?? 0}deg` },
+                      { scaleX: t.flipX ? -1 : 1 }, { scaleY: t.flipY ? -1 : 1 },
+                    ],
+                  },
+                  l.blendMode && l.blendMode !== 'normal' ? ({ mixBlendMode: l.blendMode } as unknown as ViewStyle) : null,
+                ]}
+              />
+            );
+          }
+          return (
+            <Svg key={`svg_${run.layers[0].id}`} style={StyleSheet.absoluteFill} width={canvasSize.w} height={canvasSize.h} pointerEvents="none">
+              <G transform={`scale(${dispScaleX} ${dispScaleY})`}>
+                {run.layers.map(layer => renderLayerInSvg(layer, 1, 1, bgHex, false))}
+              </G>
+            </Svg>
+          );
+        })}
+      </View>
+    );
+  }
+
+  /** Vector fallback commit (no raster backend, e.g. Expo Go): CanvasHost's display-space path → logical. */
+  function handleVectorStrokeEnd(displayPath: DrawPath) {
+    const k = dispScaleXRef.current || 1;
+    const d = displayPath.d.replace(/([ML])(-?[\d.]+),(-?[\d.]+)/g, (_m, cmd: string, xs: string, ys: string) =>
+      `${cmd}${(parseFloat(xs) / k).toFixed(2)},${(parseFloat(ys) / k).toFixed(2)}`);
+    const newPath: DrawPath = { ...displayPath, d, width: displayPath.width / k, tool: resolveActiveBrush().name };
+    const current = layersRef.current;
+    const targetId = resolveActiveDrawingLayerId(current);
+    let next: DesignLayer[];
+    if (targetId) {
+      next = current.map(l => l.id === targetId
+        ? { ...l, data: { ...(l.data as DesignDrawingLayer), paths: [...(l.data as DesignDrawingLayer).paths, newPath] } }
+        : l);
+    } else {
+      const now = new Date().toISOString();
+      next = [...current, {
+        id: uid(), name: 'Layer 1', type: 'drawing', visible: true, locked: false,
+        order: current.reduce((m, l) => Math.max(m, l.order), 0) + 1,
+        transform: { x: 0, y: 0, width: logicalW, height: logicalH, rotation: 0, scaleX: 1, scaleY: 1 },
+        data: { kind: 'drawing', paths: [newPath] } as DesignDrawingLayer,
+        opacity: 1, createdAt: now, updatedAt: now,
+      }];
+    }
+    pushUndo(current, next);
+    setLayers(next);
+    markDirty();
+  }
+
   /**
    * findLayerBelow — the next layer down in z-order (by `order`), ignoring
    * template/guide layers, for `clippingMask` compositing. Independent of the
@@ -3160,6 +3511,23 @@ export default function DesignCanvasScreen() {
     // ── Smudge overlay colour: use theme MUTED at low opacity, not hardcoded rgba ──
     const SMUDGE_STROKE = FG;
     const SMUDGE_OPACITY = 0.08;
+
+    if (layer.type === 'drawing' && rasterUris[layer.id]) {
+      return (
+        <G key={layer.id} opacity={layer.opacity}>
+          {filterDefs}
+          {clipDefs}
+          <G transform={transformAttr} filter={filterRef} mask={clipMaskRef}>
+            <SvgImage
+              x={t.x * xScale} y={t.y * yScale}
+              width={t.width * xScale} height={t.height * yScale}
+              href={rasterUris[layer.id]}
+              preserveAspectRatio="none"
+            />
+          </G>
+        </G>
+      );
+    }
 
     if (layer.type === 'drawing') {
       const d = layer.data as DesignDrawingLayer;
@@ -3436,37 +3804,39 @@ export default function DesignCanvasScreen() {
         <View style={styles.topGroup}>
           <TouchableOpacity
             style={[styles.topBtn, activeTopTool === 'brush' && styles.topBtnActive]}
-            onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
-            onLongPress={() => openSheet('brushLib')}
+            onPress={() => handlePaintToolPress('brush')}
+            onLongPress={() => { setBrushLibTool('brush'); openSheet('brushLib'); }}
             testID="btn-brush"
             hitSlop={TOP_BTN_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel="Brush"
             accessibilityState={{ selected: activeTopTool === 'brush' }}
           >
-            <Icon name="edit-2" size={ICON.sm} color={activeTopTool === 'brush' ? FG : MUTED} />
+            <PaintbrushGlyph color={activeTopTool === 'brush' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeTopTool === 'smudge' && styles.topBtnActive]}
-            onPress={() => selectTool(activeTopTool === 'smudge' ? 'brush' : 'smudge')}
+            onPress={() => handlePaintToolPress('smudge')}
+            onLongPress={() => { setBrushLibTool('smudge'); openSheet('brushLib'); }}
             testID="btn-smudge"
             hitSlop={TOP_BTN_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel="Smudge"
             accessibilityState={{ selected: activeTopTool === 'smudge' }}
           >
-            <Icon name="droplet" size={ICON.sm} color={activeTopTool === 'smudge' ? FG : MUTED} />
+            <SmudgeGlyph color={activeTopTool === 'smudge' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeTopTool === 'eraser' && styles.topBtnActive]}
-            onPress={() => selectTool(activeTopTool === 'eraser' ? 'brush' : 'eraser')}
+            onPress={() => handlePaintToolPress('eraser')}
+            onLongPress={() => { setBrushLibTool('eraser'); openSheet('brushLib'); }}
             testID="btn-eraser"
             hitSlop={TOP_BTN_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel="Eraser"
             accessibilityState={{ selected: activeTopTool === 'eraser' }}
           >
-            <Icon name="circle" size={ICON.sm} color={activeTopTool === 'eraser' ? FG : MUTED} />
+            <EraserGlyph color={activeTopTool === 'eraser' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBtn, activeSheet === 'layers' && styles.topBtnActive]}
@@ -3477,7 +3847,7 @@ export default function DesignCanvasScreen() {
             accessibilityLabel="Layers"
             accessibilityState={{ selected: activeSheet === 'layers' }}
           >
-            <Icon name="layers" size={ICON.sm} color={activeSheet === 'layers' ? FG : MUTED} />
+            <LayersGlyph color={activeSheet === 'layers' ? FG : MUTED} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.colorSwatch}
@@ -3567,94 +3937,16 @@ export default function DesignCanvasScreen() {
           }}
         />
 
-        {/* Left sidebar: Procreate's own vertically-centred handles — size on
-            top, opacity below, undo/redo beneath both — inset from the edge
-            (not glued to it, so the size handle's own preview card never
-            gets clipped by the screen's rounded corner). Handles are barely
-            visible at rest (a short line + a small dot), matching
-            Procreate; dragging either one shows the large "Size 99%"-style
-            preview card top-left, exactly like the reference. */}
-        <View style={styles.leftSliderRail} pointerEvents="box-none">
-          {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
-            <>
-              <View
-                style={styles.sizeSlider}
-                onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
-                {...sizePanResponder.panHandlers}
-                testID="brush-size-slider"
-              >
-                <View style={styles.sizeTrack}>
-                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
-                </View>
-              </View>
-
-              <View
-                style={styles.opacitySlider}
-                onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
-                {...opacityPanResponder.panHandlers}
-                testID="brush-opacity-slider"
-              >
-                <View style={styles.sizeTrack}>
-                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
-                </View>
-              </View>
-            </>
-          )}
-
-          <View style={styles.sidebarUndoGroup}>
-            <TouchableOpacity
-              style={[styles.sidebarIconBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
-              onPress={handleUndo} testID="btn-undo"
-              hitSlop={SIDEBAR_BTN_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityLabel="Undo"
-              accessibilityState={{ disabled: !undoModelRef.current.canUndo }}
-            >
-              <Icon name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.sidebarIconBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
-              onPress={handleRedo} testID="btn-redo"
-              hitSlop={SIDEBAR_BTN_HIT_SLOP}
-              accessibilityRole="button"
-              accessibilityLabel="Redo"
-              accessibilityState={{ disabled: !undoModelRef.current.canRedo }}
-            >
-              <Icon name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Large drag preview card — Procreate's own "Size 99%" card, shown
-            top-left of the canvas while actively dragging either handle,
-            with a live dot at the actual brush size/opacity. Replaces the
-            old small inline bubble that sat next to the slider itself. */}
-        {(sizeSliderDragging || opacitySliderDragging) && (
-          <View style={styles.dragPreviewCard} pointerEvents="none">
-            <Text style={styles.dragPreviewLabel}>
-              {sizeSliderDragging ? `Size ${Math.round((activeSize / 80) * 100)}%` : `Opacity ${Math.round(brushOpacity * 100)}%`}
-            </Text>
-            <View style={styles.dragPreviewDotWrap}>
-              <View
-                style={[
-                  styles.dragPreviewDot,
-                  sizeSliderDragging
-                    ? {
-                        width: Math.max(4, Math.min(72, activeSize * 1.8)),
-                        height: Math.max(4, Math.min(72, activeSize * 1.8)),
-                        backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
-                        borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
-                        borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
-                      }
-                    : {
-                        width: 40, height: 40,
-                        backgroundColor: drawColor,
-                        opacity: brushOpacity,
-                      },
-                ]}
-              />
-            </View>
-          </View>
+        {/* ── PAINT INPUT — Procreate's canvas gestures over the whole stage:
+            one finger paints, touch-and-hold samples colour, two-finger tap
+            undoes, three-finger tap redoes, two-finger pinch zooms/rotates.
+            Sits under the artboard, which ignores touches in paint mode. ── */}
+        {paintEngine && (
+          <PaintSurface
+            model={gestureModel}
+            enabled={isPaintTool && !eyedropperActive && canvasFit.scale > 0}
+            testID="paint-surface"
+          />
         )}
 
         {/* Canvas-level touch listeners observe QuickMenu long-press while the
@@ -3669,7 +3961,14 @@ export default function DesignCanvasScreen() {
               height: canvasFit.height,
             },
             canvasFit.scale <= 0 && styles.canvasUnmeasured,
+            paintEngine && {
+              transform: [
+                { translateX: viewport.tx }, { translateY: viewport.ty },
+                { rotate: `${viewport.rotation}rad` }, { scale: viewport.scale },
+              ],
+            },
           ]}
+          pointerEvents={paintEngine && isPaintTool && !eyedropperActive ? 'box-none' : 'auto'}
           testID="canvas-artboard"
           onTouchStart={handleCanvasTouchStart}
           onTouchMove={handleCanvasTouchMove}
@@ -3684,6 +3983,12 @@ export default function DesignCanvasScreen() {
             {}
           )}
         >
+          {/* ── RASTER LAYER STACK — background colour layer, then every layer
+              in z-order: drawing layers as live paint-engine surfaces, runs of
+              text/image/shape layers as SVG. Blend modes are real compositing
+              (mix-blend-mode) between them. ── */}
+          {paintEngine && canvasSize.w > 0 && renderRasterStack()}
+
           {/* Grid — uses guideSettings.gridEnabled; legacy showGrid also supported */}
           {(showGrid || guideSettings.gridEnabled) && canvasSize.w > 0 && (() => {
             const gs   = guideSettings.gridSize;
@@ -3740,12 +4045,15 @@ export default function DesignCanvasScreen() {
               height={canvasSize.h}
               pointerEvents="none"
             >
-              {/* Canvas background */}
-              <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} opacity={bgOpacity} />
+              {/* Canvas background + layers — only on the vector fallback (no
+                  raster backend, e.g. Expo Go); otherwise renderRasterStack draws them. */}
+              {!paintEngine && !project?.canvas.backgroundHidden && (
+                <Rect x={0} y={0} width={canvasSize.w} height={canvasSize.h} fill={bgHex} opacity={bgOpacity} />
+              )}
 
               {/* Layer paths and live strokes are stored in logical coordinates. */}
               <G transform={`scale(${dispScaleX} ${dispScaleY})`}>
-                {sortedLayers.map(layer =>
+                {!paintEngine && sortedLayers.map(layer =>
                   renderLayerInSvg(layer, 1, 1, bgHex, false)
                 )}
 
@@ -3913,36 +4221,6 @@ export default function DesignCanvasScreen() {
                 );
               })()}
 
-              {/* ── BRUSH CURSOR (display-only, excluded from export) ── */}
-              {prefs.brushCursor !== 'none' &&
-               (activeTopTool === 'brush' || activeTopTool === 'eraser' || activeTopTool === 'smudge') &&
-               brushCursorPos && (() => {
-                 // Pressure-adjusted radius: samplePressureCurve × activeSize × brush.widthMult / 2
-                 const pressureMult = samplePressureCurve(prefs.pressureCurve, lastStrokeForceRef.current);
-                 const brush = resolveActiveBrush();
-                 const radiusPx = (activeSize * brush.widthMult * pressureMult) / 2;
-                 const cx = brushCursorPos.x;
-                 const cy = brushCursorPos.y;
-
-                 if (prefs.brushCursor === 'crosshair') {
-                   const CS = Math.max(8, radiusPx);
-                   return (
-                     <G key="brush-cursor" opacity={0.6}>
-                       <Line x1={cx - CS} y1={cy} x2={cx + CS} y2={cy}
-                         stroke={FG} strokeWidth={1} />
-                       <Line x1={cx} y1={cy - CS} x2={cx} y2={cy + CS}
-                         stroke={FG} strokeWidth={1} />
-                     </G>
-                   );
-                 }
-                 return (
-                   <Circle key="brush-cursor"
-                     cx={cx} cy={cy} r={Math.max(2, radiusPx)}
-                     fill="none" stroke={FG} strokeWidth={1} opacity={0.55}
-                   />
-                 );
-               })()}
-
             </Svg>
           )}
 
@@ -3954,7 +4232,7 @@ export default function DesignCanvasScreen() {
               handleEngineStrokeEnd appends them to the active layer.
               CanvasGestureLayer wraps it to add two/three-finger tap
               undo/redo without stealing single-finger draw gestures. */}
-          {canvasSize.w > 0 && ['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
+          {!paintEngine && canvasSize.w > 0 && isPaintTool && (
             <CanvasGestureLayer
               onUndo={handleUndo}
               onRedo={handleRedo}
@@ -3965,15 +4243,14 @@ export default function DesignCanvasScreen() {
                 width={canvasSize.w}
                 height={canvasSize.h}
                 paths={[]}
-                brushKind={engineBrushKindFor(activeBrush)}
+                brushKind="ink"
                 color={drawColor}
-                size={activeSize * activeBrush.widthMult * (dispScaleX + dispScaleY) / 2}
-                opacity={brushOpacity * activeBrush.opacityMult}
+                size={Math.max(1, (activeSize / 80) * activeBrush.params.maxSize * dispScaleX)}
+                opacity={brushOpacity}
                 pressureCurve={prefs.pressureCurve}
-                streamline={0.3}
+                streamline={activeBrush.params.streamline}
                 tool={activeTopTool as 'brush' | 'eraser' | 'smudge'}
-                onStrokeEnd={handleEngineStrokeEnd}
-                onLivePoint={handleEngineLivePoint}
+                onStrokeEnd={handleVectorStrokeEnd}
               />
             </CanvasGestureLayer>
           )}
@@ -4065,6 +4342,23 @@ export default function DesignCanvasScreen() {
               )}
             </Svg>
           )}
+
+          {/* ── EXPORT RUN SVGs (raster pipeline) — one per run of text/image/
+              shape layers, at export size with NO background, so composeDesign
+              can composite them between drawing layers in z-order. ── */}
+          {paintEngine && canvasSize.w > 0 && buildLayerRuns(layers).map(run => (run.kind === 'svg' ? (
+            <Svg
+              key={run.key}
+              ref={el => { exportRunRefs.current.set(run.key, el); }}
+              style={[StyleSheet.absoluteFill, { opacity: 0 }]}
+              width={exportW}
+              height={exportH}
+              viewBox={`${exportX} ${exportY} ${exportW} ${exportH}`}
+              pointerEvents="none"
+            >
+              {run.layers.map(layer => renderLayerInSvg(layer, 1, 1, bgHex, true))}
+            </Svg>
+          ) : null))}
 
           {/* Inline text editing overlay */}
           {editingTextLayerId && (() => {
@@ -4178,6 +4472,132 @@ export default function DesignCanvasScreen() {
               in the wrench icon's Add tab (WrenchActionsSheet), reached from
               the top bar's row 2 wrench button. */}
         </View>
+
+        {/* Left sidebar: Procreate's own vertically-centred handles — size on
+            top, opacity below, undo/redo beneath both — inset from the edge
+            (not glued to it, so the size handle's own preview card never
+            gets clipped by the screen's rounded corner). Handles are barely
+            visible at rest (a short line + a small dot), matching
+            Procreate; dragging either one shows the large "Size 99%"-style
+            preview card top-left, exactly like the reference. */}
+        <View style={styles.leftSliderRail} pointerEvents="box-none">
+          {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
+            <>
+              <View
+                style={styles.sizeSlider}
+                onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
+                {...sizePanResponder.panHandlers}
+                testID="brush-size-slider"
+              >
+                <View style={styles.sizeTrack}>
+                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
+                </View>
+              </View>
+
+              {/* Procreate's square "modify" button: tap = eyedropper, hold = QuickMenu. */}
+              <TouchableOpacity
+                style={styles.modifySquare}
+                onPress={() => { Haptics.selectionAsync(); setEyedropperActive(true); }}
+                onLongPress={() => {
+                  if (prefsRef.current.quickMenuSlots.some(sl => sl !== 'none')) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                    setQuickMenuVisible(true);
+                  }
+                }}
+                testID="btn-modify-square"
+                accessibilityRole="button"
+                accessibilityLabel="Eyedropper"
+                accessibilityHint="Hold for QuickMenu"
+                hitSlop={{ top: 8, bottom: 8, left: 10, right: 10 }}
+              >
+                <View style={[styles.modifySquareInner, eyedropperActive && { backgroundColor: FG }]} />
+              </TouchableOpacity>
+
+              <View
+                style={styles.opacitySlider}
+                onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
+                {...opacityPanResponder.panHandlers}
+                testID="brush-opacity-slider"
+              >
+                <View style={styles.sizeTrack}>
+                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
+                </View>
+              </View>
+            </>
+          )}
+
+          <View style={styles.sidebarUndoGroup}>
+            <TouchableOpacity
+              style={[styles.sidebarIconBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
+              onPress={handleUndo} testID="btn-undo"
+              hitSlop={SIDEBAR_BTN_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Undo"
+              accessibilityState={{ disabled: !undoModelRef.current.canUndo }}
+            >
+              <Icon name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sidebarIconBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
+              onPress={handleRedo} testID="btn-redo"
+              hitSlop={SIDEBAR_BTN_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Redo"
+              accessibilityState={{ disabled: !undoModelRef.current.canRedo }}
+            >
+              <Icon name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Large drag preview card — Procreate's own "Size 99%" card, shown
+            top-left of the canvas while actively dragging either handle,
+            with a live dot at the actual brush size/opacity. Replaces the
+            old small inline bubble that sat next to the slider itself. */}
+        {(sizeSliderDragging || opacitySliderDragging) && (
+          <View style={styles.dragPreviewCard} pointerEvents="none">
+            <Text style={styles.dragPreviewLabel}>
+              {sizeSliderDragging ? `Size ${Math.round((activeSize / 80) * 100)}%` : `Opacity ${Math.round(brushOpacity * 100)}%`}
+            </Text>
+            <View style={styles.dragPreviewDotWrap}>
+              {(() => {
+                const onScreen = brushDiameter(activeBrush.params, activeSize / 80, Math.max(logicalW, logicalH)) * dispScaleX * viewport.scale;
+                const px = Math.max(3, Math.min(104, onScreen));
+                const dab = renderBrushDab(activeBrush.id, activeBrush.params, activeTopTool === 'eraser' ? '#FFFFFF' : drawColor, px);
+                if (sizeSliderDragging && dab) {
+                  return <RNImage source={{ uri: dab }} style={{ width: px + 6, height: px + 6 }} testID="size-hud-dab" />;
+                }
+                return (
+                  <View
+                    style={[
+                      styles.dragPreviewDot,
+                      sizeSliderDragging
+                        ? { width: px, height: px, backgroundColor: activeTopTool === 'eraser' ? '#FFFFFF' : drawColor }
+                        : { width: 44, height: 44, backgroundColor: drawColor, opacity: brushOpacity },
+                    ]}
+                  />
+                );
+              })()}
+            </View>
+          </View>
+        )}
+
+        {/* Touch-and-hold eyedropper loupe: Procreate's ring — sampled colour
+            on top, current colour below — floating above the finger. */}
+        {holdSample && (
+          <View
+            pointerEvents="none"
+            testID="eyedropper-loupe"
+            style={[styles.loupe, { left: holdSample.x - 44, top: holdSample.y - 120 }]}
+          >
+            <Svg width={88} height={88}>
+              <Path d="M 7 44 A 37 37 0 0 1 81 44" stroke={holdSample.color} strokeWidth={14} fill="none" />
+              <Path d="M 81 44 A 37 37 0 0 1 7 44" stroke={drawColor} strokeWidth={14} fill="none" />
+              <Circle cx={44} cy={44} r={44 - 1} stroke="#FFFFFF" strokeWidth={1.5} fill="none" />
+              <Circle cx={44} cy={44} r={30} stroke="#FFFFFF" strokeWidth={1.5} fill="none" />
+            </Svg>
+          </View>
+        )}
 
         {/* Sub-mode bars (Selection / Transform / Adjustments) dock at the
             top of the stage. Their measured height is reserved in the
@@ -4431,9 +4851,8 @@ export default function DesignCanvasScreen() {
         garmentTemplateVisible={layers.some(l => l.isTemplate && l.visible)}
         onToggleGarmentGuide={handleToggleGarmentGuide}
         // SHARE tab
-        onExportPng={() => { closeSheet(); setTimeout(() => handleExport('png'), 220); }}
-        onExportJpeg={() => { closeSheet(); setTimeout(() => handleExport('jpeg'), 220); }}
-        onShare={() => { closeSheet(); setTimeout(() => handleShare(), 220); }}
+        onOpenShareImage={() => openSheet('shareImage')}
+        onUseOnMockup={() => { void handleUseOnMockup(); }}
         onSaveCopy={handleSaveCopy}
         onSaveVersion={() => { closeSheet(); void handleManualSave(); }}
         onOpenVersionHistory={() => { closeSheet(); void handleOpenVersionHistory(); }}
@@ -4461,64 +4880,77 @@ export default function DesignCanvasScreen() {
 
       <SupportChatModal visible={supportChatOpen} onClose={() => setSupportChatOpen(false)} />
 
+      {/* ── SHARE IMAGE — Procreate's format list (Actions → Share → Share image). ── */}
+      <Modal visible={activeSheet === 'shareImage'} transparent animationType="fade" onRequestClose={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+            <SheetHandle />
+            <View style={styles.sheetHeaderRow}>
+              <Text style={styles.sheetTitle} testID="share-image-title">Share Image</Text>
+            </View>
+            {([
+              { kind: 'png-transparent', label: 'PNG — Transparent', sub: `No background · keeps alpha · ${exportW} × ${exportH}` },
+              { kind: 'png', label: 'PNG', sub: `${project?.canvas.backgroundHidden ? 'Background hidden · keeps alpha' : 'Flattened on the background colour'} · ${exportW} × ${exportH}` },
+              { kind: 'jpeg', label: 'JPEG', sub: `Flattened · smaller file · ${exportW} × ${exportH}` },
+            ] as const).map(row => (
+              <TouchableOpacity
+                key={row.kind}
+                style={styles.shareImageRow}
+                onPress={() => { void handleShareImage(row.kind); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Share as ${row.label}`}
+                testID={`share-image-${row.kind}`}
+              >
+                <View>
+                  <Text style={styles.shareImageLabel}>{row.label}</Text>
+                  <Text style={styles.shareImageSub}>{row.sub}</Text>
+                </View>
+                <Icon name="chevron-right" size={ICON.sm} color={SUBTLE} />
+              </TouchableOpacity>
+            ))}
+          </SheetRise>
+        </View>
+      </Modal>
+
+      {/* Procreate's full-screen "Exporting" state while a full-resolution file renders. */}
+      {exporting && (
+        <View style={styles.exportingOverlay} testID="exporting-overlay" accessibilityLiveRegion="polite">
+          <Text style={styles.exportingText}>Exporting</Text>
+          <ActivityIndicator color={FG} size="large" />
+        </View>
+      )}
+
       {/* ── BRUSH LIBRARY — Procreate's own full-screen "Brushes" picker
           (left sidebar of brush-set categories, right pane of that set's
           brushes, swipe-left for Share/Duplicate/Delete) when the active
           tool is the brush itself. Eraser/Smudge keep the small Size-only
           sheet below — they were never a "Brush Library" sheet, just a
           quick size control, so that part is unchanged. ── */}
-      {activeTopTool === 'brush' ? (
-        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-          <View style={styles.modalOverlay}>
-            <BrushLibraryComponent
-              brushes={brushes}
-              activeBrushId={activeBrushId}
-              strokeColor={drawColor}
-              onSelectBrush={id => { handleSelectBrush(id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-              onDuplicateBrush={handleDuplicateBrush}
-              onDeleteBrush={handleDeleteBrush}
-              onClose={closeSheet}
-            />
-          </View>
-        </Modal>
-      ) : (
-        <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
-          <View style={styles.modalOverlay}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-            <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '40%' }]}>
-              <SheetHandle />
-              <View style={styles.sheetHeaderRow}>
-                <Text style={styles.sheetTitle}>{activeTopTool === 'eraser' ? 'Eraser' : 'Smudge'}</Text>
-                <TouchableOpacity onPress={closeSheet} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.brushSliders}>
-                <View style={styles.sliderRow}>
-                  <Text style={styles.sliderLabel}>Size</Text>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease" onPress={() => {
-                    if (activeTopTool === 'eraser') setEraserSize(v => Math.max(2, v - 2));
-                    else setBrushSize(v => Math.max(1, v - 2));
-                  }}>
-                    <Icon name="minus" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                  <View style={styles.sliderTrack}>
-                    <View style={[styles.sliderFill, { width: `${(activeSize / 80) * 100}%` }]} />
-                  </View>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase size" onPress={() => {
-                    if (activeTopTool === 'eraser') setEraserSize(v => Math.min(80, v + 2));
-                    else setBrushSize(v => Math.min(80, v + 2));
-                  }}>
-                    <Icon name="plus" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                  <Text style={styles.sliderValue}>{activeSize}</Text>
-                </View>
-              </View>
-            </SheetRise>
-          </View>
-        </Modal>
-      )}
+      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <BrushLibraryComponent
+            library={brushLib.library}
+            activeBrushId={brushLib.tools[brushLibTool]}
+            onSelectBrush={id => {
+              handleSelectBrush(id);
+              if (activeTopToolRef.current !== brushLibTool) selectTool(brushLibTool);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+            onDuplicateBrush={handleDuplicateBrush}
+            onDeleteBrush={handleDeleteBrush}
+            onShareBrush={(set, id) => handleShareBrushes(set, id)}
+            onNewSet={handleNewSet}
+            onNewBrush={handleNewBrush}
+            onImport={() => { void handleImportBrushes(); }}
+            onRenameSet={handleRenameSet}
+            onDeleteSet={handleDeleteSet}
+            onDuplicateSet={handleDuplicateSet}
+            onShareSet={set => handleShareBrushes(set)}
+            onClose={closeSheet}
+          />
+        </View>
+      </Modal>
 
       {/* ── COLOR PICKER — Procreate's own full-height "Colours" sheet
           (Disc/Classic/Harmony/Value/Palettes tabs), not a small floating
@@ -4555,7 +4987,14 @@ export default function DesignCanvasScreen() {
             <LayersPanelComponent
               layers={layers}
               selectedLayerId={selectedLayerId}
-              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('transform'); }}
+              onSelect={id => {
+                setSelectedLayerId(id);
+                selectedLayerIdRef.current = id;
+                // Drawing layers: keep painting on the newly selected layer
+                // (Procreate). Text / image / shape layers open Transform.
+                const l = layers.find(x => x.id === id);
+                if (l && l.type !== 'drawing') setActiveTopTool('transform');
+              }}
               onAddLayer={handleAddDrawingLayer}
               onDuplicateLayer={handleDuplicateLayer}
               onDeleteLayer={handleDeleteLayer}
@@ -4570,7 +5009,10 @@ export default function DesignCanvasScreen() {
               onMergeDown={handleMergeLayerDown}
               onClose={closeSheet}
               canvasBackgroundHex={project?.canvas?.backgroundHex ?? '#FFFFFF'}
-              canvasBackgroundVisible={(project?.canvas?.backgroundOpacity ?? 1) !== 0}
+              canvasBackgroundVisible={!project?.canvas?.backgroundHidden && (project?.canvas?.backgroundOpacity ?? 1) !== 0}
+              thumbnailFor={layerThumbnail}
+              onFillLayer={handleFillLayer}
+              onClearLayer={handleClearLayer}
               onToggleBackgroundVisible={handleToggleCanvasBackgroundVisible}
             />
           </View>
@@ -5192,9 +5634,10 @@ interface WrenchActionsSheetProps {
   garmentTemplateVisible: boolean;
   onToggleGarmentGuide: () => void;
   // SHARE
-  onExportPng: () => void;
-  onExportJpeg: () => void;
-  onShare: () => void;
+  /** Procreate's Share → "Share image": the format list (PNG transparent / PNG / JPEG). */
+  onOpenShareImage: () => void;
+  /** Export a transparent PNG and open it on the garment mockup. */
+  onUseOnMockup: () => void;
   onSaveCopy: () => void;
   onSaveVersion: () => void;
   onOpenVersionHistory: () => void;
@@ -5240,7 +5683,7 @@ function WrenchActionsSheet({
   referenceVisible, onToggleReference, onChooseReference, onDismissReference, hasReference,
   guideSettings, onGuideSettingsChange,
   hasGarmentTemplate, garmentTemplateVisible, onToggleGarmentGuide,
-  onExportPng, onExportJpeg, onShare, onSaveCopy,
+  onOpenShareImage, onUseOnMockup, onSaveCopy,
   onSaveVersion, onOpenVersionHistory, onOpenExportOptions,
   onUseAsProductPhoto, onUseInPost, exporting,
   logicalW, logicalH, layerCount, cropRect, masterDescriptor, saveStatus,
@@ -5508,6 +5951,30 @@ function WrenchActionsSheet({
           {/* ── SHARE TAB ── */}
           {wrenchTab === 'share' && (
             <View style={{ paddingHorizontal: SP.xs }}>
+              {/* Procreate's Share tab: two big tiles — "Share image" opens the
+                  format list; "Use on mockup" is Brandthread's garment hand-off. */}
+              <View style={styles.shareTiles}>
+                <TouchableOpacity
+                  style={[styles.shareTile, exporting && styles.exportRowDisabled]}
+                  onPress={exporting ? undefined : onOpenShareImage}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share image"
+                  testID="wrench-share-image"
+                >
+                  <Icon name="share" size={ICON.sm} color={FG} />
+                  <Text style={styles.shareTileLabel}>Share image</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.shareTile, exporting && styles.exportRowDisabled]}
+                  onPress={exporting ? undefined : onUseOnMockup}
+                  accessibilityRole="button"
+                  accessibilityLabel="Use on mockup"
+                  testID="wrench-use-on-mockup"
+                >
+                  <Icon name="shopping-bag" size={ICON.sm} color={FG} />
+                  <Text style={styles.shareTileLabel}>Use on mockup</Text>
+                </TouchableOpacity>
+              </View>
               {(() => {
                 // Compute labels from policy descriptor for exact dimension display.
                 // Falls back to logicalW/H when descriptor is not yet ready (loading).
@@ -5519,27 +5986,6 @@ function WrenchActionsSheet({
                   hasCrop: cropRect != null,
                 };
                 return [
-                  {
-                    label: 'Export PNG',
-                    sub: pngLabel(desc) + ' · saves to Camera Roll',
-                    icon: 'download' as const,
-                    onPress: onExportPng,
-                    disabled: exporting,
-                  },
-                  {
-                    label: 'Export JPEG',
-                    sub: jpegLabel(desc) + ' · compressed for sharing',
-                    icon: 'image' as const,
-                    onPress: onExportJpeg,
-                    disabled: exporting,
-                  },
-                  {
-                    label: 'Share / Save',
-                    sub: `PNG — Lossless · ${desc.width} × ${desc.height} · open system share sheet`,
-                    icon: 'share-2' as const,
-                    onPress: onShare,
-                    disabled: exporting,
-                  },
                   {
                     label: 'More export options',
                     sub: 'Choose PNG, JPEG or transparent PNG at preset sizes',
@@ -5986,6 +6432,21 @@ const COLOR_SWATCH_HIT_SLOP = minHitSlop({ width: 28, height: 28 });
 const SIDEBAR_BTN_HIT_SLOP = minHitSlop({ width: 32, height: 32 });
 
 const styles = StyleSheet.create({
+  loupe: { position: 'absolute', width: 88, height: 88 },
+  shareTiles: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
+  shareTile: {
+    flex: 1, minHeight: 92, borderRadius: RADIUS.md, padding: SP.md, gap: SP.sm, justifyContent: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  shareTileLabel: { fontFamily: FONT.medium, fontSize: FS.md, color: FG },
+  shareImageRow: {
+    paddingVertical: 14, paddingHorizontal: SP.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  shareImageLabel: { fontFamily: FONT.medium, fontSize: FS.md, color: FG },
+  shareImageSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
+  exportingOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', gap: SP.lg, zIndex: 50 },
+  exportingText: { fontFamily: FONT.bold, fontSize: 34, color: FG },
   root: { flex: 1, backgroundColor: BG },
 
   eyedropperHint: {
@@ -6056,17 +6517,21 @@ const styles = StyleSheet.create({
   // Procreate's own placement (never in the top bar — see the top-bar
   // comment for why) — and Procreate's own plain arrow icons, not boxed.
   sidebarUndoGroup: { alignItems: 'center', gap: SP.md },
-  sidebarIconBtn:   { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  modifySquare: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  modifySquareInner: { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.8)', backgroundColor: 'rgba(0,0,0,0.55)' },
+  // Translucent dark backing so the arrows stay visible when a zoomed /
+  // white artboard slides under the rail (Procreate's sidebar does the same).
+  sidebarIconBtn:   { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)' },
 
   // The large drag-time preview card — Procreate's own "Size 99%" card,
   // top-left of the canvas, only while a handle is actively being dragged.
   // Opaque black + a white outline (never translucent — a translucent pill
   // read as solid grey once the canvas became a real white artboard).
   dragPreviewCard: {
-    position: 'absolute', top: SP.md, left: SP.md, zIndex: 6,
-    width: 128, minHeight: 128,
-    backgroundColor: '#000000', borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    position: 'absolute', top: SP.xl, left: SP.xl + 14, zIndex: 6,
+    width: 150, minHeight: 150,
+    backgroundColor: '#2A2A2C', borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
     padding: SP.sm, alignItems: 'flex-start', justifyContent: 'flex-start',
   },
   dragPreviewLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },

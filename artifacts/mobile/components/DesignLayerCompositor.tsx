@@ -39,6 +39,7 @@ import type {
 import { buildLayerTransform } from '@/lib/layerRenderer';
 import type { DesignLayerAdjustments } from '@/lib/adjustmentsModel';
 import { buildAdjustmentStages, safeSvgId } from '@/components/design-studio/layerFilterChain';
+import Checkerboard from '@/components/design/Checkerboard';
 
 // ─── Supported blend modes in react-native-svg ────────────────────────────────
 
@@ -112,6 +113,27 @@ export function renderLayer(
   // ── Drawing layer ──────────────────────────────────────────────────────────
   if (layer.type === 'drawing') {
     const d = layer.data as DesignDrawingLayer;
+    // Raster brush-engine layers carry their flattened pixels (saved by the
+    // editor); draw those — brushes, grain, smudge and eraser transparency
+    // can't be reproduced from vector paths.
+    if (d.rasterPreview) {
+      const bm = blendModeStyle(layer.blendMode);
+      return (
+        <G key={layer.id} opacity={layer.opacity}>
+          {curvesFilter?.filterEl}
+          <G transform={transformAttr} filter={filterRef} {...(bm ? { style: bm } : {})}>
+            <SvgImage
+              x={t.x * xScale}
+              y={t.y * yScale}
+              width={t.width * xScale}
+              height={t.height * yScale}
+              href={d.rasterPreview}
+              preserveAspectRatio="none"
+            />
+          </G>
+        </G>
+      );
+    }
     const scaledStroke = (w: number) => w * Math.min(xScale, yScale);
 
     const inkPaths   = d.paths.filter(p => p.color !== 'erase');
@@ -310,7 +332,8 @@ export default function DesignLayerCompositor({
   const fit = Math.min(displaySize / cw, displaySize / ch);
   const fitW = Math.max(1, cw * fit);
   const fitH = Math.max(1, ch * fit);
-  const isTransparent = bgHex === 'transparent';
+  // Procreate's hidden "Background colour" layer = a transparent artwork.
+  const isTransparent = bgHex === 'transparent' || !!project.canvas.backgroundHidden;
   // A blank canvas uses its own background (a black canvas is not a white
   // artboard); only a transparent blank canvas falls back to white so it is
   // still visible as an artboard.
@@ -330,8 +353,11 @@ export default function DesignLayerCompositor({
         }}
         testID="design-compositor-canvas"
       >
+        {/* A transparent artwork reads as transparent (Procreate's checkerboard), never as black-on-black. */}
+        {hasAnyLayer && isTransparent && <Checkerboard tile={Math.max(4, Math.round(fitW / 20))} light="#FFFFFF" dark="#DADADA" />}
         {hasAnyLayer && (
-          <Svg width={fitW} height={fitH} viewBox={`0 0 ${cw} ${ch}`}>
+          // Absolutely positioned so it paints above the (absolute) checkerboard.
+          <Svg width={fitW} height={fitH} viewBox={`0 0 ${cw} ${ch}`} style={{ position: 'absolute', left: 0, top: 0 }}>
             {sorted.map(layer => renderLayer(layer, 1, 1, bgHex))}
           </Svg>
         )}

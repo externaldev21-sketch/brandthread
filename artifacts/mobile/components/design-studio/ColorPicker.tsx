@@ -84,7 +84,11 @@ function HueSatWheel({ id, value }: { id: string; value: number }) {
       </Defs>
       {HUE_WEDGE_PATHS.map((w, i) => <Path key={i} d={w.d} fill={w.fill} />)}
       <Circle cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} fill={`url(#${id}-sat)`} />
-      <Circle cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} fill="#000000" opacity={Math.max(0, Math.min(1, 1 - value))} />
+      {/* Brightness is NOT baked into the wheel: at low value (e.g. black ink)
+          the disc would go solid black and stop showing any hue to pick from.
+          Value lives on its own black → colour slider below; only a light
+          dimming hints at it here. */}
+      <Circle cx={DISC_RADIUS} cy={DISC_RADIUS} r={DISC_RADIUS} fill="#000000" opacity={Math.max(0, Math.min(0.35, (1 - value) * 0.35))} />
     </Svg>
   );
 }
@@ -247,7 +251,17 @@ export default function ColorPicker(props: ColorPickerProps) {
             </View>
             <Text style={s.sliderLabel}>Value: {Math.round(hsv.v * 100)}%</Text>
             <View {...valSliderResponder.panHandlers} style={s.track} testID="color-value-slider">
-              <View style={[s.trackGradient, { backgroundColor: `hsl(${hsv.h},${hsv.s * 100}%,50%)` }]} />
+              <View style={s.trackGradient}>
+                <Svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 100 10">
+                  <Defs>
+                    <LinearGradient id="cp-val" x1="0" y1="0" x2="1" y2="0">
+                      <Stop offset="0" stopColor="#000000" />
+                      <Stop offset="1" stopColor={hsvToHex({ h: hsv.h, s: hsv.s, v: 1 })} />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect x={0} y={0} width={100} height={10} fill="url(#cp-val)" />
+                </Svg>
+              </View>
               <View style={[s.trackThumb, { left: `${hsv.v * 100}%` }]} />
             </View>
           </View>

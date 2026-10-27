@@ -499,6 +499,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       const proj = await createProject('canvas', preset.label, {
         width: preset.width, height: preset.height,
         backgroundHex: preset.transparentBg ? 'transparent' : '#FFFFFF',
+        ...(preset.dpi ? { dpi: preset.dpi } : {}),
       });
       onClose(); onCreated(proj.id);
     } catch { Alert.alert('Error', 'Could not create canvas.'); }
@@ -947,9 +948,11 @@ interface PreviewModalProps {
   project: DesignProject | null;
   onClose: () => void;
   onEdit: () => void;
+  /** "Use on mockup": put this design on a tee / hoodie (Mockup Preview). */
+  onUseOnMockup: () => void;
 }
 
-function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModalProps) {
+function ArtworkPreviewModal({ visible, project, onClose, onEdit, onUseOnMockup }: PreviewModalProps) {
   const insets = useSafeAreaInsets();
   const [masterLoading, setMasterLoading] = useState(false);
   // Hooks must run before the early return — calling useHeaderTopInset only
@@ -998,6 +1001,15 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
           >
             {masterLoading ? <ActivityIndicator color={FG} /> : <Icon name="download" size={ICON.md} color={FG} />}
             <Text style={[pv.btnLbl, { color: FG }]}>Cloud Master</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[pv.btn, { marginTop: SP.sm, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER }]}
+            onPress={onUseOnMockup} activeOpacity={0.8}
+            accessibilityLabel="Use design on a mockup" accessibilityRole="button" testID="preview-use-on-mockup"
+          >
+            <Icon name="shopping-bag" size={ICON.md} color={FG} />
+            <Text style={[pv.btnLbl, { color: FG }]}>Use on Mockup</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1463,6 +1475,13 @@ function StackContentsSheet({ visible, projects, onClose, onOpen, onRemove }: St
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function DesignGalleryScreen() {
+  const pendingCanvasIdRef = useRef<string | null>(null);
+  function openPendingCanvas() {
+    const id = pendingCanvasIdRef.current;
+    if (!id) return;
+    pendingCanvasIdRef.current = null;
+    router.push(`/design-canvas?id=${id}`);
+  }
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -2011,10 +2030,17 @@ export default function DesignGalleryScreen() {
       )}
 
       {/* ── Modals / sheets ── */}
+      {/* Open the new canvas only once the sheet has finished closing: the
+          gallery is frozen (freezeOnBlur) the moment the canvas route is
+          pushed, which stranded the sheet's invisible backdrop on top of the
+          canvas, swallowing the first seconds of touches. */}
       <NewCanvasSheet
         visible={newCanvasVisible}
-        onClose={() => setNewCanvasVisible(false)}
-        onCreated={id => router.push(`/design-canvas?id=${id}`)}
+        onClose={() => { setNewCanvasVisible(false); openPendingCanvas(); }}
+        onCreated={id => {
+          pendingCanvasIdRef.current = id;
+          setTimeout(openPendingCanvas, 650);
+        }}
       />
 
       <RenameSheet
@@ -2028,6 +2054,11 @@ export default function DesignGalleryScreen() {
         visible={previewProject !== null}
         project={previewProject}
         onClose={() => setPreviewProject(null)}
+        onUseOnMockup={() => {
+          const id = previewProject?.id;
+          setPreviewProject(null);
+          if (id) router.push(`/design-mockup-preview?projectId=${encodeURIComponent(id)}`);
+        }}
         onEdit={() => {
           const id = previewProject?.id;
           setPreviewProject(null);
