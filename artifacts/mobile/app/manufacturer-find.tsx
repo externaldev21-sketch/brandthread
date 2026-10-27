@@ -46,8 +46,7 @@ function previewCounts(): Counts {
   return { total: directory.length, byKey };
 }
 
-function countLabel(count: number | undefined): string | undefined {
-  if (count === undefined) return undefined;
+function countLabel(count: number): string {
   return count === 0 ? 'None yet' : String(count);
 }
 
@@ -124,7 +123,7 @@ export default function ManufacturerFindScreen() {
               titleNumberOfLines={1}
               subtitle={category.description}
               subtitleNumberOfLines={1}
-              value={countLabel(counts?.byKey[category.key])}
+              value={counts ? countLabel(counts.byKey[category.key] ?? 0) : undefined}
               chevron
               divider={index < categories.length - 1}
               onPress={() => openResults({ category: category.key })}
@@ -164,5 +163,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   content:      { paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xxl + COMP.tabBarH },
   search:       { marginBottom: SP.sm },
   noMatch:      { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, paddingVertical: SP.md },
-  footerHeader: { marginTop: SP.xl, marginBottom: SP.xs },
+  // SectionHeader brings its own 16pt gutter; this list already has one.
+  footerHeader: { marginTop: SP.xl, marginBottom: SP.xs, paddingHorizontal: 0 },
 });

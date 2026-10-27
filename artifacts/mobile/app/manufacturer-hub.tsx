@@ -948,7 +948,8 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   sectionTile:  { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: SP.xs, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card },
   sectionTilePressed: { backgroundColor: theme.cardElevated },
   sectionTileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text },
-  listHeader:   { marginTop: SP.xl, marginBottom: SP.xs },
+  // SectionHeader brings its own 16pt gutter; the landing already has one.
+  listHeader:   { marginTop: SP.xl, marginBottom: SP.xs, paddingHorizontal: 0 },
   manufacturerRow: { minHeight: 64 },
   landingEmpty: { alignItems: 'flex-start', gap: SP.md, paddingVertical: SP.md },
   landingEmptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },

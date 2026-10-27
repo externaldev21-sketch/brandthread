@@ -15,7 +15,17 @@
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_BUILD_DIR, launchBrowser, serveBuild } from './harness.mjs';
+import { existsSync } from 'node:fs';
+import { DEFAULT_BUILD_DIR, launchBrowser as harnessLaunch, serveBuild } from './harness.mjs';
+
+// Cloud containers ship one Chromium at /opt/pw-browsers that may not match
+// this project's Playwright version; use it when present.
+async function launchBrowser() {
+  const preinstalled = '/opt/pw-browsers/chromium';
+  if (!existsSync(preinstalled)) return harnessLaunch();
+  const { chromium } = await import('playwright');
+  return chromium.launch({ executablePath: preinstalled });
+}
 
 const OUT_DIR = process.argv[2] ?? path.join(process.cwd(), 'docs', 'pr-screenshots', 'manufacturer-hub-redesign');
 mkdirSync(OUT_DIR, { recursive: true });
@@ -41,6 +51,15 @@ async function shot(page, name) {
   console.log('saved', file);
 }
 
+// Demo data is URL-only (lib/devPreview.ts), so a tapped-to screen opens in
+// fresh mode. Re-open the URL the tap landed on with the demo flag.
+async function reopenWithDemo(page, server) {
+  const url = new URL(page.url());
+  url.searchParams.set('bt_preview', 'seller');
+  url.searchParams.set('demo', '1');
+  await page.goto(`${server.origin}${url.pathname}${url.search}`);
+}
+
 async function expectVisible(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
 }
@@ -59,9 +78,15 @@ async function main() {
 
     await demo.page.getByTestId('button-find-manufacturer').click();
     await expectVisible(demo.page, 'Dye & wash');
+    if (!demo.page.url().includes('/manufacturer-find')) failures.push(`Find tapped to ${demo.page.url()}`);
+    await reopenWithDemo(demo.page, server);
+    await expectVisible(demo.page, 'Dye & wash');
+    await expectVisible(demo.page, '12');
     await shot(demo.page, '03-category-picker');
 
     await demo.page.getByTestId('find-category-denim').click();
+    await demo.page.waitForURL(/manufacturer-category\?.*category=denim/, { timeout: 20_000 });
+    await reopenWithDemo(demo.page, server);
     await expectVisible(demo.page, 'Medina Denim Mills');
     await expectVisible(demo.page, 'Okayama Denim Works');
     await expectVisible(demo.page, 'Compare');
@@ -79,7 +104,8 @@ async function main() {
     await demo.page.goto(`${server.origin}/manufacturer-hub?bt_preview=seller&demo=1`);
     await expectVisible(demo.page, 'Your manufacturers');
     await demo.page.getByTestId('hub-section-quotes').click();
-    await demo.page.waitForTimeout(1200);
+    await demo.page.waitForURL(/manufacturer-hub\?.*tab=quotes/, { timeout: 20_000 });
+    await demo.page.waitForTimeout(1500);
     await shot(demo.page, '06-section-quotes');
     if (demo.errors.length) failures.push(`page errors: ${demo.errors.join(' | ')}`);
 

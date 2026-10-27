@@ -153,6 +153,9 @@ export default function ManufacturerCategoryScreen() {
   };
 
   const searching = query.trim().length > 0;
+  // An odd count leaves the last card alone in its row; a blank cell keeps
+  // it at half width instead of stretching across the screen.
+  const gridData: Array<Manufacturer | null> = manufacturers.length % 2 ? [...manufacturers, null] : manufacturers;
 
   return (
     <View style={s.root}>
@@ -174,8 +177,8 @@ export default function ManufacturerCategoryScreen() {
       )}
 
       <FlatList
-        data={loading || loadError ? [] : manufacturers}
-        keyExtractor={(item) => item.id}
+        data={loading || loadError ? [] : gridData}
+        keyExtractor={(item) => item?.id ?? 'grid-spacer'}
         numColumns={2}
         columnWrapperStyle={s.gridRow}
         contentContainerStyle={s.listContent}
@@ -187,7 +190,7 @@ export default function ManufacturerCategoryScreen() {
             {manufacturers.length} {manufacturers.length === 1 ? 'manufacturer' : 'manufacturers'}
           </Text>
         ) : null}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => (!item ? <View style={s.gridSpacer} /> : (
           <ManufacturerCard
             mfg={item}
             saved={savedIds.has(item.id)}
@@ -197,7 +200,7 @@ export default function ManufacturerCategoryScreen() {
             onProfile={() => router.push((`/manufacturer-profile?id=${item.id}`) as never)}
             onQuote={() => router.push(quoteHref(item.id))}
           />
-        )}
+        ))}
         ListEmptyComponent={loading ? (
           <View style={s.skeletonGrid} testID="category-loading">
             {[0, 1, 2, 3].map((item) => <View key={item} style={s.skeletonTile} />)}
@@ -235,6 +238,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   searchWrap:   { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.sm },
   listContent:  { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.xxl + COMP.tabBarH },
   gridRow:      { gap: SP.sm, alignItems: 'stretch' },
+  gridSpacer:   { flex: 1 },
   resultCount:  { fontVariant: ['tabular-nums'], fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.sm },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   skeletonTile: { width: '48%', height: 260, borderRadius: RADIUS.lg, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
