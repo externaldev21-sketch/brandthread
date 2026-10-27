@@ -21,6 +21,7 @@
     "benchmark:ai-providers:mock": "tsx ./scripts/aiProviderBenchmark/runBenchmark.ts --mock",
     "verify:ai-image-tools": "tsx ./scripts/aiImageVerification/verifyAiImageTools.ts",
     "seed:review-accounts": "tsx ./scripts/seedReviewAccounts.ts",
+    "seed:demo-ad-campaign": "tsx ./scripts/seedDemoAdCampaign.ts",
     "verify:reviewer-sign-in": "tsx ./scripts/verifyReviewerSignIn.ts",
     "admin:reset-accounts": "tsx ./scripts/reset-accounts.ts",
     "import:manufacturers": "tsx ./scripts/importManufacturers.ts"

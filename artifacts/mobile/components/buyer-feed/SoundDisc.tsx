@@ -41,7 +41,7 @@ export function SoundDisc({ avatarUri, avatarSource, initials, sound, spinning, 
         <View style={styles.inner}>
           {avatarSource ? <CachedImage source={avatarSource} style={styles.fill} contentFit="cover" />
             : avatarUri ? <CachedImage source={{ uri: avatarUri }} style={styles.fill} contentFit="cover" />
-            : <Text style={styles.initials}>{initials.slice(0, 2)}</Text>}
+            : <Text style={styles.initials}>{(initials ?? '').slice(0, 2)}</Text>}
         </View>
       </Animated.View>
     </View>

@@ -3,7 +3,7 @@
  * screen needs a slider control (budget pickers, discount percentage, etc).
  */
 import React, { useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, PanResponder, type LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, PanResponder, type LayoutChangeEvent, type ViewStyle } from 'react-native';
 
 import { haptics, haptic } from '@/lib/haptics';
 
@@ -22,6 +22,14 @@ export function InlineSlider({
   accentColor?: string;
 }) {
   const widthRef = useRef(1);
+  // Window x of the track's left edge, for platforms whose touch events carry
+  // no locationX (react-native-web): measured when a touch starts.
+  const viewRef = useRef<View>(null);
+  const leftRef = useRef(0);
+  // Never hand the screen a NaN (a bad touch position must not become "NaN days").
+  const emit = useCallback((v: number | undefined) => {
+    if (typeof v === 'number' && Number.isFinite(v)) onChange(v);
+  }, [onChange]);
 
   const snapValue = useCallback((raw: number): number => {
     if (steps) {
@@ -55,6 +63,9 @@ export function InlineSlider({
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
+    // Keep the drag once it starts: a long horizontal drag must never be
+    // handed to the screen's swipe-back gesture (or a parent scroll view).
+    onPanResponderTerminationRequest: () => false,
     onPanResponderGrant:          () => {},
     onPanResponderMove:           (_e, g) => {
       if (steps) {
@@ -62,24 +73,30 @@ export function InlineSlider({
         const startX = currentIdx === -1
           ? widthRef.current / 2
           : (currentIdx / (steps.length - 1)) * widthRef.current;
-        onChange(steps[indexFromX(startX + g.dx)]);
+        emit(steps[indexFromX(startX + g.dx)]);
       } else {
-        onChange(snapValue(value + (g.dx / widthRef.current) * (max - min)));
+        emit(snapValue(value + (g.dx / widthRef.current) * (max - min)));
       }
     },
-  }), [steps, value, max, min, snapValue, indexFromX, onChange]);
+  }), [steps, value, max, min, snapValue, indexFromX, emit]);
 
   const fraction = fractionFromValue(value);
 
   return (
     <View
+      ref={viewRef}
       style={styles.sliderTouch}
       onLayout={(e: LayoutChangeEvent) => { widthRef.current = Math.max(1, e.nativeEvent.layout.width); }}
+      onTouchStart={() => { viewRef.current?.measureInWindow?.((x) => { if (Number.isFinite(x)) leftRef.current = x; }); }}
       onTouchEnd={(e) => {
+        const ne = e.nativeEvent as typeof e.nativeEvent & { changedTouches?: ArrayLike<{ pageX: number }> };
+        const pageX = Number.isFinite(ne.pageX) ? ne.pageX : ne.changedTouches?.[0]?.pageX;
+        const x = Number.isFinite(ne.locationX) ? ne.locationX : (pageX ?? NaN) - leftRef.current;
+        if (!Number.isFinite(x)) return;
         if (steps) {
-          onChange(steps[indexFromX(e.nativeEvent.locationX)]);
+          emit(steps[indexFromX(x)]);
         } else {
-          onChange(snapValue(min + (e.nativeEvent.locationX / widthRef.current) * (max - min)));
+          emit(snapValue(min + (x / widthRef.current) * (max - min)));
         }
         haptic('select');
       }}
@@ -92,10 +109,10 @@ export function InlineSlider({
         if (steps) {
           const idx = steps.indexOf(value as any);
           const safeI = idx === -1 ? 0 : idx;
-          if (e.nativeEvent.actionName === 'increment') onChange(steps[Math.min(steps.length - 1, safeI + 1)]);
-          else onChange(steps[Math.max(0, safeI - 1)]);
+          if (e.nativeEvent.actionName === 'increment') emit(steps[Math.min(steps.length - 1, safeI + 1)]);
+          else emit(steps[Math.max(0, safeI - 1)]);
         } else {
-          onChange(snapValue(value + (e.nativeEvent.actionName === 'increment' ? step : -step)));
+          emit(snapValue(value + (e.nativeEvent.actionName === 'increment' ? step : -step)));
         }
       }}
       {...panResponder.panHandlers}
@@ -109,7 +126,9 @@ export function InlineSlider({
 }
 
 const styles = StyleSheet.create({
-  sliderTouch: { height: 44, justifyContent: 'center', position: 'relative' },
+  // touch-action none (web): the browser must not treat a drag along the
+  // slider as a page pan or a swipe-back through history.
+  sliderTouch: { height: 44, justifyContent: 'center', position: 'relative', touchAction: 'none' } as ViewStyle,
   sliderTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
   sliderFill:  { height: 5, borderRadius: 3 },
   sliderThumb: {

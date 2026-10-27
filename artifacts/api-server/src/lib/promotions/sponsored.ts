@@ -2,7 +2,7 @@
  * Pure policy for Sponsored (promoted) threads in For You.
  *
  * Nothing here touches the database, so every rule — eligibility, frequency
- * capping, budget pacing, slot placement — is unit-testable in isolation. The
+ * capping, hourly budget pacing, slot placement — is unit-testable in isolation. The
  * /api/promotions routes load candidates + viewer context, call these, and do
  * the delivery accounting.
  */
@@ -13,8 +13,10 @@ export const SPONSORED_EVERY_N_ORGANIC = 6;
 export const SPONSORED_MAX_PER_VIEWER_PER_DAY = 3;
 /** Billed per confirmed impression, in cents ($20 CPM — inside the 35–65 reach per $1 estimate band). */
 export const SPONSORED_COST_PER_IMPRESSION_CENTS = 2;
-/** Share of the budget that may be delivered immediately, before time-based pacing kicks in. */
-export const PACING_INITIAL_BURST = 0.1;
+/** Pacing slot length: delivery may run at most about one slot ahead of the even-pacing line. */
+export const PACING_SLOT_MS = 60 * 60 * 1000;
+/** Each hourly slot's allowance varies by up to ±this share, so delivery trickles rather than ticking like a metronome. */
+export const PACING_JITTER = 0.2;
 
 export type SponsoredCandidate = {
   boostId: string;
@@ -57,11 +59,39 @@ export function flightElapsed(startsAt: Date, endsAt: Date, now: Date): number {
   return Math.min(1, Math.max(0, (now.getTime() - startsAt.getTime()) / total));
 }
 
-/** Cumulative spend the boost is allowed to have delivered by `now` (even pacing + a small opening burst). */
-export function pacedAllowanceCents(c: Pick<SponsoredCandidate, "budgetCents" | "startsAt" | "endsAt">, now: Date): number {
+/**
+ * Deterministic jitter in [-PACING_JITTER, +PACING_JITTER] for one hourly slot
+ * of one boost/campaign (FNV-1a over id + slot index). Deterministic so every
+ * API instance agrees on the same allowance for the same hour.
+ */
+export function pacingJitter(id: string, slotIndex: number): number {
+  let h = 0x811c9dc5;
+  const key = `${id}:${slotIndex}`;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (((h >>> 0) / 0xffffffff) * 2 - 1) * PACING_JITTER;
+}
+
+/**
+ * Cumulative spend the boost is allowed to have delivered by `now`: the even
+ * pacing line (budget × share of the flight elapsed) plus roughly one hourly
+ * slot of headroom, jittered per hour. Delivery can therefore never run more
+ * than ~1.2 hours ahead of an even spread — nothing delivers all at once —
+ * and the very first impression is always affordable so a flight can start.
+ */
+export function pacedAllowanceCents(
+  c: Pick<SponsoredCandidate, "budgetCents" | "startsAt" | "endsAt"> & { boostId?: string },
+  now: Date,
+): number {
   const start = c.startsAt ?? now;
-  const allowed = c.budgetCents * (flightElapsed(start, c.endsAt, now) + PACING_INITIAL_BURST);
-  return Math.min(c.budgetCents, Math.floor(allowed));
+  const flightMs = Math.max(1, c.endsAt.getTime() - start.getTime());
+  const slots = Math.max(1, flightMs / PACING_SLOT_MS);
+  const slotIndex = Math.max(0, Math.floor((now.getTime() - start.getTime()) / PACING_SLOT_MS));
+  const headroom = (c.budgetCents / slots) * (1 + pacingJitter(c.boostId ?? "", slotIndex));
+  const allowed = c.budgetCents * flightElapsed(start, c.endsAt, now) + headroom;
+  return Math.min(c.budgetCents, Math.floor(Math.max(allowed, SPONSORED_COST_PER_IMPRESSION_CENTS)));
 }
 
 function mentionsMutedPhrase(text: string, phrases: readonly string[]): boolean {

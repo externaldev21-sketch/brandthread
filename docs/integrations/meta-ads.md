@@ -119,7 +119,7 @@ Once you have the App ID/Secret, set these on the api-server's environment
 | `META_APP_ID` | From the app dashboard's Basic Settings |
 | `META_APP_SECRET` | From the app dashboard's Basic Settings — keep this secret, server-side only |
 | `META_REDIRECT_URI` | Must exactly match what you added in step 3 |
-| `META_GRAPH_API_VERSION` | The current Marketing API version, e.g. `v21.0` — check Meta's changelog periodically and bump this before Meta sunsets the old version |
+| `META_GRAPH_API_VERSION` | Optional override of the pinned Marketing API version (code default `v24.0`, `src/lib/metaGraph.ts`) — check Meta's changelog periodically and bump it before Meta sunsets the old version |
 | `META_TOKEN_ENCRYPTION_KEY` | A random 32-byte key, base64-encoded (e.g. `openssl rand -base64 32`) — used to encrypt sellers' stored tokens at rest. Losing this key invalidates every connected seller's token and they'll need to reconnect. |
 | `META_OAUTH_STATE_SECRET` | A random secret used to sign the OAuth `state` parameter — any long random string, e.g. `openssl rand -hex 32` |
 
@@ -147,3 +147,5 @@ Meta periodically re-reviews apps with Advanced Access (typically annually,
 or whenever you materially change how a permission is used). Keep a current
 screencast on hand and update the "how this permission is used" text if the
 Create Ad flow changes meaningfully.
+
+> The step-by-step owner checklist (permissions and App Review, Business Verification, sandbox testing, data deletion, go-live) is in [`meta-ads-setup-checklist.md`](./meta-ads-setup-checklist.md).

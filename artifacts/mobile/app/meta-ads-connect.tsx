@@ -7,8 +7,10 @@
  * Meta bills the seller's ad account directly — Brandthread never touches
  * ad spend here.
  *
- * Return deep link: brandthread://meta-ads-connect?oauth=success
+ * Return deep link: brandthread://meta-ads-connect?oauth=code&code=…&state=…
  *                    brandthread://meta-ads-connect?oauth=error&message=…
+ * The code is handed to POST /meta-ads/oauth/complete by this signed-in
+ * screen; the server only accepts it for the seller who started the flow.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
@@ -28,12 +30,18 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { friendlyError } from '@/lib/friendlyError';
-import { buildMetaAdsReturnUrl } from '@/services/metaAdsService';
+import {
+  buildMetaAdsReturnUrl, parseMetaOAuthReturn, metaOAuthReturnFromParams, metaConnectionState,
+  isMetaReconnectError, META_CONNECTION_CHECK_FAILED,
+} from '@/services/metaAdsService';
 import type { MetaAdsConnection, MetaBusiness, MetaAdAccount, MetaPage } from '@/lib/api';
 
 // 'load_error': GET /meta-ads/connection itself failed (network / 5xx). Kept
 // apart from 'not_connected' so a failed check never offers Connect Meta.
-type Step = 'loading' | 'load_error' | 'not_configured' | 'not_connected' | 'oauth_error' | 'picker' | 'connected';
+// 'needs_reconnect': connected before, but the Meta login expired or was revoked.
+type Step =
+  | 'loading' | 'load_error' | 'not_configured' | 'not_connected' | 'needs_reconnect'
+  | 'oauth_error' | 'picker' | 'connected';
 
 // Meta's Graph API returns `account_status` as a numeric code; show the
 // seller words, never the raw number.
@@ -47,7 +55,7 @@ function adAccountStatusLabel(status: string | number): string {
 
 export default function MetaAdsConnectScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ oauth?: string; message?: string }>();
+  const params = useLocalSearchParams<{ oauth?: string; message?: string; code?: string; state?: string }>();
   const colors = useColors();
   const { theme } = useAppTheme();
   const api = useApi();
@@ -70,41 +78,56 @@ export default function MetaAdsConnectScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  function applyConnection(conn: MetaAdsConnection) {
+    setConnection(conn);
+    switch (metaConnectionState(conn)) {
+      case 'not_configured': setStep('not_configured'); break;
+      case 'connected': setStep('connected'); break;
+      case 'needs_reconnect': setStep('needs_reconnect'); break;
+      case 'pending_selection':
+        setStep('picker');
+        void loadBusinesses();
+        break;
+      default: setStep('not_connected');
+    }
+  }
+
   const loadConnection = useCallback(async () => {
     setLoadError(null);
     try {
-      const conn = await api.metaAds.connection();
-      setConnection(conn);
-      if (conn.configured === false) {
-        setStep('not_configured');
-      } else if (conn.connected && conn.status === 'connected') {
-        setStep('connected');
-      } else if (conn.status === 'pending_selection') {
-        setStep('picker');
-        void loadBusinesses();
-      } else {
-        setStep('not_connected');
-      }
+      applyConnection(await api.metaAds.connection());
     } catch (err) {
-      setLoadError(friendlyError(err, "Couldn't check your Meta connection."));
+      setLoadError(friendlyError(err, META_CONNECTION_CHECK_FAILED));
       setStep('load_error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
+  // Meta's code (from the auth session or the deep link) → server token exchange.
+  async function completeOAuth(code: string, state: string) {
+    setStep('loading');
+    try {
+      applyConnection(await api.metaAds.oauthComplete(code, state));
+    } catch (err) {
+      setOauthError(friendlyError(err, "Couldn't finish connecting Meta. Try again."));
+      setStep('oauth_error');
+    }
+  }
+
   useEffect(() => {
-    if (params.oauth === 'error') {
-      setOauthError(params.message ?? 'Meta declined the connection. Please try again.');
+    const returned = metaOAuthReturnFromParams(params);
+    if (returned?.kind === 'error') {
+      setOauthError(returned.message);
       setStep('oauth_error');
       return;
     }
-    if (params.oauth === 'success') {
-      void loadConnection();
+    if (returned?.kind === 'code') {
+      void completeOAuth(returned.code, returned.state);
       return;
     }
     void loadConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.oauth]);
+  }, [params.oauth, params.code]);
 
   async function loadBusinesses() {
     setPickerLoading(true);
@@ -113,8 +136,9 @@ export default function MetaAdsConnectScreen() {
       const { businesses: list } = await api.metaAds.businesses();
       setBusinesses(list);
       if (list.length === 1) void handleSelectBusiness(list[0].id);
-    } catch {
-      setPickerError("Couldn't load your Meta businesses. Try again.");
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setStep('needs_reconnect'); return; }
+      setPickerError(friendlyError(err, "Couldn't load your Meta businesses. Try again."));
     } finally {
       setPickerLoading(false);
     }
@@ -135,8 +159,9 @@ export default function MetaAdsConnectScreen() {
       ]);
       setAdAccounts(accountsRes.adAccounts);
       setPages(pagesRes.pages);
-    } catch {
-      setPickerError("Couldn't load ad accounts and pages for this business. Try again.");
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setStep('needs_reconnect'); return; }
+      setPickerError(friendlyError(err, "Couldn't load ad accounts and pages for this business. Try again."));
     } finally {
       setPickerLoading(false);
     }
@@ -149,10 +174,12 @@ export default function MetaAdsConnectScreen() {
       const returnUrl = buildMetaAdsReturnUrl();
       const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
       if (result.type === 'success' && result.url) {
-        const url = new URL(result.url.replace('brandthread://', 'https://x/'));
-        if (url.searchParams.get('oauth') === 'error') {
-          setOauthError(url.searchParams.get('message') ?? 'Meta declined the connection. Please try again.');
+        const returned = parseMetaOAuthReturn(result.url);
+        if (returned?.kind === 'error') {
+          setOauthError(returned.message);
           setStep('oauth_error');
+        } else if (returned?.kind === 'code') {
+          await completeOAuth(returned.code, returned.state);
         } else {
           await loadConnection();
         }
@@ -192,8 +219,9 @@ export default function MetaAdsConnectScreen() {
       });
       setConnection(conn);
       setStep('connected');
-    } catch {
-      Alert.alert("Couldn't save your selection", 'Try again.');
+    } catch (err) {
+      if (isMetaReconnectError(err)) { setStep('needs_reconnect'); return; }
+      Alert.alert("Couldn't save your selection", friendlyError(err, 'Try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -256,6 +284,21 @@ export default function MetaAdsConnectScreen() {
               </Text>
             </View>
             <PrimaryButton label="Connect Meta" icon="link" onPress={handleConnect} loading={connecting} />
+          </View>
+        )}
+
+        {step === 'needs_reconnect' && (
+          <View style={{ gap: SP.lg }}>
+            <View style={[s.introCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Icon name="refresh-cw" size={ICON.lg} color={theme.accentLight} />
+              <Text style={[s.introTitle, { color: colors.foreground }]}>Reconnect Meta</Text>
+              <Text style={[s.introBody, { color: colors.mutedForeground }]}>
+                {connection?.reconnectReason ?? 'Your Meta login expired.'} Your campaigns keep running on Meta — reconnect
+                to manage them from Brandthread again.
+              </Text>
+            </View>
+            <PrimaryButton label="Reconnect Meta" icon="link" onPress={handleConnect} loading={connecting} />
+            <TertiaryButton label="Disconnect" icon="log-out" onPress={handleDisconnect} disabled={disconnecting} />
           </View>
         )}
 
@@ -337,6 +380,11 @@ export default function MetaAdsConnectScreen() {
               <SummaryRow label="Ad account" value={`${connection.adAccountName ?? ''}${connection.adAccountCurrency ? ` (${connection.adAccountCurrency})` : ''}`} colors={colors} />
               <SummaryRow label="Facebook Page" value={connection.pageName} colors={colors} />
               <SummaryRow label="Instagram" value={connection.instagramUsername ? `@${connection.instagramUsername}` : 'Not linked'} colors={colors} />
+              {connection.sandbox && (
+                <Text style={[s.rowSub, { color: colors.mutedForeground }]}>
+                  Sandbox mode: ads go to a Meta test ad account and never deliver or spend.
+                </Text>
+              )}
             </View>
             <PrimaryButton label="Continue" icon="arrow-right" onPress={() => router.push('/meta-ads-setup')} />
             <TertiaryButton label="Disconnect" icon="log-out" onPress={handleDisconnect} disabled={disconnecting} />

@@ -3010,7 +3010,7 @@ export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
 // ─── Ad Campaigns ─────────────────────────────────────────────────────────────
 // Owner-scoped ad campaign drafts. Media is stored as object-storage paths,
 // never as base64 or local URIs. Payment lifecycle: draft → pending_payment →
-// active (webhook only) / failed / cancelled.
+// active (verified payment only); a failed/expired checkout returns to draft.
 export const adCampaigns = pgTable('ad_campaigns', {
   id:                     uuid('id').primaryKey().defaultRandom(),
   sellerId:               text('seller_id').notNull(),
@@ -3038,8 +3038,10 @@ export const adCampaigns = pgTable('ad_campaigns', {
   formats:                jsonb('formats').$type<string[]>().notNull().default([]),
 
   // ── Budget / Duration / Reach ─────────────────────────────────────────────
-  /** Integer cents: $5 (500) – $1000 (100000) */
+  /** TOTAL integer cents charged and paced: daily × days when dailyBudgetCents is set ($5 – $30,000) */
   budgetCents:            integer('budget_cents').notNull().default(500),
+  /** Seller-chosen daily budget in cents ($5 – $1,000/day); null for legacy/total-only campaigns (migration 645) */
+  dailyBudgetCents:       integer('daily_budget_cents'),
   /** Whole days: 1–30 */
   durationDays:           integer('duration_days').notNull().default(1),
   /** Pre-computed estimate range — never reported as delivered impressions */
@@ -3075,6 +3077,19 @@ export const adCampaigns = pgTable('ad_campaigns', {
   completionReason:       text('completion_reason'),
   /** Feed surfaces the ad may run on: 'following' | 'for_you' | 'discover' */
   surfaces:               jsonb('surfaces').$type<string[]>().notNull().default(['following', 'for_you', 'discover']),
+
+  // ── Payment record + refunds (migration 645) ──────────────────────────────
+  /** 'stripe' (Checkout, refundable pro-rata) | 'store' (App Store / Play purchase) */
+  paymentRail:            text('payment_rail'),
+  /** What the seller was actually charged, in cents */
+  paidAmountCents:        integer('paid_amount_cents'),
+  stripePaymentIntentId:  text('stripe_payment_intent_id'),
+  /** Undelivered budget returned to the seller so far */
+  refundedCents:          integer('refunded_cents').notNull().default(0),
+  /** null | 'processing' | 'succeeded' | 'pending' | 'failed' */
+  refundStatus:           text('refund_status'),
+  stripeRefundId:         text('stripe_refund_id'),
+  refundedAt:             timestamp('refunded_at', { withTimezone: true }),
 
   createdAt:              timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:              timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

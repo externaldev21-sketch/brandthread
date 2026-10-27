@@ -20,7 +20,7 @@ import { Image } from 'expo-image';
 
 import { Icon } from '@/components/ui/Icon';
 
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,19 +38,21 @@ import { useApi } from '@/hooks/useApi';
 import { BrandthreadScreen, BrandthreadCard, PrimaryButton, EmptyState, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { friendlyError } from '@/lib/friendlyError';
 
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 
-import { dateToYmd, startOfToday, ymdToDate } from '@/lib/dateTimeField';
+import { dateToYmd, isoToDate, startOfToday, ymdToDate } from '@/lib/dateTimeField';
 import {
-  validateMetaAdSchedule, isMetaAdScheduleValid, metaAdLatestStart,
+  validateMetaAdSchedule, isMetaAdScheduleValid, metaAdLatestStart, metaAdLatestEnd, metaAdScheduleTimes,
   tidyInterestResults, META_INTEREST_MAX_SELECTED,
 } from '@/lib/metaAdSchedule';
 
 import {
   BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
   META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, describeMetaReachEstimate,
+  metaConnectionState, isMetaReconnectError, META_CONNECTION_CHECK_FAILED,
 } from '@/services/metaAdsService';
 import { InlineSlider } from '@/components/InlineSlider';
 
@@ -71,6 +73,9 @@ try {
 
 const GENDERS = ['All', 'Men', 'Women'] as const;
 
+// 'load_error' is a failed check (network / 5xx) — never shown as "connect first".
+type Gate = 'checking' | 'ready' | 'load_error' | 'not_configured' | 'not_connected' | 'pending_selection' | 'needs_reconnect';
+
 export default function MetaAdsSetupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ promoteKind?: string; promoteRefId?: string; id?: string }>();
@@ -78,8 +83,8 @@ export default function MetaAdsSetupScreen() {
   const { theme } = useAppTheme();
   const colors = useColors();
 
-  const [checkingConnection, setCheckingConnection] = useState(true);
-  const [connected, setConnected] = useState(true);
+  const [gate, setGate] = useState<Gate>('checking');
+  const [gateError, setGateError] = useState<string | null>(null);
 
   const [campaignId, setCampaignId] = useState<string | null>(params.id ?? null);
   const [loadingExisting, setLoadingExisting] = useState(!!params.id);
@@ -138,19 +143,29 @@ export default function MetaAdsSetupScreen() {
   const [launchError, setLaunchError] = useState<string | null>(null);
 
   // ── Connection gate ──────────────────────────────────────────────────────
+  const checkConnection = useCallback(async () => {
+    setGate('checking');
+    setGateError(null);
+    try {
+      const state = metaConnectionState(await api.metaAds.connection());
+      setGate(state === 'connected' ? 'ready' : state);
+    } catch (err) {
+      setGateError(friendlyError(err, META_CONNECTION_CHECK_FAILED));
+      setGate('load_error');
+    }
+  }, [api]);
+
   useEffect(() => {
-    (async () => {
-      try {
-        const conn = await api.metaAds.connection();
-        setConnected(!!conn.connected && conn.status === 'connected');
-      } catch {
-        setConnected(false);
-      } finally {
-        setCheckingConnection(false);
-      }
-    })();
+    void checkConnection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Coming back from Connect / Reconnect: check again instead of staying gated.
+  const focusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!focusedOnce.current) { focusedOnce.current = true; return; }
+    if (gate !== 'ready' && gate !== 'checking') void checkConnection();
+  }, [gate, checkConnection]));
 
   // ── Resume an existing draft/rejected campaign ──────────────────────────
   useEffect(() => {
@@ -179,7 +194,12 @@ export default function MetaAdsSetupScreen() {
     setBudgetType(c.budgetType);
     setBudgetCents(c.budgetCents);
     setAdvantagePlacements(c.advantagePlus);
-    if (c.targetingSpec) {
+    // A saved start that has already passed means "start now" at launch.
+    const start = isoToDate(c.startTime);
+    if (start && start.getTime() > Date.now()) { setStartNow(false); setStartDate(dateToYmd(start)); }
+    const end = isoToDate(c.endTime);
+    if (end) setEndDate(dateToYmd(end));
+    if (c.targetingSpec && Object.keys(c.targetingSpec).length > 0) {
       setAdvantageAudience(false);
       setCountry(c.targetingSpec.countries?.[0] ?? 'US');
       setAgeMin(c.targetingSpec.ageMin ?? 18);
@@ -252,8 +272,8 @@ export default function MetaAdsSetupScreen() {
   // Schedule dates are checked here (real day, not past, within a year) so a
   // bad date shows under its field and blocks Launch instead of failing on Meta.
   const scheduleErrors = useMemo(
-    () => validateMetaAdSchedule({ startNow, startDate, endDate }),
-    [startNow, startDate, endDate],
+    () => validateMetaAdSchedule({ startNow, startDate, endDate, budgetType }),
+    [startNow, startDate, endDate, budgetType],
   );
   const scheduleValid = isMetaAdScheduleValid(scheduleErrors);
   const visibleInterestResults = useMemo(
@@ -277,6 +297,8 @@ export default function MetaAdsSetupScreen() {
   }, [interestQuery, advantageAudience, api]);
 
   function buildBody() {
+    // ISO times (local midnight / end of local day); null clears a saved date.
+    const times = metaAdScheduleTimes({ startNow, startDate, endDate });
     return {
       promoteKind: promoteKind!,
       promoteRefId: promoteRefId ?? undefined,
@@ -289,8 +311,8 @@ export default function MetaAdsSetupScreen() {
       mediaObjectPaths,
       budgetType,
       budgetCents,
-      startTime: startNow ? undefined : (startDate || undefined),
-      endTime: endDate || undefined,
+      startTime: times.startTime ?? null,
+      endTime: times.endTime ?? null,
       advantagePlus: advantagePlacements,
       placements: advantagePlacements ? undefined : { facebook: placeFacebook, instagram: placeInstagram },
       targetingSpec: advantageAudience ? undefined : {
@@ -327,8 +349,10 @@ export default function MetaAdsSetupScreen() {
     }
   }
 
-  async function saveDraft(): Promise<string | null> {
+  async function saveDraft(opts: { throwOnError?: boolean } = {}): Promise<string | null> {
     if (!requiredValid) return null;
+    // A bad schedule would be refused by the server; the field errors say why.
+    if (!scheduleValid) return campaignId;
     setSaving(true);
     try {
       const body = buildBody();
@@ -343,9 +367,11 @@ export default function MetaAdsSetupScreen() {
       void refreshPreview(campaignId);
       void refreshReachEstimate(campaignId);
       return campaignId;
-    } catch {
-      // Silent — this is a background autosave; the Launch button surfaces
-      // any real failure with a retry when the seller actually acts.
+    } catch (e) {
+      // Silent for the background autosave; Launch saves with throwOnError
+      // so a real failure shows with a retry when the seller actually acts.
+      if (opts.throwOnError) throw e;
+      if (isMetaReconnectError(e)) setGate('needs_reconnect');
       return campaignId;
     } finally {
       setSaving(false);
@@ -362,7 +388,18 @@ export default function MetaAdsSetupScreen() {
   async function handleLaunch() {
     setLaunchError(null);
     if (!scheduleValid) return;
-    const id = campaignId ?? await saveDraft();
+    // Save the latest edits first (a debounced autosave may still be pending).
+    if (saveDebounce.current) clearTimeout(saveDebounce.current);
+    let id: string | null;
+    try {
+      id = await saveDraft({ throwOnError: true });
+    } catch (e) {
+      if (isMetaReconnectError(e)) { setGate('needs_reconnect'); return; }
+      const msg = friendlyError(e, "Couldn't save this campaign. Try again.");
+      setLaunchError(msg);
+      Alert.alert('Launch failed', msg);
+      return;
+    }
     if (!id) {
       Alert.alert('Finish your ad', 'Add a headline, budget and creative before launching.');
       return;
@@ -372,6 +409,7 @@ export default function MetaAdsSetupScreen() {
       await api.metaAds.launch(id);
       router.replace('/meta-ads-manage');
     } catch (e) {
+      if (isMetaReconnectError(e)) { setGate('needs_reconnect'); return; }
       const msg = friendlyError(e, "Couldn't launch this campaign. Try again.");
       setLaunchError(msg);
       Alert.alert('Launch failed', msg);
@@ -381,7 +419,7 @@ export default function MetaAdsSetupScreen() {
   }
 
   // ── Gates ─────────────────────────────────────────────────────────────
-  if (checkingConnection || loadingExisting) {
+  if (gate === 'checking' || loadingExisting) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
@@ -391,17 +429,38 @@ export default function MetaAdsSetupScreen() {
       </View>
     );
   }
-  if (!connected) {
+  if (gate !== 'ready') {
     return (
       <BrandthreadScreen noSafeTop>
         <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
-        <EmptyState
-          icon="link"
-          title="Connect Meta first"
-          description="Connect your Facebook & Instagram account to build and run a campaign."
-          action={{ label: 'Connect Meta', onPress: () => router.replace('/meta-ads-connect') }}
-          style={{ marginTop: SP.xl }}
-        />
+        {gate === 'load_error' ? (
+          <ErrorState message={gateError ?? META_CONNECTION_CHECK_FAILED} onRetry={() => { void checkConnection(); }} style={{ marginTop: SP.xl }} />
+        ) : gate === 'needs_reconnect' ? (
+          <EmptyState
+            icon="refresh-cw"
+            title="Reconnect Meta"
+            description="Your Meta login expired. Reconnect to keep building and running campaigns — your draft is saved."
+            action={{ label: 'Reconnect Meta', onPress: () => router.push('/meta-ads-connect') }}
+            style={{ marginTop: SP.xl }}
+          />
+        ) : gate === 'not_configured' ? (
+          <EmptyState
+            icon="link"
+            title="Meta / Instagram not configured"
+            description="Facebook and Instagram ads are not configured for this app yet."
+            style={{ marginTop: SP.xl }}
+          />
+        ) : (
+          <EmptyState
+            icon="link"
+            title={gate === 'pending_selection' ? 'Finish connecting Meta' : 'Connect Meta first'}
+            description={gate === 'pending_selection'
+              ? 'Pick the ad account and Facebook Page to run ads from.'
+              : 'Connect your Facebook & Instagram account to build and run a campaign.'}
+            action={{ label: gate === 'pending_selection' ? 'Finish connecting' : 'Connect Meta', onPress: () => router.push('/meta-ads-connect') }}
+            style={{ marginTop: SP.xl }}
+          />
+        )}
       </BrandthreadScreen>
     );
   }
@@ -516,7 +575,7 @@ export default function MetaAdsSetupScreen() {
               {searchingInterests && <ActivityIndicator color={theme.accentLight} />}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
                 {visibleInterestResults.map((r) => (
-                  <Chip key={r.id} label={r.name} active={false} onPress={() => { setInterests((prev) => (prev.some((x) => x.id === r.id) || prev.length >= META_INTEREST_MAX_SELECTED ? prev : [...prev, { id: r.id, name: r.name }])); setInterestQuery(''); setInterestResults([]); }} colors={colors} theme={theme} />
+                  <Chip key={r.id} label={r.name} role="button" accessibilityLabel={`Add ${r.name}`} active={false} onPress={() => { setInterests((prev) => (prev.some((x) => x.id === r.id) || prev.length >= META_INTEREST_MAX_SELECTED ? prev : [...prev, { id: r.id, name: r.name }])); setInterestQuery(''); setInterestResults([]); }} colors={colors} theme={theme} />
                 ))}
               </View>
               {interests.length >= META_INTEREST_MAX_SELECTED && (
@@ -525,7 +584,7 @@ export default function MetaAdsSetupScreen() {
               {interests.length > 0 && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
                   {interests.map((i) => (
-                    <Chip key={i.id} label={`${i.name} ✕`} accessibilityLabel={`Remove ${i.name}`} active onPress={() => setInterests((prev) => prev.filter((x) => x.id !== i.id))} colors={colors} theme={theme} />
+                    <Chip key={i.id} label={`${i.name} ✕`} role="button" accessibilityLabel={`Remove ${i.name}`} active onPress={() => setInterests((prev) => prev.filter((x) => x.id !== i.id))} colors={colors} theme={theme} />
                   ))}
                 </View>
               )}
@@ -566,7 +625,7 @@ export default function MetaAdsSetupScreen() {
         <Section title="Schedule" colors={colors}>
           <ToggleRow label="Start now" value={startNow} onChange={setStartNow} colors={colors} />
           {!startNow && <NativeDateTimeField mode="date" label="Start date" value={ymdToDate(startDate)} onChange={(d) => setStartDate(dateToYmd(d))} minimumDate={startOfToday()} maximumDate={metaAdLatestStart()} error={scheduleErrors.startDate} divider testID="meta-ads-start-date" />}
-          <NativeDateTimeField mode="date" label="End date (optional)" value={ymdToDate(endDate)} onChange={(d) => setEndDate(dateToYmd(d))} onClear={() => setEndDate('')} minimumDate={ymdToDate(startDate) ?? startOfToday()} error={scheduleErrors.endDate} testID="meta-ads-end-date" />
+          <NativeDateTimeField mode="date" label={budgetType === 'lifetime' ? 'End date' : 'End date (optional)'} value={ymdToDate(endDate)} onChange={(d) => setEndDate(dateToYmd(d))} onClear={() => setEndDate('')} minimumDate={dayAfter((!startNow && ymdToDate(startDate)) || startOfToday())} maximumDate={metaAdLatestEnd(startDate, startNow)} error={scheduleErrors.endDate} testID="meta-ads-end-date" />
         </Section>
 
         {/* Placements */}
@@ -652,13 +711,19 @@ function SourceChip({ label, active, onPress, colors, theme }: any) {
   );
 }
 
-function Chip({ label, active, onPress, colors, theme, accessibilityLabel }: any) {
+function dayAfter(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+}
+
+// Single-select by default (radio); interest add/remove chips pass role="button".
+function Chip({ label, active, onPress, colors, theme, accessibilityLabel, role = 'radio' }: any) {
   return (
     <TouchableOpacity
       style={[s.chip, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
       onPress={() => { haptic('select'); onPress(); }}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: active }}
+      accessibilityRole={role}
+      accessibilityState={role === 'radio' ? { checked: active } : undefined}
+      accessibilityLabel={accessibilityLabel}
     >
       <Text style={[s.chipText, { color: active ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
     </TouchableOpacity>
@@ -667,7 +732,13 @@ function Chip({ label, active, onPress, colors, theme, accessibilityLabel }: any
 
 function PickRow({ label, sub, icon, selected, onPress, colors, theme }: any) {
   return (
-    <BrandthreadCard onPress={onPress} style={selected ? { borderColor: theme.accent } : undefined}>
+    <BrandthreadCard
+      onPress={onPress}
+      style={selected ? { borderColor: theme.accent } : undefined}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={sub ? `${label}, ${sub}` : label}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
         {icon && <Icon name={icon} size={ICON.md} color={selected ? theme.accentLight : colors.mutedForeground} />}
         <View style={{ flex: 1 }}>

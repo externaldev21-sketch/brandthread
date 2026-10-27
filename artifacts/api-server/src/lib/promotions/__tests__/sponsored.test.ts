@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  PACING_INITIAL_BURST, SPONSORED_COST_PER_IMPRESSION_CENTS, SPONSORED_EVERY_N_ORGANIC,
+  PACING_JITTER, PACING_SLOT_MS, SPONSORED_COST_PER_IMPRESSION_CENTS, SPONSORED_EVERY_N_ORGANIC,
   SPONSORED_MAX_PER_VIEWER_PER_DAY, filterEligible, flightElapsed, ineligibleReason, injectSponsored,
-  pacedAllowanceCents, planSponsoredSlots, rankEligible, sponsoredInsertionPoints,
+  pacedAllowanceCents, pacingJitter, planSponsoredSlots, rankEligible, sponsoredInsertionPoints,
   type SponsoredCandidate, type SponsoredViewerContext,
 } from "../sponsored";
 
@@ -76,15 +76,45 @@ describe("pacing", () => {
     expect(flightElapsed(s, e, new Date(e.getTime() + 5))).toBe(1);
   });
 
-  it("allows only a small opening burst on day zero", () => {
+  it("allows only about one hour of budget at the start of a flight", () => {
     const c = cand({ startsAt: NOW, endsAt: new Date(NOW.getTime() + 7 * DAY), budgetCents: 10_000 });
-    expect(pacedAllowanceCents(c, NOW)).toBe(Math.floor(10_000 * PACING_INITIAL_BURST));
+    const hourly = 10_000 / (7 * 24);
+    const allowance = pacedAllowanceCents(c, NOW);
+    expect(allowance).toBeGreaterThanOrEqual(Math.floor(hourly * (1 - PACING_JITTER)));
+    expect(allowance).toBeLessThanOrEqual(Math.ceil(hourly * (1 + PACING_JITTER)));
+  });
+
+  it("always lets the first impression through, even on a tiny hourly budget", () => {
+    const c = cand({ startsAt: NOW, endsAt: new Date(NOW.getTime() + 30 * DAY), budgetCents: 500 });
+    expect(pacedAllowanceCents(c, NOW)).toBeGreaterThanOrEqual(SPONSORED_COST_PER_IMPRESSION_CENTS);
+  });
+
+  it("tracks the even-pacing line hour by hour, never more than ~1.2 hours ahead", () => {
+    const startsAt = NOW;
+    const endsAt = new Date(NOW.getTime() + 2 * DAY);
+    const budgetCents = 26_000; // $130/day × 2 days
+    const hourly = budgetCents / 48;
+    for (let h = 0; h < 48; h += 1) {
+      const at = new Date(NOW.getTime() + h * PACING_SLOT_MS + 30 * 60 * 1000);
+      const even = budgetCents * ((h + 0.5) / 48);
+      const allowance = pacedAllowanceCents({ boostId: "camp", budgetCents, startsAt, endsAt }, at);
+      expect(allowance).toBeGreaterThanOrEqual(Math.floor(Math.min(budgetCents, even + hourly * (1 - PACING_JITTER))) - 1);
+      expect(allowance).toBeLessThanOrEqual(Math.min(budgetCents, Math.ceil(even + hourly * (1 + PACING_JITTER))));
+    }
+  });
+
+  it("jitters per hour, deterministically, within the configured band", () => {
+    const values = Array.from({ length: 48 }, (_, i) => pacingJitter("camp", i));
+    for (const v of values) expect(Math.abs(v)).toBeLessThanOrEqual(PACING_JITTER);
+    expect(new Set(values.map((v) => v.toFixed(4))).size).toBeGreaterThan(40);
+    expect(pacingJitter("camp", 7)).toBe(pacingJitter("camp", 7));
+    expect(pacingJitter("camp", 7)).not.toBe(pacingJitter("other", 7));
   });
 
   it("blocks a boost that is ahead of its pacing curve and frees it as time passes", () => {
     const startsAt = new Date(NOW.getTime() - DAY);
     const endsAt = new Date(NOW.getTime() + 6 * DAY); // 1/7 elapsed
-    const allowance = pacedAllowanceCents({ budgetCents: 10_000, startsAt, endsAt }, NOW);
+    const allowance = pacedAllowanceCents({ boostId: "b1", budgetCents: 10_000, startsAt, endsAt }, NOW);
     const ahead = cand({ startsAt, endsAt, deliveredSpendCents: allowance }); // next impression would exceed it
     expect(ineligibleReason(ahead, ctx())).toBe("pacing");
     const later = new Date(NOW.getTime() + 2 * DAY);

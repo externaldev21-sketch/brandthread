@@ -198,7 +198,7 @@ import adminPromotionsRouter from "./admin-promotions";
 import adCampaignsRouter from "./ad-campaigns";
 import iapPromotionsRouter from "./iap-promotions";
 import adsServeRouter from "./ads-serve";
-import metaAdsRouter from "./meta-ads";
+import metaAdsRouter, { metaAdsOauthCallbackRouter } from "./meta-ads";
 import vacationRouter  from "./vacation";
 import { quickRepliesRouter, awayMessageRouter } from "./seller-messaging-tools";
 import linkPreviewRouter from "./link-preview";
@@ -337,6 +337,8 @@ router.use("/webhooks/mux",     muxWebhookRouter); // HLS transcode status (off 
 // Shopify's OAuth redirect hits the seller's browser directly (no Brandthread
 // session) — mounted unauthenticated, before the authenticated /shopify group.
 router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
+// Same for Meta's Login redirect: no session, identity is the signed state.
+router.use("/meta-ads/oauth/callback", metaAdsOauthCallbackRouter);
 router.use("/support",         supportRouter);
 // AI data consent (App Store 5.1.2(i), QA-0043): no AI endpoint (support chat
 // and the AI credits catalogue) sends a person's content to a provider, or

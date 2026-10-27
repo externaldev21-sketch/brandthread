@@ -7,9 +7,9 @@
  *   2. Product & creative — one video OR 1–5 ordered photos
  *   3. Headline & caption
  *   4. Call to action (+ product selection when required)
- *   5. Audience & reach — read-only estimated reach (no audience targeting exists server-side)
- *   6. Budget & duration — sliders + live reach estimate
- *   7. Sticky "Launch" button pinned to the bottom
+ *   5. Budget & duration — daily budget + days sliders, the total, and the ONE
+ *      "Who this will reach" card (live, budget-true reach range)
+ *   6. Sticky "Launch" button pinned to the bottom
  *
  * Payment flow (unchanged, same pattern as sample-detail.tsx):
  *   1. User taps "Launch · $X" → PATCH campaign with final fields → POST /pay → get checkout URL
@@ -19,19 +19,23 @@
  *   5. Show success only after verified campaign.status === 'active'
  *   6. Cancel/failed → retry without activation
  *
- * Reach estimate formula (shared with server):
- *   low  = floor(budgetCents/100 * 35)
- *   high = floor(budgetCents/100 * 65)
- * Labeled "estimate" — never reported as delivered impressions.
+ * Budget: the seller sets a DAILY budget; the total charged is daily × days.
+ *
+ * Reach estimate: services/adReach.ts (mirrors the server) — computed from the
+ * TOTAL budget against the live reachable audience (GET /reach-model), with
+ * diminishing returns near saturation, recomputed as either slider moves.
+ * Always shown as a range and labeled an estimate — never delivered impressions.
+ *
+ * Opening a paid campaign (active / paused / completed) goes to its results.
  *
  * Output format: the server requires a non-empty `formats` array before pay,
  * but this UI no longer exposes a format picker — the ad is always delivered
  * for the single placement that matches this exact preview (portrait feed,
  * 4:5), so `DEFAULT_FORMATS` below is sent automatically.
  *
- * Audience targeting: `ad_campaigns` has no audience/targeting columns and the
- * route never reads any — there is nothing real to select here, so this
- * screen only surfaces the already-computed estimated reach, read-only.
+ * Audience targeting: `ad_campaigns` has no audience/targeting columns — every
+ * campaign reaches signed-in buyers (never the seller), so there is nothing
+ * real to select here; the reach card says so.
  */
 import React, {
   useState, useCallback, useRef, useEffect, useMemo,
@@ -48,7 +52,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { useUser } from '@clerk/expo';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -62,7 +65,6 @@ import {
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { friendlyError } from '@/lib/friendlyError';
 import {
-  estimateReach,
   BUDGET_STEPS,
   BUDGET_MIN_CENTS,
   BUDGET_MAX_CENTS,
@@ -75,9 +77,13 @@ import {
   validateCtaStage,
   validateBudgetStage,
   buildAdCampaignReturnUrl,
+  totalBudgetCents,
   validateImageFile,
   validateVideoFile,
 } from '@/services/adCampaignService';
+import {
+  estimateCampaignReach, FALLBACK_REACH_MODEL, formatReachRange, type ReachModel,
+} from '@/services/adReach';
 import type {
   AdCampaign,
   AdCtaKind,
@@ -265,7 +271,6 @@ export default function CreateAdScreen() {
   const nativeRail = nativePromotionsEnabled();
   const { theme } = useAppTheme();
   const colors    = useColors();
-  const { user }  = useUser();
 
   // Sticky bottom bar is two rows now (the Meta-ads link above the Launch
   // button) — this must clear both rows plus the bar's own padding, or the
@@ -291,9 +296,13 @@ export default function CreateAdScreen() {
   const [ctaKind,   setCtaKind]   = useState<AdCtaKind | null>(null);
   const [ctaDestId, setCtaDestId] = useState<string | null>(null);
 
-  // Budget & duration
-  const [budgetCents,  setBudgetCents]  = useState(2500);
-  const [durationDays, setDurationDays] = useState(7);
+  // Budget & duration — the slider sets dollars PER DAY; the total is daily × days.
+  const [dailyBudgetCents, setDailyBudgetCents] = useState(2000);
+  const [durationDays,     setDurationDays]     = useState(7);
+  const totalCents = totalBudgetCents(dailyBudgetCents, durationDays);
+  // Native store purchases are sold in fixed tiers: what's charged (and
+  // therefore paced and estimated) is the tier nearest the chosen total.
+  const chargeCents = nativeRail ? nearestPromoTierCents(totalCents) : totalCents;
 
   // Payment state
   const [paying,    setPaying]    = useState(false);
@@ -309,21 +318,45 @@ export default function CreateAdScreen() {
   // Prevent double-handling the paymentReturn redirect param
   const paymentReturnConsumed = useRef(false);
 
-  const reach = useMemo(() => estimateReach(budgetCents), [budgetCents]);
-
   // Detect preview once at mount (stable across the component lifetime)
   const inSellerPreview = isSellerDevPreview();
 
-  // Seller's store name for the ad preview; demo mode uses the same demo
-  // identity as Edit profile's preview seller.
+  // Live reach inputs (platform CPM + real reachable audience). Until they
+  // load — or in the signed-out preview — the server's defaults are used.
+  const [reachModel, setReachModel] = useState<ReachModel>(FALLBACK_REACH_MODEL);
+  useEffect(() => {
+    if (inSellerPreview) return;
+    let cancelled = false;
+    api.adCampaigns.reachModel()
+      .then((m) => { if (!cancelled && m?.audience) setReachModel({ cpmCents: m.cpmCents, audience: m.audience }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const reach = useMemo(
+    () => estimateCampaignReach({ totalBudgetCents: chargeCents, durationDays, model: reachModel }),
+    [chargeCents, durationDays, reachModel],
+  );
+
+  // The ad's brand line is the STORE name — the storefront's name, else the
+  // seller's brand name — never the account holder's personal name.
   const [storeName, setStoreName] = useState('');
   useEffect(() => {
-    if (isPreviewDemoMode()) { setStoreName(PREVIEW_SELLER_IDENTITY.brandName); return; }
+    if (isPreviewDemoMode()) { setStoreName(PREVIEW_SELLER_IDENTITY.storeName); return; }
     // Signed-out web preview never calls protected store APIs.
     if (isSellerDevPreview()) return;
-    getStorefront().then(sf => { if (sf?.settings?.storeName) setStoreName(sf.settings.storeName); }).catch(() => {});
+    let cancelled = false;
+    getStorefront()
+      .then(async (sf) => {
+        const name = sf?.settings?.storeName?.trim()
+          || (await api.seller.getProfile().catch(() => null))?.brandName?.trim();
+        if (!cancelled && name) setStoreName(name);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const brandName = storeName || user?.fullName || (user as any)?.username || 'Your store';
+  const brandName = storeName || 'Your store';
 
   // Fill the form from a saved campaign so it opens as it was left.
   const hydrateFromCampaign = useCallback((c: AdCampaign) => {
@@ -332,7 +365,7 @@ export default function CreateAdScreen() {
     setDescription(f.description);
     setCtaKind(f.ctaKind);
     setCtaDestId(f.ctaDestId);
-    if (f.budgetCents != null) setBudgetCents(f.budgetCents);
+    if (f.dailyBudgetCents != null) setDailyBudgetCents(f.dailyBudgetCents);
     if (f.durationDays != null) setDurationDays(f.durationDays);
     setMediaKind(f.mediaKind);
     setLocalPaths(f.mediaPaths);
@@ -358,6 +391,11 @@ export default function CreateAdScreen() {
         const res = existingCampaignId
           ? await api.adCampaigns.get(existingCampaignId)
           : await api.adCampaigns.create();
+        // A paid campaign isn't editable: open its results/detail instead.
+        if (existingCampaignId && ['active', 'paused', 'completed'].includes(res.campaign.status)) {
+          router.replace({ pathname: '/ad-campaign-results', params: { campaignId: res.campaign.id } } as never);
+          return;
+        }
         setCampaign(res.campaign);
         if (existingCampaignId) hydrateFromCampaign(res.campaign);
       } catch (e: any) {
@@ -592,11 +630,6 @@ export default function CreateAdScreen() {
     const ctaV = validateCtaStage({ ctaKind: ctaKind ?? undefined, ctaDestinationId: ctaDestId ?? undefined });
     if (!ctaV.valid) { Alert.alert('Incomplete', ctaV.errors.join('\n')); return; }
 
-    // Native store purchases are sold in fixed budget tiers; the price on the
-    // button follows the tier that will actually be bought.
-    const chargeCents = nativeRail ? nearestPromoTierCents(budgetCents) : budgetCents;
-    if (chargeCents !== budgetCents) setBudgetCents(chargeCents);
-
     const budgetV = validateBudgetStage({ formats: DEFAULT_FORMATS, budgetCents: chargeCents, durationDays });
     if (!budgetV.valid) { Alert.alert('Incomplete', budgetV.errors.join('\n')); return; }
 
@@ -622,7 +655,9 @@ export default function CreateAdScreen() {
         ctaDestinationKind: selected?.destinationKind,
         ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
         formats: DEFAULT_FORMATS,
-        budgetCents: chargeCents,
+        // Stripe: the server derives the total (daily × days). Store tiers are
+        // fixed totals, so those send the total itself.
+        ...(nativeRail ? { budgetCents: chargeCents } : { dailyBudgetCents }),
         durationDays,
       });
       setCampaign(updated.campaign);
@@ -734,7 +769,7 @@ export default function CreateAdScreen() {
             Payment confirmed. We'll start showing it right away.
           </Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.subtle, fontSize: FS.xs }]}>
-            Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
+            Estimated reach: {formatReachRange(reach)} over {durationDays} day{durationDays !== 1 ? 's' : ''}. It's delivered gradually, and any budget that isn't delivered is refunded.
           </Text>
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Done">
             <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Done</Text>
@@ -776,7 +811,8 @@ export default function CreateAdScreen() {
 
   const selectedCta   = CTA_OPTIONS.find((c) => c.kind === ctaKind);
   const launchDisabled = localPaths.length === 0 || !headline.trim() || !ctaKind || loading || paying;
-  const budgetDollars  = budgetCents / 100;
+  const budgetDollars  = chargeCents / 100;
+  const dailyDollars   = dailyBudgetCents / 100;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -848,7 +884,7 @@ export default function CreateAdScreen() {
                 />
               ))}
               {mediaKind === 'photos' && localPaths.length < MAX_PHOTOS && (
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add photos"
+                <TouchableOpacity
                   style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: colors.elevated, borderColor: colors.border }]}
                   onPress={() => pickMedia('photos')}
                   accessibilityRole="button"
@@ -983,45 +1019,31 @@ export default function CreateAdScreen() {
           )}
         </Section>
 
-        {/* 5 — Audience & reach (read-only — no audience targeting exists server-side) */}
-        <Section title="Audience & reach" colors={colors}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
-            <Icon name="users" size={16} color={colors.foreground} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
-              <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
-                Who this will reach, estimated from your budget. Brandthread doesn't yet support choosing an audience by
-                demographics or interests — every campaign reaches this general shopper pool.
-              </Text>
-            </View>
-          </View>
-        </Section>
-
-        {/* 6 — Budget & duration */}
-        <Section title="Budget & duration" subtitle="Slide to set your total spend and how long your ad runs." colors={colors}>
+        {/* 5 — Budget & duration (+ the one reach card) */}
+        <Section title="Budget & duration" subtitle="Set what you spend per day and how many days your ad runs." colors={colors}>
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
               <Text style={[styles.sliderMin, { color: colors.subtle }]}>${(BUDGET_MIN_CENTS / 100).toLocaleString('en-US')}</Text>
-              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>${budgetDollars.toLocaleString('en-US')}</Text>
+              <Text style={[styles.sliderCurrent, { color: colors.foreground }]} testID="daily-budget-value">${dailyDollars.toLocaleString('en-US')} / day</Text>
               <Text style={[styles.sliderMax, { color: colors.subtle }]}>${(BUDGET_MAX_CENTS / 100).toLocaleString('en-US')}</Text>
             </View>
             <InlineSlider
-              value={budgetCents}
+              value={dailyBudgetCents}
               min={BUDGET_MIN_CENTS}
               max={BUDGET_MAX_CENTS}
               steps={BUDGET_STEPS}
-              onChange={setBudgetCents}
-              accessibilityLabel="Campaign budget"
+              onChange={setDailyBudgetCents}
+              accessibilityLabel="Daily budget"
               accentColor={theme.accentLight}
               trackColor={colors.border}
             />
-            <Text style={[styles.sliderHint, { color: colors.subtle }]}>Whole dollars only · $5 – $1,000</Text>
+            <Text style={[styles.sliderHint, { color: colors.subtle }]}>Daily budget · $5 – $1,000 a day</Text>
           </View>
 
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
               <Text style={[styles.sliderMin, { color: colors.subtle }]}>{DURATION_MIN_DAYS} day</Text>
-              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>{durationDays} day{durationDays !== 1 ? 's' : ''}</Text>
+              <Text style={[styles.sliderCurrent, { color: colors.foreground }]} testID="duration-value">{durationDays} day{durationDays !== 1 ? 's' : ''}</Text>
               <Text style={[styles.sliderMax, { color: colors.subtle }]}>{DURATION_MAX_DAYS} days</Text>
             </View>
             <InlineSlider
@@ -1037,14 +1059,31 @@ export default function CreateAdScreen() {
             <Text style={[styles.sliderHint, { color: colors.subtle }]}>1 to 30 days</Text>
           </View>
 
-          <View style={[styles.reachCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID="estimated-reach">
-            <Icon name="trending-up" size={16} color={colors.foreground} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.reachLabel, { color: colors.mutedForeground }]}>Estimated reach</Text>
-              <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
+          <View style={[styles.totalRow, { borderColor: colors.border }]} testID="campaign-total">
+            <Text style={[styles.totalLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+              ${dailyDollars.toLocaleString('en-US')} × {durationDays} day{durationDays !== 1 ? 's' : ''}
+            </Text>
+            <Text style={[styles.totalValue, { color: colors.foreground }]}>${budgetDollars.toLocaleString('en-US')} total</Text>
+          </View>
+          {chargeCents !== totalCents && (
+            <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground, marginTop: 0 }]}>
+              App Store purchases come in set amounts, so this campaign is ${budgetDollars.toLocaleString('en-US')} spread over {durationDays} day{durationDays !== 1 ? 's' : ''}.
+            </Text>
+          )}
+
+          <View style={[styles.reachCard, { backgroundColor: colors.elevated, borderColor: colors.border }]} testID="estimated-reach">
+            <Icon name="users" size={16} color={colors.foreground} />
+            <View style={styles.reachBody}>
+              <Text style={[styles.reachLabel, { color: colors.mutedForeground }]}>Who this will reach</Text>
+              <Text style={[styles.reachRange, { color: colors.foreground }]} testID="estimated-reach-range">{formatReachRange(reach)}</Text>
               <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
-                Estimate only — based on your budget. Not a guarantee of delivered impressions.
+                Estimated from your ${budgetDollars.toLocaleString('en-US')} total across {durationDays} day{durationDays !== 1 ? 's' : ''}. Shown to Brandthread shoppers (never to you), delivered gradually through each day. Not a guarantee — any budget that isn't delivered is refunded.
               </Text>
+              {reachModel.audience.source === 'floor' && (
+                <Text style={[styles.reachDisclaimer, { color: colors.subtle }]}>
+                  Planning estimate while Brandthread's audience grows — real delivery follows real shopper traffic.
+                </Text>
+              )}
             </View>
           </View>
         </Section>
@@ -1121,7 +1160,12 @@ const styles = StyleSheet.create({
   sliderCurrent:   { fontSize: FS.base, fontFamily: FONT.bold },
   sliderMax:       { fontSize: FS.xs, fontFamily: FONT.regular },
   sliderHint:      { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.xs, textAlign: 'center' },
+  totalRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, borderTopWidth: 1, paddingTop: SP.md },
+  totalLabel:      { flexShrink: 1, fontSize: FS.sm, fontFamily: FONT.regular },
+  totalValue:      { fontSize: FS.base, fontFamily: FONT.bold },
   reachCard:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md },
+  // flex + minWidth 0 lets the copy wrap inside the card instead of overflowing it.
+  reachBody:       { flex: 1, minWidth: 0 },
   reachLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 2 },
   reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
   reachDisclaimer: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 18 },

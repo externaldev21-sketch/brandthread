@@ -193,7 +193,8 @@ const pageStyles = StyleSheet.create({
   info: { maxWidth: '78%', marginBottom: 12 },
   creatorRow: { minHeight: 22, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   creatorName: { fontSize: 14, fontFamily: FONT.semibold, color: MEDIA.foreground, flexShrink: 1, letterSpacing: 0.1, ...textShadow },
-  sponsored: { fontSize: FS.meta, fontFamily: FONT.medium, color: MEDIA.muted, marginBottom: 6, ...textShadow },
+  // Full white like the headline: the disclosure must stay legible over bright media.
+  sponsored: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MEDIA.foreground, marginBottom: 6, ...textShadow },
   headline: { fontSize: 15, fontFamily: FONT.semibold, color: MEDIA.foreground, marginBottom: 4, lineHeight: 20, ...textShadow },
   caption: { fontSize: 13, fontFamily: FONT.medium, color: MEDIA.foreground, lineHeight: 17, letterSpacing: 0.1, ...textShadow },
   cta: {

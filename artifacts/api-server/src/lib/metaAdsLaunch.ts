@@ -13,16 +13,24 @@
  */
 import { db, metaAdAccounts, metaCampaigns } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { decryptToken } from "./metaCrypto";
 import {
   MetaGraphError,
   createAd,
   createAdCreative,
   createAdSet,
   createCampaign,
+  updateCampaignStatus,
   uploadAdImage,
   uploadAdVideo,
 } from "./metaGraph";
+import {
+  MetaReconnectRequiredError,
+  RECONNECT_MESSAGE,
+  connectionState,
+  getFreshAccessToken,
+  markNeedsReconnect,
+  marketingTarget,
+} from "./metaConnection";
 import { ObjectStorageService } from "./objectStorage";
 
 const storage = new ObjectStorageService();
@@ -44,10 +52,13 @@ const OBJECTIVE_TO_BILLING_EVENT: Record<string, string> = {
 export class LaunchError extends Error {
   /** Plain-English message safe to show the seller — mirrors MetaGraphError.userMessage. */
   userMessage: string;
-  constructor(userMessage: string, cause?: unknown) {
+  /** Set when the seller must log in to Meta again before anything can launch. */
+  code?: "META_RECONNECT_REQUIRED";
+  constructor(userMessage: string, cause?: unknown, code?: "META_RECONNECT_REQUIRED") {
     super(userMessage);
     this.name = "LaunchError";
     this.userMessage = userMessage;
+    this.code = code;
     if (cause !== undefined) this.cause = cause as Error;
   }
 }
@@ -79,25 +90,49 @@ export async function launchCampaign(
     .from(metaAdAccounts)
     .where(eq(metaAdAccounts.id, campaign.adAccountRecordId))
     .limit(1);
-  if (!account || account.status !== "connected" || !account.adAccountId) {
+  const state = connectionState(account);
+  if (!account || (state !== "connected" && state !== "needs_reconnect") || !account.adAccountId) {
     const reason = "Your Meta ad account is not connected. Please reconnect and try again.";
     await markFailed(campaignId, reason);
     throw new LaunchError(reason);
   }
 
-  let accessToken: string;
+  let sellerToken: string;
   try {
-    accessToken = decryptToken(account.accessTokenEncrypted);
-  } catch {
-    const reason = "Your Meta connection expired — please reconnect.";
+    sellerToken = await getFreshAccessToken(account);
+  } catch (err) {
+    const reconnect = err instanceof MetaReconnectRequiredError;
+    const reason = reconnect ? err.userMessage : "Meta Ads isn't configured on this server yet.";
+    await markFailed(campaignId, reason);
+    throw new LaunchError(reason, err, reconnect ? "META_RECONNECT_REQUIRED" : undefined);
+  }
+
+  // Sandbox mode swaps in the sandbox ad account (and its token, when set).
+  const target = marketingTarget(account, sellerToken);
+  if (!target.adAccountId) {
+    const reason = "Meta sandbox mode is on but META_SANDBOX_AD_ACCOUNT_ID is not set.";
     await markFailed(campaignId, reason);
     throw new LaunchError(reason);
   }
+  const adAccountId = target.adAccountId;
+  const accessToken = target.accessToken;
 
-  const adAccountId = account.adAccountId;
+  // A draft saved days ago can carry a start that has since passed — Meta
+  // starts an ad set with no start_time immediately. An end that has passed
+  // can't run at all.
+  const now = Date.now();
+  if (campaign.endTime && campaign.endTime.getTime() <= now) {
+    const reason = "This campaign's end date has passed — pick new dates and launch again.";
+    await markFailed(campaignId, reason);
+    throw new LaunchError(reason);
+  }
+  const startTime = campaign.startTime && campaign.startTime.getTime() > now
+    ? campaign.startTime.toISOString()
+    : undefined;
 
   try {
-    // ── Step 1: Campaign ────────────────────────────────────────────────
+    // ── Step 1: Campaign (created PAUSED; switched on in step 5, once the
+    // whole chain exists, so nothing half-built can deliver) ─────────────
     let metaCampaignId = campaign.metaCampaignId;
     if (!metaCampaignId) {
       const created = await createCampaign(accessToken, adAccountId, {
@@ -120,12 +155,13 @@ export async function launchCampaign(
         lifetimeBudgetCents: campaign.budgetType === "lifetime" ? campaign.budgetCents : undefined,
         billingEvent: OBJECTIVE_TO_BILLING_EVENT[campaign.objective] ?? "IMPRESSIONS",
         optimizationGoal: OBJECTIVE_TO_OPTIMIZATION_GOAL[campaign.objective] ?? "LINK_CLICKS",
-        startTime: campaign.startTime ? campaign.startTime.toISOString() : undefined,
+        startTime,
         endTime: campaign.endTime ? campaign.endTime.toISOString() : undefined,
         targeting,
         advantagePlus: campaign.advantagePlus,
         placements: campaign.placements as Record<string, unknown>,
-        status: "PAUSED",
+        // Delivery is still held by the paused campaign until step 5.
+        status: "ACTIVE",
         pixelId: campaign.objective === "sales" ? (account.pixelId ?? undefined) : undefined,
         promotedObject: campaign.objective === "sales" ? { custom_event_type: "PURCHASE" } : undefined,
       });
@@ -173,7 +209,12 @@ export async function launchCampaign(
         status: "ACTIVE",
       });
       metaAdId = created.id;
+      await patchCampaign(campaignId, { metaAdId });
     }
+
+    // ── Step 5: switch the campaign on. Safe to repeat on a retried launch.
+    // Meta reviews the ad before it delivers (effective_status PENDING_REVIEW).
+    await updateCampaignStatus(accessToken, metaCampaignId, "ACTIVE");
 
     await patchCampaign(campaignId, {
       metaAdId,
@@ -185,6 +226,11 @@ export async function launchCampaign(
 
     return { status: "in_review", metaAdId };
   } catch (err) {
+    if (err instanceof MetaGraphError && err.requiresReconnect) {
+      await markNeedsReconnect(account.id);
+      await markFailed(campaignId, RECONNECT_MESSAGE);
+      throw new LaunchError(RECONNECT_MESSAGE, err, "META_RECONNECT_REQUIRED");
+    }
     const reason = err instanceof MetaGraphError
       ? err.userMessage
       : "Could not launch this campaign on Meta. Please try again.";

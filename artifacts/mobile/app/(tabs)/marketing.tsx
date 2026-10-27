@@ -26,7 +26,8 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 
 import { RetryRow } from '@/components/ui/RetryRow';
 
-import { isSellerDevPreview } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { demoAdCampaign } from '@/lib/demoAdCampaign';
 
 import { ListRow } from '@/components/ui/ListRow';
 
@@ -121,7 +122,12 @@ export default function MarketingScreen() {
         // web preview has no real signed-in account behind it at all, so a
         // 401/404 there is expected and benign, not a genuine failure —
         // show the normal empty state instead of an error banner.
-        .catch(() => { if (!cancelled) { setCampaigns([]); setCampaignsError(!isSellerDevPreview()); } });
+        .catch(() => {
+          if (cancelled) return;
+          // Demo preview: one paid campaign caught mid-delivery (lib/demoAdCampaign).
+          setCampaigns(isPreviewDemoMode() ? [demoAdCampaign()] : []);
+          setCampaignsError(!isSellerDevPreview());
+        });
       api.discountCodes.list()
         .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
         .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
@@ -217,8 +223,10 @@ export default function MarketingScreen() {
               key={c.id}
               activeOpacity={0.8}
               onPress={() => router.push((campaignHasResults(c.status)
-                ? `/ad-campaign-results?campaignId=${c.id}`
-                : `/design-campaign?campaignId=${c.id}`) as never)}
+                ? `/ad-campaign-results?campaignId=${encodeURIComponent(c.id)}`
+                : `/design-campaign?campaignId=${encodeURIComponent(c.id)}`) as never)}
+              accessibilityRole="button"
+              accessibilityLabel={`${c.headline?.trim() || 'Untitled campaign'}, ${campaignStatusLabel(c.status)}`}
               style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
               <View style={[styles.campaignIcon, { backgroundColor: colors.accent }]}>

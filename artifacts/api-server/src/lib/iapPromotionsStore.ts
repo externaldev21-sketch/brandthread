@@ -5,8 +5,10 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { adCampaigns, boosts, db, featuredSlots, iapPromotionPurchases, posts } from "@workspace/db";
-import { checkPostMediaEligibility, estimateBoostReach } from "../routes/boosts";
+import { checkPostMediaEligibility } from "../routes/boosts";
 import { confirmFeaturedSlotPaidById } from "../routes/featured-slots";
+import { estimateCampaignReach } from "./ads/reachEstimate";
+import { loadReachModel } from "./ads/reachAudience";
 import {
   findPurchaseInPayload,
   type ActivateResult,
@@ -83,9 +85,14 @@ async function activateCampaign(id: string, paidAt: Date): Promise<ActivateResul
     || !campaign.formats || (campaign.formats as string[]).length === 0
     || campaign.budgetCents < AD_CAMPAIGN_BUDGET_MIN_CENTS) return "ineligible";
 
-  const reach = estimateBoostReach(campaign.budgetCents);
+  const reach = estimateCampaignReach({
+    totalBudgetCents: campaign.budgetCents, durationDays: campaign.durationDays, model: await loadReachModel(),
+  });
   const [updated] = await db.update(adCampaigns).set({
     status: "active",
+    // Store purchases are refunded by Apple/Google, never pro-rata by us.
+    paymentRail: "store",
+    paidAmountCents: campaign.budgetCents,
     paidAt,
     startsAt: paidAt,
     endsAt: new Date(paidAt.getTime() + campaign.durationDays * 86_400_000),

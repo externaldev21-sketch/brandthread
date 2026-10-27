@@ -12,6 +12,8 @@ import { isSellerDevPreview } from './devPreview';
 
 export const PREVIEW_SELLER_IDENTITY = {
   brandName: 'Maya Okafor',
+  /** The preview seller's store, as ads show it (an ad's brand line is the store, never the person). */
+  storeName: 'Okafor Studio',
   firstName: 'Maya',
   lastName: 'Okafor',
   username: 'mayaokafor',
