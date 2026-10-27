@@ -1,0 +1,87 @@
+[
+  {
+    "name": "apparel canvas opens with the paint surface",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "brush rail lists all 12 Procreate sets",
+    "ok": true,
+    "detail": "Sketching, Inking, Drawing, Painting, Artistic, Calligraphy, Airbrushing, Textures, Abstract, Charcoals, Elements, Spraypaints"
+  },
+  {
+    "name": "long-press a set shows Rename / Delete / Share / Duplicate",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "\"Delete set?\" confirm appears",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Size HUD shows while dragging",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "colour layer reordered below the ink",
+    "ok": true,
+    "detail": "uid_1793086563849_2 > uid_1793086579080_3 > uid_1793086556510_1"
+  },
+  {
+    "name": "two-finger tap undoes the last stroke",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "three-finger tap redoes it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "pinch zooms + rotates the canvas",
+    "ok": true,
+    "detail": "matrix(1.32085, 0.262319, -0.262319, 1.32085, -1.52424, -1.6646)"
+  },
+  {
+    "name": "touch-and-hold shows the eyedropper loupe",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "eyedropper picked the red",
+    "ok": true,
+    "detail": "rgb(232, 49, 47)"
+  },
+  {
+    "name": "PNG export is full print resolution 4500×5400",
+    "ok": true,
+    "detail": "4500×5400 in 5936ms"
+  },
+  {
+    "name": "PNG keeps alpha: empty canvas is transparent",
+    "ok": true,
+    "detail": "corner rgba 0,0,0,0"
+  },
+  {
+    "name": "PNG keeps the artwork opaque",
+    "ok": true,
+    "detail": "opaque 28400 / transparent 203199 samples; red rgba 232,49,47,255"
+  },
+  {
+    "name": "design is composited on the tee mockup",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Add to product hands the mockup to the product picker",
+    "ok": true,
+    "detail": "http://127.0.0.1:33543/products?pickForMockup=1&projectId=proj_1793086544765_1"
+  },
+  {
+    "name": "gallery thumbnail renders the painted layers",
+    "ok": true,
+    "detail": "3 raster layer images"
+  }
+]

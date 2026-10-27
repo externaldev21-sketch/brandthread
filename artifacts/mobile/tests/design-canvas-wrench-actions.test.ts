@@ -208,11 +208,8 @@ describe('WrenchActionsSheet tab structure', () => {
     CANVAS_ACTIONS.forEach(a => expect(CANVAS_ACTIONS).toContain(a));
   });
 
-  it('SHARE tab includes all 9 share actions, each wired in design-canvas.tsx', () => {
+  it('SHARE tab: Procreate\'s "Share image" + "Use on mockup" tiles, then 6 wired actions', () => {
     const SHARE_ACTIONS: [label: string, handler: string][] = [
-      ['Export PNG', 'onExportPng'],
-      ['Export JPEG', 'onExportJpeg'],
-      ['Share / Save', 'onShare'],
       ['More export options', 'onOpenExportOptions'],
       ['Save a copy', 'onSaveCopy'],
       ['Save version', 'onSaveVersion'],
@@ -222,10 +219,23 @@ describe('WrenchActionsSheet tab structure', () => {
     ];
     const canvasSrc = readFileSync(resolve(__dirname, '../app/design-canvas.tsx'), 'utf8');
     const shareTab = canvasSrc.slice(canvasSrc.indexOf('{/* ── SHARE TAB ── */}'), canvasSrc.indexOf('{/* ── PREFS TAB ── */}'));
-    expect(SHARE_ACTIONS).toHaveLength(9);
+    expect(shareTab).toMatch(/onPress=\{exporting \? undefined : onOpenShareImage\}[\s\S]{0,200}testID="wrench-share-image"/);
+    expect(shareTab).toMatch(/onPress=\{exporting \? undefined : onUseOnMockup\}[\s\S]{0,200}testID="wrench-use-on-mockup"/);
     for (const [label, handler] of SHARE_ACTIONS) {
       expect(shareTab).toMatch(new RegExp(`label: '${label.replace(/[/]/g, '\\/')}',[\\s\\S]{0,240}onPress: ${handler},`));
     }
+    // The tiles reach real behaviour: the Share Image format list and the mockup hand-off.
+    expect(canvasSrc).toContain("onOpenShareImage={() => openSheet('shareImage')}");
+    expect(canvasSrc).toContain('onUseOnMockup={() => { void handleUseOnMockup(); }}');
+  });
+
+  it('Share Image offers PNG (transparent) / PNG / JPEG, each exporting through the full-resolution compose', () => {
+    const canvasSrc = readFileSync(resolve(__dirname, '../app/design-canvas.tsx'), 'utf8');
+    for (const kind of ['png-transparent', 'png', 'jpeg']) expect(canvasSrc).toContain(`kind: '${kind}'`);
+    expect(canvasSrc).toContain('onPress={() => { void handleShareImage(row.kind); }}');
+    expect(canvasSrc).toMatch(/async function handleShareImage[\s\S]{0,900}await composeDesign\(\{ transparent, format \}\)/);
+    // Transparent export composes with NO background.
+    expect(canvasSrc).toMatch(/const background = opts\.transparent \? null/);
   });
 
   it('Save version snapshots via createVersion; Version history and export options open real routes', () => {

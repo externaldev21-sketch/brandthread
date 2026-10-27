@@ -30,6 +30,17 @@ import { radius } from '@/constants/radii';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { setPendingMockup } from '@/lib/mockupProductHandoff';
 import { MissingItemState } from '@/components/states/MissingItemState';
+import GarmentMockup, { type MockupGarment } from '@/components/design/GarmentMockup';
+import { getDesignArtwork } from '@/lib/designHandoff';
+
+const GARMENT_COLORS = [
+  { label: 'White', color: '#FFFFFF' },
+  { label: 'Black', color: '#111111' },
+  { label: 'Heather grey', color: '#9A9A9A' },
+  { label: 'Silver', color: '#C9CCD1' },
+  { label: 'Charcoal', color: '#3A3A3C' },
+  { label: 'Cream', color: '#F2EAD8' },
+];
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -57,6 +68,10 @@ export default function DesignMockupPreviewScreen() {
   const [bgColor, setBgColor]       = useState('#000000');
   const [shadow, setShadow]         = useState<ShadowStyle>('Soft');
   const [saving, setSaving]         = useState(false);
+  // The transparent PNG exported by the canvas's "Use on mockup" (if any).
+  const artwork = getDesignArtwork(projectId);
+  const [garment, setGarment]       = useState<MockupGarment>('tshirt');
+  const [garmentColor, setGarmentColor] = useState('#FFFFFF');
   const previewShotRef = useRef<View>(null);
 
   useEffect(() => {
@@ -64,7 +79,12 @@ export default function DesignMockupPreviewScreen() {
     let cancelled = false;
     whenDesignServiceReady()
       .then(() => getProject(projectId))
-      .then(p => { if (!cancelled) setProject(p); })
+      .then(p => {
+        if (cancelled) return;
+        setProject(p);
+        if (p?.garmentType === 'hoodie' || p?.garmentType === 'sweatshirt') setGarment('hoodie');
+        if (p?.garmentColor) setGarmentColor(p.garmentColor);
+      })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -122,58 +142,23 @@ export default function DesignMockupPreviewScreen() {
     ]);
   }, [project, router]);
 
-  // Shadow Style, drawn inside the garment SVG so it shows on every
-  // platform and is part of the saved/added mockup capture.
-  const renderShadow = (shapePath: string, groundY: number) => {
+  // Shadow Style: a contact shadow on the "floor" under the garment, part of
+  // the captured mockup for Save / Add to product.
+  const mockupW = Math.min(SCREEN_W * 0.86, PANEL_H * 0.8);
+  const renderShadow = () => {
     if (shadow === 'None') return null;
-    if (shadow === 'Drop') {
-      return <Path d={shapePath} fill="#000000" opacity={0.35} transform="translate(6, 8)" />;
-    }
-    if (shadow === 'Hard') {
-      return <Ellipse cx={100} cy={groundY} rx={66} ry={4} fill="#000000" opacity={0.6} />;
-    }
-    // Soft: stacked translucent ellipses read as a blurred contact shadow.
+    const w = mockupW;
     return (
-      <G>
-        <Ellipse cx={100} cy={groundY} rx={92} ry={7} fill="#000000" opacity={0.08} />
-        <Ellipse cx={100} cy={groundY} rx={76} ry={5} fill="#000000" opacity={0.12} />
-        <Ellipse cx={100} cy={groundY} rx={58} ry={3.5} fill="#000000" opacity={0.18} />
-      </G>
-    );
-  };
-
-  const renderGarmentSvg = () => {
-    const garment = project?.garmentType ?? 'tshirt';
-    const fill = project?.garmentColor ?? '#1A1A2E';
-
-    if (garment === 'tshirt') {
-      // T-shirt shape path
-      const tee = 'M60,10 L30,50 L0,40 L20,80 L40,70 L40,210 L160,210 L160,70 L180,80 L200,40 L170,50 L140,10 Q120,0 100,0 Q80,0 60,10 Z';
-      return (
-        <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.7} viewBox="-8 -4 216 228">
-          {renderShadow(tee, 214)}
-          <Path
-            d={tee}
-            fill={fill}
-            stroke={PURPLE + '88'}
-            strokeWidth={1.5}
-          />
-        </Svg>
-      );
-    }
-
-    // Default: rounded rect with label
-    const label = garment.charAt(0).toUpperCase() + garment.slice(1);
-    return (
-      <Svg width={SCREEN_W * 0.7} height={PANEL_H * 0.6} viewBox="-8 -4 216 258">
-        {renderShadow('M26,10 L174,10 Q190,10 190,26 L190,224 Q190,240 174,240 L26,240 Q10,240 10,224 L10,26 Q10,10 26,10 Z', 244)}
-        <Rect
-          x={10} y={10} width={180} height={230}
-          rx={16} ry={16}
-          fill={fill}
-          stroke={CYAN + '66'}
-          strokeWidth={1.5}
-        />
+      <Svg width={w} height={28} viewBox="0 0 200 14" style={{ marginTop: -14 }} pointerEvents="none" testID="mockup-shadow">
+        {shadow === 'Hard' && <Ellipse cx={100} cy={7} rx={70} ry={3.5} fill="#000000" opacity={0.65} />}
+        {shadow === 'Drop' && <Ellipse cx={108} cy={8} rx={82} ry={5} fill="#000000" opacity={0.4} />}
+        {shadow === 'Soft' && (
+          <G>
+            <Ellipse cx={100} cy={7} rx={92} ry={6} fill="#000000" opacity={0.1} />
+            <Ellipse cx={100} cy={7} rx={76} ry={4.5} fill="#000000" opacity={0.14} />
+            <Ellipse cx={100} cy={7} rx={58} ry={3} fill="#000000" opacity={0.2} />
+          </G>
+        )}
       </Svg>
     );
   };
@@ -208,30 +193,64 @@ export default function DesignMockupPreviewScreen() {
           collapsable={false}
           style={[styles.previewPanel, { backgroundColor: bgColor, height: PANEL_H }]}
         >
-          <View style={[styles.garmentWrap, { width: SCREEN_W * 0.7, height: PANEL_H * 0.7 }]}>
-            {renderGarmentSvg()}
-            {/* Composite the actual design onto the chest print zone, in place
-                of the plain garment outline. This is an approximate chest-area
-                placement, not a pixel-accurate print-zone mask. */}
-            {project.layers && project.layers.length > 0 && (
-              <View style={styles.designOverlay} pointerEvents="none">
-                <DesignLayerCompositor
-                  project={project}
-                  displaySize={SCREEN_W * 0.7 * 0.34}
-                  borderRadius={0}
-                />
-              </View>
-            )}
-          </View>
+          <GarmentMockup
+            garment={garment}
+            color={garmentColor}
+            width={mockupW}
+            artworkUri={artwork?.uri}
+            artworkAspect={artwork ? artwork.width / artwork.height : (project.canvas.width || 1080) / (project.canvas.height || 1080)}
+            testID="garment-mockup"
+            fallback={project.layers && project.layers.length > 0 ? (
+              // From the gallery (no fresh export): the saved layer previews,
+              // background left out so empty canvas shows the garment.
+              <DesignLayerCompositor
+                project={{ ...project, canvas: { ...project.canvas, backgroundHidden: true } }}
+                displaySize={mockupW * 0.36}
+                borderRadius={0}
+              />
+            ) : null}
+          />
+          {renderShadow()}
           <View style={styles.overlayLabels} testID="mockup-overlay-labels">
             <Text style={[styles.overlayName, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#000' : FG }]}>
               {project.name}
             </Text>
             <Text style={[styles.overlayType, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#333' : MUTED }]}>
-              {GARMENT_TYPES.find(t => t.value === project.garmentType)?.label ?? project.garmentType ?? 'Garment'}
+              {garment === 'hoodie' ? 'Hoodie' : 'T-Shirt'} · {GARMENT_COLORS.find(c => c.color === garmentColor)?.label ?? 'Custom'}
             </Text>
           </View>
         </View>
+
+        {/* Garment */}
+        <SectionHeader title="Garment" style={styles.sectionHeader} />
+        <View style={styles.bgRow}>
+          {([['tshirt', 'T-Shirt'], ['hoodie', 'Hoodie']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              onPress={() => { Haptics.selectionAsync(); setGarment(key); }}
+              style={[styles.shadowPill, garment === key && styles.shadowPillActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: garment === key }}
+              testID={`mockup-garment-${key}`}
+            >
+              <Text style={[styles.shadowText, garment === key && styles.shadowTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <SectionHeader title="Garment colour" style={styles.sectionHeader} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bgRow}>
+          {GARMENT_COLORS.map(opt => (
+            <TouchableOpacity
+              key={opt.label}
+              onPress={() => { Haptics.selectionAsync(); setGarmentColor(opt.color); }}
+              style={[styles.bgSwatch, { backgroundColor: opt.color, borderColor: garmentColor === opt.color ? FG : BORDER }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${opt.label} garment`}
+              accessibilityState={{ selected: garmentColor === opt.color }}
+              testID={`mockup-garment-color-${opt.label.toLowerCase().replace(/\s+/g, '-')}`}
+            />
+          ))}
+        </ScrollView>
 
         {/* Background options */}
         <SectionHeader title="Background" style={styles.sectionHeader} />
