@@ -1,4 +1,4 @@
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,20 +12,27 @@ import {
   ImageQualityError,
   ImageQualityUnavailableError,
   type ImageEditSize,
-  type ImageOperation,
 } from "@workspace/integrations-openai-ai-server/image";
-import type { AiTool } from "../lib/aiImageProviders/config";
+import { AiProviderNotConfiguredError } from "../lib/aiImageProviders/routing";
 import {
-  AiProviderNotConfiguredError,
-  resolveToolGenerator,
-  type ToolGenerator,
-} from "../lib/aiImageProviders/routing";
+  generateShot,
+  ImageEngineNotConfiguredError,
+  mapWithConcurrency,
+  parseAspectRatio,
+  type ShotOutput,
+} from "../lib/aiImageEngine";
+import { GeminiImageError } from "../lib/aiImageEngine/gemini";
 
 const router = Router();
 router.use(requireAuth);
 
-const MAX_IMAGES = 4;
+const MAX_IMAGES = 4; // outfit swap: garments per batch
 const MAX_REFS = 5; // mockup_to_model specific: up to 5 reference images
+// AI Photoshoot: the seller's product photos and their creative references
+// have separate budgets (the app's pickers use the same numbers).
+const MAX_PRODUCT_IMAGES = 4;
+const MAX_REFERENCE_IMAGES = 6;
+const MAX_TOTAL_BYTES_PHOTOSHOOT = 30 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20MB across all photos
 // For mockup_to_model: 1 mockup + up to 5 refs; budget generously
@@ -65,31 +72,9 @@ function decodeDataUrl(input: string): Buffer | null {
 }
 
 /**
- * Env-selected image provider for a tool (see lib/aiImageProviders/config.ts).
- * `generator: null` means the default OpenAI path below runs unchanged. When a
- * non-default provider is selected without its key, answers 503 with an
- * actionable message and returns `ok: false`.
- */
-function resolveGeneratorOrRespond(
-  tool: AiTool,
-  res: Response,
-): { ok: true; generator: ToolGenerator | null } | { ok: false } {
-  try {
-    return { ok: true, generator: resolveToolGenerator(tool) };
-  } catch (err) {
-    if (err instanceof AiProviderNotConfiguredError) {
-      res.status(503).json({ error: err.message, code: err.code, retryable: false });
-      return { ok: false };
-    }
-    throw err;
-  }
-}
-
-/**
- * Maps the seller's aspect-ratio choice to the nearest output size the image
- * edit endpoint supports: square stays square, portrait ratios (4:5, 3:4,
- * 2:3, 9:16) get the portrait canvas, landscape ratios (16:9, 3:2, 4:3) the
- * landscape one. Anything unrecognised keeps the provider default.
+ * Maps the seller's aspect-ratio choice to the nearest output size the OpenAI
+ * edit endpoint supports (kept for callers and tests of the OpenAI path; the
+ * Gemini engine honours the exact ratio).
  */
 export function photoshootSizeForRatio(ratio: unknown): ImageEditSize | undefined {
   if (typeof ratio !== "string") return undefined;
@@ -102,91 +87,130 @@ export function photoshootSizeForRatio(ratio: unknown): ImageEditSize | undefine
   return w < h ? "1024x1536" : "1536x1024";
 }
 
-// POST /api/photography/generate  { images: string[] (base64/data-url), prompt?: string, ratio?: "1:1" | "4:5" | "9:16" | ... }
-router.post("/generate", async (req, res) => {
-  const { images, prompt, ratio } = req.body ?? {};
-  const size = photoshootSizeForRatio(ratio);
-  if (!Array.isArray(images) || images.length === 0) {
-    res.status(400).json({ error: "At least one reference or product photo is required." });
-    return;
-  }
-  if (images.length > MAX_IMAGES) {
-    res.status(400).json({ error: `Please upload at most ${MAX_IMAGES} photos.` });
-    return;
-  }
+const STYLE_RE = /^[a-z_]{1,24}$/;
+function styleField(value: unknown): string | undefined {
+  return typeof value === "string" && STYLE_RE.test(value) ? value : undefined;
+}
 
-  const safeDescription =
-    typeof prompt === "string" && prompt.trim().length > 0
-      ? prompt.trim().slice(0, 500)
-      : "";
+function briefField(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 500) : "";
+}
 
-  // Decode and validate all photos up front (size + format) before touching disk.
-  const decoded: Buffer[] = [];
-  let totalBytes = 0;
-  for (const img of images) {
-    if (typeof img !== "string") {
-      res.status(400).json({ error: "Each photo must be a base64-encoded image." });
-      return;
-    }
-    const buffer = decodeDataUrl(img);
+/** Decodes a list of data-URL photos, answering 400 itself on the first bad one. */
+function decodeList(
+  list: unknown,
+  what: string,
+  max: number,
+  res: Response,
+): Buffer[] | null {
+  if (list === undefined) return [];
+  if (!Array.isArray(list)) {
+    res.status(400).json({ error: `${what} must be a list of photos.` });
+    return null;
+  }
+  if (list.length > max) {
+    res.status(400).json({ error: `Please use at most ${max} ${what.toLowerCase()}.` });
+    return null;
+  }
+  const out: Buffer[] = [];
+  for (const item of list) {
+    const buffer = typeof item === "string" ? decodeDataUrl(item) : null;
     if (!buffer) {
       res.status(400).json({ error: "One or more photos are not valid images. Please re-upload." });
-      return;
+      return null;
     }
     if (buffer.length > MAX_IMAGE_BYTES) {
       res.status(400).json({ error: "Each photo must be under 8MB." });
-      return;
+      return null;
     }
-    totalBytes += buffer.length;
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      res.status(400).json({ error: "Total photo size is too large. Please upload smaller or fewer photos." });
-      return;
-    }
-    decoded.push(buffer);
+    out.push(buffer);
+  }
+  return out;
+}
+
+/**
+ * Engine/provider failures as a client-safe status + body. A missing image key
+ * is a 503 naming the one secret to add; nothing upstream is ever echoed.
+ */
+function engineFailure(err: unknown, fallback: string): { status: number; body: Record<string, unknown> } {
+  if (err instanceof ImageEngineNotConfiguredError) {
+    return {
+      status: 503,
+      body: { error: "AI photos aren't switched on for this app yet. Please try again later.", code: err.code, missingKey: err.missingKey, retryable: false },
+    };
+  }
+  if (err instanceof AiProviderNotConfiguredError) {
+    return { status: 503, body: { error: err.message, code: err.code, retryable: false } };
+  }
+  if (err instanceof ImageQualityError) {
+    return { status: 422, body: { error: "The photo didn't pass our quality check. Please try again.", retryable: true } };
+  }
+  if (err instanceof ImageQualityUnavailableError) {
+    return { status: 502, body: { error: "Photo quality verification is temporarily unavailable. Please try again.", retryable: true } };
+  }
+  if (err instanceof GeminiImageError && err.kind === "blocked") {
+    return { status: 422, body: { error: "This combination of photos and description couldn't be generated. Try different photos or wording.", retryable: false } };
+  }
+  return { status: 502, body: { error: fallback, retryable: true } };
+}
+
+/** Aborts provider work when the seller leaves the screen (the app cancels its request). */
+function abortOnClientGone(req: Request, res: Response): AbortSignal {
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  void req;
+  return controller.signal;
+}
+
+function shotJson(shot: ShotOutput) {
+  return { b64_json: shot.image.toString("base64"), mime: shot.mime, provider: shot.provider, ...(shot.model ? { model: shot.model } : {}) };
+}
+
+// POST /api/photography/generate — AI Photoshoot, one shot per call.
+// { productImages: string[] (1-4, the seller's product, ground truth),
+//   referenceImages?: string[] (0-6, creative direction),
+//   prompt?, ratio?, modelStyle?, sceneStyle?, lightingStyle?, shotIndex?, shotCount? }
+// Legacy { images: string[] } is still accepted and treated as product photos.
+router.post("/generate", async (req, res) => {
+  const body = req.body ?? {};
+  const products = decodeList(body.productImages ?? body.images, "Product photos", MAX_PRODUCT_IMAGES, res);
+  if (!products) return;
+  const references = decodeList(body.referenceImages, "Reference photos", MAX_REFERENCE_IMAGES, res);
+  if (!references) return;
+  if (products.length === 0) {
+    res.status(400).json({ error: "At least one product photo is required." });
+    return;
+  }
+  const totalBytes = [...products, ...references].reduce((n, b) => n + b.length, 0);
+  if (totalBytes > MAX_TOTAL_BYTES_PHOTOSHOOT) {
+    res.status(400).json({ error: "Total photo size is too large. Please upload smaller or fewer photos." });
+    return;
   }
 
-  const resolved = resolveGeneratorOrRespond("ai-photoshoot", res);
-  if (!resolved.ok) return;
-  const { generator } = resolved;
-
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "product-photo-"));
-  const tmpFiles: string[] = [];
-
+  const shotCount = Number.isInteger(body.shotCount) ? Math.min(Math.max(body.shotCount, 1), 4) : 1;
+  const shotIndex = Number.isInteger(body.shotIndex) ? Math.min(Math.max(body.shotIndex, 0), shotCount - 1) : 0;
   try {
-    for (const buffer of decoded) {
-      const filePath = path.join(tmpDir, `${randomUUID()}.png`);
-      await fs.writeFile(filePath, buffer);
-      tmpFiles.push(filePath);
-    }
-
-    const operation: ImageOperation = "photoshoot";
-    const editPrompt = buildFashionPrompt(
-      operation,
-      safeDescription,
-      "Use the uploaded product/reference photos as authoritative visual references. Create one finished image with a realistic human model and preserve the product exactly.",
-    );
-    const buffer = await generateWithVisualQa({
-      operation,
-      prompt: editPrompt,
-      brief: safeDescription,
-      references: decoded,
-      generate: (retryPrompt) =>
-        generator
-          ? generator({ productImages: tmpFiles, referenceImages: [], prompt: retryPrompt }).then((r) => r.imageBuffer)
-          : editImages(tmpFiles, retryPrompt, undefined, size ? { size } : undefined),
+    const shot = await generateShot({
+      task: "photoshoot",
+      productImages: products,
+      referenceImages: references,
+      brief: briefField(body.prompt),
+      aspectRatio: parseAspectRatio(body.ratio),
+      modelStyle: styleField(body.modelStyle),
+      sceneStyle: styleField(body.sceneStyle),
+      lightingStyle: styleField(body.lightingStyle),
+      shotIndex,
+      shotCount,
+      signal: abortOnClientGone(req, res),
     });
-    res.json({ b64_json: buffer.toString("base64") });
+    res.json(shotJson(shot));
   } catch (err) {
-    // Do not leak upstream provider error details to the client.
-    if (err instanceof ImageQualityError) {
-      res.status(422).json({ error: "The generated photo did not meet the quality check. Please try again.", retryable: true });
-    } else if (err instanceof ImageQualityUnavailableError) {
-      res.status(502).json({ error: "Photo quality verification is temporarily unavailable. Please try again.", retryable: true });
-    } else {
-      res.status(502).json({ error: "Photo generation failed. Please try again." });
-    }
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    if (res.headersSent || res.destroyed) return;
+    const { status, body: out } = engineFailure(err, "Photo generation failed. Please try again.");
+    if (status >= 500) req.log?.error({ err }, "AI photoshoot generation failed");
+    res.status(status).json(out);
   }
 });
 
@@ -195,7 +219,7 @@ router.post("/generate", async (req, res) => {
 // Returns one output per reference, preserving stable input/result indices.
 // Partial failures are exposed per-index; never returns fabricated fallback.
 router.post("/mockup-to-model", async (req, res) => {
-  const { mockup, references, prompt } = req.body ?? {};
+  const { mockup, references, prompt, ratio } = req.body ?? {};
 
   // --- Validate mockup ---
   if (typeof mockup !== "string" || !mockup) {
@@ -222,12 +246,7 @@ router.post("/mockup-to-model", async (req, res) => {
     return;
   }
 
-  const safeDescription =
-    typeof prompt === "string" && prompt.trim().length > 0
-      ? prompt.trim().slice(0, 500)
-      : "";
-
-  // Decode and validate all reference images up front before touching disk.
+  // Decode and validate all reference images up front.
   const refBuffers: Buffer[] = [];
   let totalBytes = mockupBuffer.length;
   for (let i = 0; i < references.length; i++) {
@@ -253,116 +272,58 @@ router.post("/mockup-to-model", async (req, res) => {
     refBuffers.push(buffer);
   }
 
-  const resolved = resolveGeneratorOrRespond("mockup-to-model", res);
-  if (!resolved.ok) return;
-  const { generator } = resolved;
+  const brief = briefField(prompt);
+  const aspectRatio = parseAspectRatio(ratio) ?? "4:5";
+  const signal = abortOnClientGone(req, res);
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-"));
+  // Bounded concurrency; results keep their input index.
+  const settled = await mapWithConcurrency(refBuffers, MOCKUP_TO_MODEL_CONCURRENCY, (refBuffer) =>
+    generateShot({ task: "mockup_to_model", productImages: [mockupBuffer], referenceImages: [refBuffer], brief, aspectRatio, signal }),
+  );
+  if (res.headersSent || res.destroyed) return;
 
-  try {
-    // Write mockup to disk once; reuse for every reference call.
-    const mockupFile = path.join(tmpDir, `${randomUUID()}-mockup.png`);
-    await fs.writeFile(mockupFile, mockupBuffer);
-
-    // Write all ref files up front.
-    const refFiles: string[] = [];
-    for (let i = 0; i < refBuffers.length; i++) {
-      const refFile = path.join(tmpDir, `${randomUUID()}-ref-${i}.png`);
-      await fs.writeFile(refFile, refBuffers[i]);
-      refFiles.push(refFile);
-    }
-
-    // Process references with bounded concurrency.
-    // Results array preserves input order (stable indices).
-    const results: { refIndex: number; b64_json: string }[] = [];
-    const errors: { refIndex: number; error: string; retryable: boolean }[] = [];
-    let providerFailureCount = 0;
-
-    // Run in batches of MOCKUP_TO_MODEL_CONCURRENCY.
-    for (let start = 0; start < refBuffers.length; start += MOCKUP_TO_MODEL_CONCURRENCY) {
-      const batch = refBuffers.slice(start, start + MOCKUP_TO_MODEL_CONCURRENCY);
-      await Promise.all(
-        batch.map(async (refBuffer, batchIndex) => {
-          const refIndex = start + batchIndex;
-          const refFile = refFiles[refIndex];
-          const editPrompt = buildFashionPrompt(
-            "photoshoot" as ImageOperation,
-            safeDescription,
-            "Image 1 is the garment/product mockup — preserve its exact design, artwork, colors, and construction. Image 2 is the reference photo — use this person's pose, body type, and composition as the model. Generate one finished editorial photo of the model wearing the garment.",
-          );
-          try {
-            const buffer = await generateWithVisualQa({
-              operation: "photoshoot" as ImageOperation,
-              prompt: editPrompt,
-              brief: safeDescription,
-              references: [mockupBuffer, refBuffer],
-              generate: (retryPrompt) =>
-                generator
-                  ? generator({ productImages: [mockupFile], referenceImages: [refFile], prompt: retryPrompt }).then((r) => r.imageBuffer)
-                  : editImages([mockupFile, refFile], retryPrompt),
-            });
-            results.push({ refIndex, b64_json: buffer.toString("base64") });
-          } catch (err) {
-            if (err instanceof ImageQualityError) {
-              errors.push({
-                refIndex,
-                error: "This reference did not meet the quality check. Please retry.",
-                retryable: true,
-              });
-            } else if (err instanceof ImageQualityUnavailableError) {
-              errors.push({
-                refIndex,
-                error: "Quality verification is temporarily unavailable. Please retry.",
-                retryable: true,
-              });
-              providerFailureCount++;
-            } else {
-              errors.push({
-                refIndex,
-                error: "Generation failed for this reference. Please retry.",
-                retryable: true,
-              });
-              providerFailureCount++;
-            }
-          }
-        }),
-      );
-    }
-
-    // Sort results by refIndex to guarantee stable ordering.
-    results.sort((a, b) => a.refIndex - b.refIndex);
-    errors.sort((a, b) => a.refIndex - b.refIndex);
-
-    if (results.length === 0 && errors.length > 0) {
-      // All failed — never return fabricated fallback.
-      const status = providerFailureCount > 0 ? 502 : 422;
-      res.status(status).json({
-        error: "No reference images could be generated. Please retry.",
-        retryable: true,
-        results: [],
-        errors,
-      });
+  const results: Array<{ refIndex: number } & ReturnType<typeof shotJson>> = [];
+  const errors: { refIndex: number; error: string; retryable: boolean }[] = [];
+  let notConfigured: ReturnType<typeof engineFailure> | null = null;
+  let providerFailureCount = 0;
+  settled.forEach((r, refIndex) => {
+    if (r.status === "fulfilled") {
+      results.push({ refIndex, ...shotJson(r.value) });
       return;
     }
+    const failure = engineFailure(r.reason, "Generation failed for this reference. Please retry.");
+    if (failure.status === 503) notConfigured = failure;
+    if (failure.status >= 500) providerFailureCount++;
+    errors.push({ refIndex, error: String(failure.body.error), retryable: failure.body.retryable !== false });
+  });
 
-    // At least one succeeded — return partial results with per-index errors.
-    // The credits gate gives back the failed references (charged per reference).
-    res.locals[AI_FAILED_UNITS_LOCAL] = errors.length;
-    res.json({
-      results,
-      ...(errors.length > 0 ? { errors } : {}),
-    });
-  } catch (_err) {
-    res.status(502).json({ error: "Mockup to Model generation failed. Please try again." });
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  if (notConfigured) {
+    const { status, body } = notConfigured as ReturnType<typeof engineFailure>;
+    res.status(status).json(body);
+    return;
   }
+  if (results.length === 0) {
+    // All failed — never return fabricated fallback.
+    req.log?.error({ errors: settled.map((r) => (r.status === "rejected" ? String(r.reason) : null)) }, "Mockup to Model: every reference failed");
+    res.status(providerFailureCount > 0 ? 502 : 422).json({
+      error: "No reference images could be generated. Please retry.",
+      retryable: true,
+      results: [],
+      errors,
+    });
+    return;
+  }
+
+  // At least one succeeded — return partial results with per-index errors.
+  // The credits gate gives back the failed references (charged per reference).
+  res.locals[AI_FAILED_UNITS_LOCAL] = errors.length;
+  res.json({ results, ...(errors.length > 0 ? { errors } : {}) });
 });
 
 // POST /api/photography/mockup-to-model/retry
 // Retry a single failed reference without discarding successful outputs.
 router.post("/mockup-to-model/retry", async (req, res) => {
-  const { mockup, reference, refIndex, prompt } = req.body ?? {};
+  const { mockup, reference, refIndex, prompt, ratio } = req.body ?? {};
 
   if (typeof mockup !== "string" || !mockup) {
     res.status(400).json({ error: "A garment mockup image is required for retry." });
@@ -396,48 +357,20 @@ router.post("/mockup-to-model/retry", async (req, res) => {
     return;
   }
 
-  const safeDescription =
-    typeof prompt === "string" && prompt.trim().length > 0
-      ? prompt.trim().slice(0, 500)
-      : "";
-
-  const resolved = resolveGeneratorOrRespond("mockup-to-model", res);
-  if (!resolved.ok) return;
-  const { generator } = resolved;
-
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-retry-"));
   try {
-    const mockupFile = path.join(tmpDir, `${randomUUID()}-mockup.png`);
-    const refFile = path.join(tmpDir, `${randomUUID()}-ref-${refIndex}.png`);
-    await fs.writeFile(mockupFile, mockupBuffer);
-    await fs.writeFile(refFile, refBuffer);
-
-    const editPrompt = buildFashionPrompt(
-      "photoshoot" as ImageOperation,
-      safeDescription,
-      "Image 1 is the garment/product mockup — preserve its exact design, artwork, colors, and construction. Image 2 is the reference photo — use this person's pose, body type, and composition as the model. Generate one finished editorial photo of the model wearing the garment.",
-    );
-    const buffer = await generateWithVisualQa({
-      operation: "photoshoot" as ImageOperation,
-      prompt: editPrompt,
-      brief: safeDescription,
-      references: [mockupBuffer, refBuffer],
-      generate: (retryPrompt) =>
-        generator
-          ? generator({ productImages: [mockupFile], referenceImages: [refFile], prompt: retryPrompt }).then((r) => r.imageBuffer)
-          : editImages([mockupFile, refFile], retryPrompt),
+    const shot = await generateShot({
+      task: "mockup_to_model",
+      productImages: [mockupBuffer],
+      referenceImages: [refBuffer],
+      brief: briefField(prompt),
+      aspectRatio: parseAspectRatio(ratio) ?? "4:5",
+      signal: abortOnClientGone(req, res),
     });
-    res.json({ refIndex, b64_json: buffer.toString("base64") });
+    res.json({ refIndex, ...shotJson(shot) });
   } catch (err) {
-    if (err instanceof ImageQualityError) {
-      res.status(422).json({ error: "This reference did not meet the quality check. Please try again.", retryable: true });
-    } else if (err instanceof ImageQualityUnavailableError) {
-      res.status(502).json({ error: "Quality verification is temporarily unavailable. Please try again.", retryable: true });
-    } else {
-      res.status(502).json({ error: "This reference could not be generated. Please try again.", retryable: true });
-    }
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    if (res.headersSent || res.destroyed) return;
+    const { status, body } = engineFailure(err, "This reference could not be generated. Please try again.");
+    res.status(status).json(body);
   }
 });
 

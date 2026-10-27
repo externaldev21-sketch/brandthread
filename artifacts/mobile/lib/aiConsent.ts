@@ -11,7 +11,7 @@
 export const AI_CONSENT_REQUIRED = 'ai_consent_required';
 
 /** Who receives the content (matches the server's AI_PROVIDERS). */
-export const AI_PROVIDER_NAMES = ['OpenAI', 'fal.ai', 'FASHN'] as const;
+export const AI_PROVIDER_NAMES = ['OpenAI', 'Google', 'fal.ai', 'FASHN'] as const;
 
 export class AiConsentRequiredError extends Error {
   readonly code = AI_CONSENT_REQUIRED;

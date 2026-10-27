@@ -33,7 +33,7 @@ describe("AI data consent (QA-0043)", () => {
     const { res, next } = await run(makeAiConsentGate(async () => false), "POST", "/bg-removal/remove");
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
-    expect(res.body).toMatchObject({ code: AI_CONSENT_REQUIRED, providers: ["OpenAI", "fal.ai", "FASHN"] });
+    expect(res.body).toMatchObject({ code: AI_CONSENT_REQUIRED, providers: ["OpenAI", "Google", "fal.ai", "FASHN"] });
   });
 
   it("lets the call through once allowed", async () => {

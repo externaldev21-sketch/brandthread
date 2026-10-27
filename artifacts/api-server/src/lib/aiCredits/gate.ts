@@ -5,6 +5,7 @@ import { allowTextRequest, debitCredits, meterRequest, refundDebit } from "./led
 import { acquireLowPrioritySlot } from "./lowPriority";
 
 const GENERIC_LIMIT = { error: "Too many requests, try again later" };
+const USER_DAILY_CAP = { error: "You have reached today's AI limit. It resets tomorrow.", code: "user_daily_cap" };
 
 /**
  * Enforces the AI rules in lib/aiCredits/catalogue.ts for every matching
@@ -72,7 +73,9 @@ export async function aiCreditsGate(req: Request, res: Response, next: NextFunct
     const result = await debitCredits({ clerkUserId: userId, cost, units, toolKey: rule.tool });
     if (!result.ok) {
       if (result.reason === "rate_limited") {
-        res.status(429).json(GENERIC_LIMIT);
+        // The per-user daily generation ceiling: say so, so the app can tell
+        // the seller it resets tomorrow rather than "wait a minute".
+        res.status(429).json(USER_DAILY_CAP);
         return;
       }
       if (result.reason === "insufficient_credits") {

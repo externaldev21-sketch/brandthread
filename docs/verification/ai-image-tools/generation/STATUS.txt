@@ -1,0 +1,1 @@
+SKIPPED: no image-model key is configured. Add GEMINI_API_KEY to the API server's secrets and re-run. No outputs were generated (none are faked).

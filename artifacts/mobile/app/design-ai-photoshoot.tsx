@@ -23,7 +23,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { saveImageToCameraRoll, saveAllToCameraRoll, shareImage } from '@/lib/aiToolMedia';
@@ -35,21 +34,24 @@ import { AiSlimComposer } from '@/components/ai-tools/AiSlimComposer';
 import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
-import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
+import { aiToolErrorMessage, aiToolFailure } from '@/components/ai-tools/aiToolErrorMessage';
 import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleKind } from '@/services/designTypes';
-import { generatePhotoshootShot, createBrandAsset, PHOTOSHOOT_MAX_IMAGES } from '@/services/designService';
+import {
+  generatePhotoshootShot, preparePhotoshootPhotos, createBrandAsset,
+  PHOTOSHOOT_MAX_PRODUCT_PHOTOS, PHOTOSHOOT_MAX_REFERENCE_PHOTOS, type PreparedPhotoshootPhotos,
+} from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
-import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
 
-// The generate endpoint accepts PHOTOSHOOT_MAX_IMAGES (4) photos in total,
-// product photos and creative reference photos combined, so every picker
-// below caps itself to what is left of that shared budget.
-const MAX_TOTAL_PHOTOS = PHOTOSHOOT_MAX_IMAGES;
-const PHOTO_LIMIT_COPY = `Up to ${MAX_TOTAL_PHOTOS} photos in total, product and reference photos combined.`;
+// Product photos (the garment the model must wear, exactly) and creative
+// reference photos (art direction) have separate budgets, the same numbers the
+// server enforces: 4 product photos, 6 references.
+const MAX_PRODUCT_PHOTOS = PHOTOSHOOT_MAX_PRODUCT_PHOTOS;
+const MAX_REF_PHOTOS = PHOTOSHOOT_MAX_REFERENCE_PHOTOS;
 const SHOT_COUNTS = [1, 2, 4];
 const RATIOS: { value: ImageRatioKind; label: string }[] = [
   { value: '1:1', label: '1:1' },
@@ -81,10 +83,11 @@ const SCENE_TILE_LABEL: Partial<Record<SceneStyleKind, string>> = {
 export default function AIPhotoshootScreen() {
   useHideTabBar();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  // useHideTabBar() hides the seller tab bar here, so this resolves to the
-  // safe-area floor rather than reserving the bar's height over empty space.
-  const tabBarInset = useSellerTabBarInset();
+  // The tab bar is hidden on this screen (useHideTabBar), so the dock only
+  // clears the home indicator. Not useSellerTabBarInset(): until the hide
+  // takes effect it reports the ~100pt bar height, which floated the dock
+  // over the form.
+  const bottomInset = useScreenBottomInset();
 
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -105,7 +108,15 @@ export default function AIPhotoshootScreen() {
   const [libraryIndex, setLibraryIndex] = useState<number | null>(null);
   const [savingAll, setSavingAll] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const requestRef = useRef<{ productImageUris: string[]; refUris: string[]; ratio: ImageRatioKind } | null>(null);
+  // The run's inputs, read once: retries reuse them instead of re-encoding.
+  const requestRef = useRef<{ photos: PreparedPhotoshootPhotos; prompt: string; sceneStyle: SceneStyleKind; modelStyle: ModelStyleKind; ratio: ImageRatioKind; shotCount: number } | null>(null);
+  // Leaving the screen (or going back to setup) cancels the run in flight.
+  const runAbortRef = useRef<AbortController | null>(null);
+  function cancelRun() {
+    runAbortRef.current?.abort();
+    runAbortRef.current = null;
+  }
+  useEffect(() => () => cancelRun(), []);
 
   // Product picker source photos
   const [showProductPicker, setShowProductPicker] = useState(false);
@@ -123,13 +134,15 @@ export default function AIPhotoshootScreen() {
     return () => { alive = false; };
   }, []);
 
-  function alertPhotoLimit() {
-    Alert.alert('Photo limit reached', `${PHOTO_LIMIT_COPY} Remove one to add another.`);
+  function alertPhotoLimit(kind: 'product' | 'reference') {
+    Alert.alert('Photo limit reached', kind === 'product'
+      ? `Use up to ${MAX_PRODUCT_PHOTOS} product photos. Remove one to add another.`
+      : `Use up to ${MAX_REF_PHOTOS} reference photos. Remove one to add another.`);
   }
 
   function toggleProduct(id: string) {
-    if (!selectedProductIds.has(id) && photosLeft <= 0) {
-      alertPhotoLimit();
+    if (!selectedProductIds.has(id) && productSlotsLeft <= 0) {
+      alertPhotoLimit('product');
       return;
     }
     setSelectedProductIds(prev => {
@@ -141,9 +154,9 @@ export default function AIPhotoshootScreen() {
   }
 
   async function pickReferences() {
-    const remaining = photosLeft;
+    const remaining = refSlotsLeft;
     if (remaining <= 0) {
-      alertPhotoLimit();
+      alertPhotoLimit('reference');
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -162,9 +175,9 @@ export default function AIPhotoshootScreen() {
   }
 
   async function pickUploadInsteadOfProduct() {
-    const remaining = photosLeft;
+    const remaining = productSlotsLeft;
     if (remaining <= 0) {
-      alertPhotoLimit();
+      alertPhotoLimit('product');
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -188,17 +201,17 @@ export default function AIPhotoshootScreen() {
     return [...fromProducts, ...uploadedProductUris];
   }, [selectedProducts, uploadedProductUris]);
 
-  const photosUsed = productImageUris.length + refUris.length;
-  const photosLeft = Math.max(0, MAX_TOTAL_PHOTOS - photosUsed);
-  const canGenerate = productImageUris.length > 0 && photosUsed <= MAX_TOTAL_PHOTOS;
+  const productSlotsLeft = Math.max(0, MAX_PRODUCT_PHOTOS - productImageUris.length);
+  const refSlotsLeft = Math.max(0, MAX_REF_PHOTOS - refUris.length);
+  const canGenerate = productImageUris.length > 0 && productImageUris.length <= MAX_PRODUCT_PHOTOS;
 
   async function handleGenerate() {
     if (productImageUris.length === 0) {
       Alert.alert('Choose a product', 'Select at least one product photo, or upload one, first.');
       return;
     }
-    if (photosUsed > MAX_TOTAL_PHOTOS) {
-      Alert.alert('Too many photos', `${PHOTO_LIMIT_COPY} Remove ${photosUsed - MAX_TOTAL_PHOTOS} to continue.`);
+    if (productImageUris.length > MAX_PRODUCT_PHOTOS) {
+      Alert.alert('Too many product photos', `Use up to ${MAX_PRODUCT_PHOTOS} product photos. Remove ${productImageUris.length - MAX_PRODUCT_PHOTOS} to continue.`);
       return;
     }
     if (isSellerDevPreview()) {
@@ -210,7 +223,6 @@ export default function AIPhotoshootScreen() {
       return;
     }
 
-    requestRef.current = { productImageUris, refUris, ratio };
     const initialSlots: AiResultSlot[] = Array.from({ length: shotCount }, (_, i) => ({
       id: i,
       status: 'generating',
@@ -222,31 +234,56 @@ export default function AIPhotoshootScreen() {
     setStep(2);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const results = await Promise.allSettled(
-      initialSlots.map(() => generatePhotoshootShot({
-        productImageUris, referenceUris: refUris, prompt, sceneStyle, modelStyle, ratio,
-      })),
-    );
-    setSlots(prev => prev.map((slot, i) => {
-      const r = results[i];
-      if (r.status === 'fulfilled') return { ...slot, status: 'done', imageUri: r.value };
-      return { ...slot, status: 'failed', error: aiToolErrorMessage(r.reason, 'Generation failed. Please try again.') };
+    cancelRun();
+    const controller = new AbortController();
+    runAbortRef.current = controller;
+    const fail = (err: unknown) => setSlots(prev => prev.map(slot => slot.status === 'generating'
+      ? { ...slot, status: 'failed', ...aiToolFailure(aiToolErrorMessage(err, 'Generation failed. Please try again.')) }
+      : slot));
+
+    let photos: PreparedPhotoshootPhotos;
+    try {
+      photos = await preparePhotoshootPhotos({ productImageUris, referenceUris: refUris });
+    } catch (err) {
+      if (!controller.signal.aborted) { fail(err); setIsGenerating(false); }
+      return;
+    }
+    if (controller.signal.aborted) return;
+    const run = { photos, prompt, sceneStyle, modelStyle, ratio, shotCount };
+    requestRef.current = run;
+
+    // Each shot lands in its tile as soon as it is ready.
+    await Promise.allSettled(initialSlots.map(async (slot, i) => {
+      try {
+        const uri = await generatePhotoshootShot({ ...run, shotIndex: i, signal: controller.signal });
+        if (!controller.signal.aborted) setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: 'done', imageUri: uri } : s));
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setSlots(prev => prev.map(s => s.id === slot.id ? { ...s, status: 'failed', ...aiToolFailure(aiToolErrorMessage(err, 'Generation failed. Please try again.')) } : s));
+        }
+      }
     }));
-    setIsGenerating(false);
+    if (!controller.signal.aborted) setIsGenerating(false);
   }
 
   async function handleRetryOne(id: number) {
     const req = requestRef.current;
     if (!req) return;
+    if (!runAbortRef.current) runAbortRef.current = new AbortController();
+    const signal = runAbortRef.current.signal;
     setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'generating', error: undefined } : s));
     try {
-      const uri = await generatePhotoshootShot({
-        productImageUris: req.productImageUris, referenceUris: req.refUris, prompt, sceneStyle, modelStyle, ratio: req.ratio,
-      });
-      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'done', imageUri: uri } : s));
+      const uri = await generatePhotoshootShot({ ...req, shotIndex: id, signal });
+      if (!signal.aborted) setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'done', imageUri: uri } : s));
     } catch (err: any) {
-      setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'failed', error: aiToolErrorMessage(err, 'Retry failed. Please try again.') } : s));
+      if (!signal.aborted) setSlots(prev => prev.map(s => s.id === id ? { ...s, status: 'failed', ...aiToolFailure(aiToolErrorMessage(err, 'Retry failed. Please try again.')) } : s));
     }
+  }
+
+  function backToSetup() {
+    cancelRun();
+    setIsGenerating(false);
+    setStep(1);
   }
 
   const doneSlots = useMemo(() => slots.filter(sl => sl.status === 'done' && sl.imageUri), [slots]);
@@ -328,11 +365,11 @@ export default function AIPhotoshootScreen() {
 
     return (
       <View style={s.root}>
-        <ScreenHeader title="Photoshoot" onBack={() => setStep(1)} />
+        <ScreenHeader title="Photoshoot" onBack={backToSetup} />
         <AiToolProgressBar step={2} />
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[s.content, { paddingBottom: tabBarInset + SP.xxl }]}
+          contentContainerStyle={[s.content, { paddingBottom: bottomInset + SP.xxl }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={s.progressBar}>
@@ -344,7 +381,9 @@ export default function AIPhotoshootScreen() {
             ) : successCount === 0 ? (
               <>
                 <Feather name="alert-circle" size={ICON.sm} color={FG} />
-                <Text style={[s.progressText, { color: FG }]}>No shots were created. Tap Retry to try again.</Text>
+                <Text style={[s.progressText, { color: FG }]}>
+                  {slots.some(sl => sl.retryable !== false) ? 'No shots were created. Tap Retry to try again.' : slots[0]?.error ?? 'No shots were created.'}
+                </Text>
               </>
             ) : (
               <>
@@ -369,7 +408,7 @@ export default function AIPhotoshootScreen() {
             {doneSlots.length > 0 && (
               <AiPrimaryButton label={`Save all (${doneSlots.length})`} icon="download" onPress={handleSaveAll} loading={savingAll} />
             )}
-            <AiSecondaryButton label="Back to setup" icon="arrow-left" variant="outline" onPress={() => setStep(1)} />
+            <AiSecondaryButton label="Back to setup" icon="arrow-left" variant="outline" onPress={backToSetup} />
           </View>
         </ScrollView>
 
@@ -412,6 +451,7 @@ export default function AIPhotoshootScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={s.sectionLabel}>Product photos</Text>
+        <Text style={s.sectionSub}>The exact piece the model wears. Up to {MAX_PRODUCT_PHOTOS}; front, back and detail shots help.</Text>
         {products === null ? (
           <ActivityIndicator style={{ marginTop: SP.lg }} color={FG} />
         ) : (
@@ -479,7 +519,7 @@ export default function AIPhotoshootScreen() {
           <View style={{ marginTop: SP.sm }}>
             <ReferencePhotoTiles
               uris={uploadedProductUris}
-              max={uploadedProductUris.length + photosLeft}
+              max={uploadedProductUris.length + productSlotsLeft}
               onAdd={pickUploadInsteadOfProduct}
               onRemove={(i) => setUploadedProductUris(prev => prev.filter((_, idx) => idx !== i))}
               label="uploaded photo"
@@ -489,8 +529,8 @@ export default function AIPhotoshootScreen() {
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Creative reference photos</Text>
-        <Text style={s.sectionSub}>{PHOTO_LIMIT_COPY} {photosLeft === 0 ? 'Limit reached.' : `${photosLeft} left.`}</Text>
-        <ReferencePhotoTiles uris={refUris} max={refUris.length + photosLeft} onAdd={pickReferences} onRemove={removeRef} label="reference" />
+        <Text style={s.sectionSub}>Setting, pose and light to follow. Up to {MAX_REF_PHOTOS}{refSlotsLeft === 0 ? ', limit reached.' : `, ${refSlotsLeft} left.`}</Text>
+        <ReferencePhotoTiles uris={refUris} max={MAX_REF_PHOTOS} onAdd={pickReferences} onRemove={removeRef} label="reference" />
 
         <View style={s.sectionDivider} />
         <Text style={s.sectionLabel}>Describe the shoot</Text>
@@ -567,7 +607,7 @@ export default function AIPhotoshootScreen() {
 
       {/* In-flow footer below the ScrollView, so Generate never floats over
           the scene/model options. The tab bar is hidden here (useHideTabBar). */}
-      <AiButtonDock bottomInset={tabBarInset || insets.bottom} style={{ position: 'relative', overflow: 'hidden' }}>
+      <AiButtonDock bottomInset={bottomInset} style={{ position: 'relative', overflow: 'hidden' }}>
         <AiPrimaryButton
           label="Generate"
           icon="zap"

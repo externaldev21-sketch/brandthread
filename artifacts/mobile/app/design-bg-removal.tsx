@@ -3,19 +3,22 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Brandthread Design Studio — Remove Background
  * Route: /design-bg-removal
  *
- * One page, no step screens (Dev's spec; layout follows Photoroom's "Editing a
- * photo" flow): header → a large stage → a strip of recent photos → one
- * pinned button. Tapping the button plays the background-dissolve sweep over
- * the stage while the real API call runs, then the same page offers background
- * swatches, Refine (brush erase/restore) and Save.
+ * One screen, no steps: pick a photo (stage, recent strip or the pinned
+ * button) and removal starts right away. While it runs the stage sparkles
+ * (components/ai-tools/BgRemovalGlowSweep.tsx: silver glitter while working,
+ * the background dissolving to the checkerboard, a silver glisten on the
+ * cutout's edge), then the same screen offers backdrop swatches, Save, Share,
+ * Use (as a product photo) and Refine, the optional erase/restore brush.
  *
- * Real backend: POST /api/bg-removal/remove (server-side OpenAI call with a
- * visual-QA pass). Every result is also persisted server-side via
+ * Real backend: POST /api/bg-removal/remove, which runs a self-hosted matting
+ * model (BiRefNet) on the seller's own pixels — a true cutout with a soft
+ * alpha edge, not an AI redraw. Every result is also kept on device via
  * services/bgRemovalService.ts saveResult().
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Image, FlatList, Platform, Alert, LayoutChangeEvent,
+  Modal, ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming,
@@ -25,7 +28,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
@@ -40,8 +43,11 @@ import { pickImageOnWeb, fileToPickedImage } from '@/lib/webFilePicker';
 import { makeDemoCutout } from '@/lib/demoCutout';
 import { saveResult } from '@/services/bgRemovalService';
 import { AI_CREDITS_ALERT_COPY, classifyAiCreditsError, surfaceAiCreditsError } from '@/lib/aiCreditsError';
-import { BG, FG, MUTED, BORDER, RED, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
+import { BG, FG, MUTED, SUBTLE, CARD, BORDER, RED, FONT, FS, SP, RADIUS, ICON, COMP } from '@/lib/theme';
 import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
+import { shareImage } from '@/lib/aiToolMedia';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
 
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
@@ -141,7 +147,12 @@ export default function DesignBgRemovalScreen() {
   const [redo, setRedo] = useState<RefineStroke[]>([]);
   const [applying, setApplying] = useState(false);
 
+  // "Use": set the cutout as a product's cover photo.
+  const [productPicker, setProductPicker] = useState<{ products: Product[]; uri: string } | null>(null);
+  const [usingProduct, setUsingProduct] = useState(false);
+
   const abortRef = useRef<AbortController | null>(null);
+  const runRemovalRef = useRef<((src: SourcePhoto) => void) | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refineRef = useRef<BgRefineHandle>(null);
   const canvasRef = useRef<View>(null);
@@ -200,6 +211,8 @@ export default function DesignBgRemovalScreen() {
       if (Platform.OS === 'web') {
         setRecent(prev => [{ key: key ?? `${Date.now()}`, uri: p.uri }, ...prev.filter(r => r.uri !== p.uri)].slice(0, 20));
       }
+      // One screen, no extra tap: removal starts as soon as the photo is in.
+      runRemovalRef.current?.({ ...p, w, h });
     } catch {
       Alert.alert('Cannot use this image', 'Could not read image data. Please try a different photo.');
     }
@@ -247,8 +260,8 @@ export default function DesignBgRemovalScreen() {
     }
   }, [loadPhoto, phase, refining]);
 
-  const handleRemove = useCallback(async () => {
-    if (!source || phase !== 'loaded') return;
+  const runRemoval = useCallback(async (src: SourcePhoto) => {
+    abortRef.current?.abort(); // a newer photo replaces any removal still running
     setErrorMsg(null);
 
     const demo = isSellerDevPreview() && isPreviewDemoMode();
@@ -265,11 +278,14 @@ export default function DesignBgRemovalScreen() {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const fail = (msg: string) => { setPhase('loaded'); setErrorMsg(msg); };
+    const fail = (msg: string) => {
+      if (controller.signal.aborted) return;
+      setPhase('loaded'); setErrorMsg(msg);
+    };
 
     try {
       if (demo) {
-        const [uri] = await Promise.all([makeDemoCutout(source.uri), new Promise(r => setTimeout(r, 1400))]);
+        const [uri] = await Promise.all([makeDemoCutout(src.uri), new Promise(r => setTimeout(r, 1400))]);
         if (controller.signal.aborted) return;
         setCutoutUri(uri);
         return;
@@ -283,7 +299,7 @@ export default function DesignBgRemovalScreen() {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ image: `data:${source.mime};base64,${source.base64}` }),
+        body: JSON.stringify({ image: `data:${src.mime};base64,${src.base64}` }),
       });
       if (controller.signal.aborted) return;
       if (!resp.ok) {
@@ -305,7 +321,7 @@ export default function DesignBgRemovalScreen() {
       const data: { b64_json: string; storageKey: string | null; size: number; createdAt: string; id: string } = await resp.json();
       if (!data.b64_json) return fail('The server returned an empty result. Please try again.');
       await saveResult({
-        id: data.id, b64Json: data.b64_json, originalUri: source.uri, storageKey: data.storageKey,
+        id: data.id, b64Json: data.b64_json, originalUri: src.uri, storageKey: data.storageKey,
         size: data.size, createdAt: data.createdAt, sourceScreen: 'design_studio',
       }).catch(() => {});
       setCutoutUri(`data:image/png;base64,${data.b64_json}`);
@@ -315,9 +331,14 @@ export default function DesignBgRemovalScreen() {
         ? 'Network error. Check your connection and try again.'
         : 'Something went wrong. Please try again.');
     } finally {
-      abortRef.current = null;
+      if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [source, phase, getToken]);
+  }, [getToken]);
+  runRemovalRef.current = runRemoval;
+
+  const handleRetry = useCallback(() => {
+    if (source && phase === 'loaded') runRemoval(source);
+  }, [source, phase, runRemoval]);
 
   const handleSettled = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -330,17 +351,65 @@ export default function DesignBgRemovalScreen() {
     if (phase === 'done' && cutoutUri && history.length === 0) { setHistory([cutoutUri]); setHIndex(0); }
   }, [phase, cutoutUri, history.length]);
 
+  /** The image as shown: the transparent cutout, or flattened onto the chosen backdrop. */
+  async function finishedImage(): Promise<string | null> {
+    if (!cutout) return null;
+    if (backdrop === 'transparent' || !canvasRef.current) return cutout;
+    // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
+    const { captureRef } = await import('react-native-view-shot');
+    const shot = await captureRef(canvasRef, { format: 'png', quality: 1, result: 'data-uri' });
+    return shot.startsWith('data:') ? shot : `data:image/png;base64,${shot}`;
+  }
+
+  async function handleShare() {
+    try {
+      const uri = await finishedImage();
+      if (uri) await shareImage(uri, 'cutout');
+    } catch {
+      Alert.alert('Share failed', 'Could not prepare this image. Please try again.');
+    }
+  }
+
+  async function handleUse() {
+    if (usingProduct) return;
+    setUsingProduct(true);
+    try {
+      const uri = await finishedImage();
+      if (!uri) return;
+      const active = (await getProducts()).filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products yet', 'Create a product first, then use this cutout as its photo.');
+        return;
+      }
+      setProductPicker({ products: active, uri });
+    } catch {
+      Alert.alert("Couldn't load products", 'Please try again.');
+    } finally {
+      setUsingProduct(false);
+    }
+  }
+
+  async function confirmUse(product: Product) {
+    const uri = productPicker?.uri;
+    setProductPicker(null);
+    if (!uri) return;
+    const existing = product.media ?? [];
+    const updated = await updateProduct(product.id, {
+      media: [...existing, { id: `cutout-${Date.now()}`, type: 'image', uri, altText: 'Product photo, background removed', isCover: true, sortOrder: existing.length, createdAt: new Date().toISOString() }],
+    }).catch(() => null);
+    if (updated) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Done', `"${product.name ?? 'Product'}" now uses this cutout as its cover photo.`);
+    } else {
+      Alert.alert("Couldn't update product", 'Please try again.');
+    }
+  }
+
   async function handleSave() {
     if (!cutout || saving) return;
     setSaving(true);
     try {
-      let uri = cutout;
-      if (backdrop !== 'transparent' && canvasRef.current) {
-        // Loaded on demand: keeps view-shot (html2canvas on web) out of the startup bundle.
-        const { captureRef } = await import('react-native-view-shot');
-        const shot = await captureRef(canvasRef, { format: 'png', quality: 1, result: 'data-uri' });
-        uri = shot.startsWith('data:') ? shot : `data:image/png;base64,${shot}`;
-      }
+      const uri = (await finishedImage()) ?? cutout;
       const result = await saveImageToCameraRoll(uri, 'cutout');
       if (result.ok) {
         setSaved(true);
@@ -506,11 +575,19 @@ export default function DesignBgRemovalScreen() {
       </View>
 
       <View style={[s.dock, { paddingBottom: bottomPad }]}>
-        {!editing && (
+        {phase === 'empty' && (
+          <Pill label="Choose a photo" onPress={pickPhoto} testID="bg-removal-choose" />
+        )}
+        {(phase === 'processing' || (phase === 'done' && !sweepDone)) && (
+          <View style={[s.pill, s.pillWorking]} accessibilityRole="progressbar" accessibilityLabel="Removing background" testID="bg-removal-working">
+            <ActivityIndicator size="small" color={FG} />
+            <Text style={[s.pillText, { color: FG }]}>Removing background…</Text>
+          </View>
+        )}
+        {phase === 'loaded' && (
           <Pill
-            label="Remove background"
-            onPress={handleRemove}
-            disabled={phase !== 'loaded'}
+            label={errorMsg ? 'Try again' : 'Remove background'}
+            onPress={handleRetry}
             testID="bg-removal-run"
           />
         )}
@@ -522,15 +599,14 @@ export default function DesignBgRemovalScreen() {
               ))}
             </View>
             <View style={s.grid}>
-              <Pressable onPress={() => setRefining(true)} style={({ pressed }) => [s.cell, s.cellOutline, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Refine" testID="bg-removal-refine">
-                <Icon name="edit-3" size={ICON.sm} color={FG} />
-                <Text style={s.cellText}>Refine</Text>
-              </Pressable>
-              <Pressable onPress={handleSave} style={({ pressed }) => [s.cell, s.cellSolid, saving && s.dim, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Save" testID="bg-removal-save">
-                <Icon name={saved ? 'check' : 'download'} size={ICON.sm} color={BG} />
-                <Text style={[s.cellText, { color: BG }]}>{saved ? 'Saved' : 'Save'}</Text>
-              </Pressable>
+              <ActionCell icon="edit-3" label="Refine" onPress={() => setRefining(true)} testID="bg-removal-refine" />
+              <ActionCell icon="share" label="Share" onPress={handleShare} testID="bg-removal-share" />
+              <ActionCell icon="package" label="Use" onPress={handleUse} busy={usingProduct} testID="bg-removal-use" accessibilityLabel="Use as product photo" />
             </View>
+            <Pressable onPress={handleSave} style={({ pressed }) => [s.cell, s.cellSolid, s.saveRow, saving && s.dim, pressed && s.pressed]} accessibilityRole="button" accessibilityLabel="Save" testID="bg-removal-save">
+              <Icon name={saved ? 'check' : 'download'} size={ICON.sm} color={BG} />
+              <Text style={[s.cellText, { color: BG }]}>{saved ? 'Saved' : 'Save'}</Text>
+            </Pressable>
           </View>
         )}
         {editing && refining && (
@@ -545,11 +621,58 @@ export default function DesignBgRemovalScreen() {
           </View>
         )}
       </View>
+
+      <Modal
+        visible={!!productPicker}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setProductPicker(null)}
+      >
+        <SafeAreaProvider style={s.pickerRoot}>
+          <ScreenHeader title="Use as product photo" variant="modal" onBack={() => setProductPicker(null)} />
+          <Text style={s.pickerSub}>The cutout becomes the product's cover photo.</Text>
+          <FlatList
+            data={productPicker?.products ?? []}
+            keyExtractor={p => p.id}
+            contentContainerStyle={{ padding: SP.md }}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={s.productRow} onPress={() => confirmUse(item)} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={`Use for ${item.name}`}>
+                {item.media?.[0]?.uri ? (
+                  <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[s.productThumb, s.productThumbEmpty]}><Icon name="package" size={ICON.md} color={SUBTLE} /></View>
+                )}
+                <Text style={s.productName} numberOfLines={1}>{item.name || 'Untitled product'}</Text>
+                <Icon name="chevron-right" size={ICON.xs} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          />
+        </SafeAreaProvider>
+      </Modal>
     </View>
   );
 }
 
 // ── Small pieces ─────────────────────────────────────────────────────────────
+
+function ActionCell({ icon, label, onPress, busy, testID, accessibilityLabel }: {
+  icon: IconName; label: string; onPress: () => void; busy?: boolean; testID?: string; accessibilityLabel?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      style={({ pressed }) => [s.cell, s.cellOutline, s.cellCompact, busy && s.dim, pressed && s.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ busy: !!busy }}
+      testID={testID}
+    >
+      {busy ? <ActivityIndicator size="small" color={FG} /> : <Icon name={icon} size={ICON.sm} color={FG} />}
+      <Text style={s.cellText} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
 
 function Pill({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
@@ -656,6 +779,15 @@ const s = StyleSheet.create({
   cellText: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   pill: { height: COMP.buttonH, borderRadius: ControlRadius.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
   pillDisabled: { opacity: 0.4 },
+  pillWorking: { flexDirection: 'row', gap: SP.sm, backgroundColor: BG, borderWidth: 1, borderColor: BORDER },
+  cellCompact: { paddingHorizontal: SP.sm, gap: SP.xs },
+  saveRow: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
+  pickerRoot: { flex: 1, backgroundColor: BG },
+  pickerSub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, padding: SP.md, paddingTop: SP.sm, paddingBottom: 0 },
+  productRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
+  productThumb: { width: 44, height: 44, borderRadius: RADIUS.sm },
+  productThumbEmpty: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  productName: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.md, color: BG },
   swatches: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.xs, height: 44 },
   swatchRing: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },

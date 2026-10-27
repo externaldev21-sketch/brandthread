@@ -26,7 +26,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
@@ -39,7 +39,7 @@ import { ReferencePhotoTiles } from '@/components/ai-tools/ReferencePhotoTiles';
 import { AiResultsGrid } from '@/components/ai-tools/AiResultsGrid';
 import { AiResultViewer } from '@/components/ai-tools/AiResultViewer';
 import type { AiResultSlot } from '@/components/ai-tools/AiResultTypes';
-import { aiToolErrorMessage } from '@/components/ai-tools/aiToolErrorMessage';
+import { aiToolErrorMessage, aiToolFailure } from '@/components/ai-tools/aiToolErrorMessage';
 import {
   generateMockupToModel,
   retryMockupToModelRef,
@@ -51,7 +51,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
-import { useSellerTabBarInset } from '@/hooks/useSellerTabBarInset';
+import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
 
 /**
  * `TUTORIAL_ID` also doubles as the app-wide first-run tutorial system's
@@ -67,8 +67,11 @@ const FOOTER_DOCK = { position: 'relative', overflow: 'hidden' } as const;
 export default function MockupToModelScreen() {
   useHideTabBar();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const tabBarInset = useSellerTabBarInset();
+  // The tab bar is hidden on this screen (useHideTabBar), so the dock only
+  // clears the home indicator. Not useSellerTabBarInset(): until the hide
+  // takes effect it reports the ~100pt bar height, which floated the dock
+  // over the reference photos.
+  const bottomInset = useScreenBottomInset();
   const params = useLocalSearchParams<{ seedMockupUri?: string }>();
   const mockupTipUpload = useTipTarget('mockup-to-model:upload');
 
@@ -312,7 +315,7 @@ export default function MockupToModelScreen() {
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const msg = aiToolErrorMessage(err, 'Generation failed. Please try again.');
-      setSlots(prev => prev.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', error: msg } : slot));
+      setSlots(prev => prev.map(slot => slot.status === 'generating' ? { ...slot, status: 'failed', ...aiToolFailure(msg) } : slot));
     } finally {
       if (!controller.signal.aborted) setIsGenerating(false);
     }
@@ -344,7 +347,7 @@ export default function MockupToModelScreen() {
       const msg = aiToolErrorMessage(err, 'Retry failed. Please try again.');
       setSlots(prev => {
         const next = [...prev];
-        if (next[refIndex]) next[refIndex] = { ...next[refIndex], status: 'failed', error: msg };
+        if (next[refIndex]) next[refIndex] = { ...next[refIndex], status: 'failed', ...aiToolFailure(msg) };
         return next;
       });
     }
@@ -378,7 +381,7 @@ export default function MockupToModelScreen() {
         />
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[s.content, { paddingBottom: tabBarInset + SP.xxl }]}
+          contentContainerStyle={[s.content, { paddingBottom: bottomInset + SP.xxl }]}
           showsVerticalScrollIndicator={false}
         >
           {!allDone && (
@@ -393,7 +396,9 @@ export default function MockupToModelScreen() {
             <View style={s.progressBar}>
               <Feather name="alert-circle" size={ICON.sm} color={FG} />
               <Text style={[s.progressText, { color: FG }]}>
-                No photos were created. Tap Retry to try again.
+                {slots.some(sl => sl.retryable !== false)
+                  ? 'No photos were created. Tap Retry to try again.'
+                  : slots[0]?.error ?? 'No photos were created.'}
               </Text>
             </View>
           )}
@@ -584,7 +589,7 @@ export default function MockupToModelScreen() {
           form always ends above the button. The seller tab bar is hidden
           here (useHideTabBar + root deny-list); the inset only applies if
           it ever shows. */}
-      <AiButtonDock bottomInset={tabBarInset || insets.bottom} style={FOOTER_DOCK}>
+      <AiButtonDock bottomInset={bottomInset} style={FOOTER_DOCK}>
         <AiPrimaryButton
           label={`Create ${refUris.length > 0 ? `${refUris.length} photo${refUris.length !== 1 ? 's' : ''}` : 'photos'}`}
           icon="zap"

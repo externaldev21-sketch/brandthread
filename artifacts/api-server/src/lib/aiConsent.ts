@@ -14,9 +14,9 @@ import { aiDataConsents, db } from "@workspace/db";
 import { findToolRule } from "./aiCredits/catalogue";
 
 /** Bump when the disclosure (providers or data sent) changes: everyone is asked again. */
-export const AI_CONSENT_VERSION = "2026-10-06";
-/** Named in the consent sheet; keep in sync with lib/aiImageProviders and the AI routes. */
-export const AI_PROVIDERS = ["OpenAI", "fal.ai", "FASHN"] as const;
+export const AI_CONSENT_VERSION = "2026-10-27";
+/** Named in the consent sheet; keep in sync with lib/aiImageProviders, lib/aiImageEngine (Google Gemini) and the AI routes. */
+export const AI_PROVIDERS = ["OpenAI", "Google", "fal.ai", "FASHN"] as const;
 export const AI_CONSENT_REQUIRED = "ai_consent_required";
 
 /** Endpoints outside the credits catalogue that also send user content to an AI model. */

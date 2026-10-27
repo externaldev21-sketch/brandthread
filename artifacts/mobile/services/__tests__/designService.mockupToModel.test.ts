@@ -308,38 +308,48 @@ describe('cancellation signal', () => {
     await generateMockupToModel({ mockupUri: 'file://mockup', referenceUris: ['file://ref-0'], signal: controller.signal });
     expect(mockServiceRequest.mock.calls[0][1].signal).toBe(controller.signal);
 
-    mockServiceRequest.mockResolvedValueOnce({ refIndex: 0, b64_json: 'bbbb' });
-    await retryMockupToModelRef({ mockupUri: 'file://mockup', referenceUri: 'file://ref-0', refIndex: 0, signal: controller.signal });
+    mockServiceRequest.mockResolvedValueOnce({ refIndex: 0, b64_json: 'bbbb', mime: 'image/jpeg' });
+    const retried = await retryMockupToModelRef({ mockupUri: 'file://mockup', referenceUri: 'file://ref-0', refIndex: 0, signal: controller.signal });
     expect(mockServiceRequest.mock.calls[1][1].signal).toBe(controller.signal);
+    // The engine answers with JPEG; the data URI carries the server's mime.
+    expect(retried.imageUri).toBe('data:image/jpeg;base64,bbbb');
   });
 });
 
-describe('generatePhotoshootShot', () => {
+describe('AI Photoshoot service', () => {
   beforeEach(() => {
     mockServiceRequest.mockReset();
     setupFetchBlob({ product: 'product-content', 'ref-0': 'ref0-content' });
   });
 
-  it('sends the chosen aspect ratio to /api/photography/generate', async () => {
-    const { generatePhotoshootShot } = await import('../designService');
-    mockServiceRequest.mockResolvedValueOnce({ b64_json: 'shot' });
-    const uri = await generatePhotoshootShot({ productImageUris: ['file://product'], referenceUris: ['file://ref-0'], ratio: '9:16' });
+  it('sends product photos and creative references as separate lists with the ratio, styles and shot position', async () => {
+    const { preparePhotoshootPhotos, generatePhotoshootShot } = await import('../designService');
+    const photos = await preparePhotoshootPhotos({ productImageUris: ['file://product'], referenceUris: ['file://ref-0'] });
+    const controller = new AbortController();
+    mockServiceRequest.mockResolvedValueOnce({ b64_json: 'shot', mime: 'image/jpeg' });
+    const uri = await generatePhotoshootShot({
+      photos, prompt: '  Rooftop at dusk ', ratio: '9:16', sceneStyle: 'street', modelStyle: 'male', lightingStyle: 'golden_hour',
+      shotIndex: 1, shotCount: 2, signal: controller.signal,
+    });
     const [path, options] = mockServiceRequest.mock.calls[0] as [string, any];
     expect(path).toBe('/api/photography/generate');
+    expect(options.signal).toBe(controller.signal);
     const body = JSON.parse(options.body);
-    expect(body.ratio).toBe('9:16');
-    expect(body.images).toHaveLength(2);
-    expect(body.prompt).toContain('Aspect ratio: 9:16.');
-    expect(uri).toBe('data:image/png;base64,shot');
+    expect(Buffer.from(body.productImages[0].split(',')[1], 'base64').subarray(8).toString()).toBe('product-content');
+    expect(Buffer.from(body.referenceImages[0].split(',')[1], 'base64').subarray(8).toString()).toBe('ref0-content');
+    expect(body.images).toBeUndefined();
+    expect(body).toMatchObject({ prompt: 'Rooftop at dusk', ratio: '9:16', sceneStyle: 'street', modelStyle: 'male', lightingStyle: 'golden_hour', shotIndex: 1, shotCount: 2 });
+    expect(uri).toBe('data:image/jpeg;base64,shot');
   });
 
-  it('rejects more than 4 photos in total before calling the API', async () => {
-    const { generatePhotoshootShot, PHOTOSHOOT_MAX_IMAGES } = await import('../designService');
-    expect(PHOTOSHOOT_MAX_IMAGES).toBe(4);
-    await expect(generatePhotoshootShot({
-      productImageUris: ['file://product', 'file://product'],
-      referenceUris: ['file://ref-0', 'file://ref-0', 'file://ref-0'],
-    })).rejects.toThrow(/at most 4/);
+  it('allows 4 product photos and 6 references, and rejects more before calling the API', async () => {
+    const { preparePhotoshootPhotos, PHOTOSHOOT_MAX_PRODUCT_PHOTOS, PHOTOSHOOT_MAX_REFERENCE_PHOTOS } = await import('../designService');
+    expect([PHOTOSHOOT_MAX_PRODUCT_PHOTOS, PHOTOSHOOT_MAX_REFERENCE_PHOTOS]).toEqual([4, 6]);
+    const ok = await preparePhotoshootPhotos({ productImageUris: Array(4).fill('file://product'), referenceUris: Array(6).fill('file://ref-0') });
+    expect([ok.productImages.length, ok.referenceImages.length]).toEqual([4, 6]);
+    await expect(preparePhotoshootPhotos({ productImageUris: ['file://product'], referenceUris: Array(7).fill('file://ref-0') })).rejects.toThrow(/at most 6 reference/);
+    await expect(preparePhotoshootPhotos({ productImageUris: Array(5).fill('file://product'), referenceUris: [] })).rejects.toThrow(/at most 4 product/);
+    await expect(preparePhotoshootPhotos({ productImageUris: [], referenceUris: ['file://ref-0'] })).rejects.toThrow(/at least one product/);
     expect(mockServiceRequest).not.toHaveBeenCalled();
   });
 });

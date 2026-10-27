@@ -1,31 +1,34 @@
 /**
- * Brandthread — Remove Background sweep
+ * Brandthread — Remove Background sparkle
  *
- * The shiny "glitch" pass Dev asked for, modelled on Photoroom's removal
- * screen: a scanline travels down the photo and, behind it, ONLY the
- * background dissolves — glitter, pixel-glitch slices and a silver trail —
- * while the subject stays solid.
+ * What the seller sees while their background is removed, all black / white /
+ * silver:
+ *  1. working: the request is in flight. A silver sheen glides across the
+ *     photo, a field of glitter twinkles over it and a soft scanline sweeps,
+ *     so the wait reads as "something is happening to this photo".
+ *  2. dissolving: the real cutout has arrived. A bright line runs down the
+ *     photo once; behind it the background breaks into silver glitter that
+ *     sparkles, drifts up and fades, leaving the checkerboard. The subject
+ *     never flickers.
+ *  3. glisten: a brief silver rim light travels around the cutout's edge,
+ *     then onSettled() hands the result to the screen.
  *
- * How the "background only" part works without a segmentation polygon: the
- * finished cutout PNG is drawn as the top layer, so everything beneath it
- * (the scanline, sparkles, glitch slices, the original photo itself) is only
- * ever visible where the cutout is transparent — i.e. exactly the areas being
- * removed.
+ * "Only the background sparkles" needs no segmentation polygon: the finished
+ * cutout PNG is the top layer, so every effect beneath it (glitter, line,
+ * the dissolving original) is only visible where the cutout is transparent,
+ * i.e. exactly the areas being removed. The rim glisten is the cutout itself
+ * tinted silver and nudged a pixel or two in each direction, drawn just under
+ * the cutout, so it only shows as a thin outline.
  *
- * Two phases, both on the UI thread (Reanimated shared values, no React
- * re-renders while animating):
- *  - waiting: the request is in flight and there is no cutout yet, so a single
- *    scanline sweeps the photo back and forth.
- *  - dissolving: the cutout has arrived. The line returns to the top, then runs
- *    down once (~2s) wiping the background away. Calls onSettled when done.
- *
- * Works on native and web (no Skia dependency — Skia is not loaded on web).
+ * All animation runs on the UI thread (Reanimated shared values; no React
+ * re-renders while animating). Works on native and web (no Skia). Reduced
+ * motion skips straight to the result.
  */
 import React, { useEffect, useMemo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing, cancelAnimation, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue,
-  withRepeat, withTiming, type SharedValue,
+  withDelay, withRepeat, withSequence, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Checkerboard from '@/components/design/Checkerboard';
@@ -39,11 +42,20 @@ interface Props {
   onSettled?: () => void;
 }
 
-const DISSOLVE_MS = 2000;
-const GLITCH_BANDS = 6;
-const STARS = 26;
-const DOTS = 38;
-const TRAIL = 0.22; // fraction of the photo height the glitter lives behind the line
+const WHITE = '#FFFFFF';
+const SILVER = '#C0C0C0';
+const SILVER_LIGHT = '#E6E6E6';
+
+const DISSOLVE_MS = 2400;
+const GLISTEN_MS = 1100;
+const TWINKLES = 28; // glitter over the photo while working
+const STARS = 48; // sparkles born behind the line while dissolving
+const DUST = 96; // fine silver dust behind the line
+const TRAIL = 0.26; // fraction of the photo height the dissolving glitter lives behind the line
+// Rim glisten: a bright silver ring 2px out over a soft dark halo 4px out, so the
+// glint reads on any backdrop, the light checkerboard included.
+const RIM_INNER = [[-2, 0], [2, 0], [0, -2], [0, 2], [-1.4, -1.4], [1.4, 1.4], [-1.4, 1.4], [1.4, -1.4]] as const;
+const RIM_OUTER = [[-4, 0], [4, 0], [0, -4], [0, 4]] as const;
 
 // Deterministic pseudo-random so particles are stable across renders.
 function rand(seed: number) {
@@ -51,126 +63,147 @@ function rand(seed: number) {
   return x - Math.floor(x);
 }
 
-function Star({ pos, dissolving, x, y, size, bright, h }: {
-  pos: SharedValue<number>; dissolving: SharedValue<number>; x: number; y: number; size: number; bright: boolean; h: number;
-}) {
-  const lineY = y / h;
-  const style = useAnimatedStyle(() => {
-    const age = pos.value - lineY; // >0 once the line has passed
-    const visible = dissolving.value === 1 && age > -0.02 && age < TRAIL;
-    const k = visible ? Math.sin(((age + 0.02) / (TRAIL + 0.02)) * Math.PI) : 0;
-    return {
-      opacity: k,
-      transform: [
-        { translateY: -age * 46 },
-        { rotate: `${age * 260}deg` },
-        { scale: 0.3 + k * 0.9 },
-      ],
-    };
-  });
-  const color = bright ? '#FFFFFF' : '#C0C0C0';
+/** A four-point glint: two crossed arms and a bright core. */
+function Glint({ size, color }: { size: number; color: string }) {
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[{ position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size }, style]}
-    >
-      <View style={[st.starArm, { width: size, height: 2, top: size / 2 - 1, backgroundColor: color }]} />
-      <View style={[st.starArm, { width: 2, height: size, left: size / 2 - 1, backgroundColor: color }]} />
-      <View style={[st.starCore, { backgroundColor: color, left: size / 2 - 2.5, top: size / 2 - 2.5 }]} />
+    <>
+      <View style={[st.arm, st.glow, { width: size, height: 1.8, top: size / 2 - 0.9, backgroundColor: color }]} />
+      <View style={[st.arm, st.glow, { width: 1.8, height: size, left: size / 2 - 0.9, backgroundColor: color }]} />
+      <View style={[st.core, { backgroundColor: WHITE, left: size / 2 - 2, top: size / 2 - 2 }]} />
+    </>
+  );
+}
+
+/** Working phase: twinkles in place on its own rhythm. */
+function Twinkle({ clock, x, y, size, phase, speed, color }: {
+  clock: SharedValue<number>; x: number; y: number; size: number; phase: number; speed: number; color: string;
+}) {
+  const style = useAnimatedStyle(() => {
+    const wave = Math.sin((clock.value * speed + phase) * Math.PI * 2);
+    const k = Math.max(0, wave) ** 3; // mostly dark, with sharp flashes
+    return { opacity: k, transform: [{ scale: 0.35 + k * 0.85 }, { rotate: `${clock.value * 90 * speed}deg` }] };
+  });
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size }, style]}>
+      <Glint size={size} color={color} />
     </Animated.View>
   );
 }
 
-function Dot({ pos, dissolving, x, y, size, h }: { pos: SharedValue<number>; dissolving: SharedValue<number>; x: number; y: number; size: number; h: number }) {
+/** Dissolving phase: born as the line passes, flares, drifts up and fades. */
+function Star({ pos, dissolving, clock, x, y, size, bright, h, phase }: {
+  pos: SharedValue<number>; dissolving: SharedValue<number>; clock: SharedValue<number>;
+  x: number; y: number; size: number; bright: boolean; h: number; phase: number;
+}) {
+  const lineY = y / h;
+  const style = useAnimatedStyle(() => {
+    const age = pos.value - lineY; // > 0 once the line has passed
+    const alive = dissolving.value === 1 && age > -0.015 && age < TRAIL;
+    const life = alive ? Math.sin(((age + 0.015) / (TRAIL + 0.015)) * Math.PI) : 0;
+    const flicker = 0.65 + 0.35 * Math.sin((clock.value * 6 + phase) * Math.PI * 2);
+    const k = life * flicker;
+    return {
+      opacity: k,
+      transform: [{ translateY: -age * 60 }, { rotate: `${age * 300}deg` }, { scale: 0.3 + k * 0.95 }],
+    };
+  });
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size }, style]}>
+      <Glint size={size} color={bright ? WHITE : SILVER} />
+    </Animated.View>
+  );
+}
+
+function Dust({ pos, dissolving, x, y, size, h, drift }: {
+  pos: SharedValue<number>; dissolving: SharedValue<number>; x: number; y: number; size: number; h: number; drift: number;
+}) {
   const lineY = y / h;
   const style = useAnimatedStyle(() => {
     const age = pos.value - lineY;
-    const visible = dissolving.value === 1 && age > 0 && age < TRAIL * 0.8;
-    const k = visible ? 1 - age / (TRAIL * 0.8) : 0;
-    return { opacity: k, transform: [{ translateY: -age * 30 }] };
+    const alive = dissolving.value === 1 && age > 0 && age < TRAIL * 0.9;
+    const k = alive ? 1 - age / (TRAIL * 0.9) : 0;
+    return { opacity: k, transform: [{ translateY: -age * 42 }, { translateX: age * drift }] };
   });
   return (
     <Animated.View
       pointerEvents="none"
-      style={[{ position: 'absolute', left: x, top: y, width: size, height: size, borderRadius: size / 2, backgroundColor: '#FFFFFF' }, style]}
+      style={[{ position: 'absolute', left: x, top: y, width: size, height: size, borderRadius: size / 2, backgroundColor: SILVER_LIGHT }, st.glow, style]}
     />
-  );
-}
-
-/** One horizontal slice of the original photo that jitters sideways just behind the line. */
-function GlitchBand({ pos, dissolving, index, uri, w, h }: {
-  pos: SharedValue<number>; dissolving: SharedValue<number>; index: number; uri: string; w: number; h: number;
-}) {
-  const bandH = Math.max(6, Math.round(h * (0.012 + rand(index + 3) * 0.022)));
-  const back = (0.02 + index * 0.028) * h;
-  const style = useAnimatedStyle(() => {
-    const top = pos.value * h - back;
-    const jitter = Math.sin(pos.value * 140 + index * 7.3) * (10 + index * 3);
-    const on = dissolving.value === 1 && pos.value > 0.02 && pos.value < 0.985;
-    return {
-      top,
-      opacity: on ? (Math.sin(pos.value * 90 + index * 2.1) > -0.15 ? 0.9 : 0) : 0,
-      transform: [{ translateX: jitter }],
-    };
-  });
-  const imgStyle = useAnimatedStyle(() => ({ top: -(pos.value * h - back) }));
-  return (
-    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, width: w, height: bandH, overflow: 'hidden' }, style]}>
-      <Animated.Image source={{ uri }} resizeMode="cover" style={[{ position: 'absolute', left: 0, width: w, height: h }, imgStyle]} />
-    </Animated.View>
   );
 }
 
 export default function BgRemovalGlowSweep({ width, height, originalUri, cutoutUri, onSettled }: Props) {
   const reduceMotion = useReducedMotion();
-  const pos = useSharedValue(0);
+  const pos = useSharedValue(0); // scanline position, 0 (top) .. 1 (bottom)
   const dissolving = useSharedValue(0);
+  const clock = useSharedValue(0); // free-running 0..1 for twinkles/flicker
+  const sheen = useSharedValue(0);
+  const working = useSharedValue(1); // 1 while waiting for the result, fades to 0
+  const rim = useSharedValue(0);
   const resolved = !!cutoutUri;
 
-  // Waiting: scanline ping-pongs until a result exists.
+  // Working: sheen glides, glitter twinkles, scanline ping-pongs until a result exists.
   useEffect(() => {
     if (resolved) return;
     dissolving.value = 0;
+    working.value = 1;
     pos.value = 0;
     if (reduceMotion) { pos.value = 0.5; return; }
-    pos.value = withRepeat(withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.quad) }), -1, true);
-    return () => cancelAnimation(pos);
+    clock.value = withRepeat(withTiming(1, { duration: 4000, easing: Easing.linear }), -1, false);
+    sheen.value = withRepeat(withSequence(withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.quad) }), withDelay(350, withTiming(0, { duration: 0 }))), -1, false);
+    pos.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => { cancelAnimation(pos); cancelAnimation(sheen); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved, reduceMotion]);
 
-  // Dissolving: return to the top, then one pass that wipes the background.
+  // Dissolving, then the rim glisten, then hand over.
   useEffect(() => {
     if (!resolved) return;
     cancelAnimation(pos);
+    cancelAnimation(sheen);
     if (reduceMotion) {
       dissolving.value = 1;
+      working.value = 0;
       pos.value = 1;
       onSettled?.();
       return;
     }
     const done = () => { onSettled?.(); };
-    pos.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.quad) }, (fin) => {
+    working.value = withTiming(0, { duration: 260 });
+    pos.value = withTiming(0, { duration: 240, easing: Easing.out(Easing.quad) }, (fin) => {
       'worklet';
       if (!fin) return;
       dissolving.value = 1;
       pos.value = withTiming(1, { duration: DISSOLVE_MS, easing: Easing.inOut(Easing.cubic) }, (f2) => {
         'worklet';
-        if (f2) runOnJS(done)();
+        if (!f2) return;
+        rim.value = withSequence(
+          withTiming(1, { duration: GLISTEN_MS * 0.4, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: GLISTEN_MS * 0.6, easing: Easing.in(Easing.quad) }, (f3) => {
+            'worklet';
+            if (f3) runOnJS(done)();
+          }),
+        );
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved]);
 
+  const twinkles = useMemo(() => Array.from({ length: TWINKLES }, (_, i) => ({
+    x: 10 + rand(i + 701) * (width - 20), y: 10 + rand(i + 801) * (height - 20),
+    size: 7 + rand(i + 901) * 12, phase: rand(i + 1001), speed: 1 + Math.floor(rand(i + 1101) * 3),
+    color: rand(i + 1201) > 0.4 ? WHITE : SILVER,
+  })), [width, height]);
   const stars = useMemo(() => Array.from({ length: STARS }, (_, i) => ({
     x: 8 + rand(i + 1) * (width - 16), y: 8 + rand(i + 101) * (height - 16),
-    size: 9 + rand(i + 201) * 13, bright: rand(i + 301) > 0.35,
+    size: 9 + rand(i + 201) * 14, bright: rand(i + 301) > 0.35, phase: rand(i + 351),
   })), [width, height]);
-  const dots = useMemo(() => Array.from({ length: DOTS }, (_, i) => ({
-    x: rand(i + 401) * width, y: rand(i + 501) * height, size: 2 + rand(i + 601) * 2.5,
+  const dust = useMemo(() => Array.from({ length: DUST }, (_, i) => ({
+    x: rand(i + 401) * width, y: rand(i + 501) * height, size: 1.5 + rand(i + 601) * 2.5, drift: (rand(i + 651) - 0.5) * 40,
   })), [width, height]);
 
-  // Original photo: only the part still below the line. Once dissolving, the
-  // part above the line is gone (checkerboard shows through).
+  // Original photo: only the part still below the line. Above it the
+  // background is gone (checkerboard) and only the cutout remains.
   const clipStyle = useAnimatedStyle(() => {
     const d = dissolving.value === 1 ? pos.value : 0;
     return { top: d * height, height: (1 - d) * height };
@@ -179,32 +212,70 @@ export default function BgRemovalGlowSweep({ width, height, originalUri, cutoutU
     const d = dissolving.value === 1 ? pos.value : 0;
     return { top: -d * height };
   });
-  const lineStyle = useAnimatedStyle(() => ({ top: pos.value * height - 1 }));
-  const trailStyle = useAnimatedStyle(() => ({ top: pos.value * height - height * TRAIL }));
+  const veilStyle = useAnimatedStyle(() => ({ opacity: 0.18 * working.value }));
+  const workingStyle = useAnimatedStyle(() => ({ opacity: working.value }));
+  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -width * 0.8 + sheen.value * width * 2.2 }, { rotate: '20deg' }] }));
+  const lineStyle = useAnimatedStyle(() => ({ top: pos.value * height - 1, opacity: dissolving.value === 1 ? (pos.value < 0.995 ? 1 : 0) : 0.55 }));
+  const trailStyle = useAnimatedStyle(() => ({ top: pos.value * height - height * TRAIL, opacity: dissolving.value === 1 ? 1 : 0 }));
+  const rimStyle = useAnimatedStyle(() => ({ opacity: rim.value }));
 
   return (
-    <View style={{ width, height, overflow: 'hidden' }} pointerEvents="none">
+    <View style={{ width, height, overflow: 'hidden' }} pointerEvents="none" testID="bg-removal-sparkle">
       <Checkerboard />
       <Animated.View style={[{ position: 'absolute', left: 0, width, overflow: 'hidden' }, clipStyle]}>
         <Animated.Image source={{ uri: originalUri }} resizeMode="cover" style={[{ position: 'absolute', left: 0, width, height }, clipImgStyle]} />
       </Animated.View>
 
-      {Array.from({ length: GLITCH_BANDS }, (_, i) => (
-        <GlitchBand key={i} pos={pos} dissolving={dissolving} index={i} uri={originalUri} w={width} h={height} />
-      ))}
-      {dots.map((d, i) => <Dot key={`d${i}`} pos={pos} dissolving={dissolving} x={d.x} y={d.y} size={d.size} h={height} />)}
-      {stars.map((s, i) => <Star key={`s${i}`} pos={pos} dissolving={dissolving} x={s.x} y={s.y} size={s.size} bright={s.bright} h={height} />)}
+      {/* Working: a dark veil so the silver reads, a gliding sheen and twinkling glitter. */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, st.veil, veilStyle]} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, workingStyle]}>
+        <Animated.View style={[{ position: 'absolute', top: -height * 0.3, height: height * 1.6, width: width * 0.35 }, sheenStyle]}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(230,230,230,0.20)', 'rgba(255,255,255,0.38)', 'rgba(192,192,192,0.16)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        {twinkles.map((t, i) => <Twinkle key={`t${i}`} clock={clock} {...t} />)}
+      </Animated.View>
+
+      {/* Dissolving: glitter born behind the line over the background. */}
+      {dust.map((d, i) => <Dust key={`d${i}`} pos={pos} dissolving={dissolving} {...d} h={height} />)}
+      {stars.map((s, i) => <Star key={`s${i}`} pos={pos} dissolving={dissolving} clock={clock} {...s} h={height} />)}
 
       <Animated.View style={[{ position: 'absolute', left: 0, width, height: height * TRAIL }, trailStyle]}>
-        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.22)']} style={StyleSheet.absoluteFill} />
+        {/* The background breaks up through a dark silver veil (glitter reads on it, even over the light checkerboard). */}
+        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(12,12,12,0.45)', 'rgba(40,40,40,0.72)']} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
       </Animated.View>
       <Animated.View style={[{ position: 'absolute', left: 0, width, height: 2 }, lineStyle]}>
         <LinearGradient
-          colors={['rgba(255,255,255,0)', '#FFFFFF', '#FFFFFF', 'rgba(255,255,255,0)']}
+          colors={['rgba(255,255,255,0)', WHITE, WHITE, 'rgba(255,255,255,0)']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={st.line}
         />
       </Animated.View>
+
+      {/* Glisten: the cutout tinted silver, nudged out by a pixel or two, under the cutout itself. */}
+      {cutoutUri ? (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, rimStyle]}>
+          {RIM_OUTER.map(([dx, dy], i) => (
+            <Image
+              key={`o${i}`}
+              source={{ uri: cutoutUri }}
+              resizeMode="cover"
+              style={{ position: 'absolute', left: dx, top: dy, width, height, tintColor: '#000000', opacity: 0.4 }}
+            />
+          ))}
+          {RIM_INNER.map(([dx, dy], i) => (
+            <Image
+              key={`i${i}`}
+              source={{ uri: cutoutUri }}
+              resizeMode="cover"
+              style={{ position: 'absolute', left: dx, top: dy, width, height, tintColor: SILVER_LIGHT }}
+            />
+          ))}
+        </Animated.View>
+      ) : null}
 
       {/* Top layer: the subject. Everything above is only visible where it is transparent. */}
       {cutoutUri ? (
@@ -215,7 +286,9 @@ export default function BgRemovalGlowSweep({ width, height, originalUri, cutoutU
 }
 
 const st = StyleSheet.create({
-  starArm: { position: 'absolute', left: 0, borderRadius: 1 },
-  starCore: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5 },
-  line: { flex: 1, shadowColor: '#FFFFFF', shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+  arm: { position: 'absolute', left: 0, borderRadius: 1 },
+  core: { position: 'absolute', width: 4, height: 4, borderRadius: 2 },
+  glow: { shadowColor: '#000000', shadowOpacity: 0.7, shadowRadius: 2, shadowOffset: { width: 0, height: 0 } },
+  veil: { backgroundColor: '#000000' },
+  line: { flex: 1, shadowColor: WHITE, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
 });

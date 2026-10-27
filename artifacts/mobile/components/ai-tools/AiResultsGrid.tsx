@@ -87,19 +87,21 @@ function AiResultTile({
 
   if (slot.status === 'failed') {
     return (
-      <View style={[s.tile, s.tileFailed]}>
-        <View style={s.failedBody}>
+      <View style={[s.tile, s.tileFailed, tileW]}>
+        <View style={[s.failedBody, { minHeight: COL_W * 1.3 }]}>
           <Icon name="alert-circle" size={ICON.lg} color={RED} />
           <Text style={s.failedText}>{slot.error ?? 'Generation failed'}</Text>
-          <Button
-            label="Retry"
-            icon="refresh-cw"
-            variant="secondary"
-            size="compact"
-            style={{ marginTop: SP.xs }}
-            onPress={onRetry}
-            accessibilityLabel={`Retry ${slot.label}`}
-          />
+          {slot.retryable !== false && (
+            <Button
+              label="Retry"
+              icon="refresh-cw"
+              variant="secondary"
+              size="compact"
+              style={{ marginTop: SP.xs }}
+              onPress={onRetry}
+              accessibilityLabel={`Retry ${slot.label}`}
+            />
+          )}
         </View>
         <View style={s.meta}>
           <Text style={s.metaText}>{slot.label} · Failed</Text>

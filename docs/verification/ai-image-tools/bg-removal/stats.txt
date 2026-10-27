@@ -1,0 +1,5 @@
+model: birefnet-general-lite
+runway-long-hair: 1080x1920 RGBA PNG, 68.7% fully transparent, 29.0% fully opaque, 2.3% soft edge, 22778 ms
+runway-braids-mesh: 1080x1920 RGBA PNG, 71.5% fully transparent, 26.2% fully opaque, 2.3% soft edge, 15691 ms
+runway-flyaway-hair: 1080x1920 RGBA PNG, 58.0% fully transparent, 40.0% fully opaque, 2.1% soft edge, 15742 ms
+product-boots: 1200x1600 RGBA PNG, 87.3% fully transparent, 12.3% fully opaque, 0.4% soft edge, 16351 ms

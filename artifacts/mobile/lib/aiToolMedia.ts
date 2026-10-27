@@ -21,10 +21,18 @@ export function triggerWebDownload(url: string, filename: string) {
   document.body.removeChild(a);
 }
 
+/** File extension matching a data URL's image type (the AI tools return PNG cutouts and JPEG photos). */
+export function imageExtension(imageUri: string): 'png' | 'jpg' | 'webp' {
+  const mime = /^data:image\/([a-z]+);/.exec(imageUri)?.[1];
+  if (mime === 'jpeg' || mime === 'jpg') return 'jpg';
+  if (mime === 'webp') return 'webp';
+  return 'png';
+}
+
 export async function dataUrlToLocalFile(imageUri: string, prefix: string): Promise<string> {
   if (!imageUri.startsWith('data:')) return imageUri;
   const b64 = imageUri.replace(/^data:image\/[a-z]+;base64,/, '');
-  const file = new File(Paths.cache, `${prefix}-${Date.now()}.png`);
+  const file = new File(Paths.cache, `${prefix}-${Date.now()}.${imageExtension(imageUri)}`);
   file.write(b64, { encoding: 'base64' });
   return file.uri;
 }
@@ -39,7 +47,7 @@ export async function saveImageToCameraRoll(imageUri: string, filenamePrefix = '
   { ok: true } | { ok: false; reason: 'permission' | 'error' | 'unavailable' }
 > {
   if (Platform.OS === 'web') {
-    triggerWebDownload(imageUri, `${filenamePrefix}-${Date.now()}.png`);
+    triggerWebDownload(imageUri, `${filenamePrefix}-${Date.now()}.${imageExtension(imageUri)}`);
     return { ok: true };
   }
   try {
@@ -78,7 +86,7 @@ export async function saveAllToCameraRoll(
 export async function shareImage(imageUri: string, filenamePrefix = 'brandthread'): Promise<void> {
   try {
     if (Platform.OS === 'web') {
-      triggerWebDownload(imageUri, `${filenamePrefix}-${Date.now()}.png`);
+      triggerWebDownload(imageUri, `${filenamePrefix}-${Date.now()}.${imageExtension(imageUri)}`);
       return;
     }
     const fileUri = await dataUrlToLocalFile(imageUri, `${filenamePrefix}-share`);
