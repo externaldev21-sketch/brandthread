@@ -43,7 +43,15 @@ export type ImageRatioKind = '9:16' | '4:5' | '1:1' | '3:4';
 
 // ─── Layer Data ───────────────────────────────────────────────────────────────
 
-export interface DrawPath { d: string; color: string; width: number; opacity: number; tool: string; }
+export interface DrawPath {
+  d: string; color: string; width: number; opacity: number; tool: string;
+  /**
+   * Raster brush-engine stroke (lib/paint/strokeRecord.ts): raw samples +
+   * brush snapshot + seed. When present it is the source of truth and `d`
+   * is empty; older vector-only paths are upgraded from `d` on render.
+   */
+  stroke?: import('../lib/paint/strokeRecord').StrokeRecord;
+}
 
 export interface DesignTransform {
   x: number; y: number; width: number; height: number;
@@ -120,6 +128,13 @@ export interface DesignDrawingLayer {
   kind: 'drawing';
   paths: DrawPath[];
   brushType?: string;
+  /**
+   * Flattened PNG data URI of this layer's pixels (full canvas extent,
+   * downscaled to a preview size) refreshed by the raster engine on save.
+   * Read-only surfaces (gallery thumbnails, previews, mockups) draw this
+   * instead of re-running the brush engine; the editor never reads it.
+   */
+  rasterPreview?: string;
 }
 
 export type DesignLayerData = DesignTextLayer | DesignImageLayer | DesignShapeLayer | DesignDrawingLayer;
@@ -164,6 +179,11 @@ export interface DesignCanvas {
   dpi?: number;
   /** Which CanvasPresetId (if any) this canvas was created from. */
   presetId?: CanvasPresetId;
+  /**
+   * Procreate's "Background colour" layer visibility. Hidden = the canvas has
+   * no backdrop: the editor shows a checkerboard and PNG export keeps alpha.
+   */
+  backgroundHidden?: boolean;
 }
 
 export interface GarmentPlacement {
