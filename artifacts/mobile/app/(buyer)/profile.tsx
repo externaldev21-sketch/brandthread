@@ -1277,7 +1277,7 @@ export default function ProfileScreen() {
             ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
             : null,
         }).concat([
-          { key: 'orders', label: 'Orders', icon: 'package', onPress: () => router.push('/buyer-orders' as never) },
+          { key: 'orders', label: 'Orders', icon: 'package', onPress: () => router.navigate('/(buyer)/orders' as never) },
           { key: 'closet', label: 'Closet', icon: 'layers', onPress: () => router.push('/closet' as never) },
           { key: 'tagged', label: 'Tagged posts', icon: 'tag', onPress: () => handleTabPress('Tagged') },
         ])}
