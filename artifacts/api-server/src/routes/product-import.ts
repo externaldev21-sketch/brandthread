@@ -27,6 +27,7 @@ import { EtsyApiError, fetchAllActiveListings, getEtsyApi } from "../lib/etsy/cl
 import { mapEtsyListings } from "../lib/etsy/mapper";
 import { logger } from "../lib/logger";
 import { mapInstagramMedia, mapShopifyCatalog } from "../lib/productImport/oneTap";
+import { shopifyAppConfigured } from "../lib/shopify/config";
 import { ShopifyImportError, discoverShopifyCatalog, normalizeShopifyUrl } from "../lib/shopifyImport";
 import { decryptToken } from "../lib/metaCrypto";
 import { MetaGraphError, listInstagramMedia } from "../lib/metaGraph";
@@ -48,7 +49,7 @@ function ownerOf(req: express.Request): string {
 }
 
 export function shopifyOauthEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env.SHOPIFY_APP_API_KEY && env.SHOPIFY_APP_API_SECRET && env.SHOPIFY_APP_REDIRECT_URI && env.SHOPIFY_TOKEN_ENCRYPTION_KEY);
+  return shopifyAppConfigured(env);
 }
 
 // ─── CSV body (text/csv, up to 5 MB) ────────────────────────────────────────

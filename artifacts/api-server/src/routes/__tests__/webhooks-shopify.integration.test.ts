@@ -132,4 +132,13 @@ describe("POST /api/webhooks/shopify", () => {
     const [conn] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.shopDomain, shopDomain));
     expect(conn.status).toBe("disconnected");
   });
+
+  it("answers the customer privacy webhooks and erases the store on shop/redact", async () => {
+    const dataRequest = await postWebhook(base, "customers/data_request", { customer: { id: 1 } }, { shopDomain });
+    expect(dataRequest.status).toBe(200);
+    const redact = await postWebhook(base, "shop/redact", { shop_domain: shopDomain }, { shopDomain });
+    expect(redact.status).toBe(200);
+    const rows = await db.select().from(shopifyConnections).where(eq(shopifyConnections.shopDomain, shopDomain));
+    expect(rows).toHaveLength(0);
+  });
 });

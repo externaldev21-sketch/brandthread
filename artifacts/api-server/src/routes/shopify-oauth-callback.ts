@@ -19,16 +19,22 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
+/** Where the in-app browser hands control back to the app (expo-web-browser auth session). */
+export const SHOPIFY_APP_RETURN_URL = "brandthread://shopify-import";
+
 function resultPage(status: "success" | "error", message: string): string {
-  // A tiny static page: the mobile app opens the authorize URL in an
-  // in-app browser and listens for this page's URL (or its own deep-link
-  // redirect, see docs/integrations/shopify-tapstitch.md) to know when to
-  // close it and refresh the connection screen.
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="font-family: -apple-system, sans-serif; text-align:center; padding-top:80px;">
-<h2>${status === "success" ? "Shopify connected" : "Connection failed"}</h2>
-<p>${message}</p>
-<p>You can close this window and return to Brandthread.</p>
+  // The app opens the authorize URL in an auth session that closes as soon
+  // as the browser lands on SHOPIFY_APP_RETURN_URL; the import screen then
+  // re-reads the connection status. The button is the fallback for a browser
+  // that doesn't follow the automatic redirect.
+  const returnUrl = `${SHOPIFY_APP_RETURN_URL}?shopify=${status === "success" ? "connected" : "error"}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brandthread</title></head>
+<body style="margin:0;background:#fff;color:#0a0a0a;font-family:Inter,-apple-system,system-ui,sans-serif;text-align:center;padding:80px 24px;">
+<h2 style="font-weight:700;margin:0 0 12px;">${status === "success" ? "Shopify connected" : "Connection failed"}</h2>
+<p style="color:#6b6b6b;line-height:1.5;margin:0 0 28px;">${message}</p>
+<a href="${returnUrl}" style="display:inline-block;background:#0a0a0a;color:#fff;text-decoration:none;font-weight:600;padding:14px 24px;border-radius:999px;">Return to Brandthread</a>
+<script>setTimeout(function(){ location.href = ${JSON.stringify(returnUrl)}; }, 600);</script>
 </body></html>`;
 }
 
@@ -93,7 +99,7 @@ router.get("/", async (req, res) => {
     const webhookError = saved ? await registerWebhooksForConnection(saved) : null;
     res.send(resultPage(
       "success",
-      `Your Shopify store ${escapeHtml(shopDomain)} is now connected to Brandthread.${webhookError ? ` ${escapeHtml(webhookError)}` : ""}`,
+      `${escapeHtml(shopDomain)} is connected. Head back to Brandthread to import your products.${webhookError ? ` ${escapeHtml(webhookError)}` : ""}`,
     ));
   } catch (err) {
     logger.error({ err, shopDomain }, "Shopify OAuth callback failed");

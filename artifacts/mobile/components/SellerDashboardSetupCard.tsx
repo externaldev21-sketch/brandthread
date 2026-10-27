@@ -36,7 +36,7 @@ export function SellerDashboardSetupCard({
   onAddProduct: () => void;
   onOpenSetup: () => void;
   hasSetupChecklist: boolean;
-  /** One-tap import from a Shopify store link (app/quick-import.tsx). */
+  /** Full-catalog import over Shopify's own sign-in and consent (app/shopify-import.tsx). */
   onImport?: () => void;
 }) {
   const router = useRouter();

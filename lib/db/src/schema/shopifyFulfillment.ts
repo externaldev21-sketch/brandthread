@@ -60,11 +60,38 @@ export const shopifyProductLinks = pgTable('shopify_product_links', {
   brandthreadProductId: uuid('brandthread_product_id').notNull(),
   // variantId -> shopifyVariantId, e.g. {"<bt-variant-uuid>": "<shopify-variant-id>"}
   variantMap: json('variant_map').$type<Record<string, string>>().notNull().default({}),
+  // Shopify image URL (query string stripped) -> the `/objects/...` copy we
+  // stored, so a re-import never re-downloads a photo it already has.
+  imageMap: json('image_map').$type<Record<string, string>>().notNull().default({}),
   lastImportedAt: timestamp('last_imported_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   ownerShopifyProductUnique: uniqueIndex('shopify_product_links_owner_product_unique').on(table.ownerId, table.shopifyProductId),
   brandthreadProductIdx: index('shopify_product_links_bt_product_idx').on(table.brandthreadProductId),
+}));
+
+// ─── Full-catalog import over the OAuth connection: one row per run, polled
+// by the app for live progress ("23 of 61 products"). ──────────────────────
+
+export const shopifyCatalogImportJobs = pgTable('shopify_catalog_import_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull(),
+  shopDomain: text('shop_domain').notNull(),
+  // 'running' | 'complete' | 'failed'
+  status: text('status').notNull().default('running'),
+  totalCount: integer('total_count'),
+  processedCount: integer('processed_count').notNull().default(0),
+  importedCount: integer('imported_count').notNull().default(0),
+  updatedCount: integer('updated_count').notNull().default(0),
+  skipped: json('skipped').$type<Array<{ shopifyProductId: string; title?: string; reason: string }>>().notNull().default([]),
+  imagesStored: integer('images_stored').notNull().default(0),
+  imagesLinked: integer('images_linked').notNull().default(0),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, (table) => ({
+  ownerCreatedIdx: index('shopify_catalog_import_jobs_owner_created_idx').on(table.ownerId, table.createdAt),
 }));
 
 // ─── Order forwarding (B): one Brandthread order maps to at most one

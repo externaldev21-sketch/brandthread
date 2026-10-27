@@ -115,4 +115,20 @@ describe("Shopify public import safety and conversion", () => {
     expect(deterministicSku("https://shop.example", "100", "TEE", 0))
       .not.toBe(deterministicSku("https://shop.example", "101", "TEE", 0));
   });
+
+  it("does not treat Shopify's 'Default Title' placeholder as a size", () => {
+    const product = toBrandthreadProduct({
+      id: 5, title: "Tote", options: [{ name: "Title" }],
+      variants: [{ id: 51, sku: "TOTE", price: "25.00", inventory_quantity: 9, option1: "Default Title" }],
+    });
+    expect(product.variants[0]).toMatchObject({ size: undefined, color: undefined, stock: 9, priceCents: 2500 });
+  });
+
+  it("keeps inline-formatted description text readable", () => {
+    const product = toBrandthreadProduct({
+      id: 6, title: "Tee", body_html: "<p>Made in <strong>Portugal</strong>.</p><p>Wash cold.</p>",
+      variants: [{ id: 61, price: "10.00" }],
+    });
+    expect(product.description).toBe("Made in Portugal. Wash cold.");
+  });
 });
