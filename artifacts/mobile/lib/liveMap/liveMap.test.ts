@@ -64,6 +64,6 @@ describe('live map helpers', () => {
         expect(new Date(c.lastAt).getTime()).toBeLessThanOrEqual(now.getTime());
       }
     }
-    expect(previewLiveMap('fresh', clocks[0])).toEqual({ total: 0, cities: [], recent: [] });
+    expect(previewLiveMap('fresh', clocks[0])).toEqual({ total: 0, cities: [], recent: [], sessions: [], sessionsTotal: 0, home: null });
   });
 });

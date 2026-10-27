@@ -1,0 +1,57 @@
+{
+ "fps": {
+  "frames": 240,
+  "avgFps": 60,
+  "p95FrameMs": 16.8,
+  "over33ms": 0
+ },
+ "arcStats": {
+  "max": 3,
+  "min": 2,
+  "avg": 2.34
+ },
+ "landShare": 0.262,
+ "orderPop": {
+  "expected": {
+   "number": "BT-18591",
+   "city": "Brooklyn",
+   "amountCents": 6200
+  },
+  "number": "BT-18591",
+  "item": "Wide Pleated Trousers",
+  "amount": "$62.00",
+  "place": "Brooklyn, NY",
+  "time": "15h ago"
+ },
+ "sessionPop": {
+  "expected": {
+   "key": "US:IL:chicago",
+   "city": "Chicago",
+   "region": "IL",
+   "country": "US",
+   "lat": 41.88,
+   "lng": -87.63,
+   "count": 2
+  },
+  "label": "2 sessions \u00b7 Chicago, IL"
+ },
+ "bothPop": {
+  "expected": {
+   "number": "BT-18594",
+   "sessions": 1
+  },
+  "number": "BT-18594",
+  "place": "London, GB",
+  "sessions": "1 session right now"
+ },
+ "dragYaw": 0.527,
+ "zoom": [
+  1,
+  1.252
+ ],
+ "captions": {
+  "orders": "Latest 60 orders \u00b7 last 7 days",
+  "sessions": "10 visitors right now"
+ },
+ "errors": []
+}

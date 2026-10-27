@@ -2,18 +2,27 @@
  * Seller dashboard order globe (the Live map's slot). Behaviour reference:
  * Shopify's admin globe / Live View, reskinned black/white/silver.
  *
- * A dark sphere with a silver dot-matrix landmass slowly auto-rotates; each
- * recent order (GET /api/seller/live-map/today `recent`, the last 7 days of
- * paid orders) is a glowing silver dot at its shipping city. Drag to spin
- * (with a little fling), pinch or scroll to zoom lightly, tap a dot for its
- * order number, item, amount, place and time. A new order arrives over the
- * seller socket (useSellerLiveMap), its city's dot flares and the list
- * refetches; without a socket the hook polls.
+ * A dark sphere with solid silver continents slowly auto-rotates. Dots mean
+ * customer activity and nothing else (GET /api/seller/live-map/today):
+ *   - orders: each place with a recent order (`recent`, the last 7 days of
+ *     paid orders) glows silver-white; tap for order number, item, amount,
+ *     place and time;
+ *   - sessions: each place with shoppers on the store right now (`sessions`)
+ *     is a softer silver ring; tap for "N sessions · City".
+ * Arcs dart across the globe from activity to the store's home (`home`, or
+ * to another activity point when the store has no place): a new order over
+ * the seller socket fires one at once, and while the globe is on screen the
+ * recent activity takes turns firing at a calm cadence (lib/liveMap/arcs.ts
+ * caps how many fly at once and recycles slots).
+ *
+ * Drag to spin (with a little fling), pinch or scroll to zoom lightly. A new
+ * order also flares its city's dot and refetches; without a socket the hook
+ * polls.
  *
  * Rendering is per platform (components/globe/GlobeSurface*.tsx): Skia on
  * native, a 2D canvas on web, both projecting through lib/liveMap/globe.ts so
  * what is drawn is what is tapped. Where 3D can't run (Expo Go, no Skia) the
- * same dots and popovers sit on a flat dotted map (FlatOrderMap).
+ * same dots and popovers sit on a flat map (FlatOrderMap), without arcs.
  *
  * Header ("Live" + today's order count) and the full-screen city list are
  * unchanged from the flat Live map this replaces.
@@ -21,7 +30,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useFrameCallback, useSharedValue } from 'react-native-reanimated';
+import { runOnJS, runOnUI, useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
@@ -39,12 +48,24 @@ import {
   viewCenteredOn,
   type GlobeView,
 } from '@/lib/liveMap/globe';
-import { globeSpots, liveMapCityLabel, RECENT_ORDERS_LIMIT, recentOrders, type LiveMapRecentOrder, type LiveMapToday } from '@/lib/liveMap/liveMap';
+import { AMBIENT_ARC_MS, ambientArcEnds, emptyArcSlots, liveArcCount, makeArc, pushArc, type ArcSlot } from '@/lib/liveMap/arcs';
+import {
+  globeActivities,
+  liveMapCityLabel,
+  liveSessions,
+  RECENT_ORDERS_LIMIT,
+  recentOrders,
+  type GlobeActivity,
+  type LiveMapHome,
+  type LiveMapRecentOrder,
+  type LiveMapSession,
+  type LiveMapToday,
+} from '@/lib/liveMap/liveMap';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { Icon } from '@/components/ui/Icon';
 import { GlobeSurface, globeSurfaceMode } from '@/components/globe/GlobeSurface';
 import { FlatOrderMap, flatHeightFor } from '@/components/globe/FlatOrderMap';
-import { OrderGlobePopover } from '@/components/globe/OrderGlobePopover';
+import { OrderGlobePopover, SessionGlobePopover } from '@/components/globe/OrderGlobePopover';
 import { GLOBE_COLORS } from '@/components/globe/globeColors';
 
 const MAX_GLOBE = 380;
@@ -52,10 +73,19 @@ const MAX_GLOBE = 380;
 const DEFAULT_VIEW: GlobeView = viewCenteredOn(25, -35);
 const PING_FLARE_MS = 4000;
 
-interface Selection { order: LiveMapRecentOrder; x: number; y: number }
+interface Selection { activity: GlobeActivity; x: number; y: number }
+
+/** Runs on the UI thread: stamps the arc with the globe clock and takes a slot. */
+function fireArc(arcs: SharedValue<ArcSlot[]>, clock: SharedValue<number>, arc: ArcSlot) {
+  'worklet';
+  const now = clock.value;
+  arcs.value = pushArc(arcs.value, { ...arc, start: now }, now);
+}
 
 function OrderGlobeView({
   orders: recent,
+  sessions,
+  home,
   ping,
   active,
   maxSize = MAX_GLOBE,
@@ -63,18 +93,20 @@ function OrderGlobeView({
   testID,
 }: {
   orders: LiveMapRecentOrder[];
+  sessions: LiveMapSession[];
+  home: LiveMapHome | null;
   ping: LiveMapPing | null;
-  /** Rotation runs only while the globe is on screen. */
+  /** Rotation and arcs run only while the globe is on screen. */
   active: boolean;
   maxSize?: number;
   onOpenOrder?: (orderId: string) => void;
   testID?: string;
 }) {
   const reduceMotion = useReduceMotion();
-  // One dot per place (the newest order there); the popover counts the rest.
-  const spots = useMemo(() => globeSpots(recent), [recent]);
-  const orders = useMemo(() => spots.map((s) => s.order), [spots]);
-  const countByKey = useMemo(() => new Map(spots.map((s) => [s.order.key, s.count])), [spots]);
+  // One dot per place with activity: orders (newest order there; the
+  // popover counts the rest), then places with shoppers right now.
+  const activities = useMemo(() => globeActivities(recent, sessions), [recent, sessions]);
+  const orderCount = useMemo(() => activities.filter((a) => a.kind === 'order').length, [activities]);
   const mode = useMemo(() => globeSurfaceMode(), []);
   const [width, setWidth] = useState(0);
   const size = Math.min(width, maxSize);
@@ -90,31 +122,57 @@ function OrderGlobeView({
   const lastTouch = useSharedValue(-1e9);
   const startView = useSharedValue<GlobeView>(DEFAULT_VIEW);
   const startZoom = useSharedValue(1);
+  const arcs = useSharedValue<ArcSlot[]>(emptyArcSlots());
   const centeredRef = useRef(false);
+  const arcTickRef = useRef(0);
 
   useEffect(() => { still.value = reduceMotion; }, [reduceMotion, still]);
 
-  // Face the newest order the first time orders arrive (until the seller turns it).
+  // Face the newest activity the first time it arrives (until the seller turns it).
   useEffect(() => {
-    if (centeredRef.current || orders.length === 0) return;
+    if (centeredRef.current || activities.length === 0) return;
     centeredRef.current = true;
-    view.value = { ...viewCenteredOn(orders[0].lat, orders[0].lng), zoom: view.value.zoom };
-  }, [orders, view]);
+    view.value = { ...viewCenteredOn(activities[0].lat, activities[0].lng), zoom: view.value.zoom };
+  }, [activities, view]);
 
-  // A dot that's gone (fell out of the 7-day window) closes its popover.
+  // A dot that's gone (order fell out of the 7-day window, shopper left) closes its popover.
   useEffect(() => {
-    if (selection && !orders.some((o) => o.id === selection.order.id)) {
+    if (selection && !activities.some((a) => a.id === selection.activity.id)) {
       setSelection(null);
       paused.value = false;
     }
-  }, [orders, paused, selection]);
+  }, [activities, paused, selection]);
 
+  const arcsRun = active && mode === 'globe' && size > 0 && !reduceMotion;
+
+  // A new order: its dot flares and an arc shoots from it right away.
   useEffect(() => {
     if (!ping) return;
     setHighlightKey(ping.key);
+    if (arcsRun && ping.lat != null && ping.lng != null) {
+      const from = { key: ping.key, lat: ping.lat, lng: ping.lng };
+      const ends = home ? { from, to: home } : ambientArcEnds([from, ...activities.filter((a) => a.key !== ping.key)], null, 0);
+      if (ends) runOnUI(fireArc)(arcs, clock, makeArc(ends.from, ends.to, 0));
+    }
     const id = setTimeout(() => setHighlightKey(null), PING_FLARE_MS);
     return () => clearTimeout(id);
+    // Only a new ping fires; activity/home changes alone don't.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ping]);
+
+  // Ambient arcs: recent activity takes turns while the globe is on screen.
+  useEffect(() => {
+    if (!arcsRun || activities.length === 0) return;
+    const sources = activities.map((a) => ({ key: a.key, lat: a.lat, lng: a.lng }));
+    const fire = () => {
+      const ends = ambientArcEnds(sources, home, arcTickRef.current);
+      arcTickRef.current += 1;
+      if (ends) runOnUI(fireArc)(arcs, clock, makeArc(ends.from, ends.to, 0));
+    };
+    const first = setTimeout(fire, 400);
+    const id = setInterval(fire, AMBIENT_ARC_MS);
+    return () => { clearTimeout(first); clearInterval(id); };
+  }, [activities, arcs, arcsRun, clock, home]);
 
   const frame = useFrameCallback((info) => {
     'worklet';
@@ -144,13 +202,13 @@ function OrderGlobeView({
 
   const handleTap = useCallback((x: number, y: number) => {
     const v = view.value;
-    const hit = hitTest(orders, v, size, x, y);
+    const hit = hitTest(activities, v, size, x, y);
     if (!hit) { close(); return; }
     const [px, py] = projectLatLng(hit.lat, hit.lng, v, size);
     spin.value = 0;
     paused.value = true;
-    setSelection({ order: hit, x: px, y: py });
-  }, [close, orders, paused, size, spin, view]);
+    setSelection({ activity: hit, x: px, y: py });
+  }, [activities, close, paused, size, spin, view]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
@@ -214,16 +272,18 @@ function OrderGlobeView({
     if (!__DEV__ || Platform.OS !== 'web' || mode !== 'globe') return;
     const g = globalThis as { __btOrderGlobe?: Record<string, unknown> };
     g.__btOrderGlobe = {
-      orders,
+      orders: activities.flatMap((a) => (a.kind === 'order' ? [a.order] : [])),
+      activities,
       size,
       view: () => view.value,
+      liveArcs: () => liveArcCount(arcs.value, clock.value),
       project: (id: string) => {
-        const o = orders.find((x) => x.id === id);
-        return o ? projectLatLng(o.lat, o.lng, view.value, size) : null;
+        const a = activities.find((x) => x.id === id);
+        return a ? projectLatLng(a.lat, a.lng, view.value, size) : null;
       },
     };
     return () => { delete g.__btOrderGlobe; };
-  }, [mode, orders, size, view]);
+  }, [activities, arcs, clock, mode, size, view]);
 
   const flatHeight = flatHeightFor(width);
   const boxHeight = mode === 'globe' ? size : flatHeight;
@@ -234,7 +294,7 @@ function OrderGlobeView({
       testID={testID}
       onLayout={(e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width))}
       style={styles.globeRow}
-      accessibilityLabel={`Order globe, ${orders.length} ${orders.length === 1 ? 'order' : 'orders'} in the last 7 days. Tap a dot for details.`}
+      accessibilityLabel={`Order globe, ${orderCount} ${orderCount === 1 ? 'place' : 'places'} with orders in the last 7 days${activities.length > orderCount ? `, ${activities.length - orderCount} with visitors right now` : ''}. Tap a dot for details.`}
     >
       {width > 0 && (
         <View ref={boxRef} style={{ width: boxWidth, height: boxHeight }} testID="seller-globe-box">
@@ -245,8 +305,9 @@ function OrderGlobeView({
                   size={size}
                   view={view}
                   clock={clock}
-                  orders={orders}
-                  selectedId={selection?.order.id ?? null}
+                  activities={activities}
+                  arcs={arcs}
+                  selectedId={selection?.activity.id ?? null}
                   highlightKey={highlightKey}
                   reduceMotion={reduceMotion}
                 />
@@ -255,20 +316,31 @@ function OrderGlobeView({
           ) : (
             <FlatOrderMap
               width={width}
-              orders={orders}
-              selectedId={selection?.order.id ?? null}
-              onSelect={(order, x, y) => (order ? setSelection({ order, x, y }) : setSelection(null))}
+              activities={activities}
+              selectedId={selection?.activity.id ?? null}
+              onSelect={(activity, x, y) => (activity ? setSelection({ activity, x, y }) : setSelection(null))}
             />
           )}
-          {selection && (
+          {selection?.activity.kind === 'order' && (
             <OrderGlobePopover
-              order={selection.order}
+              order={selection.activity.order}
               x={selection.x}
               y={selection.y}
               boxWidth={boxWidth}
               boxHeight={boxHeight}
-              moreHere={(countByKey.get(selection.order.key) ?? 1) - 1}
+              moreHere={selection.activity.count - 1}
+              sessionsHere={selection.activity.sessions}
               onOpen={onOpenOrder}
+              onClose={close}
+            />
+          )}
+          {selection?.activity.kind === 'session' && (
+            <SessionGlobePopover
+              session={selection.activity.session}
+              x={selection.x}
+              y={selection.y}
+              boxWidth={boxWidth}
+              boxHeight={boxHeight}
               onClose={close}
             />
           )}
@@ -296,6 +368,9 @@ export function SellerOrderGlobe({
   const total = data?.total ?? 0;
   const cities = data?.cities ?? [];
   const recent = recentOrders(data);
+  const sessions = liveSessions(data);
+  const sessionsTotal = Math.max(data?.sessionsTotal ?? 0, sessions.reduce((n, s) => n + s.count, 0));
+  const home = data?.home ?? null;
 
   return (
     <View testID="seller-dashboard-live-map">
@@ -316,14 +391,27 @@ export function SellerOrderGlobe({
         </TouchableOpacity>
       </View>
       <View style={[styles.frame, { borderColor: theme.borderSubtle }]}>
-        <OrderGlobeView orders={recent} ping={ping} active={active && !open} onOpenOrder={onOpenOrder} testID="seller-order-globe" />
-        <Text style={styles.caption} testID="seller-globe-caption">
-          {data && recent.length === 0
-            ? 'No orders in the last 7 days'
-            : recent.length >= RECENT_ORDERS_LIMIT
-              ? `Latest ${recent.length} orders · last 7 days`
-              : `${recent.length} ${recent.length === 1 ? 'order' : 'orders'} · last 7 days`}
-        </Text>
+        <OrderGlobeView orders={recent} sessions={sessions} home={home} ping={ping} active={active && !open} onOpenOrder={onOpenOrder} testID="seller-order-globe" />
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            {recent.length > 0 && <View style={styles.orderGlyph} />}
+            <Text style={styles.caption} numberOfLines={1} testID="seller-globe-caption">
+              {data && recent.length === 0
+                ? 'No orders in the last 7 days'
+                : recent.length >= RECENT_ORDERS_LIMIT
+                  ? `Latest ${recent.length} orders · last 7 days`
+                  : `${recent.length} ${recent.length === 1 ? 'order' : 'orders'} · last 7 days`}
+            </Text>
+          </View>
+          {sessionsTotal > 0 && (
+            <View style={styles.legendItem}>
+              <View style={styles.sessionGlyph} />
+              <Text style={styles.caption} numberOfLines={1} testID="seller-globe-sessions-caption">
+                {`${sessionsTotal} ${sessionsTotal === 1 ? 'visitor' : 'visitors'} right now`}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <Modal visible={open} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setOpen(false)}>
@@ -336,6 +424,8 @@ export function SellerOrderGlobe({
               <View style={[styles.frame, styles.fullMap, { borderColor: theme.borderSubtle }]}>
                 <OrderGlobeView
                   orders={recent}
+                  sessions={sessions}
+                  home={home}
                   ping={ping}
                   active={open}
                   maxSize={560}
@@ -381,9 +471,20 @@ const styles = StyleSheet.create({
     paddingBottom: SP.md,
   },
   globeRow: { width: '100%', alignItems: 'center' },
-  caption: {
+  legend: {
     marginTop: SP.xs,
     marginHorizontal: SP.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: SP.md,
+    rowGap: 2,
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  orderGlyph: { width: 6, height: 6, borderRadius: 3, backgroundColor: GLOBE_COLORS.core },
+  sessionGlyph: { width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: GLOBE_COLORS.text },
+  caption: {
+    flexShrink: 1,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     color: GLOBE_COLORS.mutedText,

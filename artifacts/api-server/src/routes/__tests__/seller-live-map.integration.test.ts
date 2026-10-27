@@ -4,6 +4,9 @@
  *  - GET /api/seller/live-map/today: paid, non-cancelled orders since the
  *    seller's local midnight, aggregated to city level; other sellers'
  *    orders never appear; nothing finer than city leaves the server.
+ *  - `sessions`: shoppers on the store in the last few minutes, placed at
+ *    their saved address's city, aggregated; `home`: the seller's profile
+ *    location, where the globe's arcs land.
  *  - /ws/seller: an order_city broadcast reaches only the sockets of the
  *    seller it was addressed to, and carries city-level keys only.
  *
@@ -18,11 +21,15 @@ import crypto from "node:crypto";
 import express from "express";
 import WS from "ws";
 import { inArray } from "drizzle-orm";
-import { db, orderItems, orders, users } from "@workspace/db";
+import { buyerAddresses, db, orderItems, orders, storeVisits, users } from "@workspace/db";
 
 const suffix = crypto.randomBytes(5).toString("hex");
 const SELLER = `livemap-seller-${suffix}`;
 const OTHER = `livemap-other-${suffix}`;
+const BUYER_A = `livemap-buyer-a-${suffix}`;
+const BUYER_B = `livemap-buyer-b-${suffix}`;
+const BUYER_C = `livemap-buyer-c-${suffix}`;
+const BUYER_NOADDR = `livemap-buyer-n-${suffix}`;
 
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, res: any, next: () => void) => {
@@ -102,10 +109,13 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.delete(orders).where(inArray(orders.ownerId, [SELLER, OTHER]));
+  await db.delete(storeVisits).where(inArray(storeVisits.sellerId, [SELLER, OTHER]));
 });
 
 afterAll(async () => {
   await db.delete(orders).where(inArray(orders.ownerId, [SELLER, OTHER]));
+  await db.delete(storeVisits).where(inArray(storeVisits.sellerId, [SELLER, OTHER]));
+  await db.delete(buyerAddresses).where(inArray(buyerAddresses.buyerId, [BUYER_A, BUYER_B, BUYER_C]));
   await db.delete(users).where(inArray(users.clerkId, [SELLER, OTHER]));
   await new Promise<void>((resolve) => server?.close(() => resolve()));
 });
@@ -143,7 +153,7 @@ describe("GET /api/seller/live-map/today", () => {
     await makeOrder(SELLER, new Date(Date.now() - 1000), ADDRESS("Austin", "TX"));
     const res = await get("/api/seller/live-map/today?tz=0");
     const body = await res.json() as any;
-    expect(Object.keys(body).sort()).toEqual(["cities", "recent", "total"]);
+    expect(Object.keys(body).sort()).toEqual(["cities", "home", "recent", "sessions", "sessionsTotal", "total"]);
     for (const c of body.cities) {
       expect(Object.keys(c).sort()).toEqual(["city", "count", "country", "key", "lastAt", "lat", "lng", "region"]);
     }
@@ -230,6 +240,57 @@ describe("GET /api/seller/live-map/today", () => {
     expect(body.total).toBe(0);
     expect(body.cities).toEqual([]);
     expect(body.recent.map((r: any) => r.city)).toEqual(["Austin"]);
+  });
+
+  it("places shoppers on the store right now by their saved address's city, aggregated, never who", async () => {
+    const now = Date.now();
+    const addr = (buyerId: string, city: string, state: string, country: string, isDefault: boolean, ageMs = 0) => ({
+      buyerId, recipientName: "Jane Buyer", street: "123 Secret Lane", city, state, postalCode: "78701", country, isDefault,
+      createdAt: new Date(now - ageMs),
+    });
+    await db.insert(buyerAddresses).values([
+      addr(BUYER_A, "Austin", "TX", "US", true),
+      addr(BUYER_A, "Denver", "CO", "US", false),
+      addr(BUYER_B, "austin", "Texas", "US", false),
+      addr(BUYER_C, "Berlin", "", "DE", false, 60_000),
+      addr(BUYER_C, "Paris", "", "FR", false),
+    ]);
+    const visit = (viewerUserId: string | null, agoMs: number, sellerId = SELLER) => ({
+      sellerId, source: "feed", viewerUserId, createdAt: new Date(now - agoMs),
+    });
+    await db.insert(storeVisits).values([
+      visit(BUYER_A, 30_000), visit(BUYER_A, 60_000), // one shopper, two screens: one session
+      visit(BUYER_B, 2 * 60_000),
+      visit(BUYER_C, 4 * 60_000), // no default: newest address (Paris)
+      visit(BUYER_NOADDR, 60_000), // signed in, nothing saved: counted, not placed
+      visit(null, 10_000), visit(null, 20_000), // signed out: each counts, none placed
+      visit(SELLER, 5_000), // the seller on their own store: not a session
+      visit(BUYER_B, 30 * 60_000), // long gone
+      visit(BUYER_A, 10_000, OTHER), // another store
+    ]);
+
+    const body = await (await get("/api/seller/live-map/today?tz=0")).json() as any;
+    expect(body.sessions.map((s: any) => [s.key, s.count])).toEqual([["US:TX:austin", 2], ["FR:11:paris", 1]]);
+    for (const s of body.sessions) expect(Object.keys(s).sort()).toEqual(["city", "count", "country", "key", "lat", "lng", "region"]);
+    expect(body.sessions[0]).toMatchObject({ city: "Austin", region: "TX", country: "US" });
+    expect(body.sessionsTotal).toBe(6);
+    const raw = JSON.stringify(body);
+    for (const secret of ["Secret Lane", "78701", "Jane Buyer", BUYER_A, BUYER_B, BUYER_C, BUYER_NOADDR]) expect(raw).not.toContain(secret);
+
+    const theirs = await (await get("/api/seller/live-map/today?tz=0", OTHER)).json() as any;
+    expect(theirs.sessions.map((s: any) => s.key)).toEqual(["US:TX:austin"]);
+    expect(theirs.sessionsTotal).toBe(1);
+  });
+
+  it("returns the store's home from its profile location for arcs to land on, or null", async () => {
+    await db.update(users).set({ location: "Brooklyn, NY" }).where(inArray(users.clerkId, [SELLER]));
+    await db.update(users).set({ location: "somewhere nice" }).where(inArray(users.clerkId, [OTHER]));
+    const body = await (await get("/api/seller/live-map/today?tz=0")).json() as any;
+    expect(body.home).toMatchObject({ city: "Brooklyn", region: "NY", country: "US" });
+    expect(body.home.lat).toBeCloseTo(40.65, 0);
+    const theirs = await (await get("/api/seller/live-map/today?tz=0", OTHER)).json() as any;
+    expect(theirs.home).toBeNull();
+    await db.update(users).set({ location: null }).where(inArray(users.clerkId, [SELLER, OTHER]));
   });
 
   it("requires auth", async () => {

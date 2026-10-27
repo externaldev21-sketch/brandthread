@@ -8,9 +8,12 @@
  * chart and Orders tile), with the server's own rules: `total`/`cities` are
  * today's paid, non-cancelled orders (so the Live count equals the Today
  * Orders count on the same screen), and `recent` is the last 7 days of them,
- * newest first, capped like the server. Fresh shows the empty globe.
+ * newest first, capped like the server. Demo also has a handful of
+ * shoppers on the store right now (`sessions`, the globe's visitor dots) and
+ * a home (New York, where the demo store ships from) for order arcs to land
+ * on, so the preview shows the whole effect. Fresh shows the empty globe.
  */
-import { EMPTY_LIVE_MAP, type LiveMapCity, type LiveMapRecentOrder, type LiveMapToday } from '@/lib/liveMap/liveMap';
+import { EMPTY_LIVE_MAP, type LiveMapCity, type LiveMapHome, type LiveMapRecentOrder, type LiveMapSession, type LiveMapToday } from '@/lib/liveMap/liveMap';
 import { ordersForDay, type PreviewSellerOrder } from '@/lib/previewSellerOrders';
 
 /** Same window and cap as routes/seller-live-map.ts (RECENT_WINDOW_DAYS / RECENT_LIMIT). */
@@ -39,6 +42,23 @@ const DEMO_CITY_POINTS: Record<string, Omit<LiveMapCity, 'count' | 'lastAt'>> = 
   'MX|mexico city': { key: 'MX:09:mexico city', city: 'Mexico City', region: '09', country: 'MX', lat: 19.43, lng: -99.13 },
   'ZA|cape town': { key: 'ZA:11:cape town', city: 'Cape Town', region: '11', country: 'ZA', lat: -33.93, lng: 18.42 },
 };
+
+/**
+ * Demo shoppers browsing right now, by city: mostly places with no recent
+ * order (so their own ring dots show), two where orders came from too.
+ */
+const DEMO_SESSIONS: Array<[Omit<LiveMapSession, 'count'>, number]> = [
+  [{ key: 'US:IL:chicago', city: 'Chicago', region: 'IL', country: 'US', lat: 41.88, lng: -87.63 }, 2],
+  [{ key: 'SE:26:stockholm', city: 'Stockholm', region: '26', country: 'SE', lat: 59.33, lng: 18.07 }, 1],
+  [{ key: 'IN:16:mumbai', city: 'Mumbai', region: '16', country: 'IN', lat: 19.08, lng: 72.88 }, 1],
+  [{ key: 'SG:01:singapore', city: 'Singapore', region: '01', country: 'SG', lat: 1.29, lng: 103.85 }, 1],
+  [{ key: 'NG:05:lagos', city: 'Lagos', region: '05', country: 'NG', lat: 6.45, lng: 3.39 }, 1],
+  [{ key: 'AR:07:buenos aires', city: 'Buenos Aires', region: '07', country: 'AR', lat: -34.6, lng: -58.38 }, 1],
+  [DEMO_CITY_POINTS['US|austin'], 2],
+  [DEMO_CITY_POINTS['GB|london'], 1],
+];
+
+const DEMO_HOME: LiveMapHome = { ...DEMO_CITY_POINTS['US|new york'] };
 
 function pointFor(order: PreviewSellerOrder) {
   const addr = order.shippingAddress;
@@ -103,5 +123,8 @@ export function previewLiveMap(mode: 'demo' | 'fresh', now: Date = new Date()): 
     })
     .slice(0, RECENT_LIMIT);
 
-  return { total: today.length, cities, recent };
+  const sessions: LiveMapSession[] = DEMO_SESSIONS
+    .map(([place, count]) => ({ ...place, count }))
+    .sort((a, b) => b.count - a.count);
+  return { total: today.length, cities, recent, sessions, sessionsTotal: sessions.reduce((n, x) => n + x.count, 0), home: DEMO_HOME };
 }
