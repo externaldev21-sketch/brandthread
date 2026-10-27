@@ -541,8 +541,8 @@ export const SELLER_CANVAS_PRESETS: SellerCanvasPreset[] = [
   },
   {
     id: 'ig_post',
-    label: 'Instagram Post',
-    description: '1080 x 1080 px',
+    label: 'Square',
+    description: '1080 x 1080 px — posts, stickers, logos',
     width: 1080, height: 1080, dpi: 72, colorProfile: 'sRGB',
   },
   {
@@ -553,8 +553,8 @@ export const SELLER_CANVAS_PRESETS: SellerCanvasPreset[] = [
   },
   {
     id: 'tshirt_print',
-    label: 'T-Shirt Print Area',
-    description: '4500 x 5400 px — 300 dpi',
+    label: 'Apparel Print',
+    description: '4500 x 5400 px — 300 dpi, tee / hoodie front',
     width: 4500, height: 5400, dpi: 300, colorProfile: 'sRGB',
   },
   {

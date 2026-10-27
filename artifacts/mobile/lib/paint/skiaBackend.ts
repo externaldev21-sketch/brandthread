@@ -135,6 +135,11 @@ export class SkiaBackend implements RasterBackend<SkSurface> {
       case 'erase': return B.DstOut;
       case 'atop': return B.SrcATop;
       case 'mask': return B.DstIn;
+      case 'multiply': return B.Multiply;
+      case 'screen': return B.Screen;
+      case 'overlay': return B.Overlay;
+      case 'darken': return B.Darken;
+      case 'lighten': return B.Lighten;
       default: return B.SrcOver;
     }
   }

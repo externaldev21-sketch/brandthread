@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { PaintEngine } from '@/lib/paint/engine';
 import { SoftwareBackend } from '@/lib/paint/softwareBackend';
 import { DEFAULT_BRUSH_PRESETS, findPreset, type BrushMode } from '@/lib/paint/brushPresets';
-import { drawPathFromRecord, type StrokeRecord } from '@/lib/paint/strokeRecord';
+import { drawPathFromRecord, fillRecord, mergeRecord, type StrokeRecord } from '@/lib/paint/strokeRecord';
 import type { StrokeSample } from '@/lib/paint/dabEmitter';
 import type { DrawPath } from '@/services/designTypes';
 
@@ -89,6 +89,41 @@ describe('PaintEngine (pixels)', () => {
     const replay = new PaintEngine(B, 80, 80);
     replay.sync('L', recs.map(drawPathFromRecord));
     expect(Array.from((replay.content('L') as any).px)).toEqual(Array.from((live.content('L') as any).px));
+  });
+
+  it('replay matches live exactly even for fractional, irregular input (real touch data)', () => {
+    const samples: StrokeSample[] = Array.from({ length: 40 }, (_, i) => ({
+      x: 10.37 + i * 1.913, y: 30 + Math.sin(i / 3) * 9.271, p: -1, t: 1000.4 + i * 7.31,
+    }));
+    const live = new PaintEngine(B, 96, 64);
+    const rec = draw(live, 'L', 'paint', samples, { params: { ...params('6b-pencil') }, diameter: 9, seed: 21 });
+    const replay = new PaintEngine(B, 96, 64);
+    replay.sync('L', [drawPathFromRecord(rec)]);
+    expect(Array.from((replay.content('L') as any).px)).toEqual(Array.from((live.content('L') as any).px));
+  });
+
+  it('merge-down record keeps the top layer\'s eraser off the layer below', () => {
+    const e = new PaintEngine(B, 64, 64);
+    const below = draw(e, 'below', 'paint', hline(32, 8, 56), { diameter: 12, color: '#0000FF' });
+    const topPaint = draw(e, 'top', 'paint', hline(20, 8, 56), { diameter: 8 });
+    const topErase = draw(e, 'top', 'erase', [{ x: 32, y: 10, p: 1, t: 0 }, { x: 32, y: 40, p: 1, t: 16 }], { diameter: 10 });
+    const merged = new PaintEngine(B, 64, 64);
+    merged.sync('M', [drawPathFromRecord(below), drawPathFromRecord(mergeRecord([topPaint, topErase].map(drawPathFromRecord), 1))]);
+    // The top layer's eraser crossed the blue line at x=32 but must not have erased it.
+    expect(B.readPixel(merged.content('M'), 32, 32)).toEqual([0, 0, 255, 255]);
+    // …while it did cut the top layer's own red line.
+    expect(B.readPixel(merged.content('M'), 32, 20)[3]).toBe(0);
+    expect(B.readPixel(merged.content('M'), 16, 20)).toEqual([255, 0, 0, 255]);
+  });
+
+  it('fill layer honours alpha lock', () => {
+    const e = new PaintEngine(B, 64, 64);
+    const line = draw(e, 'L', 'paint', hline(32, 8, 56), { diameter: 8, color: '#000000' });
+    e.sync('L', [drawPathFromRecord(line), drawPathFromRecord(fillRecord('#00FF00', true))]);
+    expect(B.readPixel(e.content('L'), 32, 32)).toEqual([0, 255, 0, 255]);
+    expect(B.readPixel(e.content('L'), 32, 10)[3]).toBe(0);
+    e.sync('L', [drawPathFromRecord(line), drawPathFromRecord(fillRecord('#00FF00', false))]);
+    expect(B.readPixel(e.content('L'), 32, 10)).toEqual([0, 255, 0, 255]);
   });
 
   it('sync is incremental for appends and replays on undo', () => {

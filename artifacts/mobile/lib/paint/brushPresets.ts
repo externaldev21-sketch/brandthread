@@ -175,7 +175,7 @@ export function findPreset(presets: BrushPreset[], id: string): BrushPreset {
 export function brushDiameter(params: BrushParams, sizeFraction: number, canvasLong: number): number {
   const f = Math.max(0.01, Math.min(1, sizeFraction));
   // Perceptual curve: the bottom of the slider gives fine control.
-  const curved = 0.02 + 0.98 * f * f;
+  const curved = 0.02 + 0.98 * Math.pow(f, 1.6);
   return Math.max(1, params.maxSize * curved * (canvasLong / 1080));
 }
 

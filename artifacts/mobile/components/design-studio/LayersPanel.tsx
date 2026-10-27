@@ -63,6 +63,11 @@ export interface LayersPanelProps {
   canvasBackgroundHex: string;
   canvasBackgroundVisible: boolean;
   onToggleBackgroundVisible: () => void;
+  /** Live pixel thumbnail for a layer (drawing layers), or null to fall back to the type glyph. */
+  thumbnailFor?: (layer: DesignLayer) => string | null;
+  /** Layer menu → Fill Layer / Clear (drawing layers). */
+  onFillLayer?: (id: string) => void;
+  onClearLayer?: (id: string) => void;
 }
 
 const BLEND_MODES: BlendModeKind[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
@@ -75,7 +80,7 @@ export default function LayersPanel(props: LayersPanelProps) {
   const {
     layers, selectedLayerId, onSelect, onAddLayer, onDuplicateLayer, onDeleteLayer,
     onRenameLayer, onToggleVisible, onToggleLocked, onToggleAlphaLock, onToggleClippingMask,
-    onSetBlendMode, onReorder, onClose,
+    onSetBlendMode, onReorder, onClose, onSetOpacity, onMergeDown, thumbnailFor, onFillLayer, onClearLayer,
     canvasBackgroundHex, canvasBackgroundVisible, onToggleBackgroundVisible,
   } = props;
 
@@ -87,6 +92,8 @@ export default function LayersPanel(props: LayersPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // Procreate's "N" popover (opacity + blend modes) for one layer.
+  const [blendFor, setBlendFor] = useState<string | null>(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -257,7 +264,11 @@ export default function LayersPanel(props: LayersPanelProps) {
                   </View>
 
                   <View style={s.thumb}>
-                    {layer.type === 'image' && data?.uri ? (
+                    {layer.type === 'drawing' && thumbnailFor?.(layer) ? (
+                      <View style={s.thumbChecker}>
+                        <RNImage source={{ uri: thumbnailFor(layer)! }} style={s.thumbImage} resizeMode="contain" testID={`layer-thumb-${layer.id}`} />
+                      </View>
+                    ) : layer.type === 'image' && data?.uri ? (
                       <RNImage source={{ uri: data.uri }} style={s.thumbImage} resizeMode="cover" />
                     ) : layer.type === 'text' ? (
                       <Text style={[s.thumbGlyph, { color: MUTED }]}>Aa</Text>
@@ -296,9 +307,17 @@ export default function LayersPanel(props: LayersPanelProps) {
                     )}
                   </Pressable>
 
-                  <Text style={[s.blendLetter, isSelected && s.blendLetterSelected]} testID={`layer-blend-letter-${layer.id}`}>
-                    {blendLetter(layer.blendMode)}
-                  </Text>
+                  <TouchableOpacity
+                    onPress={() => { setMenuFor(null); setBlendFor(blendFor === layer.id ? null : layer.id); }}
+                    hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Blend mode and opacity for ${layer.name}`}
+                    testID={`layer-blend-button-${layer.id}`}
+                  >
+                    <Text style={[s.blendLetter, isSelected && s.blendLetterSelected]} testID={`layer-blend-letter-${layer.id}`}>
+                      {blendLetter(layer.blendMode)}
+                    </Text>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     onPress={() => onToggleVisible(layer.id)}
@@ -317,6 +336,32 @@ export default function LayersPanel(props: LayersPanelProps) {
                   </TouchableOpacity>
                 </Animated.View>
               </View>
+
+              {blendFor === layer.id && (
+                <View style={s.blendPopover} testID={`layer-blend-popover-${layer.id}`}>
+                  <OpacitySlider
+                    value={layer.opacity ?? 1}
+                    onCommit={v => onSetOpacity(layer.id, v)}
+                    testID={`layer-opacity-${layer.id}`}
+                  />
+                  {BLEND_MODES.map(mode => {
+                    const on = (layer.blendMode ?? 'normal') === mode;
+                    return (
+                      <TouchableOpacity
+                        key={mode}
+                        style={[s.blendListRow, on && s.blendListRowOn]}
+                        onPress={() => onSetBlendMode(layer.id, mode)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: on }}
+                        testID={`layer-blendmode-${mode}-${layer.id}`}
+                      >
+                        <Text style={[s.blendListText, on && s.blendListTextOn]}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</Text>
+                        <Text style={[s.blendListLetter, on && s.blendListTextOn]}>{blendLetter(mode)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               {menuFor === layer.id && (
                 <View style={s.contextMenu} testID={`layer-context-menu-${layer.id}`}>
@@ -340,6 +385,16 @@ export default function LayersPanel(props: LayersPanelProps) {
                   >
                     <Text style={s.menuItemText}>Copy</Text>
                   </TouchableOpacity>
+                  {layer.type === 'drawing' && onFillLayer && (
+                    <TouchableOpacity style={s.menuItem} onPress={() => { onFillLayer(layer.id); setMenuFor(null); }} testID={`layer-menu-fill-${layer.id}`} accessibilityRole="button">
+                      <Text style={s.menuItemText}>Fill Layer</Text>
+                    </TouchableOpacity>
+                  )}
+                  {layer.type === 'drawing' && onClearLayer && (
+                    <TouchableOpacity style={s.menuItem} onPress={() => { onClearLayer(layer.id); setMenuFor(null); }} testID={`layer-menu-clear-${layer.id}`} accessibilityRole="button">
+                      <Text style={s.menuItemText}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={s.menuItem}
                     onPress={() => onToggleAlphaLock(layer.id)}
@@ -356,6 +411,11 @@ export default function LayersPanel(props: LayersPanelProps) {
                   >
                     <Text style={s.menuItemText}>Mask{layer.clippingMask ? '  ✓' : ''}</Text>
                   </TouchableOpacity>
+                  {layer.type === 'drawing' && (
+                    <TouchableOpacity style={s.menuItem} onPress={() => { setMenuFor(null); onMergeDown(layer.id); }} testID={`layer-menu-merge-${layer.id}`} accessibilityRole="button">
+                      <Text style={s.menuItemText}>Merge Down</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={s.menuItem}
                     onPress={() => { setMenuFor(null); onDeleteLayer(layer.id); }}
@@ -468,6 +528,24 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   thumbImage: { width: '100%', height: '100%' },
+  // Drawing-layer thumbnails are transparent PNGs: a light backdrop like Procreate's.
+  thumbChecker: { width: '100%', height: '100%', backgroundColor: '#E6E6E6' },
+  blendPopover: {
+    marginHorizontal: SP.md, marginTop: 4, marginBottom: SP.sm, paddingVertical: 6,
+    backgroundColor: '#1C1C1C', borderRadius: 12, borderWidth: 1, borderColor: BORDER_SUBTLE,
+  },
+  blendListRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 9 },
+  blendListRowOn: { backgroundColor: 'rgba(255,255,255,0.10)' },
+  blendListText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  blendListLetter: { fontFamily: FONT.semibold, fontSize: FS.sm, color: SUBTLE },
+  blendListTextOn: { color: FG },
+  opacityRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  opacityLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, width: 58 },
+  opacityValue: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, width: 44, textAlign: 'right' },
+  opacityTrack: { flex: 1, height: 28, justifyContent: 'center' },
+  opacityRail: { height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' },
+  opacityFill: { position: 'absolute', left: 0, height: 3, borderRadius: 2, backgroundColor: FG },
+  opacityKnob: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, backgroundColor: FG, top: 5 },
   thumbGlyph: { fontFamily: FONT.semibold, fontSize: FS.sm, includeFontPadding: false },
   rowMain: { flex: 1, justifyContent: 'center' },
   name: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, includeFontPadding: false },
@@ -498,3 +576,43 @@ const s = StyleSheet.create({
   blendChipText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
   blendChipTextActive: { color: BG },
 });
+
+/** The "N" popover's Opacity slider: live while dragging, committed (one undo step) on release. */
+function OpacitySlider({ value, onCommit, testID }: { value: number; onCommit: (v: number) => void; testID?: string }) {
+  const [live, setLive] = useState<number | null>(null);
+  const width = useRef(1);
+  const startX = useRef(0);
+  const latest = useRef(value);
+  const shown = live ?? value;
+  const set = (x: number) => {
+    const v = Math.max(0, Math.min(1, x / width.current));
+    latest.current = v;
+    setLive(v);
+  };
+  const responder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: e => { startX.current = e.nativeEvent.locationX; set(startX.current); },
+    onPanResponderMove: (_e, g) => set(startX.current + g.dx),
+    onPanResponderRelease: () => { onCommit(latest.current); setLive(null); },
+    onPanResponderTerminate: () => { onCommit(latest.current); setLive(null); },
+  })).current;
+  return (
+    <View style={s.opacityRow}>
+      <Text style={s.opacityLabel}>Opacity</Text>
+      <View
+        style={s.opacityTrack}
+        onLayout={e => { width.current = Math.max(1, e.nativeEvent.layout.width); }}
+        {...responder.panHandlers}
+        testID={testID}
+        accessibilityRole="adjustable"
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
+      >
+        <View style={s.opacityRail} pointerEvents="none" />
+        <View style={[s.opacityFill, { width: `${shown * 100}%` }]} pointerEvents="none" />
+        <View style={[s.opacityKnob, { left: `${shown * 100}%` }]} pointerEvents="none" />
+      </View>
+      <Text style={s.opacityValue}>{Math.round(shown * 100)}%</Text>
+    </View>
+  );
+}

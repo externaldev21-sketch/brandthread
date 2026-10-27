@@ -34,6 +34,21 @@ function blend(d: Float32Array, o: number, sr: number, sg: number, sb: number, s
     case 'mask':
       for (let k = 0; k < 4; k++) d[o + k] *= sa;
       break;
+    default: {
+      // Separable blend modes (premultiplied): co = cs·(1−ab) + cb·(1−as) + B(cs, cb)
+      const fn = (cs: number, cb: number): number => {
+        const s = sa > 0 ? cs / sa : 0, b = da > 0 ? cb / da : 0;
+        let m = s;
+        if (mode === 'multiply') m = s * b;
+        else if (mode === 'screen') m = s + b - s * b;
+        else if (mode === 'darken') m = Math.min(s, b);
+        else if (mode === 'lighten') m = Math.max(s, b);
+        else if (mode === 'overlay') m = b <= 0.5 ? 2 * s * b : 1 - 2 * (1 - s) * (1 - b);
+        return cs * (1 - da) + cb * (1 - sa) + sa * da * m;
+      };
+      d[o] = fn(sr, d[o]); d[o + 1] = fn(sg, d[o + 1]); d[o + 2] = fn(sb, d[o + 2]);
+      d[o + 3] = sa + da * (1 - sa);
+    }
   }
 }
 

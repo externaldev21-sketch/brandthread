@@ -20,7 +20,15 @@ import type { StrokeSample } from './dabEmitter';
 
 export interface StrokeRecord {
   v: 1;
-  mode: BrushMode;
+  /**
+   * paint / erase / smudge: a brush stroke.
+   * fill: Procreate's "Fill Layer" (whole layer, honours alpha lock).
+   * merge: a merged-down layer — its own strokes rendered into a separate
+   *   surface, then composited at the merged layer's opacity + blend mode, so
+   *   its eraser strokes never touch the layer it was merged into.
+   */
+  mode: BrushMode | 'fill' | 'merge';
+  merge?: { paths: DrawPath[]; opacity: number; blendMode?: import('@/services/designTypes').BlendModeKind };
   brushId: string;
   brushName: string;
   params: BrushParams;
@@ -37,6 +45,15 @@ export interface StrokeRecord {
   unitScale: number;
   /** Flat [x, y, p, t] quadruples in logical canvas px; p = -1 for no pressure. */
   pts: number[];
+}
+
+/**
+ * Rounds a sample exactly the way samplesToPts stores it. The live engine
+ * feeds the emitter QUANTISED samples, so the stored record replays into the
+ * very same dabs (identical pixels after undo/redo, reload and export).
+ */
+export function quantizeSample(s: StrokeSample, t0: number): StrokeSample {
+  return { x: round1(s.x), y: round1(s.y), p: s.p < 0 ? -1 : Math.round(s.p * 1000) / 1000, t: Math.round(s.t - t0) };
 }
 
 export function samplesToPts(samples: StrokeSample[]): number[] {
@@ -60,7 +77,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 export function drawPathFromRecord(rec: StrokeRecord): DrawPath {
   return {
     d: '',
-    color: rec.mode === 'erase' ? 'erase' : rec.mode === 'smudge' ? 'smudge' : rec.color,
+    color: rec.mode === 'erase' ? 'erase' : rec.mode === 'smudge' ? 'smudge' : rec.mode === 'merge' ? 'merge' : rec.color,
     width: rec.diameter,
     opacity: rec.opacity,
     tool: rec.brushName,
@@ -97,6 +114,23 @@ export function recordFromDrawPath(path: DrawPath): StrokeRecord | null {
     seed: 1,
     unitScale: 1,
     pts,
+  };
+}
+
+/** A "Fill Layer" record. */
+export function fillRecord(color: string, alphaLock: boolean): StrokeRecord {
+  return {
+    v: 1, mode: 'fill', brushId: 'fill', brushName: 'Fill', params: LEGACY_PARAMS,
+    color, diameter: 1, opacity: 1, seed: 1, alphaLock, unitScale: 1, pts: [],
+  };
+}
+
+/** A merged-down layer, replayed as a unit (see StrokeRecord.mode). */
+export function mergeRecord(paths: DrawPath[], opacity: number, blendMode?: import('@/services/designTypes').BlendModeKind): StrokeRecord {
+  return {
+    v: 1, mode: 'merge', brushId: 'merge', brushName: 'Merged layer', params: LEGACY_PARAMS,
+    color: '#000000', diameter: 1, opacity: 1, seed: 1, unitScale: 1, pts: [],
+    merge: { paths, opacity, blendMode },
   };
 }
 

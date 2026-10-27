@@ -19,8 +19,11 @@ export interface IRect { x: number; y: number; w: number; h: number }
  *  - atop:  paints only where dst is already opaque (source-atop) — Alpha Lock
  *  - copy:  replaces dst pixels inside the rect
  *  - mask:  keeps dst only where src is opaque (destination-in)
+ *  - multiply / screen / overlay / darken / lighten: layer blend modes
  */
-export type CompositeMode = 'over' | 'erase' | 'atop' | 'copy' | 'mask';
+export type CompositeMode =
+  | 'over' | 'erase' | 'atop' | 'copy' | 'mask'
+  | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten';
 
 /** A dab in SURFACE pixels (already multiplied by the resolution scale). */
 export interface SurfaceDab {

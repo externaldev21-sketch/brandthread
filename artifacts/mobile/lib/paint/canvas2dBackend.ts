@@ -21,6 +21,11 @@ const OPS: Record<CompositeMode, GlobalCompositeOperation> = {
   atop: 'source-atop',
   copy: 'source-over',
   mask: 'destination-in',
+  multiply: 'multiply',
+  screen: 'screen',
+  overlay: 'overlay',
+  darken: 'darken',
+  lighten: 'lighten',
 };
 
 function ctx2d(s: Surface): CanvasRenderingContext2D {

@@ -25,7 +25,7 @@
 import type { DrawPath } from '@/services/designTypes';
 import { clipRect, rectUnion, type CompositeMode, type IRect, type RasterBackend, type SurfaceDab } from './backend';
 import { DabEmitter, type Dab, type StrokeSample } from './dabEmitter';
-import { ptsToSamples, recordFromDrawPath, samplesToPts, type StrokeRecord } from './strokeRecord';
+import { ptsToSamples, quantizeSample, recordFromDrawPath, samplesToPts, type StrokeRecord } from './strokeRecord';
 
 /** Longest side of the live working surfaces. Plenty for any phone screen; export replays at full size. */
 export const MAX_WORKING_SIDE = 2048;
@@ -40,6 +40,8 @@ interface LayerSurfaces<S> {
 
 interface LiveStroke<S> {
   layerId: string;
+  /** Timestamp of the first sample; samples are stored relative to it. */
+  t0: number;
   rec: StrokeRecord;
   samples: StrokeSample[];
   emitter: DabEmitter;
@@ -50,6 +52,8 @@ interface LiveStroke<S> {
 export interface EngineOptions {
   /** Explicit logical→surface scale. Defaults to fitting MAX_WORKING_SIDE (never upscaling). */
   scale?: number;
+  /** Export engines: no separate display surface per layer (halves memory at print size). */
+  headless?: boolean;
 }
 
 const legacyRecords = new WeakMap<DrawPath, StrokeRecord | null>();
@@ -69,6 +73,7 @@ export class PaintEngine<S> {
   private scratch: S | null = null;
   private live: LiveStroke<S> | null = null;
   private listeners = new Set<(layerId: string) => void>();
+  private readonly headless: boolean;
 
   constructor(
     readonly backend: RasterBackend<S>,
@@ -80,6 +85,7 @@ export class PaintEngine<S> {
     this.scale = opts.scale ?? Math.min(1, MAX_WORKING_SIDE / long);
     this.width = Math.max(1, Math.round(logicalWidth * this.scale));
     this.height = Math.max(1, Math.round(logicalHeight * this.scale));
+    this.headless = !!opts.headless;
   }
 
   get unitScale(): number { return Math.max(this.logicalWidth, this.logicalHeight) / 1080; }
@@ -97,9 +103,10 @@ export class PaintEngine<S> {
   layer(id: string): LayerSurfaces<S> {
     let l = this.layers.get(id);
     if (!l) {
+      const content = this.backend.createSurface(this.width, this.height);
       l = {
-        content: this.backend.createSurface(this.width, this.height),
-        display: this.backend.createSurface(this.width, this.height),
+        content,
+        display: this.headless ? content : this.backend.createSurface(this.width, this.height),
         rendered: [],
       };
       this.layers.set(id, l);
@@ -114,7 +121,7 @@ export class PaintEngine<S> {
     const l = this.layers.get(id);
     if (!l) return;
     this.backend.dispose(l.content);
-    this.backend.dispose(l.display);
+    if (l.display !== l.content) this.backend.dispose(l.display);
     this.layers.delete(id);
   }
 
@@ -143,7 +150,7 @@ export class PaintEngine<S> {
       this.replayInto(l.content, recs[i]);
       l.rendered.push(recs[i]);
     }
-    this.backend.draw(l.display, l.content, this.full(), this.full(), 1, 'copy');
+    this.refreshDisplay(l, this.full());
     this.emit(id);
     return true;
   }
@@ -166,6 +173,7 @@ export class PaintEngine<S> {
     const full: StrokeRecord = { ...rec, unitScale: this.unitScale, pts: [] };
     const live: LiveStroke<S> = {
       layerId,
+      t0: first.t,
       rec: full,
       samples: [],
       emitter: new DabEmitter({ params: full.params, diameter: full.diameter, seed: full.seed, unitScale: full.unitScale }),
@@ -190,7 +198,14 @@ export class PaintEngine<S> {
     const live = this.live;
     if (!live) return;
     const dabs: Dab[] = [];
-    for (const s of samples) { live.samples.push(s); dabs.push(...live.emitter.push(s)); }
+    for (const raw of samples) {
+      const s = quantizeSample(raw, live.t0);
+      // Coalesced pointer events can repeat a timestamp/position; drop exact repeats.
+      const prev = live.samples[live.samples.length - 1];
+      if (prev && prev.x === s.x && prev.y === s.y && prev.t === s.t) continue;
+      live.samples.push(s);
+      dabs.push(...live.emitter.push(s));
+    }
     this.applyLiveDabs(live, dabs);
   }
 
@@ -208,7 +223,7 @@ export class PaintEngine<S> {
       this.backend.draw(l.content, src, live.dirty, live.dirty, live.rec.opacity, this.landMode(live.rec));
       this.backend.clear(this.buffer!, live.dirty);
     }
-    if (live.dirty) this.backend.draw(l.display, l.content, live.dirty, live.dirty, 1, 'copy');
+    if (live.dirty) this.refreshDisplay(l, live.dirty);
     live.rec.pts = samplesToPts(live.samples);
     l.rendered.push(live.rec);
     this.live = null;
@@ -229,11 +244,11 @@ export class PaintEngine<S> {
       l.rendered = [];
       this.backend.clear(l.content);
       for (const r of recs) { this.replayInto(l.content, r); l.rendered.push(r); }
-      this.backend.draw(l.display, l.content, this.full(), this.full(), 1, 'copy');
+      this.refreshDisplay(l, this.full());
     } else {
       if (live.dirty) {
         this.backend.clear(this.buffer!, live.dirty);
-        this.backend.draw(l.display, l.content, live.dirty, live.dirty, 1, 'copy');
+        this.refreshDisplay(l, live.dirty);
       }
     }
     this.emit(live.layerId);
@@ -252,7 +267,7 @@ export class PaintEngine<S> {
     live.dirty = rectUnion(live.dirty, clipped);
     if (live.smudge) {
       this.smudgeDabs(l.content, live.rec, live.smudge, sd);
-      this.backend.draw(l.display, l.content, clipped, clipped, 1, 'copy');
+      this.refreshDisplay(l, clipped);
     } else {
       this.backend.stamp(this.buffer!, live.rec.params.tip, live.rec.mode === 'erase' ? '#000000' : live.rec.color, sd);
       // Recomposite the whole stroke-so-far region: content + grained buffer at stroke opacity.
@@ -268,6 +283,25 @@ export class PaintEngine<S> {
 
   /** Renders one record into `target` exactly as the live path would have. */
   replayInto(target: S, rec: StrokeRecord) {
+    if (rec.mode === 'fill') {
+      const tmp = this.ensureScratchSurface();
+      this.backend.clear(tmp);
+      this.backend.fill(tmp, rec.color, this.full());
+      this.backend.draw(target, tmp, this.full(), this.full(), rec.opacity, rec.alphaLock ? 'atop' : 'over');
+      this.backend.clear(tmp);
+      return;
+    }
+    if (rec.mode === 'merge' && rec.merge) {
+      // Nested layer: its own surface, so its erasers / alpha locks act on it alone.
+      const sub = this.backend.createSurface(this.width, this.height);
+      try {
+        for (const p of rec.merge.paths) { const r = recordOf(p); if (r) this.replayInto(sub, r); }
+        this.backend.draw(target, sub, this.full(), this.full(), rec.merge.opacity, blendOf(rec.merge.blendMode));
+      } finally {
+        this.backend.dispose(sub);
+      }
+      return;
+    }
     const samples = ptsToSamples(rec.pts);
     if (samples.length === 0) return;
     const em = new DabEmitter({ params: rec.params, diameter: rec.diameter, seed: rec.seed, unitScale: rec.unitScale || this.unitScale });
@@ -300,6 +334,15 @@ export class PaintEngine<S> {
   // ─── Internals ─────────────────────────────────────────────────────────────
 
   private full(): IRect { return { x: 0, y: 0, w: this.width, h: this.height }; }
+
+  private refreshDisplay(l: LayerSurfaces<S>, r: IRect) {
+    if (l.display !== l.content) this.backend.draw(l.display, l.content, r, r, 1, 'copy');
+  }
+
+  private ensureScratchSurface(): S {
+    this.ensureScratch();
+    return this.scratch!;
+  }
 
   private ensureScratch() {
     if (!this.buffer) this.buffer = this.backend.createSurface(this.width, this.height);
@@ -352,6 +395,13 @@ export class PaintEngine<S> {
       B.multiplyAlpha(sm.carry, 0.985, C);
       B.draw(sm.carry, target, at, C, 1 - strength * 0.7, 'over');
     }
+  }
+}
+
+function blendOf(mode: string | undefined): CompositeMode {
+  switch (mode) {
+    case 'multiply': case 'screen': case 'overlay': case 'darken': case 'lighten': return mode;
+    default: return 'over';
   }
 }
 
