@@ -12,6 +12,8 @@ export const GLOBE_COLORS = {
   /** Order glow, as "r,g,b". */
   glowRgb: '228,231,236',
   core: '#FFFFFF',
+  /** Outer edge of the halo gradient. */
+  clear: 'rgba(0,0,0,0)',
   /** Captions and popover meta on the black frame. */
   mutedText: '#9A9CA1',
   text: '#D9DBDF',

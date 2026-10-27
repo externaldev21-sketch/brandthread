@@ -1,0 +1,212 @@
+{
+ "rows": [
+  {
+   "what": "Total sales (Today)",
+   "api": "$474.00",
+   "screen": "$474.00",
+   "match": true
+  },
+  {
+   "what": "Sales change vs same hours yesterday",
+   "api": "464.3%",
+   "screen": " 464.3% vs yesterday",
+   "match": true
+  },
+  {
+   "what": "Orders tile",
+   "api": "3",
+   "screen": "ORDERS TODAY 3 ↑ 200%",
+   "match": true
+  },
+  {
+   "what": "Visitors tile",
+   "api": "12",
+   "screen": "VISITORS 12 ↑ 200%",
+   "match": true
+  },
+  {
+   "what": "Conversion tile",
+   "api": "25.0%",
+   "screen": "CONVERSION RATE 25.0%",
+   "match": true
+  },
+  {
+   "what": "AOV tile",
+   "api": "$158.00",
+   "screen": "AVG ORDER VALUE $158.00 ↑ 88.1%",
+   "match": true
+  },
+  {
+   "what": "Top product Wool Overcoat",
+   "api": "Wool Overcoat 2 units sold $480.00",
+   "screen": "Top products See all Wool Overcoat 2 units sold $480.00 Silver Gown 3 units sold $234.00 S Silk Scarf 6 units sold $90.00",
+   "match": true
+  },
+  {
+   "what": "Top product Silver Gown",
+   "api": "Silver Gown 3 units sold $234.00",
+   "screen": "Top products See all Wool Overcoat 2 units sold $480.00 Silver Gown 3 units sold $234.00 S Silk Scarf 6 units sold $90.00",
+   "match": true
+  },
+  {
+   "what": "Top product Silk Scarf",
+   "api": "Silk Scarf 6 units sold $90.00",
+   "screen": "Top products See all Wool Overcoat 2 units sold $480.00 Silver Gown 3 units sold $234.00 S Silk Scarf 6 units sold $90.00",
+   "match": true
+  },
+  {
+   "what": "Recent order #XC1001",
+   "api": "#XC1001 · 1 item",
+   "screen": "Recent orders See all  Ana Buyer #XC1001 · 1 item $246 New   Ana Buyer #XC1002 · 2 items $177 New   Ana Buyer #XC1003 · 1 item $51 Processing   Ana Buyer #XC1004 · 1 item $246 Cancelled   Ana Buyer #XC1005 · 1 item $84 New ",
+   "match": true
+  },
+  {
+   "what": "Recent order #XC1002",
+   "api": "#XC1002 · 2 items",
+   "screen": "Recent orders See all  Ana Buyer #XC1001 · 1 item $246 New   Ana Buyer #XC1002 · 2 items $177 New   Ana Buyer #XC1003 · 1 item $51 Processing   Ana Buyer #XC1004 · 1 item $246 Cancelled   Ana Buyer #XC1005 · 1 item $84 New ",
+   "match": true
+  },
+  {
+   "what": "Recent order #XC1003",
+   "api": "#XC1003 · 1 item",
+   "screen": "Recent orders See all  Ana Buyer #XC1001 · 1 item $246 New   Ana Buyer #XC1002 · 2 items $177 New   Ana Buyer #XC1003 · 1 item $51 Processing   Ana Buyer #XC1004 · 1 item $246 Cancelled   Ana Buyer #XC1005 · 1 item $84 New ",
+   "match": true
+  },
+  {
+   "what": "Recent order #XC1004",
+   "api": "#XC1004 · 1 item",
+   "screen": "Recent orders See all  Ana Buyer #XC1001 · 1 item $246 New   Ana Buyer #XC1002 · 2 items $177 New   Ana Buyer #XC1003 · 1 item $51 Processing   Ana Buyer #XC1004 · 1 item $246 Cancelled   Ana Buyer #XC1005 · 1 item $84 New ",
+   "match": true
+  },
+  {
+   "what": "Recent order #XC1005",
+   "api": "#XC1005 · 1 item",
+   "screen": "Recent orders See all  Ana Buyer #XC1001 · 1 item $246 New   Ana Buyer #XC1002 · 2 items $177 New   Ana Buyer #XC1003 · 1 item $51 Processing   Ana Buyer #XC1004 · 1 item $246 Cancelled   Ana Buyer #XC1005 · 1 item $84 New ",
+   "match": true
+  },
+  {
+   "what": "Traffic feed",
+   "api": "6",
+   "screen": "Traffic sources See all 12 store visits this period ↑ 8 (200%) vs yesterday Most visits from Discover feed  Discover feed 6 50%  Search 3 25%  Your profile 0 0%  External links 3 25%",
+   "match": true
+  },
+  {
+   "what": "Traffic search",
+   "api": "3",
+   "screen": "Traffic sources See all 12 store visits this period ↑ 8 (200%) vs yesterday Most visits from Discover feed  Discover feed 6 50%  Search 3 25%  Your profile 0 0%  External links 3 25%",
+   "match": true
+  },
+  {
+   "what": "Traffic external",
+   "api": "3",
+   "screen": "Traffic sources See all 12 store visits this period ↑ 8 (200%) vs yesterday Most visits from Discover feed  Discover feed 6 50%  Search 3 25%  Your profile 0 0%  External links 3 25%",
+   "match": true
+  },
+  {
+   "what": "Orders to ship (= Orders tab Unfulfilled; 3 of them paid)",
+   "api": "4",
+   "screen": "4 Orders to ship Ship now",
+   "match": true
+  },
+  {
+   "what": "Returns to review",
+   "api": "1 return to review",
+   "screen": "To do 4 Orders to ship Ship now  1 item low on stock   1 return to review ",
+   "match": true
+  },
+  {
+   "what": "Live (orders today)",
+   "api": "3",
+   "screen": "3",
+   "match": true
+  },
+  {
+   "what": "Globe caption",
+   "api": "5 orders · last 7 days",
+   "screen": "5 orders · last 7 days",
+   "match": true
+  }
+ ],
+ "popovers": [
+  {
+   "order": "#XC1001",
+   "popover": "#XC1001  Wool Overcoat $246.00 Tokyo, JP 47m ago",
+   "match": true
+  },
+  {
+   "order": "#XC1002",
+   "popover": "#XC1002  Silver Gown + 1 more $177.00 Paris, FR 1h ago",
+   "match": true
+  },
+  {
+   "order": "#XC1003",
+   "skipped": "never faced the viewer (same spot as a newer order)"
+  },
+  {
+   "order": "#XC1006",
+   "popover": "#XC1006  Silver Gown $84.00 Toronto, CA 1d ago",
+   "match": true
+  },
+  {
+   "order": "#XC1007",
+   "popover": "#XC1007  Wool Overcoat $246.00 Austin, TX 3d ago",
+   "match": true
+  }
+ ],
+ "unknown": [
+  "GET /api/call/dm/incoming",
+  "GET /api/buyer/saved",
+  "POST /api/auth/onboarding/complete",
+  "GET /api/buyer/notifications/unread-count",
+  "GET /api/conversations",
+  "GET /api/first-week",
+  "GET /api/seller/milestones/next",
+  "GET /api/seller-hub/quote-requests",
+  "GET /api/sample-orders",
+  "GET /api/manufacturers/threads",
+  "GET /api/seller/morning-brief",
+  "GET /api/seller/launch-checklist/ready-to-sell",
+  "GET /api/social/followers",
+  "GET /api/reviews/mine",
+  "GET /api/ai/settings",
+  "GET /api/ai/suggestions",
+  "GET /api/seller/subscription/status",
+  "PUT /api/ai/settings",
+  "GET /api/seller/subscription/entitlement",
+  "GET /api/auth/privacy",
+  "GET /api/analytics/home",
+  "GET /api/public/products",
+  "GET /api/posts/mine"
+ ],
+ "errors": [
+  "console: %s must not return anything besides a function, which is used for clean-up.%s useEffect  You returned: [object Object]",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+  "console: Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/calls?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/user?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/messages?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+  "console: WebSocket connection to 'ws://127.0.0.1:5055/ws/seller?token=demo-token' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+ ]
+}

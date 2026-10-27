@@ -1,0 +1,1101 @@
+{
+  "/api/analytics/home?range=today": {
+    "range": "today",
+    "totalCents": 47400,
+    "netCents": 47400,
+    "orderCount": 3,
+    "visitorCount": 12,
+    "conversionRate": 25,
+    "averageOrderCents": 15800,
+    "threadCashReceivedCents": 0,
+    "toFulfill": 3,
+    "toCapture": 0,
+    "previous": {
+      "totalCents": 8400,
+      "netCents": 8400,
+      "orderCount": 1,
+      "visitorCount": 4
+    },
+    "trafficSources": [
+      {
+        "source": "feed",
+        "count": 6,
+        "sharePercent": 50
+      },
+      {
+        "source": "search",
+        "count": 3,
+        "sharePercent": 25
+      },
+      {
+        "source": "profile",
+        "count": 0,
+        "sharePercent": 0
+      },
+      {
+        "source": "external",
+        "count": 3,
+        "sharePercent": 25
+      }
+    ],
+    "buckets": [
+      {
+        "bucket": "2026-10-26 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 01:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 02:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 03:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 04:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 05:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 06:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 07:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 08:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 09:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 10:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 11:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 12
+      },
+      {
+        "bucket": "2026-10-26 12:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 13:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 14:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 15:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 16:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 17:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 18:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 19:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 20:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 21:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 22:00:00",
+        "totalCents": 22800,
+        "netCents": 22800,
+        "orderCount": 2,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-26 23:00:00",
+        "totalCents": 24600,
+        "netCents": 24600,
+        "orderCount": 1,
+        "visitorCount": 0
+      }
+    ]
+  },
+  "/api/analytics/home?range=7d": {
+    "range": "7d",
+    "totalCents": 80400,
+    "netCents": 80400,
+    "orderCount": 5,
+    "visitorCount": 16,
+    "conversionRate": 31.3,
+    "averageOrderCents": 16080,
+    "threadCashReceivedCents": 0,
+    "toFulfill": 3,
+    "toCapture": 0,
+    "previous": {
+      "totalCents": 3600,
+      "netCents": 3600,
+      "orderCount": 1,
+      "visitorCount": 0
+    },
+    "trafficSources": [
+      {
+        "source": "feed",
+        "count": 8,
+        "sharePercent": 50
+      },
+      {
+        "source": "search",
+        "count": 4,
+        "sharePercent": 25
+      },
+      {
+        "source": "profile",
+        "count": 0,
+        "sharePercent": 0
+      },
+      {
+        "source": "external",
+        "count": 4,
+        "sharePercent": 25
+      }
+    ],
+    "buckets": [
+      {
+        "bucket": "2026-10-20 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-21 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-22 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-23 00:00:00",
+        "totalCents": 24600,
+        "netCents": 24600,
+        "orderCount": 1,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-24 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-25 00:00:00",
+        "totalCents": 8400,
+        "netCents": 8400,
+        "orderCount": 1,
+        "visitorCount": 4
+      },
+      {
+        "bucket": "2026-10-26 00:00:00",
+        "totalCents": 47400,
+        "netCents": 47400,
+        "orderCount": 3,
+        "visitorCount": 12
+      }
+    ]
+  },
+  "/api/analytics/home?range=30d": {
+    "range": "30d",
+    "totalCents": 84000,
+    "netCents": 84000,
+    "orderCount": 6,
+    "visitorCount": 16,
+    "conversionRate": 37.5,
+    "averageOrderCents": 14000,
+    "threadCashReceivedCents": 0,
+    "toFulfill": 3,
+    "toCapture": 0,
+    "previous": {
+      "totalCents": 0,
+      "netCents": 0,
+      "orderCount": 0,
+      "visitorCount": 0
+    },
+    "trafficSources": [
+      {
+        "source": "feed",
+        "count": 8,
+        "sharePercent": 50
+      },
+      {
+        "source": "search",
+        "count": 4,
+        "sharePercent": 25
+      },
+      {
+        "source": "profile",
+        "count": 0,
+        "sharePercent": 0
+      },
+      {
+        "source": "external",
+        "count": 4,
+        "sharePercent": 25
+      }
+    ],
+    "buckets": [
+      {
+        "bucket": "2026-09-27 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-09-28 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-09-29 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-09-30 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-01 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-02 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-03 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-04 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-05 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-06 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-07 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-08 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-09 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-10 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-11 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-12 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-13 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-14 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-15 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-16 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-17 00:00:00",
+        "totalCents": 3600,
+        "netCents": 3600,
+        "orderCount": 1,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-18 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-19 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-20 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-21 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-22 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-23 00:00:00",
+        "totalCents": 24600,
+        "netCents": 24600,
+        "orderCount": 1,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-24 00:00:00",
+        "totalCents": 0,
+        "netCents": 0,
+        "orderCount": 0,
+        "visitorCount": 0
+      },
+      {
+        "bucket": "2026-10-25 00:00:00",
+        "totalCents": 8400,
+        "netCents": 8400,
+        "orderCount": 1,
+        "visitorCount": 4
+      },
+      {
+        "bucket": "2026-10-26 00:00:00",
+        "totalCents": 47400,
+        "netCents": 47400,
+        "orderCount": 3,
+        "visitorCount": 12
+      }
+    ]
+  },
+  "/api/analytics/products": [
+    {
+      "productId": "0c0a6087-ae5f-4955-bb41-802db9a21219",
+      "name": "Wool Overcoat",
+      "imageUrl": "https://img.test/coat.jpg",
+      "revenueCents": 48000,
+      "unitsSold": 2,
+      "orderCount": 2,
+      "inventoryStatus": "low"
+    },
+    {
+      "productId": "bb6fbcb4-1017-4142-970b-de3a1816399d",
+      "name": "Silver Gown",
+      "imageUrl": "https://img.test/gown.jpg",
+      "revenueCents": 23400,
+      "unitsSold": 3,
+      "orderCount": 2,
+      "inventoryStatus": "in_stock"
+    },
+    {
+      "productId": "28ddfc59-5d0b-44fa-87c0-cf9cf237f752",
+      "name": "Silk Scarf",
+      "imageUrl": null,
+      "revenueCents": 9000,
+      "unitsSold": 6,
+      "orderCount": 3,
+      "inventoryStatus": "out_of_stock"
+    }
+  ],
+  "/api/orders": [
+    {
+      "id": "b6e78397-a141-47fa-98e5-57c3c3371c5c",
+      "orderNumber": "#XC1001",
+      "status": "pending",
+      "totalCents": 24600,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-26T23:12:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.549Z",
+      "paidAt": "2026-10-26T23:12:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "49282c47-f997-4aa6-8ee1-3f1a0411107c",
+          "productId": "0c0a6087-ae5f-4955-bb41-802db9a21219",
+          "productName": "Wool Overcoat",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 24000,
+          "imageUrl": "https://img.test/coat.jpg"
+        }
+      ],
+      "thumbnailUrl": "https://img.test/coat.jpg"
+    },
+    {
+      "id": "bd6fc6e5-a921-45e1-9a39-a64309f0aca2",
+      "orderNumber": "#XC1002",
+      "status": "pending",
+      "totalCents": 17700,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-26T22:37:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.554Z",
+      "paidAt": "2026-10-26T22:37:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 2,
+      "risk": null,
+      "items": [
+        {
+          "id": "73e5a64a-fcea-4aa9-9945-d399d021af03",
+          "productId": "bb6fbcb4-1017-4142-970b-de3a1816399d",
+          "productName": "Silver Gown",
+          "variantLabel": null,
+          "quantity": 2,
+          "priceCents": 7800,
+          "imageUrl": "https://img.test/gown.jpg"
+        },
+        {
+          "id": "46663558-e220-4dee-8be4-c201ec38ee58",
+          "productId": "28ddfc59-5d0b-44fa-87c0-cf9cf237f752",
+          "productName": "Silk Scarf",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 1500,
+          "imageUrl": null
+        }
+      ],
+      "thumbnailUrl": "https://img.test/gown.jpg"
+    },
+    {
+      "id": "d5b02641-8925-4f69-bc08-2dd6baf513d8",
+      "orderNumber": "#XC1003",
+      "status": "processing",
+      "totalCents": 5100,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-26T22:07:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.558Z",
+      "paidAt": "2026-10-26T22:07:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "d26d230e-d5f8-4901-93d9-389f09c61569",
+          "productId": "28ddfc59-5d0b-44fa-87c0-cf9cf237f752",
+          "productName": "Silk Scarf",
+          "variantLabel": null,
+          "quantity": 3,
+          "priceCents": 1500,
+          "imageUrl": null
+        }
+      ],
+      "thumbnailUrl": null
+    },
+    {
+      "id": "153da3de-2500-4b14-8121-bb2f7526f142",
+      "orderNumber": "#XC1004",
+      "status": "cancelled",
+      "totalCents": 24600,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-26T21:57:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.562Z",
+      "paidAt": null,
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "44a14ec7-510a-42e1-93e6-a98f7bac88ce",
+          "productId": "0c0a6087-ae5f-4955-bb41-802db9a21219",
+          "productName": "Wool Overcoat",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 24000,
+          "imageUrl": "https://img.test/coat.jpg"
+        }
+      ],
+      "thumbnailUrl": "https://img.test/coat.jpg"
+    },
+    {
+      "id": "faaab69c-17b5-40ec-aedc-a1052c33963a",
+      "orderNumber": "#XC1005",
+      "status": "pending",
+      "totalCents": 8400,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-26T21:47:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.565Z",
+      "paidAt": null,
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "16211ae8-5555-49f2-a6d6-582bed0bfa84",
+          "productId": "bb6fbcb4-1017-4142-970b-de3a1816399d",
+          "productName": "Silver Gown",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 7800,
+          "imageUrl": "https://img.test/gown.jpg"
+        }
+      ],
+      "thumbnailUrl": "https://img.test/gown.jpg"
+    },
+    {
+      "id": "da5b41f9-e3b3-4a85-87b7-afc69ef4c03e",
+      "orderNumber": "#XC1006",
+      "status": "shipped",
+      "totalCents": 8400,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-25T22:57:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.568Z",
+      "paidAt": "2026-10-25T22:57:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "fc27922a-e5d5-44e0-b78c-4352a1812144",
+          "productId": "bb6fbcb4-1017-4142-970b-de3a1816399d",
+          "productName": "Silver Gown",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 7800,
+          "imageUrl": "https://img.test/gown.jpg"
+        }
+      ],
+      "thumbnailUrl": "https://img.test/gown.jpg"
+    },
+    {
+      "id": "f3d954eb-acd1-460d-abfd-5b0742f2d077",
+      "orderNumber": "#XC1007",
+      "status": "delivered",
+      "totalCents": 24600,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-23T23:17:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.572Z",
+      "paidAt": "2026-10-23T23:17:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "82329898-a35d-4d09-a672-598666eca8cb",
+          "productId": "0c0a6087-ae5f-4955-bb41-802db9a21219",
+          "productName": "Wool Overcoat",
+          "variantLabel": null,
+          "quantity": 1,
+          "priceCents": 24000,
+          "imageUrl": "https://img.test/coat.jpg"
+        }
+      ],
+      "thumbnailUrl": "https://img.test/coat.jpg"
+    },
+    {
+      "id": "1f949191-1c48-4d92-afee-09e946072aa0",
+      "orderNumber": "#XC1008",
+      "status": "delivered",
+      "totalCents": 3600,
+      "trackingNumber": null,
+      "carrier": null,
+      "cancellationReason": null,
+      "createdAt": "2026-10-17T23:17:04.516Z",
+      "updatedAt": "2026-10-26T23:17:04.576Z",
+      "paidAt": "2026-10-17T23:17:04.516Z",
+      "source": null,
+      "deliverBy": null,
+      "isPreorder": false,
+      "promisedShipDate": null,
+      "deliveredAt": null,
+      "autoRefundedAt": null,
+      "disputePausedAt": null,
+      "customerName": "Ana Buyer",
+      "customerEmail": "xcheck-buyer-d3202e6387@test.local",
+      "dropName": null,
+      "dropType": null,
+      "itemCount": 1,
+      "risk": null,
+      "items": [
+        {
+          "id": "507f19c4-37f7-482e-8a20-cc900bef4154",
+          "productId": "28ddfc59-5d0b-44fa-87c0-cf9cf237f752",
+          "productName": "Silk Scarf",
+          "variantLabel": null,
+          "quantity": 2,
+          "priceCents": 1500,
+          "imageUrl": null
+        }
+      ],
+      "thumbnailUrl": null
+    }
+  ],
+  "/api/returns": [
+    {
+      "id": "ret_d3202e6387_2",
+      "orderId": "f3d954eb-acd1-460d-abfd-5b0742f2d077",
+      "buyerId": "xcheck-buyer-d3202e6387",
+      "sellerId": "xcheck-seller-d3202e6387",
+      "reason": "fit",
+      "notes": null,
+      "resolutionRequested": "refund",
+      "status": "approved",
+      "stripeRefundId": null,
+      "refundAmountCents": null,
+      "sellerResponse": null,
+      "evidenceUrls": [],
+      "requestedItems": [],
+      "returnLabelUrl": null,
+      "returnCarrier": null,
+      "returnTrackingNumber": null,
+      "returnTrackingStatus": null,
+      "refundOnScan": false,
+      "createdAt": "2026-10-26T23:17:04.575Z",
+      "updatedAt": "2026-10-26T23:17:04.575Z",
+      "orderNumber": "#XC1007",
+      "totalCents": 24600,
+      "buyerName": "Ana Buyer"
+    },
+    {
+      "id": "ret_d3202e6387_1",
+      "orderId": "da5b41f9-e3b3-4a85-87b7-afc69ef4c03e",
+      "buyerId": "xcheck-buyer-d3202e6387",
+      "sellerId": "xcheck-seller-d3202e6387",
+      "reason": "fit",
+      "notes": null,
+      "resolutionRequested": "refund",
+      "status": "pending",
+      "stripeRefundId": null,
+      "refundAmountCents": null,
+      "sellerResponse": null,
+      "evidenceUrls": [],
+      "requestedItems": [],
+      "returnLabelUrl": null,
+      "returnCarrier": null,
+      "returnTrackingNumber": null,
+      "returnTrackingStatus": null,
+      "refundOnScan": false,
+      "createdAt": "2026-10-26T23:17:04.571Z",
+      "updatedAt": "2026-10-26T23:17:04.571Z",
+      "orderNumber": "#XC1006",
+      "totalCents": 8400,
+      "buyerName": "Ana Buyer"
+    }
+  ],
+  "/api/products": [
+    {
+      "id": "0c0a6087-ae5f-4955-bb41-802db9a21219",
+      "name": "Wool Overcoat",
+      "category": "apparel",
+      "status": "active",
+      "images": [
+        "https://img.test/coat.jpg"
+      ],
+      "tags": [],
+      "createdAt": "2026-10-26T23:17:04.543Z",
+      "updatedAt": "2026-10-26T23:17:04.543Z",
+      "variantCount": 1,
+      "totalStock": 3,
+      "lowStockCount": 1,
+      "priceCents": 24000,
+      "minPriceCents": 24000
+    },
+    {
+      "id": "28ddfc59-5d0b-44fa-87c0-cf9cf237f752",
+      "name": "Silk Scarf",
+      "category": "apparel",
+      "status": "active",
+      "images": [],
+      "tags": [],
+      "createdAt": "2026-10-26T23:17:04.543Z",
+      "updatedAt": "2026-10-26T23:17:04.543Z",
+      "variantCount": 1,
+      "totalStock": 0,
+      "lowStockCount": 1,
+      "priceCents": 1500,
+      "minPriceCents": 1500
+    },
+    {
+      "id": "bb6fbcb4-1017-4142-970b-de3a1816399d",
+      "name": "Silver Gown",
+      "category": "apparel",
+      "status": "active",
+      "images": [
+        "https://img.test/gown.jpg"
+      ],
+      "tags": [],
+      "createdAt": "2026-10-26T23:17:04.543Z",
+      "updatedAt": "2026-10-26T23:17:04.543Z",
+      "variantCount": 1,
+      "totalStock": 40,
+      "lowStockCount": 0,
+      "priceCents": 7800,
+      "minPriceCents": 7800
+    }
+  ],
+  "/api/seller/live-map/today": {
+    "total": 3,
+    "cities": [
+      {
+        "key": "JP:40:tokyo",
+        "city": "Tokyo",
+        "region": "40",
+        "country": "JP",
+        "lat": 35.69,
+        "lng": 139.69,
+        "count": 1,
+        "lastAt": "2026-10-26T23:12:04.516Z"
+      },
+      {
+        "key": "FR:11:paris",
+        "city": "Paris",
+        "region": "11",
+        "country": "FR",
+        "lat": 48.85,
+        "lng": 2.35,
+        "count": 1,
+        "lastAt": "2026-10-26T22:37:04.516Z"
+      },
+      {
+        "key": "AU:02:sydney",
+        "city": "Sydney",
+        "region": "02",
+        "country": "AU",
+        "lat": -33.87,
+        "lng": 151.21,
+        "count": 1,
+        "lastAt": "2026-10-26T22:07:04.516Z"
+      }
+    ],
+    "recent": [
+      {
+        "id": "b6e78397-a141-47fa-98e5-57c3c3371c5c",
+        "orderNumber": "#XC1001",
+        "item": "Wool Overcoat",
+        "itemCount": 1,
+        "amountCents": 24600,
+        "key": "JP:40:tokyo",
+        "city": "Tokyo",
+        "region": "40",
+        "country": "JP",
+        "lat": 35.69,
+        "lng": 139.69,
+        "at": "2026-10-26T23:12:04.516Z"
+      },
+      {
+        "id": "bd6fc6e5-a921-45e1-9a39-a64309f0aca2",
+        "orderNumber": "#XC1002",
+        "item": "Silver Gown",
+        "itemCount": 2,
+        "amountCents": 17700,
+        "key": "FR:11:paris",
+        "city": "Paris",
+        "region": "11",
+        "country": "FR",
+        "lat": 48.85,
+        "lng": 2.35,
+        "at": "2026-10-26T22:37:04.516Z"
+      },
+      {
+        "id": "d5b02641-8925-4f69-bc08-2dd6baf513d8",
+        "orderNumber": "#XC1003",
+        "item": "Silk Scarf",
+        "itemCount": 1,
+        "amountCents": 5100,
+        "key": "AU:02:sydney",
+        "city": "Sydney",
+        "region": "02",
+        "country": "AU",
+        "lat": -33.87,
+        "lng": 151.21,
+        "at": "2026-10-26T22:07:04.516Z"
+      },
+      {
+        "id": "da5b41f9-e3b3-4a85-87b7-afc69ef4c03e",
+        "orderNumber": "#XC1006",
+        "item": "Silver Gown",
+        "itemCount": 1,
+        "amountCents": 8400,
+        "key": "CA:08:toronto",
+        "city": "Toronto",
+        "region": "08",
+        "country": "CA",
+        "lat": 43.7,
+        "lng": -79.42,
+        "at": "2026-10-25T22:57:04.516Z"
+      },
+      {
+        "id": "f3d954eb-acd1-460d-abfd-5b0742f2d077",
+        "orderNumber": "#XC1007",
+        "item": "Wool Overcoat",
+        "itemCount": 1,
+        "amountCents": 24600,
+        "key": "US:TX:austin",
+        "city": "Austin",
+        "region": "TX",
+        "country": "US",
+        "lat": 30.27,
+        "lng": -97.74,
+        "at": "2026-10-23T23:17:04.516Z"
+      }
+    ]
+  }
+}

@@ -20,7 +20,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useFrameCallback, useSharedValue } from 'react-native-reanimated';
 
@@ -42,6 +41,7 @@ import {
 } from '@/lib/liveMap/globe';
 import { globeSpots, liveMapCityLabel, RECENT_ORDERS_LIMIT, recentOrders, type LiveMapRecentOrder, type LiveMapToday } from '@/lib/liveMap/liveMap';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { Icon } from '@/components/ui/Icon';
 import { GlobeSurface, globeSurfaceMode } from '@/components/globe/GlobeSurface';
 import { FlatOrderMap, flatHeightFor } from '@/components/globe/FlatOrderMap';
 import { OrderGlobePopover } from '@/components/globe/OrderGlobePopover';
@@ -312,7 +312,7 @@ export function SellerOrderGlobe({
           accessibilityLabel={`Live, ${total} ${total === 1 ? 'order' : 'orders'} today. Open full screen`}
           testID="seller-live-map-expand"
         >
-          <Feather name="maximize-2" size={14} color={theme.subtle} />
+          <Icon name="maximize-2" size={14} color={theme.subtle} />
         </TouchableOpacity>
       </View>
       <View style={[styles.frame, { borderColor: theme.borderSubtle }]}>
@@ -369,7 +369,7 @@ export function SellerOrderGlobe({
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
   headerLeft: { flexDirection: 'row', alignItems: 'baseline', gap: SP.sm, flexShrink: 1 },
-  sectionHeader: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionHeader: { fontFamily: FONT.bold, fontSize: FS.sm },
   headerCount: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   headerCaption: { fontFamily: FONT.medium, fontSize: FS.xs, flexShrink: 1 },
   frame: {

@@ -70,7 +70,7 @@ export function GlobeSurface({ size, view, clock, orders, selectedId, highlightK
       // Atmosphere: a faint silver halo just outside the limb.
       const halo = ctx.createRadialGradient(c, c, r * 0.96, c, c, r * 1.14);
       halo.addColorStop(0, GLOBE_COLORS.haloInner);
-      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      halo.addColorStop(1, GLOBE_COLORS.clear);
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(c, c, r * 1.14, 0, Math.PI * 2);
