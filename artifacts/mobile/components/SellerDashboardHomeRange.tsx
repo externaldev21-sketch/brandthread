@@ -31,5 +31,5 @@ export function SellerDashboardHomeRange({
 }
 
 const styles = StyleSheet.create({
-  root: { marginTop: SP.md },
+  root: { marginTop: SP.md, marginBottom: 0 },
 });

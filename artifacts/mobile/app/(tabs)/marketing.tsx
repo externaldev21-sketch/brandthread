@@ -316,7 +316,9 @@ export default function MarketingScreen() {
 
       {/* Growth: tracked links, link in bio, store pixels */}
       <SectionHeader title="Growth" />
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden' }}>
+      {/* ListRow has no side padding of its own; the card supplies it so the
+          icon tiles clear the rounded, clipped edge. */}
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: 'hidden', paddingHorizontal: SP.md }}>
         <ListRow icon="link" title="Links" subtitle="Trackable links with clicks and sales" chevron onPress={() => router.push('/growth-links' as never)} />
         <ListRow icon="user" title="Link in bio" subtitle="Your shareable page" chevron onPress={() => router.push('/link-in-bio' as never)} />
         <ListRow icon="activity" title="Pixels" subtitle="Meta and TikTok" chevron onPress={() => router.push('/store-pixels' as never)} />

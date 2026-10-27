@@ -1128,6 +1128,10 @@ function makeStyles(theme: AppThemePreset) {
     dashboardRow: {
       backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1,
       borderRadius: RADIUS.md, marginBottom: SP.sm,
+      // ListRow has no side padding of its own (it lives inside padded
+      // cards); this bordered row needs its own, or the icon tile sits on
+      // the border and the rounded corner clips it.
+      paddingHorizontal: SP.md,
     },
     followBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     previewBanner: {

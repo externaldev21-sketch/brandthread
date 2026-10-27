@@ -24,7 +24,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/serviceConfig', () => ({ serviceRequest: request }));
 vi.mock('@/lib/devPreview', () => ({ isSellerDevPreview: () => false, isPreviewDemoMode: () => false, isBuyerDevPreview: () => false }));
-vi.mock('react-native', () => ({ Platform: { OS: 'web' }, View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (o: unknown) => o } }));
+vi.mock('react-native', () => ({ Platform: { OS: 'web', select: (o: Record<string, unknown>) => o.web ?? o.default }, View: 'View', Text: 'Text', TouchableOpacity: 'TouchableOpacity', StyleSheet: { create: (o: unknown) => o } }));
 vi.mock('expo-haptics', () => ({ selectionAsync: () => undefined }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: () => undefined }) }));
 vi.mock('@expo/vector-icons', () => ({ Feather: 'Feather' }));

@@ -76,3 +76,19 @@ export function withSystemFont<T extends StyleProp<TextStyle>>(style: T): T {
   };
   return [style, override] as unknown as T;
 }
+
+/**
+ * Font props for react-native-svg `<Text>` (chart axis/tick labels). SVG text
+ * never passes through the app's Text shim, so a bare `fontFamily={FONT.x}`
+ * reaches the renderer as the literal family "system-400" and falls back to
+ * the browser's default serif on web. Spread this instead:
+ *
+ *   <SvgText {...svgTextFont(FONT.regular)} fontSize={FS.xs} …>
+ *
+ * Web gets Inter (SYSTEM_FONT) at the token's weight; native omits the family
+ * so react-native-svg draws in the platform UI font, like every other Text.
+ */
+export function svgTextFont(token: string): { fontFamily?: string; fontWeight: SystemFontWeight } {
+  const weight = (weightForFamily(token) ?? '400') as SystemFontWeight;
+  return Platform.OS === 'web' ? { fontFamily: SYSTEM_FONT, fontWeight: weight } : { fontWeight: weight };
+}

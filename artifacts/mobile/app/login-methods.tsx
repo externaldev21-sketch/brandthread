@@ -484,6 +484,9 @@ export default function LoginMethods() {
               icon="mail"
               title="Change email"
               chevron
+              // ListRow has no side padding; this card clips at its rounded
+              // edge, so the row brings its own or the icon tile sits on it.
+              style={s.cardRow}
               onPress={() => router.push('/change-email' as never)}
             />
             {hasPassword && (
@@ -494,6 +497,7 @@ export default function LoginMethods() {
                   icon="lock"
                   title="Change password"
                   chevron
+                  style={s.cardRow}
                   onPress={() => router.push('/change-password' as never)}
                 />
               </>
@@ -805,6 +809,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
     marginBottom: SPACING.lg,
   },
+  cardRow: { paddingHorizontal: SPACING.md },
   row: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SPACING.md, paddingVertical: 14, gap: SPACING.sm,

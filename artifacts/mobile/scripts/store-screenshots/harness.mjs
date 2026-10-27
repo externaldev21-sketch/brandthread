@@ -90,7 +90,10 @@ export async function serveBuild(buildDir) {
 export async function launchBrowser() {
   const { chromium } = await import('playwright');
   try {
-    return await chromium.launch();
+    // PLAYWRIGHT_CHROMIUM_PATH points at a preinstalled Chromium when the
+    // pinned Playwright's own download is absent (e.g. cloud containers).
+    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
+    return await chromium.launch(executablePath ? { executablePath } : {});
   } catch (error) {
     if (String(error?.message).includes("Executable doesn't exist")) {
       throw new Error('Chromium for Playwright is not installed. Run once:  pnpm exec playwright install chromium');

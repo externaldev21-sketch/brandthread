@@ -11,6 +11,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import Svg, { Defs, LinearGradient, Line, Path, Stop, Text as SvgText, Circle } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { svgTextFont } from '@/lib/systemFont';
 import { CachedImage } from '@/components/CachedImage';
 import { TrendChip } from '@/components/analytics/AnalyticsKit';
 import { bucketLabel, selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
@@ -104,7 +105,7 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
           const ly = y(allZero ? (i / 2) * topVal : v);
           return (
             <React.Fragment key={i}>
-              <SvgText x={yLabelW - 6} y={ly + 4} textAnchor="end" fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.mutedForeground}>
+              <SvgText x={yLabelW - 6} y={ly + 4} textAnchor="end" fontSize={FS.xs} {...svgTextFont(FONT.regular)} fill={colors.mutedForeground}>
                 {allZero ? '' : fmt(v)}
               </SvgText>
             </React.Fragment>
@@ -113,7 +114,7 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
         {!allZero && n > 1 && <Path d={linePath} stroke={colors.primary} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />}
         {!allZero && <Circle cx={x(n - 1)} cy={y(points[n - 1].value)} r={3.5} fill={colors.primary} />}
         {labelIdx.map(i => (
-          <SvgText key={`l${i}`} x={x(i)} y={height - 4} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.mutedForeground}>
+          <SvgText key={`l${i}`} x={x(i)} y={height - 4} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontSize={FS.xs} {...svgTextFont(FONT.regular)} fill={colors.mutedForeground}>
             {bucketLabel(points[i].bucket, range)}
           </SvgText>
         ))}

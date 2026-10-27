@@ -26,6 +26,7 @@ import { haptics, haptic } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
 
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { svgTextFont } from '@/lib/systemFont';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
@@ -339,7 +340,7 @@ export function AnalyticsBarChart({
           const y = levels.length === 1 ? gridHeight : gridHeight - (i / (levels.length - 1)) * (gridHeight - 4);
           return (
             <React.Fragment key={i}>
-              <SvgText x={yLabelW - 4} y={y + 4} textAnchor="end" fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.subtle}>
+              <SvgText x={yLabelW - 4} y={y + 4} textAnchor="end" fontSize={FS.xs} {...svgTextFont(FONT.regular)} fill={colors.subtle}>
                 {fmt(v)}
               </SvgText>
             </React.Fragment>
@@ -356,7 +357,7 @@ export function AnalyticsBarChart({
           const indices = points.length <= 7 ? points.map((_, i) => i) : [0, Math.floor((points.length - 1) / 2), points.length - 1];
           // First/last labels anchor inward so they never run past the chart edge.
           return indices.map(i => (
-            <SvgText key={`lbl-${i}`} x={barX(i) + barW / 2} y={height - 2} textAnchor={points.length > 7 && i === 0 ? 'start' : points.length > 7 && i === points.length - 1 ? 'end' : 'middle'} fontSize={FS.xs} fontFamily={FONT.regular} fill={colors.subtle}>
+            <SvgText key={`lbl-${i}`} x={barX(i) + barW / 2} y={height - 2} textAnchor={points.length > 7 && i === 0 ? 'start' : points.length > 7 && i === points.length - 1 ? 'end' : 'middle'} fontSize={FS.xs} {...svgTextFont(FONT.regular)} fill={colors.subtle}>
               {points[i].label}
             </SvgText>
           ));

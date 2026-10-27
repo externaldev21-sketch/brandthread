@@ -118,6 +118,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SP.xs,
     marginTop: SP.sm,
+    // The glass pill fills the row's full 44pt height, so whatever sits
+    // directly below (Analytics' Visits tile, a report's first card) must
+    // not start at the pill's edge. Callers that end a card with the row
+    // (SellerDashboardChart) pass marginBottom: 0.
+    marginBottom: SP.sm,
     position: 'relative',
   },
   rangeIndicatorWrap: {

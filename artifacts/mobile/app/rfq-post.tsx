@@ -241,7 +241,9 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   typeChipTextActive: { color: theme.accentLight, fontFamily: FONT.semibold },
   field: { marginBottom: SP.sm },
   row2: { flexDirection: 'row', gap: SP.sm },
-  half: { flex: 1 },
+  // minWidth 0: on web the two inputs would not shrink below their
+  // intrinsic width and overlapped each other.
+  half: { flex: 1, minWidth: 0 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, height: 44, marginBottom: SP.sm },
   searchInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },
   loadingWrap: { paddingVertical: SP.xl, alignItems: 'center' },

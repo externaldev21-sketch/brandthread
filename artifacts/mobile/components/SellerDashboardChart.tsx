@@ -388,7 +388,7 @@ export function SellerDashboardChart({
       )}
 
       {rangeControl ?? (
-        <SellerDashboardRangePills range={range as SellerDashboardRange} onRangeChange={onRangeChange ?? (() => {})} theme={theme} />
+        <SellerDashboardRangePills range={range as SellerDashboardRange} onRangeChange={onRangeChange ?? (() => {})} theme={theme} style={{ marginBottom: 0 }} />
       )}
     </View>
   );
