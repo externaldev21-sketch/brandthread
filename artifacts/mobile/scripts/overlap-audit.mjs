@@ -175,6 +175,7 @@ function inPageCheck({ allow }) {
   // Pinned chrome (floating tab bar, sticky header, footer CTA): content
   // scrolls underneath it by design; cutoff-audit's "covered" check owns that.
   const pinned = (el) => {
+    let bar = false;
     for (let p = el; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p);
       if (cs.position === 'fixed' || cs.position === 'sticky') return true;
@@ -184,10 +185,10 @@ function inPageCheck({ allow }) {
       if (cs.position === 'absolute') {
         const r = p.getBoundingClientRect();
         // A bar, not a navigator scene (scenes are absolute and full-screen).
-        if (r.width >= VW * 0.5 && r.height < VH * 0.4 && (r.bottom >= VH - 140 || r.top <= 0)) return true;
+        if (r.width >= VW * 0.5 && r.height < VH * 0.4 && (r.bottom >= VH - 140 || r.top <= 0)) bar = true;
       }
     }
-    return false;
+    return bar;
   };
   const inHorizontalScroller = (el) => {
     for (let p = el.parentElement; p; p = p.parentElement) {

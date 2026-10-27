@@ -61,3 +61,13 @@ describe('giveaway rules retry row', () => {
     expect(read('app/seller-giveaway-create.tsx')).toMatch(/<RetryRow label="Couldn't load the rules template" style=\{\{ marginTop: SP\.sm \}\}/);
   });
 });
+
+describe('more audit fixes', () => {
+  it('FormInput text input can shrink beside another input', () => {
+    expect(read('components/BrandthreadUI.tsx')).toMatch(/input:\s+\{ flex: 1, minWidth: 0, fontSize: FS\.base/);
+  });
+
+  it('store editor leaves a gap under "Add section"', () => {
+    expect(styleBlock(read('app/store-editor.tsx'), 'sectionsTopRow')).toMatch(/paddingBottom: SP\.sm/);
+  });
+});
