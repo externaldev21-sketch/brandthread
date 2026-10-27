@@ -38,11 +38,41 @@ export interface LiveMapRecentOrder {
   at: string;
 }
 
+/**
+ * Shoppers browsing the store right now, by city (GET /api/seller/live-map/today
+ * `sessions`): signed-in visitors of the last few minutes, placed at the
+ * city of their saved address. City level only, never who.
+ */
+export interface LiveMapSession {
+  key: string;
+  city: string;
+  region: string;
+  country: string;
+  lat: number;
+  lng: number;
+  count: number;
+}
+
+/** The store's own place (seller profile location), where order arcs land. */
+export interface LiveMapHome {
+  key: string;
+  city: string;
+  region: string;
+  country: string;
+  lat: number;
+  lng: number;
+}
+
 export interface LiveMapToday {
   total: number;
   cities: LiveMapCity[];
   /** Newest first. Older servers omit it; read through `recentOrders()`. */
   recent?: LiveMapRecentOrder[];
+  /** Busiest first. Older servers omit it; read through `liveSessions()`. */
+  sessions?: LiveMapSession[];
+  /** Every active session, including ones that can't be placed (signed out). */
+  sessionsTotal?: number;
+  home?: LiveMapHome | null;
 }
 
 export interface OrderCityEvent {
@@ -72,10 +102,47 @@ export function globeSpots(recent: LiveMapRecentOrder[]): GlobeSpot[] {
   return [...byKey.values()];
 }
 
-export const EMPTY_LIVE_MAP: LiveMapToday = { total: 0, cities: [], recent: [] };
+export const EMPTY_LIVE_MAP: LiveMapToday = { total: 0, cities: [], recent: [], sessions: [], sessionsTotal: 0, home: null };
+
+// Stable empties, so a missing list doesn't look like a new one every render.
+const NO_RECENT: LiveMapRecentOrder[] = [];
+const NO_SESSIONS: LiveMapSession[] = [];
 
 export function recentOrders(state: LiveMapToday | null | undefined): LiveMapRecentOrder[] {
-  return Array.isArray(state?.recent) ? state.recent : [];
+  return Array.isArray(state?.recent) ? state.recent : NO_RECENT;
+}
+
+export function liveSessions(state: LiveMapToday | null | undefined): LiveMapSession[] {
+  return Array.isArray(state?.sessions) ? state.sessions : NO_SESSIONS;
+}
+
+/**
+ * Everything the globe draws a dot for: one per place with recent orders
+ * (newest first), then one per place with shoppers on the store right now.
+ * A place with both shows the order dot; its session count rides along.
+ * No activity, no dot.
+ */
+export type GlobeActivity =
+  | { kind: 'order'; id: string; key: string; lat: number; lng: number; order: LiveMapRecentOrder; count: number; sessions: number }
+  | { kind: 'session'; id: string; key: string; lat: number; lng: number; session: LiveMapSession };
+
+export function globeActivities(recent: LiveMapRecentOrder[], sessions: LiveMapSession[]): GlobeActivity[] {
+  const sessionsByKey = new Map(sessions.map((s) => [s.key, s.count]));
+  const out: GlobeActivity[] = globeSpots(recent).map(({ order, count }) => ({
+    kind: 'order', id: order.id, key: order.key, lat: order.lat, lng: order.lng, order, count, sessions: sessionsByKey.get(order.key) ?? 0,
+  }));
+  const taken = new Set(out.map((a) => a.key));
+  for (const session of sessions) {
+    if (session.count <= 0 || taken.has(session.key)) continue;
+    taken.add(session.key);
+    out.push({ kind: 'session', id: `session:${session.key}`, key: session.key, lat: session.lat, lng: session.lng, session });
+  }
+  return out;
+}
+
+/** "1 session · Austin, TX" / "3 sessions · Berlin, DE". */
+export function sessionLabel(s: Pick<LiveMapSession, 'count' | 'city' | 'region' | 'country'>): string {
+  return `${s.count} ${s.count === 1 ? 'session' : 'sessions'} · ${liveMapCityLabel(s)}`;
 }
 
 /** "3 items" / "Wool Overcoat" / "Wool Overcoat + 1 more". */

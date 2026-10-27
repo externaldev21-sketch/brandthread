@@ -12,7 +12,7 @@
  * Functions are plain math marked 'worklet' so Reanimated can run them on
  * the UI thread; on web and in tests they are ordinary functions.
  */
-import { GLOBE_LAND_DOTS } from './globeLand';
+import { WORLD_LAND_PATH, WORLD_LAT_TOP } from './worldLand';
 
 export interface GlobeView { yaw: number; pitch: number; zoom: number }
 
@@ -30,21 +30,51 @@ export const HIT_SLOP = 22;
 
 const DEG = Math.PI / 180;
 
-/** Unit vectors for every land dot: [x0, y0, z0, x1, …], computed once. */
-export const LAND_UNIT: Float32Array = (() => {
-  const n = GLOBE_LAND_DOTS.length / 2;
-  const out = new Float32Array(n * 3);
-  for (let i = 0; i < n; i += 1) {
-    const lat = (GLOBE_LAND_DOTS[i * 2] / 10) * DEG;
-    const lng = (GLOBE_LAND_DOTS[i * 2 + 1] / 10) * DEG;
-    out[i * 3] = Math.cos(lat) * Math.sin(lng);
-    out[i * 3 + 1] = Math.sin(lat);
-    out[i * 3 + 2] = Math.cos(lat) * Math.cos(lng);
-  }
-  return out;
-})();
+/**
+ * The landmass as closed rings of unit vectors, parsed once from the Live
+ * map's own outline (lib/liveMap/worldLand.ts, Natural Earth 1:110m), so the
+ * globe and the flat fallback show the same coastlines. Long outline edges
+ * are split so no step exceeds LAND_MAX_STEP_DEG: a straight 3D chord between
+ * far-apart vertices would cut inside the sphere once projected.
+ *
+ * LAND_RINGS holds [x, y, z, …] for every vertex of every ring;
+ * LAND_RING_STARTS[i] is ring i's first vertex index, with a final sentinel.
+ */
+const LAND_MAX_STEP_DEG = 1.5;
 
-export const LAND_DOT_COUNT = LAND_UNIT.length / 3;
+function parseLandRings(): { rings: number[]; starts: number[] } {
+  const rings: number[] = [];
+  const starts: number[] = [];
+  let vertex = 0;
+  for (const part of WORLD_LAND_PATH.split('Z')) {
+    const pts = [...part.matchAll(/[ML](-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g)].map((m) => [
+      WORLD_LAT_TOP - Number(m[2]) / 2,
+      Number(m[1]) / 2 - 180,
+    ]);
+    if (pts.length < 3) continue;
+    starts.push(vertex);
+    for (let i = 0; i < pts.length; i += 1) {
+      const [la0, lo0] = pts[i];
+      const [la1, lo1Raw] = pts[(i + 1) % pts.length];
+      // Eurasia and Fiji cross the antimeridian: the flat outline jumps from
+      // -180 to 180 there, which on the sphere is a step of zero, not a lap.
+      const lo1 = lo1Raw - lo0 > 180 ? lo1Raw - 360 : lo1Raw - lo0 < -180 ? lo1Raw + 360 : lo1Raw;
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(la1 - la0), Math.abs(lo1 - lo0)) / LAND_MAX_STEP_DEG));
+      for (let k = 0; k < steps; k += 1) {
+        const la = (la0 + ((la1 - la0) * k) / steps) * DEG;
+        const lo = (lo0 + ((lo1 - lo0) * k) / steps) * DEG;
+        rings.push(Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo));
+        vertex += 1;
+      }
+    }
+  }
+  starts.push(vertex);
+  return { rings, starts };
+}
+
+const PARSED_LAND = parseLandRings();
+export const LAND_RINGS: readonly number[] = PARSED_LAND.rings;
+export const LAND_RING_STARTS: readonly number[] = PARSED_LAND.starts;
 
 export function clampZoom(zoom: number): number {
   'worklet';
@@ -125,15 +155,91 @@ export function hitTest<T extends { lat: number; lng: number }>(
   return best;
 }
 
-/** Land dot brightness by depth: the limb fades so the sphere reads as round. */
-export function landAlpha(depth: number): number {
-  'worklet';
-  return 0.18 + 0.62 * Math.max(0, depth);
-}
-
 /** 0 → 1 → 0 pulse for an order dot, staggered per dot so they don't blink in unison. */
 export function pulsePhase(timeMs: number, index: number, periodMs = 2400): number {
   'worklet';
   const t = ((timeMs + index * 377) % periodMs) / periodMs;
   return t;
+}
+
+/** Angle step (radians) for the stretch of a land ring that runs along the horizon. */
+const LIMB_STEP = 0.12;
+
+/**
+ * The visible half of the landmass as one SVG path string (screen points,
+ * fill with the even-odd rule), for a view and a box of `size`.
+ *
+ * Each ring is rotated by the view and clipped against the horizon plane
+ * (z = 0, Sutherland–Hodgman). Where a coastline goes behind the globe, the
+ * clipped outline follows the limb circle from where it left to where it
+ * comes back (the short way round; no land ring spans a hemisphere), so land
+ * at the edge of the globe stays solid up to the rim instead of being cut by
+ * a chord.
+ */
+export function landPath(rings: readonly number[], starts: readonly number[], view: GlobeView, size: number): string {
+  'worklet';
+  const cy = Math.cos(view.yaw);
+  const sy = Math.sin(view.yaw);
+  const cp = Math.cos(view.pitch);
+  const sp = Math.sin(view.pitch);
+  const r = globeRadius(size, view.zoom);
+  const c = size / 2;
+  let d = '';
+  for (let ring = 0; ring + 1 < starts.length; ring += 1) {
+    const from = starts[ring];
+    const n = starts[ring + 1] - from;
+    // Rotate the ring once; X right, Y up, Z toward the viewer.
+    const xs: number[] = new Array(n);
+    const ys: number[] = new Array(n);
+    const zs: number[] = new Array(n);
+    let firstVisible = -1;
+    for (let i = 0; i < n; i += 1) {
+      const o = (from + i) * 3;
+      const x = rings[o];
+      const y = rings[o + 1];
+      const z = rings[o + 2];
+      const x1 = x * cy + z * sy;
+      const z1 = -x * sy + z * cy;
+      xs[i] = x1;
+      ys[i] = y * cp - z1 * sp;
+      zs[i] = y * sp + z1 * cp;
+      if (firstVisible < 0 && zs[i] >= 0) firstVisible = i;
+    }
+    if (firstVisible < 0) continue;
+    let started = false;
+    let exitAngle = 0;
+    let out = '';
+    const emit = (x: number, y: number) => {
+      out += `${started ? 'L' : 'M'}${(c + x * r).toFixed(1)} ${(c - y * r).toFixed(1)}`;
+      started = true;
+    };
+    for (let k = 0; k < n; k += 1) {
+      const a = (firstVisible + k) % n;
+      const b = (a + 1) % n;
+      const za = zs[a];
+      const zb = zs[b];
+      if (za >= 0) emit(xs[a], ys[a]);
+      if ((za >= 0) !== (zb >= 0)) {
+        const t = za / (za - zb);
+        const ix = xs[a] + (xs[b] - xs[a]) * t;
+        const iy = ys[a] + (ys[b] - ys[a]) * t;
+        const angle = Math.atan2(iy, ix);
+        if (za >= 0) {
+          exitAngle = angle;
+        } else {
+          let delta = angle - exitAngle;
+          while (delta > Math.PI) delta -= Math.PI * 2;
+          while (delta < -Math.PI) delta += Math.PI * 2;
+          const steps = Math.ceil(Math.abs(delta) / LIMB_STEP);
+          for (let s = 0; s <= steps; s += 1) {
+            const ang = exitAngle + (delta * s) / Math.max(1, steps);
+            emit(Math.cos(ang), Math.sin(ang));
+          }
+        }
+      }
+    }
+    d += `${out}Z`;
+  }
+  // Skia rejects an empty path string; a bare move draws nothing.
+  return d || 'M0 0';
 }

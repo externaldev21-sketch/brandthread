@@ -7,7 +7,9 @@
  *   no network, no socket.
  * - Real seller: GET /api/seller/live-map/today on focus and on every socket
  *   (re)connect; the socket is open only while `enabled` (dashboard focused);
- *   while it isn't connected, the same endpoint is polled every 60s. An
+ *   while it isn't connected, the same endpoint is polled every 60s. Even
+ *   when connected it's refetched every 60s, since shoppers coming and going
+ *   (`sessions`, the globe's visitor dots) have no socket event. An
  *   `order_city` event bumps today's count at once and refetches, since the
  *   event is city level only and the new dot's popover needs the order.
  */
@@ -20,8 +22,11 @@ import { applyOrderCity, EMPTY_LIVE_MAP, isOrderCityEvent, type LiveMapToday } f
 import { previewLiveMap } from '@/lib/previewLiveMap';
 
 const FALLBACK_POLL_MS = 60_000;
+/** Visitor dots go stale without an event; refresh them this often while connected. */
+const SESSIONS_REFRESH_MS = 60_000;
 
-export interface LiveMapPing { key: string; seq: number }
+/** A new order just landed at this place: the globe flares its dot and fires an arc from it. */
+export interface LiveMapPing { key: string; lat?: number; lng?: number; seq: number }
 
 export function useSellerLiveMap({ enabled, preview }: { enabled: boolean; preview: 'demo' | 'fresh' | null }) {
   const api = useApi();
@@ -69,14 +74,14 @@ export function useSellerLiveMap({ enabled, preview }: { enabled: boolean; previ
     onEvent: (event) => {
       if (!isOrderCityEvent(event)) return;
       setData((prev) => applyOrderCity(prev ?? EMPTY_LIVE_MAP, event));
-      setPing((prev) => ({ key: event.key, seq: (prev?.seq ?? 0) + 1 }));
+      setPing((prev) => ({ key: event.key, lat: event.lat, lng: event.lng, seq: (prev?.seq ?? 0) + 1 }));
       void load();
     },
   });
 
   useEffect(() => {
-    if (!live || connected) return;
-    const id = setInterval(() => { void load(); }, FALLBACK_POLL_MS);
+    if (!live) return;
+    const id = setInterval(() => { void load(); }, connected ? SESSIONS_REFRESH_MS : FALLBACK_POLL_MS);
     return () => clearInterval(id);
   }, [live, connected, load]);
 

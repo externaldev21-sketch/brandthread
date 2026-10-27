@@ -3,15 +3,30 @@ import {
   clampZoom,
   dragView,
   globeRadius,
+  globeRadius as radiusOf,
   hitTest,
-  LAND_DOT_COUNT,
-  LAND_UNIT,
+  LAND_RING_STARTS,
+  LAND_RINGS,
+  landPath,
   projectLatLng,
   viewCenteredOn,
   ZOOM_MAX,
   ZOOM_MIN,
 } from './globe';
-import { globeSpots, recentOrderItemLabel, timeAgo, type LiveMapRecentOrder } from './liveMap';
+import { globeActivities, globeSpots, recentOrderItemLabel, sessionLabel, timeAgo, type LiveMapRecentOrder, type LiveMapSession } from './liveMap';
+import {
+  ambientArcEnds,
+  ARC_LIFE_MS,
+  ARC_SLOTS,
+  ARC_TRAVEL_MS,
+  arcFrame,
+  arcPhase,
+  emptyArcSlots,
+  liveArcCount,
+  makeArc,
+  NO_PATH,
+  pushArc,
+} from './arcs';
 import { previewLiveMap } from '../previewLiveMap';
 import { popoverPosition, POPOVER_WIDTH } from '../../components/globe/OrderGlobePopover';
 
@@ -66,11 +81,155 @@ describe('order globe projection', () => {
     expect(hitTest([back], view, SIZE, bx, by)).toBeNull();
   });
 
-  it('ships a real landmass: a few thousand unit vectors', () => {
-    expect(LAND_DOT_COUNT).toBeGreaterThan(1500);
-    for (let i = 0; i < LAND_UNIT.length; i += 3 * 97) {
-      expect(Math.hypot(LAND_UNIT[i], LAND_UNIT[i + 1], LAND_UNIT[i + 2])).toBeCloseTo(1, 4);
+});
+
+/** Points of an SVG path string from landPath(), per subpath. */
+function subpaths(d: string): Array<Array<[number, number]>> {
+  return d.split('Z').filter(Boolean).map((part) => [...part.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as [number, number]));
+}
+
+/** Even-odd point-in-path test over all subpaths. */
+function inside(rings: Array<Array<[number, number]>>, x: number, y: number): boolean {
+  let hit = false;
+  for (const poly of rings) {
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i];
+      const [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
     }
+  }
+  return hit;
+}
+
+describe('solid land', () => {
+  it('ships the real coastline as closed rings of unit vectors', () => {
+    expect(LAND_RING_STARTS.length).toBeGreaterThan(50);
+    expect(LAND_RINGS.length / 3).toBe(LAND_RING_STARTS[LAND_RING_STARTS.length - 1]);
+    expect(LAND_RINGS.length / 3).toBeGreaterThan(1500);
+    for (let i = 0; i < LAND_RINGS.length; i += 3 * 97) {
+      expect(Math.hypot(LAND_RINGS[i], LAND_RINGS[i + 1], LAND_RINGS[i + 2])).toBeCloseTo(1, 4);
+    }
+  });
+
+  it('fills continents and leaves oceans empty, on the visible side only', () => {
+    // Facing Africa/Europe.
+    const view = { yaw: -20 * (Math.PI / 180), pitch: 0.2, zoom: 1 };
+    const rings = subpaths(landPath(LAND_RINGS, LAND_RING_STARTS, view, SIZE));
+    const at = (lat: number, lng: number) => {
+      const [x, y] = projectLatLng(lat, lng, view, SIZE);
+      return inside(rings, x, y);
+    };
+    expect(at(9, 20)).toBe(true); // Chad
+    expect(at(48, 10)).toBe(true); // Germany
+    expect(at(-20, 25)).toBe(true); // Botswana
+    expect(at(0, -20)).toBe(false); // Atlantic
+    expect(at(-30, 60)).toBe(false); // Indian Ocean
+    // Every vertex is on or inside the globe's disc.
+    const r = radiusOf(SIZE, 1);
+    for (const ring of rings) for (const [x, y] of ring) expect(Math.hypot(x - SIZE / 2, y - SIZE / 2)).toBeLessThanOrEqual(r + 0.2);
+  });
+
+  it('keeps land solid up to the limb: where a continent crosses the horizon the outline follows the rim', () => {
+    // Facing the Atlantic: the Americas and Africa/Europe are cut by the limb.
+    const view = { yaw: 30 * (Math.PI / 180), pitch: 0, zoom: 1 };
+    const rings = subpaths(landPath(LAND_RINGS, LAND_RING_STARTS, view, SIZE));
+    const r = radiusOf(SIZE, 1);
+    const c = SIZE / 2;
+    let onRim = 0;
+    for (const ring of rings) for (const [x, y] of ring) if (Math.abs(Math.hypot(x - c, y - c) - r) < 0.3) onRim += 1;
+    expect(onRim).toBeGreaterThan(10);
+    // Russia (lng ~100E) is behind the globe from here: no land drawn at the
+    // matching screen point on the far side.
+    expect(projectLatLng(60, 100, view, SIZE)[2]).toBeLessThan(0);
+  });
+
+  it('crosses the antimeridian without a lap round the globe (Chukotka, Fiji)', () => {
+    // No outline step is longer than a couple of degrees of arc.
+    for (let ring = 0; ring + 1 < LAND_RING_STARTS.length; ring += 1) {
+      for (let i = LAND_RING_STARTS[ring]; i + 1 < LAND_RING_STARTS[ring + 1]; i += 1) {
+        const dot = LAND_RINGS[i * 3] * LAND_RINGS[i * 3 + 3] + LAND_RINGS[i * 3 + 1] * LAND_RINGS[i * 3 + 4] + LAND_RINGS[i * 3 + 2] * LAND_RINGS[i * 3 + 5];
+        expect(Math.acos(Math.min(1, dot)) * (180 / Math.PI)).toBeLessThan(2.2);
+      }
+    }
+    // Facing the North Pacific: the Arctic Ocean is open water, Chukotka is land.
+    const view = viewCenteredOn(60, 180);
+    const rings = subpaths(landPath(LAND_RINGS, LAND_RING_STARTS, view, SIZE));
+    const at = (lat: number, lng: number) => {
+      const [x, y] = projectLatLng(lat, lng, view, SIZE);
+      return inside(rings, x, y);
+    };
+    expect(at(66, -175)).toBe(true); // Chukotka
+    expect(at(64, 100)).toBe(true); // Siberia
+    expect(at(50, -170)).toBe(false); // North Pacific
+    expect(at(85, 0)).toBe(false); // Arctic Ocean
+  });
+
+  it('never returns an empty path (Skia rejects one)', () => {
+    expect(landPath([], [0], { yaw: 0, pitch: 0, zoom: 1 }, SIZE)).toBe('M0 0');
+  });
+});
+
+describe('activity arcs', () => {
+  const nyc = { key: 'nyc', lat: 40.71, lng: -74.01 };
+  const tokyo = { key: 'tokyo', lat: 35.69, lng: 139.69 };
+  const paris = { key: 'paris', lat: 48.85, lng: 2.35 };
+
+  it('darts out, then the tail catches up and the line fades', () => {
+    expect(arcPhase(-1)).toBeNull();
+    expect(arcPhase(ARC_LIFE_MS)).toBeNull();
+    const early = arcPhase(ARC_TRAVEL_MS * 0.25)!;
+    const late = arcPhase(ARC_TRAVEL_MS * 0.75)!;
+    expect(early.head).toBeGreaterThan(0.25); // ease-out: fast start
+    expect(late.head).toBeGreaterThan(early.head);
+    expect(early.alpha).toBe(1);
+    const fading = arcPhase(ARC_TRAVEL_MS + 450)!;
+    expect(fading.head).toBe(1);
+    expect(fading.alpha).toBeLessThan(1);
+    expect(fading.tail).toBeGreaterThan(late.tail);
+  });
+
+  it('caps arcs in flight and recycles the oldest slot', () => {
+    let slots = emptyArcSlots();
+    expect(slots).toHaveLength(ARC_SLOTS);
+    for (let i = 0; i < ARC_SLOTS + 3; i += 1) slots = pushArc(slots, makeArc(paris, nyc, i * 10), i * 10);
+    expect(slots).toHaveLength(ARC_SLOTS);
+    expect(liveArcCount(slots, 100)).toBe(ARC_SLOTS);
+    // The three oldest were replaced by the newest.
+    expect(slots.map((s) => s.start).sort((a, b) => a - b)).toEqual([30, 40, 50, 60, 70]);
+    // A finished slot is reused before a live one.
+    slots = pushArc(slots, makeArc(paris, nyc, 10_000), 10_000);
+    expect(liveArcCount(slots, 10_000)).toBe(1);
+  });
+
+  it('lifts longer hops higher, and draws only the part in front of the globe', () => {
+    expect(makeArc(tokyo, nyc, 0).lift).toBeGreaterThan(makeArc(paris, nyc, 0).lift);
+    const view = viewCenteredOn(45, -40); // over the Atlantic
+    const arc = makeArc(paris, nyc, 0);
+    const mid = arcFrame(arc, ARC_TRAVEL_MS * 0.6, view, SIZE);
+    expect(mid.head).not.toBe(NO_PATH);
+    expect(mid.headVisible).toBe(true);
+    expect(mid.alpha).toBe(1);
+    // Facing away (the Pacific), a Paris → New York arc is hidden.
+    const away = arcFrame(arc, ARC_TRAVEL_MS * 0.6, viewCenteredOn(0, 160), SIZE);
+    expect(away.headVisible).toBe(false);
+    expect(away.head).toBe(NO_PATH);
+    // Done: nothing drawn.
+    expect(arcFrame(arc, ARC_LIFE_MS + 1, view, SIZE).alpha).toBe(0);
+  });
+
+  it('ambient arcs take turns from each activity to home, or across to another point', () => {
+    const sources = [tokyo, paris, nyc];
+    expect(ambientArcEnds(sources, nyc, 0)).toEqual({ from: tokyo, to: nyc });
+    expect(ambientArcEnds(sources, nyc, 1)?.from).toBe(paris);
+    // The source at home shoots elsewhere instead of to itself.
+    const atHome = ambientArcEnds(sources, nyc, 2)!;
+    expect(atHome.from).toBe(nyc);
+    expect(atHome.to).not.toBe(nyc);
+    const noHome = ambientArcEnds(sources, null, 0)!;
+    expect(noHome.from).toBe(tokyo);
+    expect(noHome.to).not.toBe(tokyo);
+    expect(ambientArcEnds([], nyc, 0)).toBeNull();
+    expect(ambientArcEnds([tokyo], null, 0)).toBeNull();
   });
 });
 
@@ -89,6 +248,25 @@ describe('one dot per place', () => {
     const pts = [order('newest', 'a', '2'), order('older', 'b', '1')];
     const [x, y] = projectLatLng(51.5, -0.1, view, SIZE);
     expect(hitTest(pts, view, SIZE, x, y)?.id).toBe('newest');
+  });
+});
+
+describe('activity dots', () => {
+  const order = (id: string, key: string, at: string): LiveMapRecentOrder => ({
+    id, key, at, orderNumber: id, item: 'Coat', itemCount: 1, amountCents: 100, city: key, region: '', country: 'GB', lat: 51.5, lng: -0.1,
+  });
+  const session = (key: string, count: number): LiveMapSession => ({ key, count, city: key, region: '', country: 'DE', lat: 52.5, lng: 13.4 });
+
+  it('one dot per place with activity: orders first, then places with shoppers right now', () => {
+    const list = globeActivities([order('a', 'london', '2'), order('b', 'london', '1')], [session('berlin', 2), session('london', 1), session('empty', 0)]);
+    expect(list.map((a) => [a.kind, a.key])).toEqual([['order', 'london'], ['session', 'berlin']]);
+    expect(list[0].kind === 'order' && [list[0].count, list[0].sessions]).toEqual([2, 1]);
+    expect(globeActivities([], [])).toEqual([]);
+  });
+
+  it('labels a session dot "N sessions · City"', () => {
+    expect(sessionLabel({ count: 1, city: 'Austin', region: 'TX', country: 'US' })).toBe('1 session · Austin, TX');
+    expect(sessionLabel({ count: 3, city: 'Berlin', region: '16', country: 'DE' })).toBe('3 sessions · Berlin, DE');
   });
 });
 
@@ -131,7 +309,27 @@ describe('preview globe data (demo store)', () => {
     }
   });
 
-  it('fresh preview has no dots', () => {
-    expect(previewLiveMap('fresh', NOW).recent).toEqual([]);
+  it('seeds a handful of shoppers right now and a home, so arcs fire in preview', () => {
+    const data = previewLiveMap('demo', NOW);
+    const sessions = data.sessions ?? [];
+    expect(sessions.length).toBeGreaterThanOrEqual(5);
+    expect(data.sessionsTotal).toBe(sessions.reduce((n, s) => n + s.count, 0));
+    expect(data.home).toMatchObject({ city: 'New York', country: 'US' });
+    const activities = globeActivities(data.recent ?? [], sessions);
+    // Some shoppers are where no order came from (their own ring dots), some share an order's dot.
+    expect(activities.filter((a) => a.kind === 'session').length).toBeGreaterThanOrEqual(4);
+    expect(activities.some((a) => a.kind === 'order' && a.sessions > 0)).toBe(true);
+    // Enough distinct places that every ambient tick has somewhere to fly.
+    const sources = activities.map((a) => ({ key: a.key, lat: a.lat, lng: a.lng }));
+    let fired = 0;
+    for (let tick = 0; tick < sources.length; tick += 1) if (ambientArcEnds(sources, data.home ?? null, tick)) fired += 1;
+    expect(fired).toBeGreaterThanOrEqual(sources.length - 1);
+  });
+
+  it('fresh preview has no dots, no sessions, no arcs', () => {
+    const fresh = previewLiveMap('fresh', NOW);
+    expect(fresh.recent).toEqual([]);
+    expect(fresh.sessions).toEqual([]);
+    expect(globeActivities(fresh.recent ?? [], fresh.sessions ?? [])).toEqual([]);
   });
 });
