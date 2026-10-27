@@ -62,6 +62,12 @@ integration a home if Tapstitch ever grants API access.
 
 ### 1. Create a free Shopify Partner account + the Brandthread app
 
+> The current, Dev Dashboard version of these steps (and the two secrets the
+> server needs) is in [shopify-import.md](./shopify-import.md#one-time-setup-in-shopify-owner).
+> The steps below predate Shopify's Dev Dashboard. The "custom-app token"
+> fallback described further down has been removed: connections are made only
+> through Shopify's OAuth consent screen.
+
 1. Sign up at Shopify's Partner Dashboard (partners.shopify.com) — free.
 2. Create a new app → "Custom app" or "Public app" (public app if this will
    be distributed to sellers generally; a custom app is enough to test

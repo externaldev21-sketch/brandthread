@@ -71,6 +71,20 @@ router.post("/", async (req, res) => {
       return;
     }
 
+    // Mandatory privacy (compliance) webhooks for public Shopify apps.
+    // Brandthread never reads or stores Shopify customer records, so there
+    // is nothing to export or erase for a customer; shop/redact (48h after uninstall)
+    // removes the store's connection and stored access token.
+    if (topic === "customers/data_request" || topic === "customers/redact") {
+      res.status(200).json({ ok: true, noCustomerData: true });
+      return;
+    }
+    if (topic === "shop/redact") {
+      await db.delete(shopifyConnections).where(eq(shopifyConnections.shopDomain, shopDomain));
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     if (topic === "fulfillments/create" || topic === "fulfillments/update") {
       await handleFulfillmentWebhook(shopDomain, payload);
       res.status(200).json({ ok: true });

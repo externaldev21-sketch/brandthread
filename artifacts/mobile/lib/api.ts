@@ -1492,6 +1492,25 @@ export interface StoreSubdomainAvailability {
   message?: string;
 }
 
+/** GET /api/shopify/catalog-import/:id — full-catalog import over the seller's Shopify OAuth connection. */
+export interface ShopifyCatalogImportJob {
+  id: string;
+  shopDomain: string;
+  status: 'running' | 'complete' | 'failed';
+  totalCount: number | null;
+  processedCount: number;
+  importedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  skipped: Array<{ shopifyProductId: string; title?: string; reason: string }>;
+  imagesStored: number;
+  imagesLinked: number;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+}
+
 export interface ShopifyImportJob {
   id: string;
   sourceUrl: string;
@@ -2445,8 +2464,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       status:        () => get<any>('/api/shopify/status'),
       connectStart:  (shopDomain: string, purpose: 'import' | 'fulfillment') =>
         post<{ authorizeUrl: string }>('/api/shopify/connect/start', { shopDomain, purpose }),
-      connectCustomApp: (shopDomain: string, accessToken: string, purpose: 'import' | 'fulfillment') =>
-        post<any>('/api/shopify/connect/custom-app', { shopDomain, accessToken, purpose }),
       disconnect:    () => post<any>('/api/shopify/disconnect', {}),
       fulfillmentEnable:  () => post<any>('/api/shopify/fulfillment/enable', {}),
       fulfillmentDisable: () => post<any>('/api/shopify/fulfillment/disable', {}),
@@ -2458,6 +2475,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ imported: number; updated: number; skipped: Array<{ shopifyProductId: string; reason: string }> }>(
           '/api/shopify/products/import', { shopifyProductIds, publishStatus },
         ),
+      /** Whole-catalog import over the OAuth connection; poll catalogImport for progress. */
+      startCatalogImport: () => post<ShopifyCatalogImportJob>('/api/shopify/catalog-import', {}),
+      catalogImport: (id: string) => get<ShopifyCatalogImportJob>(`/api/shopify/catalog-import/${encodeURIComponent(id)}`),
+      latestCatalogImport: () => get<ShopifyCatalogImportJob | null>('/api/shopify/catalog-import/latest'),
     },
     /** Apple Wallet passes for pre-orders (off until the server has its Apple keys). */
     wallet: {

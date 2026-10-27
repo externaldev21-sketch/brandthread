@@ -272,6 +272,9 @@ export function cursorFromLink(link: string | null): string | null {
 function textFromHtml(html: string): string {
   return html.replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    // Inline formatting sits inside a sentence ("no. <strong>3</strong>."):
+    // drop it without adding a space; any other tag is a word break.
+    .replace(/<\/?(?:strong|b|em|i|u|span|a|small|sup|sub|mark)(?:\s[^>]*)?>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -387,7 +390,9 @@ export function toBrandthreadProduct(product: ShopifyProduct, collectionTitle?: 
   const variants = product.variants.map((variant, index) => {
     const options = [variant.option1, variant.option2, variant.option3]
       .map((value, optionIndex) => ({ name: optionNames[optionIndex] ?? "", value: String(value ?? "").trim() }))
-      .filter((option) => option.value);
+      // A product without options carries Shopify's placeholder
+      // "Title: Default Title" variant — that is not a size.
+      .filter((option) => option.value && !(option.name === "title" && option.value === "Default Title"));
     const size = options.find((option) => /size|dimension|fit/.test(option.name))?.value
       ?? options[0]?.value ?? undefined;
     const color = options.find((option) => /color|colour/.test(option.name))?.value

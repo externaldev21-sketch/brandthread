@@ -382,6 +382,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'store-live',
   // One-tap import picker — its own pinned "Import N as drafts" bottom bar.
   'quick-import',
+  // Import from Shopify — its own pinned bottom action (Continue / Import / View products).
+  'shopify-import',
   // Multi-step quote wizard with its own step header/footer.
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.

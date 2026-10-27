@@ -4,7 +4,11 @@
  * the actual secret) a Shopify access token IS the bearer credential for the
  * seller's store, so it is encrypted before it ever reaches the database.
  *
- * SHOPIFY_TOKEN_ENCRYPTION_KEY must be a 32-byte key, base64-encoded.
+ * SHOPIFY_TOKEN_ENCRYPTION_KEY, when set, must be a 32-byte key,
+ * base64-encoded. Without it the key is derived (HKDF-SHA256) from the
+ * Shopify app's client secret, so the app only needs its two Dev Dashboard
+ * credentials. Set an explicit key before ever rotating that secret, or
+ * existing connections will need to reconnect.
  */
 import crypto from "node:crypto";
 
@@ -13,7 +17,9 @@ const ALGORITHM = "aes-256-gcm";
 function loadKey(): Buffer {
   const raw = process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY;
   if (!raw) {
-    throw new Error("SHOPIFY_TOKEN_ENCRYPTION_KEY is not configured");
+    const appSecret = process.env.SHOPIFY_APP_API_SECRET?.trim();
+    if (!appSecret) throw new Error("SHOPIFY_TOKEN_ENCRYPTION_KEY is not configured");
+    return Buffer.from(crypto.hkdfSync("sha256", appSecret, "brandthread", "shopify-token-encryption-v1", 32));
   }
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {

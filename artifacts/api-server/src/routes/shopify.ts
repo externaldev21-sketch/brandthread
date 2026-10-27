@@ -2,24 +2,30 @@
  * Seller-authenticated Shopify fulfillment-bridge routes.
  *
  * Two independent capabilities share one connection row per seller:
- *  (A) Product transfer — GET /products, POST /products/import. Only ever
+ *  (A) Product transfer — POST /catalog-import (whole catalog, with live
+ *      progress) and GET /products + POST /products/import. Only ever
  *      needs read_products/read_inventory scopes and never forwards orders.
  *  (B) Fulfillment via Shopify — POST /fulfillment/enable|disable. Requires
  *      the connection to carry order-write scopes; enabling it when the
  *      current connection doesn't have them returns an upgrade URL that
  *      re-runs OAuth with the fuller scope set (Shopify merges scopes for
  *      the same app, so the seller is only prompted for what's new).
+ *
+ * A connection is only ever made through Shopify's own OAuth consent screen;
+ * there is deliberately no route that accepts a pasted token or API key.
  */
 import { Router } from "express";
 import crypto from "node:crypto";
-import { eq } from "drizzle-orm";
-import { db, shopifyConnections, shopifyProductLinks, shopifyOauthStates } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { db, shopifyCatalogImportJobs, shopifyConnections, shopifyProductLinks, shopifyOauthStates } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
 import { ShopifyConnectPurpose, hasFulfillmentScopes, isValidShopDomain, normalizeShopDomain } from "../lib/shopify/constants";
 import { buildAuthorizeUrl } from "../lib/shopify/oauth";
 import { ShopifyAdminClient } from "../lib/shopify/adminClient";
-import { encryptSecret, decryptSecret } from "../lib/shopifyCrypto";
+import { decryptSecret } from "../lib/shopifyCrypto";
+import { shopifyAppConfigured, shopifyRedirectUri } from "../lib/shopify/config";
+import { createCatalogJob, expireIfStale, latestCatalogJob, publicCatalogJob, runCatalogImport } from "../lib/shopify/catalogImport";
 import { importShopifyProducts } from "../lib/shopify/productImport";
 import { registerWebhooksForConnection } from "../lib/shopify/webhooks";
 import { logger } from "../lib/logger";
@@ -32,6 +38,7 @@ const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 function serializeConnection(row: typeof shopifyConnections.$inferSelect, linkedProductsCount: number) {
   return {
+    configured: shopifyAppConfigured(),
     connected: row.status === "connected",
     shopDomain: row.shopDomain,
     connectionType: row.connectionType,
@@ -50,7 +57,7 @@ function serializeConnection(row: typeof shopifyConnections.$inferSelect, linked
 router.get("/status", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [row] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, ownerId)).limit(1);
-  if (!row) { res.json({ connected: false, fulfillmentEnabled: false, linkedProductsCount: 0 }); return; }
+  if (!row) { res.json({ configured: shopifyAppConfigured(), connected: false, fulfillmentEnabled: false, linkedProductsCount: 0 }); return; }
   const links = await db.select({ id: shopifyProductLinks.id }).from(shopifyProductLinks).where(eq(shopifyProductLinks.ownerId, ownerId));
   res.json(serializeConnection(row, links.length));
 });
@@ -69,10 +76,11 @@ router.post("/connect/start", requireRole("staff"), async (req, res) => {
   if (!isValidShopDomain(shopDomain)) {
     res.status(400).json({ error: "That doesn't look like a valid myshopify.com domain" }); return;
   }
-  const redirectUri = process.env.SHOPIFY_APP_REDIRECT_URI;
-  if (!redirectUri) {
-    res.status(503).json({ error: "Shopify connections are not configured yet" }); return;
+  if (!shopifyAppConfigured()) {
+    res.status(503).json({ error: "not_configured", message: "Shopify import is almost ready — Brandthread's Shopify app is still being set up." });
+    return;
   }
+  const redirectUri = shopifyRedirectUri();
 
   const state = crypto.randomBytes(24).toString("hex");
   await db.insert(shopifyOauthStates).values({
@@ -82,57 +90,6 @@ router.post("/connect/start", requireRole("staff"), async (req, res) => {
 
   const authorizeUrl = buildAuthorizeUrl({ shopDomain, state, purpose, redirectUri });
   res.json({ authorizeUrl });
-});
-
-// POST /api/shopify/connect/custom-app { shopDomain, accessToken, purpose }
-// Fallback for testing against the owner's own store before the public
-// Shopify app is approved — a merchant-generated custom-app Admin API token.
-router.post("/connect/custom-app", requireRole("staff"), async (req, res) => {
-  const ownerId = (req as any).clerkUserId as string;
-  const { shopDomain: rawShopDomain, accessToken, purpose } = req.body ?? {};
-  if (!rawShopDomain || typeof rawShopDomain !== "string" || !accessToken || typeof accessToken !== "string") {
-    res.status(400).json({ error: "shopDomain and accessToken are required" }); return;
-  }
-  if (purpose !== "import" && purpose !== "fulfillment") {
-    res.status(400).json({ error: "purpose must be 'import' or 'fulfillment'" }); return;
-  }
-  const shopDomain = normalizeShopDomain(rawShopDomain);
-  if (!isValidShopDomain(shopDomain)) {
-    res.status(400).json({ error: "That doesn't look like a valid myshopify.com domain" }); return;
-  }
-
-  try {
-    const client = new ShopifyAdminClient(shopDomain, accessToken);
-    await client.getShop(); // Verifies the token actually works before we store it.
-  } catch (err) {
-    logger.warn({ err, shopDomain }, "Shopify custom-app token verification failed");
-    res.status(400).json({ error: "Could not verify that access token against the shop" }); return;
-  }
-
-  const scopes = (purpose === "fulfillment"
-    ? ["read_products", "read_inventory", "read_orders", "write_orders", "read_fulfillments"]
-    : ["read_products", "read_inventory"]).join(",");
-  const accessTokenEncrypted = encryptSecret(accessToken);
-
-  const [existing] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, ownerId)).limit(1);
-  if (existing) {
-    await db.update(shopifyConnections).set({
-      shopDomain, accessTokenEncrypted, connectionType: "custom_app",
-      // A custom-app connection is configured with whatever scopes the
-      // merchant granted it in Shopify admin; trust the requested purpose
-      // rather than re-deriving from an OAuth grant (there is none here).
-      scopes: purpose === "fulfillment" ? scopes : existing.scopes || scopes,
-      status: "connected", lastError: null, disconnectedAt: null, updatedAt: new Date(),
-      ...(purpose === "fulfillment" ? { fulfillmentEnabled: true } : {}),
-    }).where(eq(shopifyConnections.id, existing.id));
-  } else {
-    await db.insert(shopifyConnections).values({
-      ownerId, shopDomain, accessTokenEncrypted, connectionType: "custom_app", scopes,
-      fulfillmentEnabled: purpose === "fulfillment",
-    });
-  }
-  const [row] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, ownerId)).limit(1);
-  res.json(serializeConnection(row!, 0));
 });
 
 // POST /api/shopify/disconnect
@@ -235,6 +192,37 @@ router.post("/products/import", requireRole("staff"), async (req, res) => {
 
   await db.update(shopifyConnections).set({ lastImportAt: new Date(), updatedAt: new Date() }).where(eq(shopifyConnections.id, row.id));
   res.json(summary);
+});
+
+// POST /api/shopify/catalog-import — imports the whole connected catalog in
+// the background; poll GET /catalog-import/:id for progress. Returns the job
+// already running (200) instead of starting a second one.
+router.post("/catalog-import", requireRole("manager"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [row] = await db.select().from(shopifyConnections).where(eq(shopifyConnections.ownerId, ownerId)).limit(1);
+  if (!row || row.status !== "connected") { res.status(400).json({ error: "not_connected", message: "Connect Shopify first." }); return; }
+  const { job, created } = await createCatalogJob(ownerId, row.shopDomain);
+  if (created) {
+    void runCatalogImport(job.id).catch((err) => logger.error({ err, jobId: job.id }, "Shopify catalog import crashed"));
+  }
+  res.status(created ? 202 : 200).json(publicCatalogJob(job));
+});
+
+// GET /api/shopify/catalog-import/latest
+router.get("/catalog-import/latest", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const job = await latestCatalogJob(ownerId);
+  res.json(job ? publicCatalogJob(job) : null);
+});
+
+// GET /api/shopify/catalog-import/:id
+router.get("/catalog-import/:id", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) { res.status(404).json({ error: "not_found" }); return; }
+  const [job] = await db.select().from(shopifyCatalogImportJobs)
+    .where(and(eq(shopifyCatalogImportJobs.id, req.params.id), eq(shopifyCatalogImportJobs.ownerId, ownerId))).limit(1);
+  if (!job) { res.status(404).json({ error: "not_found" }); return; }
+  res.json(publicCatalogJob(await expireIfStale(job)));
 });
 
 export default router;
