@@ -246,8 +246,8 @@ describe('recommendSellerPlan', () => {
 
 describe('onboarding PlanStep (after the store preview)', () => {
   const tiers = [
-    { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 10, staffSeats: 1 }, features: { analytics: 'basic' } },
-    { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 50, staffSeats: 3 }, features: { analytics: 'advanced', liveSelling: true } },
+    { id: 'starter', name: 'Starter', amountCents: 1999, limits: { activeProducts: 5, staffSeats: 1 }, features: { analytics: 'basic' } },
+    { id: 'growth', name: 'Growth', amountCents: 4900, limits: { activeProducts: 25, staffSeats: 3 }, features: { analytics: 'advanced', liveSelling: true } },
     { id: 'pro', name: 'Pro', amountCents: 12900, limits: { activeProducts: null, staffSeats: null }, features: { analytics: 'full', liveSelling: true, prioritySupport: true } },
   ] as import('@/lib/planTiers').PlanTier[];
   const props = () => ({
@@ -278,7 +278,7 @@ describe('onboarding PlanStep (after the store preview)', () => {
 
   it('the active-product count is the headline on every card, then the differences', async () => {
     const json = await render();
-    for (const text of ['List up to 10 products', 'List up to 50 products', 'Unlimited products', '3 staff seats', 'Advanced analytics', 'Live selling', 'Priority support', 'Compare all features']) {
+    for (const text of ['List up to 5 products', 'List up to 25 products', 'Unlimited products', '3 staff seats', 'Advanced analytics', 'Live selling', 'Priority support', 'Compare all features']) {
       expect(json).toContain(text);
     }
   });

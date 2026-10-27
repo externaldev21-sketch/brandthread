@@ -23,8 +23,8 @@ type LimitedPlanId = 'starter' | 'growth' | 'pro';
 
 /** Mirrors PLAN_CATALOGUE[id].limits on the server. null = unlimited. */
 export const PLAN_LIMITS: Record<LimitedPlanId, { products: number | null; teamSeats: number | null }> = {
-  starter: { products: 10, teamSeats: 1 },
-  growth: { products: 50, teamSeats: 3 },
+  starter: { products: 5, teamSeats: 1 },
+  growth: { products: 25, teamSeats: 3 },
   pro: { products: null, teamSeats: null },
 };
 
@@ -126,8 +126,11 @@ export function buildProductLimitUnlocks(hit: ProductLimitHit): ProductLimitUnlo
   }
   for (const feature of addedFeatures(hit.requiredPlan)) rows.push({ label: feature });
 
+  const current = hit.currentPlan ? SELLER_PLANS.find((p) => p.id === hit.currentPlan) : null;
   return {
-    title: `You've reached ${plural(hit.limit, 'product', 'products')}`,
+    title: current
+      ? `You've reached your ${current.name} limit of ${plural(hit.limit, 'product', 'products')}`
+      : `You've reached ${plural(hit.limit, 'product', 'products')}`,
     planId: next.id,
     planName: next.name,
     price: `${next.priceLabel}/mo`,

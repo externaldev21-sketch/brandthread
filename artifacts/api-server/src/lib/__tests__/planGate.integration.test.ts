@@ -1,7 +1,7 @@
 /**
  * Plan gate on real Postgres: a seller with no live trial or plan can't sell
- * (NO_PLAN_LIMITS); a trialing/active seller sells up to the plan's active
- * product cap; past_due keeps the plan only during the grace period; App
+ * (NO_PLAN_LIMITS); a trialing/active seller sells every live listing, even
+ * over the plan's product cap (the cap only blocks new listings); past_due keeps the plan only during the grace period; App
  * Review demo accounts keep full access.
  */
 import { afterAll, describe, expect, it } from "vitest";
@@ -50,12 +50,12 @@ describe("plan gate", () => {
     expect(await productsBeyondSellerPlan(id, ids)).toEqual(ids);
   });
 
-  it("a trialing Starter seller sells their first 10 live listings; the newest over the cap waits", async () => {
+  it("a Starter seller already over the cap of 5 (7 live listings) still sells all 7", async () => {
     const id = await seller("trial", { subscriptionStatus: "trialing", subscriptionPlanId: "starter" });
-    const cap = PLAN_CATALOGUE.starter.limits.products!;
-    const ids = await listings(id, cap + 1);
+    expect(PLAN_CATALOGUE.starter.limits.products).toBe(5);
+    const ids = await listings(id, 7);
     expect(await getVerifiedPlanAccess(id)).toMatchObject({ paid: true, limits: PLAN_CATALOGUE.starter.limits });
-    expect(await productsBeyondSellerPlan(id, ids)).toEqual([ids[ids.length - 1]]);
+    expect(await productsBeyondSellerPlan(id, ids)).toEqual([]);
   });
 
   it("past_due keeps the plan during the grace period, then selling stops", async () => {

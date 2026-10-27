@@ -71,8 +71,8 @@ export const DEMO_PERKS: PerksResponse = {
   currentPlan: 'starter',
   hasAdvancedAnalytics: false,
   plans: [
-    { planId: 'starter', name: 'Brandthread Starter Plan', amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, unlimitedAiCredits: false, advancedAnalytics: false, productLimit: 25, teamSeats: 0 },
-    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, unlimitedAiCredits: false, advancedAnalytics: false, productLimit: null, teamSeats: 3 },
+    { planId: 'starter', name: 'Brandthread Starter Plan', amountCents: 2900, platformFeeBps: 500, monthlyAiCredits: 1000, unlimitedAiCredits: false, advancedAnalytics: false, productLimit: 5, teamSeats: 0 },
+    { planId: 'growth', name: 'Brandthread Growth Plan', amountCents: 7900, platformFeeBps: 400, monthlyAiCredits: 4000, unlimitedAiCredits: false, advancedAnalytics: false, productLimit: 25, teamSeats: 3 },
     { planId: 'pro', name: 'Brandthread Pro Plan', amountCents: 19900, platformFeeBps: 300, monthlyAiCredits: null, unlimitedAiCredits: true, advancedAnalytics: true, productLimit: null, teamSeats: null },
   ],
 };

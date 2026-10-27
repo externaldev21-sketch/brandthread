@@ -1,5 +1,5 @@
 /**
- * "You've reached 25 products" — shown when the server refuses a product
+ * "You've reached your Starter limit of 5 products" — shown when the server refuses a product
  * create / publish / duplicate / import with 403 PLAN_LIMIT_REACHED.
  *
  * Layout copied 1:1 from Grok's "Get Ultra" upgrade sheet
@@ -36,7 +36,7 @@ export function ProductLimitSheet({ unlocks, onClose }: { unlocks: ProductLimitU
       {u ? (
         <View style={s.body}>
           <Text style={s.title} accessibilityRole="header">{u.title}</Text>
-          <Text style={s.subtitle}>Upgrade to {u.planName} to keep adding products.</Text>
+          <Text style={s.subtitle}>Upgrade to {u.planName} to list more.</Text>
           <View style={s.card}>
             {u.rows.map((row, i) => (
               <View key={row.label} style={[s.row, i < u.rows.length - 1 && s.rowDivider]}>

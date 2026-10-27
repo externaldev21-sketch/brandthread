@@ -1,7 +1,7 @@
 /**
  * Shown when a seller taps Publish at their plan's active-product cap:
- * "You've listed 10 of 10 products on Starter. Upgrade to Growth to list up
- * to 50." The product can still be saved as a draft. The server enforces the
+ * "You've reached your Starter limit of 5 products — upgrade to Growth to
+ * list more." The product can still be saved as a draft. The server enforces the
  * cap; this sheet only explains it, with numbers from the shared plan config.
  */
 import React from 'react';

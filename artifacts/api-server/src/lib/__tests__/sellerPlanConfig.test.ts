@@ -43,20 +43,20 @@ describe("shared seller plan config", () => {
     expect(m.TRIAL_REMINDER_DAYS_BEFORE).toBe(1);
   });
 
-  it("defaults to Dev's tiers: $19.99 / $49 / $129, 10 / 50 / unlimited products, 1 / 3 / unlimited seats", async () => {
+  it("defaults to Dev's tiers: $19.99 / $49 / $129, 5 / 25 / unlimited products, 1 / 3 / unlimited seats", async () => {
     const { catalogue: m, config } = await load({});
     expect(m.PLAN_CATALOGUE.starter.amountCents).toBe(1999);
     expect(m.PLAN_CATALOGUE.growth.amountCents).toBe(4900);
     expect(m.PLAN_CATALOGUE.pro.amountCents).toBe(12900);
     expect(m.PLAN_IDS.map((id) => m.PLAN_CATALOGUE[id].limits)).toEqual([
-      { products: 10, teamSeats: 1 },
-      { products: 50, teamSeats: 3 },
+      { products: 5, teamSeats: 1 },
+      { products: 25, teamSeats: 3 },
       { products: null, teamSeats: null },
     ]);
     const cfg = config.publicSellerPlanConfig();
     expect(cfg.plans.map((p) => [p.id, p.name, p.productLimit, p.staffSeats])).toEqual([
-      ["starter", "Starter", 10, 1],
-      ["growth", "Growth", 50, 3],
+      ["starter", "Starter", 5, 1],
+      ["growth", "Growth", 25, 3],
       ["pro", "Pro", null, null],
     ]);
     // The commission shown is the one checkout charges (lib/planPerks.ts).
@@ -93,12 +93,12 @@ describe("shared seller plan config", () => {
   it("prices, caps and the trial come from env without a code change, and bad values fall back", async () => {
     const { catalogue: m, config } = await load({
       SELLER_TRIAL_DAYS: "14", SELLER_PLAN_GROWTH_CENTS: "6900", SELLER_CHECKOUT_MODE: "web",
-      SELLER_PLAN_STARTER_PRODUCTS: "5", SELLER_PLAN_GROWTH_PRODUCTS: "15", SELLER_PLAN_PRO_PRODUCTS: "unlimited",
+      SELLER_PLAN_STARTER_PRODUCTS: "3", SELLER_PLAN_GROWTH_PRODUCTS: "15", SELLER_PLAN_PRO_PRODUCTS: "unlimited",
     });
     expect(m.TRIAL_DAYS).toBe(14);
     expect(m.PLAN_CATALOGUE.growth.amountCents).toBe(6900);
     expect(config.publicSellerPlanConfig().checkoutMode).toBe("web");
-    expect(config.publicSellerPlanConfig().plans.map((p) => p.productLimit)).toEqual([5, 15, null]);
+    expect(config.publicSellerPlanConfig().plans.map((p) => p.productLimit)).toEqual([3, 15, null]);
 
     const bad = await load({
       SELLER_TRIAL_DAYS: "-3", SELLER_PLAN_GROWTH_CENTS: "free", SELLER_CHECKOUT_MODE: "paypal",
@@ -107,8 +107,8 @@ describe("shared seller plan config", () => {
     expect(bad.catalogue.TRIAL_DAYS).toBe(7);
     expect(bad.catalogue.PLAN_CATALOGUE.growth.amountCents).toBe(4900);
     expect(bad.catalogue.SELLER_CHECKOUT_MODE).toBe("auto");
-    expect(bad.catalogue.PLAN_CATALOGUE.starter.limits.products).toBe(10);
-    expect(bad.catalogue.PLAN_CATALOGUE.growth.limits.products).toBe(50);
+    expect(bad.catalogue.PLAN_CATALOGUE.starter.limits.products).toBe(5);
+    expect(bad.catalogue.PLAN_CATALOGUE.growth.limits.products).toBe(25);
   });
 
   it("the reminder always lands inside the trial", async () => {

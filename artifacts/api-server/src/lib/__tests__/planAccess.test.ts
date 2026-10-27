@@ -88,24 +88,29 @@ describe("plan access catalogue", () => {
     expect(nextPlanFor({ planId: "starter", paid: true }, "teamSeats")).toBe("growth");
   });
 
-  it("uses Dev's exact cap-hit copy with the counts the upgrade sheet needs", () => {
+  it("uses the owner's exact cap-hit copy with the counts the upgrade sheet needs", () => {
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
     sendPlanLimitReached({ status, json } as any, {
-      resource: "products", currentPlan: "starter", requiredPlan: "growth", limit: 10, paid: true,
+      resource: "products", currentPlan: "starter", requiredPlan: "growth", limit: 5, paid: true,
     });
     expect(status).toHaveBeenCalledWith(403);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({
       code: "PLAN_LIMIT_REACHED",
       currentPlan: "starter",
       requiredPlan: "growth",
-      used: 10,
-      limit: 10,
-      nextLimit: PLAN_CATALOGUE.growth.limits.products,
-      message: "You've listed 10 of 10 products on Starter. Upgrade to Growth to list up to 50.",
+      used: 5,
+      limit: 5,
+      nextLimit: 25,
+      message: "You've reached your Starter limit of 5 products — upgrade to Growth to list more.",
     }));
-    expect(planLimitMessage({ resource: "products", planId: "growth", paid: true, used: 50, limit: 50, nextPlan: "pro" }))
-      .toBe("You've listed 50 of 50 products on Growth. Upgrade to Pro to list unlimited products.");
+    expect(planLimitMessage({ resource: "products", planId: "growth", paid: true, used: 25, limit: 25, nextPlan: "pro" }))
+      .toBe("You've reached your Growth limit of 25 products — upgrade to Pro to list more.");
+    // A seller already over a lowered cap is told the cap, not a count over it.
+    expect(planLimitMessage({ resource: "products", planId: "starter", paid: true, used: 7, limit: 5, nextPlan: "growth" }))
+      .toBe("You've reached your Starter limit of 5 products — upgrade to Growth to list more.");
+    expect(planLimitMessage({ resource: "products", planId: "pro", paid: true, used: 3, limit: 3, nextPlan: null }))
+      .toBe("You've reached your Pro limit of 3 products.");
   });
 
   it("tells a seller without a plan to pick one", () => {

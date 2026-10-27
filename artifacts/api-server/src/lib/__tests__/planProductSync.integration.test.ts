@@ -64,37 +64,39 @@ describe("planProductChanges", () => {
     expect(planProductChanges({ cap: 0, activeNewestFirst: ["b", "a"], hiddenOldestFirst: [] }))
       .toEqual({ hidden: ["b", "a"], restored: [] });
   });
+
+  it("on a paid plan nothing over the cap is hidden, and nothing is restored past it", () => {
+    expect(planProductChanges({ cap: 5, hideOverCap: false, activeNewestFirst: ["g", "f", "e", "d", "c", "b", "a"], hiddenOldestFirst: ["h"] }))
+      .toEqual({ hidden: [], restored: [] });
+  });
 });
 
 describe("syncProductsToPlan", () => {
-  it("Growth → Starter hides the newest listings over 10, keeps drafts, deletes nothing, and says so", async () => {
+  it("Growth → Starter keeps every live listing over the new cap of 5: the cap only blocks new ones", async () => {
     const id = await seller("down", { subscriptionStatus: "active", subscriptionPlanId: "growth" });
-    const live = await listings(id, 12);
+    const live = await listings(id, 7);
     const [ownDraft] = await listings(id, 1, "draft");
     expect((await syncProductsToPlan(id)).hidden).toEqual([]);
 
     await setPlan(id, { subscriptionPlanId: "starter" });
-    const change = await syncProductsToPlan(id);
-    expect(change.hidden.sort()).toEqual(live.slice(10).sort());
-
-    const rows = await statusOf(id);
-    expect(rows.filter((r) => r.status === "active").map((r) => r.id).sort()).toEqual(live.slice(0, 10).sort());
-    expect(rows.every((r) => r.deletedAt === null)).toBe(true);
-    expect(rows.find((r) => r.id === ownDraft)).toMatchObject({ status: "draft", planHiddenAt: null });
-    expect(published.find((n) => n.userId === id)).toMatchObject({
-      type: "plan_products_hidden", title: "2 products moved to drafts",
-    });
-
-    // Idempotent: nothing more to do.
     expect(await syncProductsToPlan(id)).toEqual({ hidden: [], restored: [] });
 
-    // Re-upgrade brings the hidden ones back, and only those.
-    await setPlan(id, { subscriptionPlanId: "growth" });
-    const back = await syncProductsToPlan(id);
-    expect(back.restored.sort()).toEqual(live.slice(10).sort());
-    const after = await statusOf(id);
-    expect(after.filter((r) => r.status === "active")).toHaveLength(12);
-    expect(after.find((r) => r.id === ownDraft)?.status).toBe("draft");
+    const rows = await statusOf(id);
+    expect(rows.filter((r) => r.status === "active").map((r) => r.id).sort()).toEqual([...live].sort());
+    expect(rows.every((r) => r.deletedAt === null && r.planHiddenAt === null)).toBe(true);
+    expect(rows.find((r) => r.id === ownDraft)).toMatchObject({ status: "draft", planHiddenAt: null });
+    expect(published.filter((n) => n.userId === id)).toEqual([]);
+  });
+
+  it("re-subscribing on Starter restores plan-hidden listings only up to its cap of 5", async () => {
+    const id = await seller("resub", { subscriptionStatus: "active", subscriptionPlanId: "starter" });
+    const live = await listings(id, 7);
+    await setPlan(id, { subscriptionStatus: "canceled" });
+    expect((await syncProductsToPlan(id)).hidden.sort()).toEqual([...live].sort());
+
+    await setPlan(id, { subscriptionStatus: "active" });
+    expect((await syncProductsToPlan(id)).restored).toHaveLength(5);
+    expect((await statusOf(id)).filter((r) => r.status === "active")).toHaveLength(5);
     expect(published.filter((n) => n.userId === id).map((n) => n.type)).toContain("plan_products_restored");
   });
 

@@ -1,9 +1,11 @@
 /**
- * Keeps a seller's live listings inside their plan's product cap (Dev's
- * plan-tier spec):
- *  - Downgrade, cancelled or lapsed plan: live products over the new cap are
- *    moved to drafts newest-first (the oldest stay live), never deleted, and
- *    marked plan_hidden_at. The seller gets a clear notice.
+ * Keeps a seller's live listings in line with their plan:
+ *  - On a paid plan the product cap only blocks new listings
+ *    (lib/productCapacity.ts). A seller already over it (a downgrade, or a
+ *    cap lowered after they listed) keeps every live product.
+ *  - Cancelled or lapsed plan (no plan at all): live products are moved to
+ *    drafts newest-first, never deleted, and marked plan_hidden_at. The
+ *    seller gets a clear notice.
  *  - Upgrade or re-subscribe: products the plan hid come back oldest-first
  *    until the cap is full.
  * Products the seller drafted or archived themselves are never touched; a
@@ -25,13 +27,16 @@ export type PlanProductSyncResult = { hidden: string[]; restored: string[] };
 /** Which products to hide or restore for a cap. Pure, so the ordering rules are unit tested. */
 export function planProductChanges(input: {
   cap: number | null;
+  /** False on a paid plan: listings over the cap stay live. Defaults to true. */
+  hideOverCap?: boolean;
   /** Live products, newest first. */
   activeNewestFirst: string[];
   /** Plan-hidden drafts, oldest first. */
   hiddenOldestFirst: string[];
 }): PlanProductSyncResult {
-  const { cap, activeNewestFirst, hiddenOldestFirst } = input;
+  const { cap, activeNewestFirst, hiddenOldestFirst, hideOverCap = true } = input;
   if (cap !== null && activeNewestFirst.length > cap) {
+    if (!hideOverCap) return { hidden: [], restored: [] };
     return { hidden: activeNewestFirst.slice(0, activeNewestFirst.length - cap), restored: [] };
   }
   const room = cap === null ? hiddenOldestFirst.length : cap - activeNewestFirst.length;
@@ -80,6 +85,7 @@ export async function syncProductsToPlan(ownerId: string, now = new Date()): Pro
       .orderBy(asc(products.createdAt), asc(products.id));
     const next = planProductChanges({
       cap,
+      hideOverCap: !access.paid,
       activeNewestFirst: active.map((row) => row.id),
       hiddenOldestFirst: hidden.map((row) => row.id),
     });

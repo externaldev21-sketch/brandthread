@@ -48,7 +48,7 @@ export interface PlanTier {
 const n = (value: number) => value.toLocaleString('en-US');
 const plural = (count: number, one: string, many: string) => `${n(count)} ${count === 1 ? one : many}`;
 
-/** The headline on each card: "List up to 10 products" / "Unlimited products". */
+/** The headline on each card: "List up to 5 products" / "Unlimited products". */
 export function productHeadline(limits: PlanTierLimits): string {
   return limits.activeProducts === null
     ? 'Unlimited products'
@@ -165,19 +165,15 @@ export function nextTierForProducts(tiers: PlanTier[], currentId: SellerPlanId):
 }
 
 /**
- * The publish-at-cap sheet: "You've listed 10 of 10 products on Starter.
- * Upgrade to Growth to list up to 50."
+ * The publish-at-cap sheet: "You've reached your Starter limit of 5
+ * products — upgrade to Growth to list more."
  */
 export function productCapCopy(tiers: PlanTier[], currentId: SellerPlanId, used: number): { title: string; body: string; next: PlanTier | null } | null {
   const current = tiers.find((t) => t.id === currentId);
   const limit = current?.limits.activeProducts;
   if (!current || limit === null || limit === undefined) return null;
   const next = nextTierForProducts(tiers, currentId);
-  const listed = `You've listed ${n(Math.min(used, limit))} of ${plural(limit, 'product', 'products')} on ${current.name}.`;
-  const upgrade = next
-    ? next.limits.activeProducts === null
-      ? ` Upgrade to ${next.name} to list unlimited products.`
-      : ` Upgrade to ${next.name} to list up to ${n(next.limits.activeProducts)}.`
-    : '';
-  return { title: 'Product limit reached', body: `${listed}${upgrade} You can still save this as a draft.`, next };
+  const reached = `You've reached your ${current.name} limit of ${plural(limit, 'product', 'products')}`;
+  const upgrade = next ? ` — upgrade to ${next.name} to list more.` : '.';
+  return { title: 'Product limit reached', body: `${reached}${upgrade} You can still save this as a draft.`, next };
 }

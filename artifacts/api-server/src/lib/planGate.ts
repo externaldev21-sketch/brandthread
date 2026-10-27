@@ -1,12 +1,11 @@
 /**
- * Checkout-side backstop for the plan's product cap. Only the seller's first
- * N live listings (oldest first) can be bought, where N is the plan's cap
- * (0 with no live trial or plan). lib/planProductSync.ts normally moves any
- * extra listings to drafts after a downgrade; this check covers the window
- * before that runs, so a lapsed or downgraded seller can never sell more
- * listings than the plan includes.
+ * Checkout-side backstop for sellers with no live trial or plan: they can't
+ * sell anything. lib/planProductSync.ts moves their listings to drafts; this
+ * check covers the window before that runs.
  *
- * Publishing is limited separately by lib/productCapacity.ts.
+ * On a paid plan the product cap only limits publishing
+ * (lib/productCapacity.ts): a seller already over it (a downgrade, or a cap
+ * lowered after they listed) keeps selling every live listing.
  */
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, products } from "@workspace/db";
@@ -21,6 +20,7 @@ export async function productsBeyondSellerPlan(sellerId: string, productIds: rea
   if (productIds.length === 0) return [];
   try {
     const access = await getVerifiedPlanAccess(sellerId);
+    if (access.paid) return [];
     const limit = access.limits.products;
     if (limit === null) return [];
     const sellable = await db.select({ id: products.id }).from(products)
