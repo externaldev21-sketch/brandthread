@@ -45,16 +45,16 @@ export function pacingJitter(id: string, slotIndex: number): number {
   return (((h >>> 0) / 0xffffffff) * 2 - 1) * PACING_JITTER;
 }
 
-/** Buyer traffic by hour of day (UTC): quieter overnight, peaking in the evening. */
+/** Buyer traffic by hour of day (UTC): a little quieter overnight, busier in the evening; averages 1. */
 function trafficShare(hourOfDay: number): number {
-  return 0.75 + 0.35 * Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI);
+  return 1 + 0.12 * Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI);
 }
 
 /** Spend delivered in hour slot `h` (whole impressions, never past the paced share). */
 function hourSpendCents(h: number): number {
   const hourly = BUDGET_CENTS / (DURATION_DAYS * 24);
   const hourOfDay = new Date(STARTED_AT + h * HOUR_MS).getUTCHours();
-  const cents = hourly * (1 + pacingJitter(DEMO_AD_CAMPAIGN_ID, h)) * Math.min(1, trafficShare(hourOfDay));
+  const cents = hourly * (1 + pacingJitter(DEMO_AD_CAMPAIGN_ID, h)) * trafficShare(hourOfDay);
   return Math.floor(cents / COST_PER_IMPRESSION_CENTS) * COST_PER_IMPRESSION_CENTS;
 }
 

@@ -58,8 +58,9 @@ export function useFeedAds<T>({
   const api = useApi();
   const router = useRouter();
   const { isSignedIn } = useAuth();
-  const active = enabled && isSignedIn === true;
   const [demo] = useState(() => isPreviewDemoMode());
+  // The demo preview never calls the ads API (it has no backend).
+  const active = enabled && isSignedIn === true && !demo;
 
   const [placements, setPlacements] = useState<ReadonlyMap<number, FeedAd>>(() => new Map());
   const servedUpTo = useRef(0);
@@ -118,8 +119,8 @@ export function useFeedAds<T>({
   );
 
   const items = useMemo(
-    () => (active ? mergeFeedAds(organic, placements)
-      : demoPlacements ? mergeFeedAds(organic, demoPlacements)
+    () => (demoPlacements ? mergeFeedAds(organic, demoPlacements)
+      : active ? mergeFeedAds(organic, placements)
       : (organic as Array<T | SponsoredFeedItem>)),
     [active, organic, placements, demoPlacements],
   );
