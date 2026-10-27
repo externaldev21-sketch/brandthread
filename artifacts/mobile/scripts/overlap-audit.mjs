@@ -70,6 +70,9 @@ export const ALLOWLIST = [
   { kind: 'overlap', testID: /video|reel|feed-item|rail|player/i, reason: 'video overlay controls' },
   // The live-orders globe popover floats over the globe it describes.
   { kind: 'overlap', testID: /globe|map-popover/i, reason: 'globe popover' },
+  // A floating action button ("Add product") floats over the list it adds
+  // to; the list scrolls out from under it.
+  { kind: '*', testID: /-fab$/i, reason: 'floating action button over a list' },
   // Size chart: a table whose header row meets its body rows by design.
   { kind: 'touching', any: /^Size\s+Chest\b/, reason: 'size chart table header row' },
   // Modals and bottom sheets are drawn over the page on purpose.
