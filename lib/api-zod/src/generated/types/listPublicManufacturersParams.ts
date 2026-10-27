@@ -5,12 +5,17 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ListPublicManufacturersCategory } from './listPublicManufacturersCategory';
 import type { ListPublicManufacturersSort } from './listPublicManufacturersSort';
 
 export type ListPublicManufacturersParams = {
 q?: string;
 country?: string;
 specialty?: string;
+/**
+ * Picker category key (lib/manufacturer-flow categories), matched against specialty and description. Unknown keys return 400.
+ */
+category?: ListPublicManufacturersCategory;
 /**
  * @minimum 0
  */

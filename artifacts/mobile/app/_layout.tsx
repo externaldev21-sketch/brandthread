@@ -1405,6 +1405,8 @@ function RootLayoutNav() {
     'design-ai-photoshoot': 'aiPhotoShoot',
     boost: 'boosts',
     'manufacturer-hub': 'manufacturerHub',
+    'manufacturer-find': 'manufacturerHub',
+    'manufacturer-category': 'manufacturerHub',
   };
   const feature = gatedRoutes[route];
   const pathname = segments.join('/');
@@ -1712,6 +1714,8 @@ const AppStack = React.memo(function AppStack() {
         {/* Manufacturer Hub screens */}
         <Stack.Screen name="manufacturer-hub" options={() => ({ headerShown: false, animation: consumeAnimationOverride('ios_from_right') })} />
         <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-find"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-category" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'ios_from_right' }} />

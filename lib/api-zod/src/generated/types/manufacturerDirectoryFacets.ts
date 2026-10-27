@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ManufacturerDirectoryFacetsCategoriesItem } from './manufacturerDirectoryFacetsCategoriesItem';
 import type { ManufacturerDirectoryFacetsCountriesItem } from './manufacturerDirectoryFacetsCountriesItem';
 import type { ManufacturerDirectoryFacetsSpecialtiesItem } from './manufacturerDirectoryFacetsSpecialtiesItem';
 
@@ -12,4 +13,6 @@ export interface ManufacturerDirectoryFacets {
   total: number;
   countries: ManufacturerDirectoryFacetsCountriesItem[];
   specialties: ManufacturerDirectoryFacetsSpecialtiesItem[];
+  /** Every picker category in picker order, with how many live manufacturers match it. */
+  categories?: ManufacturerDirectoryFacetsCategoriesItem[];
 }

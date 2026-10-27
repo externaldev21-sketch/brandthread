@@ -205,6 +205,8 @@ export interface PublicManufacturer {
   /** @nullable */
   timeZone?: string | null;
   isVerified: boolean;
+  /** Picker category keys derived from specialty and description. */
+  categories?: string[];
   /** @nullable */
   rating?: number | null;
   reviewCount?: number;
@@ -226,10 +228,17 @@ export type ManufacturerDirectoryFacetsSpecialtiesItem = {
   count: number;
 };
 
+export type ManufacturerDirectoryFacetsCategoriesItem = {
+  key: string;
+  count: number;
+};
+
 export interface ManufacturerDirectoryFacets {
   total: number;
   countries: ManufacturerDirectoryFacetsCountriesItem[];
   specialties: ManufacturerDirectoryFacetsSpecialtiesItem[];
+  /** Every picker category in picker order, with how many live manufacturers match it. */
+  categories?: ManufacturerDirectoryFacetsCategoriesItem[];
 }
 
 export interface ManufacturerInviteResolution {
@@ -1255,6 +1264,10 @@ q?: string;
 country?: string;
 specialty?: string;
 /**
+ * Picker category key (lib/manufacturer-flow categories), matched against specialty and description. Unknown keys return 400.
+ */
+category?: ListPublicManufacturersCategory;
+/**
  * @minimum 0
  */
 minYears?: number;
@@ -1266,6 +1279,21 @@ verified?: boolean;
 hasPhotos?: boolean;
 sort?: ListPublicManufacturersSort;
 };
+
+export type ListPublicManufacturersCategory = typeof ListPublicManufacturersCategory[keyof typeof ListPublicManufacturersCategory];
+
+
+export const ListPublicManufacturersCategory = {
+  'cut-and-sew': 'cut-and-sew',
+  knitwear: 'knitwear',
+  denim: 'denim',
+  'screen-printing': 'screen-printing',
+  embroidery: 'embroidery',
+  'dye-and-wash': 'dye-and-wash',
+  'leather-and-footwear': 'leather-and-footwear',
+  accessories: 'accessories',
+  'labels-and-packaging': 'labels-and-packaging',
+} as const;
 
 export type ListPublicManufacturersSort = typeof ListPublicManufacturersSort[keyof typeof ListPublicManufacturersSort];
 

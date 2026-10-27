@@ -26,6 +26,8 @@ export interface PublicManufacturer {
   /** @nullable */
   timeZone?: string | null;
   isVerified: boolean;
+  /** Picker category keys derived from specialty and description. */
+  categories?: string[];
   /** @nullable */
   rating?: number | null;
   reviewCount?: number;
