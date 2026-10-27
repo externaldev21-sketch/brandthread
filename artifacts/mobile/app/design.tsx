@@ -443,11 +443,13 @@ const DPI_OPTIONS = [72, 150, 300];
 
 interface NewCanvasSheetProps {
   visible: boolean;
+  /** Unmount the Modal now, even mid close animation (see DesignGalleryScreen). */
+  unmounted?: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
 }
 
-function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
+function NewCanvasSheet({ visible, unmounted, onClose, onCreated }: NewCanvasSheetProps) {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<NewCanvasTab>('presets');
   const [customW, setCustomW] = useState('1080');
@@ -583,7 +585,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   // same fast swipe-down-to-dismiss / tap-outside-to-dismiss every other
   // bespoke sheet in the app uses, instead of a bare fade + no gesture.
   const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
-  if (!modalVisible) return null;
+  if (!modalVisible || unmounted) return null;
 
   return (
     <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID="new-canvas-sheet">
@@ -1476,14 +1478,29 @@ function StackContentsSheet({ visible, projects, onClose, onOpen, onRemove }: St
 
 export default function DesignGalleryScreen() {
   const pendingCanvasIdRef = useRef<string | null>(null);
+  // Opening a new canvas unmounts the New Canvas sheet in its own commit and
+  // pushes only in the effect after it; the sheet stays unmounted until it is
+  // opened again (see the comment above <NewCanvasSheet>).
+  const [canvasToOpen, setCanvasToOpen] = useState<string | null>(null);
+  const [newCanvasSheetUnmounted, setNewCanvasSheetUnmounted] = useState(false);
   function openPendingCanvas() {
     const id = pendingCanvasIdRef.current;
     if (!id) return;
     pendingCanvasIdRef.current = null;
-    router.push(`/design-canvas?id=${id}`);
+    setNewCanvasSheetUnmounted(true);
+    setCanvasToOpen(id);
+  }
+  function showNewCanvasSheet() {
+    setNewCanvasSheetUnmounted(false);
+    setNewCanvasVisible(true);
   }
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  React.useEffect(() => {
+    if (!canvasToOpen) return;
+    router.push(`/design-canvas?id=${canvasToOpen}`);
+    setCanvasToOpen(null);
+  }, [canvasToOpen, router]);
 
   const [projects, setProjects]               = useState<DesignProject[]>([]);
   const [loading, setLoading]                 = useState(true);
@@ -1926,7 +1943,7 @@ export default function DesignGalleryScreen() {
             <TouchableOpacity
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setNewCanvasVisible(true);
+                showNewCanvasSheet();
               }}
               hitSlop={HIT}
               style={s.plusBtn}
@@ -1981,7 +1998,7 @@ export default function DesignGalleryScreen() {
                 icon="edit-3"
                 title="No designs yet"
                 description="Tap + to start a design."
-                action={{ label: 'New canvas', icon: 'plus', onPress: () => setNewCanvasVisible(true) }}
+                action={{ label: 'New canvas', icon: 'plus', onPress: showNewCanvasSheet }}
               />
             </View>
           }
@@ -2030,12 +2047,17 @@ export default function DesignGalleryScreen() {
       )}
 
       {/* ── Modals / sheets ── */}
-      {/* Open the new canvas only once the sheet has finished closing: the
-          gallery is frozen (freezeOnBlur) the moment the canvas route is
-          pushed, which stranded the sheet's invisible backdrop on top of the
-          canvas, swallowing the first seconds of touches. */}
+      {/* The gallery is frozen (freezeOnBlur) the moment the canvas route is
+          pushed, so any sheet state not yet committed by then never lands.
+          On web that stranded the sheet's Modal (react-native-web's fixed
+          full-screen container plus the invisible backdrop) over the canvas
+          whenever the push beat the close animation, swallowing every touch.
+          openPendingCanvas therefore unmounts the sheet first (until it is
+          next opened) and pushes only after that commit; the close animation
+          still plays whenever it finishes before the push. */}
       <NewCanvasSheet
         visible={newCanvasVisible}
+        unmounted={newCanvasSheetUnmounted}
         onClose={() => { setNewCanvasVisible(false); openPendingCanvas(); }}
         onCreated={id => {
           pendingCanvasIdRef.current = id;
