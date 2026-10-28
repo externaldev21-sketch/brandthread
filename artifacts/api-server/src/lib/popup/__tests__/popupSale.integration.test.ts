@@ -70,7 +70,7 @@ vi.mock("../../../middlewares/requireRole", async (importOriginal) => {
 });
 
 import { db, checkoutSessions, orders, orderItems, productVariants, sellerLocations } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { fake } from "../../money/__tests__/fakeStripe";
 import {
   call, expectLedgerBalanced, orderLedger, seedProduct, seedSeller, startApp, uid,
@@ -178,8 +178,45 @@ describe("feature flag", () => {
     const status = await callAs("GET", "/status", seller);
     expect(status.status).toBe(200);
     expect(status.body.enabled).toBe(false);
+    expect(status.body.terminalUnavailable).toBe(true);
     expect(fake.state.paymentIntentCreates).toHaveLength(0);
     expect(await stockOf(product.variantId)).toBe(3);
+  });
+});
+
+describe("status", () => {
+  it("tells a seller without Stripe payouts to set them up instead of failing", async () => {
+    const seller = await seedSeller("nostripe", { stripeAccount: false });
+    const res = await callAs("GET", "/status", seller);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toMatchObject({
+      enabled: true, paymentsReady: false, needsPayoutSetup: true, terminalUnavailable: false, location: null,
+    });
+  });
+
+  it("is ready for a seller with active payouts", async () => {
+    const seller = await seedSeller("ready");
+    const res = await callAs("GET", "/status", seller);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ enabled: true, paymentsReady: true, needsPayoutSetup: false, terminalUnavailable: false });
+  });
+
+  // A long-lived database that missed migration 274 has no
+  // seller_terminal_locations table; /status used to throw (500).
+  it("answers terminalUnavailable, not 500, when the Terminal tables can't be read", async () => {
+    const noStripe = await seedSeller("drift-nostripe", { stripeAccount: false });
+    const ready = await seedSeller("drift-ready");
+    await db.execute(sql`ALTER TABLE seller_terminal_locations RENAME TO seller_terminal_locations_hidden`);
+    try {
+      const gated = await callAs("GET", "/status", noStripe);
+      expect(gated.status, JSON.stringify(gated.body)).toBe(200);
+      expect(gated.body).toMatchObject({ needsPayoutSetup: true, paymentsReady: false });
+      const unavailable = await callAs("GET", "/status", ready);
+      expect(unavailable.status, JSON.stringify(unavailable.body)).toBe(200);
+      expect(unavailable.body).toMatchObject({ enabled: true, paymentsReady: true, terminalUnavailable: true, location: null });
+    } finally {
+      await db.execute(sql`ALTER TABLE seller_terminal_locations_hidden RENAME TO seller_terminal_locations`);
+    }
   });
 });
 
