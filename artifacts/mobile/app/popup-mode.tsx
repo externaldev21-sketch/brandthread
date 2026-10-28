@@ -106,6 +106,15 @@ export default function PopupModeScreen() {
         setLoad({ kind: 'off' });
         return;
       }
+      // A seller without payouts sees the setup gate; the catalog isn't needed.
+      if (status.needsPayoutSetup ?? !status.paymentsReady) {
+        setLoad({ kind: 'ready', status: { ...status, paymentsReady: false }, products: [] });
+        return;
+      }
+      if (status.terminalUnavailable) {
+        setLoad({ kind: 'off' });
+        return;
+      }
       const { products } = await api.popup.catalog();
       setLoad({ kind: 'ready', status, products });
     } catch (error) {
@@ -293,7 +302,8 @@ export default function PopupModeScreen() {
     body = centered(
       <>
         <Feather name="credit-card" size={36} color={theme.muted} />
-        <Text style={styles.stateTitle}>Set up payouts to take payments</Text>
+        <Text style={styles.stateTitle}>Set up payouts to use Pop-up mode</Text>
+        <Text style={styles.stateBody}>Connect payouts to take card payments in person.</Text>
         <View style={styles.stateButton}><PrimaryButton label="Set up payouts" onPress={() => router.push('/payouts' as never)} /></View>
       </>,
     );

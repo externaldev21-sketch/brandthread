@@ -90,19 +90,39 @@ async function terminalLocationOf(sellerId: string) {
   return row ?? null;
 }
 
+/**
+ * Always a structured answer, never a 500 for a seller who can't sell yet:
+ * needsPayoutSetup — no active Stripe payouts account (the app shows the
+ * payouts setup gate); terminalUnavailable — Pop-up mode is off, or its
+ * Terminal tables can't be read (e.g. a database that missed migration 274).
+ */
 router.get("/status", async (req, res) => {
   const sellerId = sellerOf(req);
   if (!terminalEnabled()) {
-    res.json({ enabled: false, paymentsReady: false, location: null, hasSellerLocation: false });
+    res.json({
+      enabled: false, paymentsReady: false, needsPayoutSetup: false, terminalUnavailable: true,
+      location: null, hasSellerLocation: false,
+    });
     return;
   }
   const [seller] = await db.select({ stripeAccountId: users.stripeAccountId, status: users.stripeAccountStatus })
     .from(users).where(eq(users.clerkId, sellerId)).limit(1);
-  const terminal = await terminalLocationOf(sellerId);
-  const saved = await primaryLocation(sellerId);
+  const paymentsReady = Boolean(seller?.stripeAccountId) && seller?.status === "active";
+  let terminal: Awaited<ReturnType<typeof terminalLocationOf>> | null = null;
+  let saved: Awaited<ReturnType<typeof primaryLocation>> | null = null;
+  let terminalUnavailable = false;
+  try {
+    terminal = await terminalLocationOf(sellerId);
+    saved = await primaryLocation(sellerId);
+  } catch (error) {
+    logger.error({ err: error, sellerId }, "Pop-up status: Terminal location lookup failed");
+    terminalUnavailable = true;
+  }
   res.json({
     enabled: true,
-    paymentsReady: Boolean(seller?.stripeAccountId) && seller?.status === "active",
+    paymentsReady,
+    needsPayoutSetup: !paymentsReady,
+    terminalUnavailable,
     location: terminal ? { id: terminal.stripeLocationId, displayName: terminal.displayName } : null,
     hasSellerLocation: Boolean(saved),
   });

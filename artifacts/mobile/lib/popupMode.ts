@@ -7,6 +7,10 @@
 export type PopupStatus = {
   enabled: boolean;
   paymentsReady: boolean;
+  /** No active Stripe payouts account: show the payouts setup gate. */
+  needsPayoutSetup?: boolean;
+  /** Pop-up mode is off, or its Terminal setup can't be read right now. */
+  terminalUnavailable?: boolean;
   location: { id: string; displayName: string } | null;
   hasSellerLocation: boolean;
 };
