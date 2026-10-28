@@ -180,8 +180,12 @@ export function previewBuyerProductFromCatalog(row: PreviewCatalogProduct): Buye
 
 /** The product page's BuyerProduct for a seeded preview product, or null. */
 export function getPreviewBuyerProduct(id: string | null | undefined): BuyerProduct | null {
-  if (!isPreviewProductId(id) || !previewEnabled()) return null;
-  const row = catalog().getPreviewCatalogProduct(id!);
+  if (!isPreviewProductId(id) || (typeof __DEV__ !== 'undefined' && !__DEV__)) return null;
+  // A route that dropped `&demo=1` still resolves the preview's own ids; the
+  // product page shows them read-only (its sellerPreview 'local' mode).
+  const row = previewEnabled()
+    ? catalog().getPreviewCatalogProduct(id!)
+    : catalog().getPreviewCatalogProductForDetail(id!);
   return row ? previewBuyerProductFromCatalog(row) : null;
 }
 

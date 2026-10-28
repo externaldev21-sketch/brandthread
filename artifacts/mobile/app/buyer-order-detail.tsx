@@ -35,7 +35,8 @@ import { useAuth } from '@clerk/expo';
 import { haptics } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FIT_OPTIONS, MAX_REVIEW_PHOTOS, addReviewPhotos, type FitOption } from '@/lib/reviewDisplay';
-import { getPreviewBuyerOrder } from '@/lib/previewOrders';
+import { getPreviewBuyerOrder, isPreviewOrderId } from '@/lib/previewOrders';
+import { getPreviewBuyerOrderView, isPreviewCommerceId } from '@/lib/previewCommerce';
 import { useReorderFlow } from '@/components/orders/ReorderFlow';
 import { MysteryReveal } from '@/components/orders/MysteryReveal';
 import { mapDelivery, safeTrackingUrl } from '@/lib/deliveryGuarantee';
@@ -645,6 +646,13 @@ export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: Tr
   );
 }
 
+/** A synthetic preview order (seeded, placed this session, or a My orders
+ *  preview card), resolved locally — never through the live API. */
+function previewOrderView(id: string): BuyerOrderView | null {
+  const row = getPreviewBuyerOrder(id);
+  return row ? adaptOrderDetail(row as OrderDetailRow) : getPreviewBuyerOrderView(id);
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerOrderDetailScreen() {
@@ -661,6 +669,9 @@ export default function BuyerOrderDetailScreen() {
   const { reorder, busyOrderId: reorderBusyId, element: reorderElement } = useReorderFlow();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
+  // Synthetic preview orders render read-only from local preview data: no
+  // live API request, and every order action is hidden.
+  const previewOnly = !!id && (isPreviewOrderId(id) || isPreviewCommerceId(id));
 
   // The real order, or — only when that request fails in the dev-web
   // preview (no account) — the seeded order a preview Activity row points
@@ -753,6 +764,14 @@ export default function BuyerOrderDetailScreen() {
   useFocusEffect(useCallback(() => {
     // No id (a bad deep link): show "not found" instead of spinning forever.
     if (!id) { setLoading(false); return; }
+    if (previewOnly) {
+      const view = previewOrderView(id);
+      setOrder(view);
+      setOrderOwnerId(userId);
+      setFetchError(!view);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     const accountGeneration = accountGenerationRef.current;
     consecutiveFailuresRef.current = 0;
@@ -820,10 +839,16 @@ export default function BuyerOrderDetailScreen() {
         timerRef.current = null;
       }
     };
-  }, [api, id, loadBuyerOrder, userId, realtimeConnected]));
+  }, [api, id, previewOnly, loadBuyerOrder, userId, realtimeConnected]));
 
   function handlePullRefresh() {
     if (!id || refreshing) return;
+    if (previewOnly) {
+      const view = previewOrderView(id);
+      setOrder(view);
+      setFetchError(!view);
+      return;
+    }
     const accountGeneration = accountGenerationRef.current;
     setRefreshing(true);
     setIsFetching(true);
@@ -1169,7 +1194,7 @@ export default function BuyerOrderDetailScreen() {
             {order.delivery.autoRefund ? <AutoRefundCard autoRefund={order.delivery.autoRefund} /> : null}
             {!order.delivery.autoRefund || order.delivery.autoRefund.partial ? (
               <DeliveryTrackerCard
-                delivery={order.delivery}
+                delivery={previewOnly ? { ...order.delivery, canConfirmReceipt: false } : order.delivery}
                 status={order.status}
                 storeName={order.sellerName}
                 onCopyTracking={handleCopyTracking}
@@ -1289,7 +1314,7 @@ export default function BuyerOrderDetailScreen() {
               {item.productId ? <Icon name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
             </TouchableOpacity>
           ))}
-          <MysteryReveal orderId={id} />
+          {previewOnly ? null : <MysteryReveal orderId={id} />}
           <TouchableOpacity
             onPress={handleViewSeller}
             activeOpacity={0.75}
@@ -1413,11 +1438,12 @@ export default function BuyerOrderDetailScreen() {
                 <StatusBadge label="IN PRODUCTION" variant="info" />
               </View>
             </GradientCard>
-            <AddToWalletButton orderId={order.id} />
+            {previewOnly ? null : <AddToWalletButton orderId={order.id} />}
           </View>
         )}
 
         {/* ── 6. Contextual secondary actions ─────────────────────────────── */}
+        {!previewOnly && (
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm, marginBottom: SP.md }}>
           {canBuyerCancel(order.status, order.createdAt, Date.now(), order.buyerCancelDeadline) && (
             <>
@@ -1454,6 +1480,7 @@ export default function BuyerOrderDetailScreen() {
             <SecondaryButton label={reorderBusyId === order.id ? 'Adding…' : 'Reorder'} icon="repeat" onPress={handleBuyAgain} disabled={reorderBusyId === order.id} />
           )}
         </View>
+        )}
 
       </ResponsiveContainer>
       </View>
@@ -1488,7 +1515,11 @@ export default function BuyerOrderDetailScreen() {
         )}
 
         <SecondaryButton label="Help center" icon="help-circle" onPress={() => router.push('/help' as never)} small />
-        <PrimaryButton label="Contact seller" icon="message-circle" onPress={handleContactSeller} />
+        {previewOnly ? (
+          <Text style={styles.paymentNote} testID="order-preview-note">Preview order. Order actions are off.</Text>
+        ) : (
+          <PrimaryButton label="Contact seller" icon="message-circle" onPress={handleContactSeller} />
+        )}
       </View>
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}

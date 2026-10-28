@@ -19,7 +19,7 @@
  * data whenever the API actually returns any.
  */
 import { Asset } from 'expo-asset';
-import { isPreviewDemoMode } from './devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from './devPreview';
 
 export function isPreviewCatalogEnabled(): boolean {
   // Stripped to `false` in production builds — this whole module becomes
@@ -147,6 +147,10 @@ let cached: PreviewCatalogProduct[] | null = null;
 export function getPreviewCatalog(): PreviewCatalogProduct[] {
   // Sample products are demo-only (`&demo=1`); any other dev build gets the real empty state.
   if (!isPreviewDemoMode()) return [];
+  return buildCatalog();
+}
+
+function buildCatalog(): PreviewCatalogProduct[] {
   if (cached) return cached;
   cached = SEED.map((row, i) => ({
     id: `preview-product-${String(i + 1).padStart(2, '0')}`,
@@ -178,4 +182,16 @@ export function getPreviewCatalogByDemand(limit?: number): PreviewCatalogProduct
 
 export function getPreviewCatalogProduct(id: string): PreviewCatalogProduct | null {
   return getPreviewCatalog().find(p => p.id === id || p.productId === id) ?? null;
+}
+
+/**
+ * One seeded product by id, for its detail page. Demo mode is URL-only, so a
+ * `preview-product-*` card tapped on a `&demo=1` screen (search, Just Dropped)
+ * or a preview order line lands on a route without it. Any dev-web preview
+ * still resolves the id the preview itself handed out, instead of "This drop
+ * is gone"; lists stay demo-only (getPreviewCatalog above).
+ */
+export function getPreviewCatalogProductForDetail(id: string): PreviewCatalogProduct | null {
+  if (!__DEV__ || !(isBuyerDevPreview() || isSellerDevPreview())) return null;
+  return buildCatalog().find(p => p.id === id || p.productId === id) ?? null;
 }

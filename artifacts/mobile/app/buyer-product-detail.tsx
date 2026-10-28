@@ -2239,7 +2239,7 @@ export default function BuyerProductDetailScreen() {
             variant="primary"
             onPress={handleAddToCart}
             loading={addingToCart}
-            disabled={addingToCart || launching || (allSelected && !inStock)}
+            disabled={addingToCart || launching || !!sellerPreview || (allSelected && !inStock)}
             accessibilityLabel={!allSelected ? 'Add to bag. Select a size first' : !inStock ? 'Out of stock' : 'Add to bag'}
             fullWidth
             testID="product-add-to-cart"

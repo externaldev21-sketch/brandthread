@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/expo';
 
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +26,8 @@ import { radius } from '@/constants/radii';
 
 import { Button } from '@/components/ui/Button';
 
-import { previewBuyerIdentity, profileShareUrl } from '@/lib/previewBuyerIdentity';
+import { PREVIEW_BUYER_IDENTITY, previewBuyerIdentity, profileShareUrl } from '@/lib/previewBuyerIdentity';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -34,17 +36,20 @@ export default function BuyerQRCode() {
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useUser();
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
 
   useEffect(() => {
     getMyProfile().then(setProfile);
   }, []);
 
-  // Demo preview (&demo=1) has no account profile — use the demo buyer's
-  // identity so the QR code renders; fresh preview stays empty.
-  const demo = previewBuyerIdentity();
-  const username = profile?.username || demo?.username || '';
-  const displayName = profile?.name || demo?.name || '';
+  // Same identity the profile header shows (app/(buyer)/profile.tsx): the
+  // local profile, then the account's Clerk username, then — only in the
+  // signed-out dev preview, where the header reads @ava — the preview buyer.
+  const preview = previewBuyerIdentity() ?? (isBuyerDevPreview() && !user?.id ? PREVIEW_BUYER_IDENTITY : null);
+  const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  const username = profile?.username || user?.username || preview?.username || '';
+  const displayName = profile?.name || clerkName || preview?.name || '';
   const canonicalUrl = buildCanonicalProfileUrl(username);
   const handle = canonicalUrl ? `@${username.replace(/^@/, '')}` : null;
   // Legacy alias — used by existing Share call below; keep for compatibility.

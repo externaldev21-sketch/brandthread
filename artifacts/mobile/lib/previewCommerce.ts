@@ -143,6 +143,11 @@ export function getPreviewBuyerOrders(): BuyerOrderView[] {
   }));
 }
 
+/** One of the list's synthetic orders, for its read-only detail page. */
+export function getPreviewBuyerOrderView(id: string | null | undefined): BuyerOrderView | null {
+  return getPreviewBuyerOrders().find(order => order.id === id) ?? null;
+}
+
 /**
  * Shape consumed by the existing live.active() → feed row adapter. Synthetic
  * IDs intentionally cannot be mistaken for server UUIDs; sessions contain no

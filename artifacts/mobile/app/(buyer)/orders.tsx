@@ -320,8 +320,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
   const extraCount = order.lineItems.length - 1;
   const orderLabel = orderDisplayNumber(order.orderNumber);
   const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
-  // Preview orders are list-only here: never pass their synthetic IDs into
-  // a detail or mutation route that can reach the live API.
+  // Preview orders open their read-only detail, but never prefetch, menu or
+  // track through routes that can reach the live API.
   const isPreview = isPreviewOrderId(order.id) || isPreviewCommerceId(order.id);
   const autoRefunded = !!order.delivery?.autoRefund;
   const headline = deliveryHeadline(order);
@@ -358,9 +358,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen, onTra
       onPressIn={isPreview ? undefined : () => prefetchBuyerOrderOnPressIn(order.id)}
       onLongPress={isPreview ? undefined : openMenu}
       delayLongPress={350}
-      disabled={isPreview}
       accessibilityLabel={`${orderLabel ?? 'Order'} from ${order.sellerName}, ${statusBadgeLabel(order.status).toLowerCase()}`}
-      accessibilityHint={isPreview ? undefined : 'Opens order details'}
+      accessibilityHint="Opens order details"
     >
       {/* Top row */}
       <View style={styles.cardTopRow}>
@@ -590,9 +589,12 @@ export default function BuyerOrdersScreen() {
   const centeredPadding = useCenteredContentPadding();
   const router = useRouter();
   const openOrder = useCallback((orderId: string) => {
-    // Synthetic preview orders are list-only; never hand their IDs to a
-    // detail/mutation route backed by the live API.
-    if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) return;
+    // Synthetic preview orders never reach the live API: the detail screen
+    // renders them read-only from the same local preview data.
+    if (isPreviewOrderId(orderId) || isPreviewCommerceId(orderId)) {
+      router.push(('/buyer-order-detail?id=' + encodeURIComponent(orderId)) as never);
+      return;
+    }
     router.push(('/buyer-order-detail?id=' + orderId) as never);
   }, [router]);
   // Track Shipment opens the order's tracking screen (carrier, number,
