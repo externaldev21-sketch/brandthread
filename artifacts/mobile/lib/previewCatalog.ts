@@ -19,6 +19,7 @@
  * data whenever the API actually returns any.
  */
 import { Asset } from 'expo-asset';
+import { ALLOW_DEV_TOOLS } from './buildFlags';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from './devPreview';
 
 export function isPreviewCatalogEnabled(): boolean {
@@ -192,6 +193,8 @@ export function getPreviewCatalogProduct(id: string): PreviewCatalogProduct | nu
  * is gone"; lists stay demo-only (getPreviewCatalog above).
  */
 export function getPreviewCatalogProductForDetail(id: string): PreviewCatalogProduct | null {
-  if (!__DEV__ || !(isBuyerDevPreview() || isSellerDevPreview())) return null;
+  // Same gate as the preview harness (lib/devPreview.ts): dev builds and the
+  // static fast-preview export, never a production build.
+  if (!ALLOW_DEV_TOOLS || !(isBuyerDevPreview() || isSellerDevPreview())) return null;
   return buildCatalog().find(p => p.id === id || p.productId === id) ?? null;
 }
