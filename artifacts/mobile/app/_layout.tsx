@@ -8,6 +8,7 @@ import { recordNavigationStart, recordShellInteractive } from '@/lib/perf';
 import { focusedNavigationKey, markNavigationCommit, markNavigationDispatch, markNavigationInput } from '@/lib/navigation/navigationTrace';
 import { RetainedScene } from '@/components/RetainedScene';
 import { prefetchRouteCode, scheduleRouteWarmup } from '@/lib/navigation/routeWarmup';
+import { noteTouchEnd, noteTouchStart } from '@/lib/navigation/inputActivity';
 import { PerfOverlay } from '@/components/dev/PerfOverlay';
 import { isBuyerBrowseRoute, safeReturnTo } from '@/lib/guestRoutes';
 import { GuestRouteBoundary } from '@/components/GuestRouteBoundary';
@@ -151,6 +152,13 @@ installPushGuard(globalRouter, undefined, markNavigationDispatch);
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
 const OPAQUE_SCREEN_CONTENT = { backgroundColor: 'transparent' } as const;
+
+// Root touch tracking: navigation tracing, plus the quiet-moment check that
+// keeps background tab pre-mounting out of the middle of a press.
+function onRootTouchStart() {
+  markNavigationInput();
+  noteTouchStart();
+}
 
 // Tap-outside-to-dismiss-keyboard wraps the whole app. On native this is
 // inert for a tap that lands directly on a text field: RN's responder
@@ -1576,7 +1584,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
   }
 
   return (
-    <View onTouchStart={markNavigationInput} style={{ flex: 1, flexDirection: 'column' }}>
+    <View onTouchStart={onRootTouchStart} onTouchEnd={noteTouchEnd} onTouchCancel={noteTouchEnd} style={{ flex: 1, flexDirection: 'column' }}>
       <View
         testID="expo-go-startup-ready"
         accessibilityLabel="Brandthread startup ready"

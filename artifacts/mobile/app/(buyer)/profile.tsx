@@ -30,6 +30,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useProfilePostsDefault } from '@/hooks/useProfilePostsDefault';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 import { useUser } from '@clerk/expo';
 import { ProfileSongLine } from '@/components/profile/ProfileSongLine';
 import { useProfileMusicEnabled } from '@/hooks/useProfileMusic';
@@ -527,6 +528,8 @@ export default function ProfileScreen() {
   }, [activeTab, loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  // Pre-mounted by the tab preloader: load now so the first visit paints data.
+  usePreloadedSceneEffect(() => { void loadData(); });
 
   useFocusEffect(useCallback(() => {
     setFocused(true);

@@ -13,6 +13,7 @@ import Animated, {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
+import { warmTabOnPressIn } from '@/components/navigation/TabScenePreloader';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarMediaLift, TabBarSlot, CrossfadeNavIcon, tabIconColor,
   useTabBarActiveIndex, INDICATOR_SPRING,
@@ -199,11 +200,14 @@ export function BuyerTabBar({
   const pressSlot = React.useCallback((index: number) => {
     onProfile.set(false);
     pressIndicator(index);
-  }, [onProfile, pressIndicator]);
+    const route = BUYER_TAB_ITEMS[index]?.route;
+    if (route) warmTabOnPressIn(state, '/(buyer)', route);
+  }, [onProfile, pressIndicator, state]);
   const pressProfile = React.useCallback(() => {
     onProfile.set(true);
     hideIndicator();
-  }, [activeSlot, onProfile, hideIndicator]);
+    warmTabOnPressIn(state, '/(buyer)', 'profile');
+  }, [activeSlot, onProfile, hideIndicator, state]);
   // Where the resize is heading (1 compact, 0 regular) — set in the
   // reaction below on the same frame the resize starts.
   const modeTarget = useSharedValue(isCompact ? 1 : 0);

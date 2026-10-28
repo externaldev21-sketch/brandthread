@@ -8,6 +8,9 @@ type SceneNavigation = {
   getParent?(): { isFocused(): boolean } | undefined;
 };
 
+/** How long a never-focused (pre-mounted) scene stays live before freezing. */
+const PRELOADED_SETTLE_MS = 6000;
+
 /** Native screens already coordinate freezing with their transitions. RN web
  * keeps hidden scenes mounted but ignores native freezeOnBlur. Suspend only
  * genuinely hidden DOM trees, never a visible transparent-modal backdrop.
@@ -28,9 +31,11 @@ function FrozenWebScene({ navigation, children, opaque }: { navigation: SceneNav
   const focused = useSyncExternalStore(subscribe, snapshot, () => true);
   const [frozen, setFrozen] = useState(false);
   const host = useRef<View>(null);
+  const everFocused = useRef(focused);
   useEffect(() => {
-    if (focused) { setFrozen(false); return; }
+    if (focused) { everFocused.current = true; setFrozen(false); return; }
     let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const check = () => {
       // Run AFTER the blur commit/effects: videos and infinite animations must
       // get their unfocused render/cleanup before the subtree is suspended.
@@ -48,8 +53,13 @@ function FrozenWebScene({ navigation, children, opaque }: { navigation: SceneNav
         element = element.parentElement;
       }
     };
-    raf = requestAnimationFrame(check);
-    return () => cancelAnimationFrame(raf);
+    // A scene pre-mounted hidden (components/navigation/TabScenePreloader)
+    // first gets to finish its initial load and reveal — frozen right away,
+    // that data and any skeleton fade-out would only commit on the first
+    // visit, in front of the user.
+    if (everFocused.current) raf = requestAnimationFrame(check);
+    else timer = setTimeout(() => { raf = requestAnimationFrame(check); }, PRELOADED_SETTLE_MS);
+    return () => { cancelAnimationFrame(raf); clearTimeout(timer); };
   }, [focused, opaque]);
   return <View ref={host} style={{ flex: 1 }}>
     <Freeze freeze={!focused && frozen}>{children}</Freeze>

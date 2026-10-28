@@ -22,6 +22,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Icon, type IconName } from '@/components/ui/Icon';
 
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
@@ -658,6 +659,9 @@ export default function ProductsScreen() {
   useFocusEffect(useCallback(() => {
     loadProducts();
   }, [loadProducts]));
+  // Pre-mounted by the tab preloader: load now so the first visit paints the
+  // list; the focus load above then refreshes it silently (same key).
+  usePreloadedSceneEffect(() => { void loadProducts(); });
 
   function refresh() { loadProducts(); }
 

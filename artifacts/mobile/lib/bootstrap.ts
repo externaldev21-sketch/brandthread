@@ -9,6 +9,7 @@ import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
 import { runAfterFirstPaint } from '@/lib/deferStartup';
 import { logNativeRuntimeDiagnostics } from '@/lib/startupDiagnostics';
 import { injectWebFocusOutlineStyles, injectWebRootClipStyles, injectWebScrollbarHideStyles, injectWebTextRenderingStyles } from '@/lib/webTextRendering';
+import { installHiddenLayoutGuard } from '@/lib/hiddenLayoutGuard';
 // Android: headless FCM task that rings DM calls when the app is killed (no-op elsewhere).
 import '@/lib/calls/native/registerBackgroundCallTask';
 
@@ -23,6 +24,10 @@ import '@/lib/calls/native/registerBackgroundCallTask';
 // keeps logging to the console/terminal for developers either way; this only
 // stops it from also painting an in-app banner over the real UI.
 LogBox.ignoreAllLogs(true);
+
+// Web: hidden (stack-covered) scenes keep their last layout instead of
+// collapsing to 0×0 and re-measuring a frame late on return.
+installHiddenLayoutGuard();
 
 // Start of the cold-start clock for app JS (lib/perf.ts).
 markAppJsStart();

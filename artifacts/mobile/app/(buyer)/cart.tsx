@@ -26,6 +26,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { applyCartQuantity } from '@/lib/cartOptimistic';
 
@@ -296,6 +297,16 @@ export default function CartScreen() {
     }
     return () => { active = false; };
   }, [api, load, isSignedIn, cartOwnerId]));
+  // Pre-mounted by the buyer tab preloader: load the bag now so its first
+  // open paints the items, not the loading state.
+  usePreloadedSceneEffect(() => {
+    void load().then(() => { hasLoadedCartRef.current = cartOwnerId; });
+    if (isSignedIn) {
+      void api.loyalty.get()
+        .then(result => setLoyaltyBalance(Math.max(0, Number(result.balance ?? 0))))
+        .catch(() => {});
+    }
+  });
 
   const groups = groupCartBySeller(cart.items);
 

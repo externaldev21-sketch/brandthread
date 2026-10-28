@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, usePathname } from 'expo-router';
 import { RetainedScene } from '@/components/RetainedScene';
+import { TabScenePreloader } from '@/components/navigation/TabScenePreloader';
 import { GuestRouteBoundary } from '@/components/GuestRouteBoundary';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -37,6 +38,10 @@ import {
 // scenes, so every screen pads its content with useBuyerTabBarInset().
 // Friends, Cart, Orders, Following and Edit Profile are routes in this
 // navigator (so the bar stays on screen) but have no slot of their own.
+
+// Bar tabs pre-mounted in the background after the first paint, so the first
+// tap on each is as instant as a revisit (components/navigation/TabScenePreloader).
+const PRELOADED_TABS = ['discover', 'inbox', 'activity', 'profile', 'index', 'cart'] as const;
 
 function BuyerTabLayout() {
   const { isSignedIn } = useAuth();
@@ -140,6 +145,18 @@ function BuyerTabLayout() {
       // feeling on every tab tap. The memory cost is 5 always-attached
       // screens, which is cheap next to eliminating that reload.
       detachInactiveScreens={false}
+      layout={({ children, state, navigation }) => (
+        <>
+          {children}
+          <TabScenePreloader
+            state={state}
+            navigation={navigation}
+            group="/(buyer)"
+            routes={PRELOADED_TABS}
+            enabled={!!isSignedIn || isBuyerDevPreview()}
+          />
+        </>
+      )}
       screenLayout={({ children, navigation, route }) => (
         <RetainedScene navigation={navigation} opaque>
           <GuestRouteBoundary routeName={route.name} buyerTab>{children}</GuestRouteBoundary>

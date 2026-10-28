@@ -68,6 +68,8 @@ vi.mock('expo-router', async (importOriginal) => ({
   useRouter: () => ({ push: routerPush, back: vi.fn(), replace: vi.fn() }),
   useScrollToTop: () => {},
   useLocalSearchParams: () => ({}),
+  // Screens are focused in these tests (usePreloadedSceneEffect only acts on hidden pre-mounts).
+  useNavigation: () => ({ isFocused: () => true }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

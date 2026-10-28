@@ -37,9 +37,10 @@ import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View, type
 
 import { Icon } from '@/components/ui/Icon';
 
-import { useFocusEffect, useRouter, useSegments } from 'expo-router';
+import { useFocusEffect, useNavigation, useRouter, useSegments } from 'expo-router';
 
 import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 import { useAuth, useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -818,6 +819,15 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
   // After the screen has painted, and skipped when a fast tab burst only
   // passes through Activity (hooks/useFocusEffectAfterPaint.ts).
   const loadedOnce = useRef(false);
+  // Pre-mounted by the buyer tab preloader: fetch the first page now so the
+  // first visit paints rows instead of the skeleton. Reads only — rows are
+  // marked read on view, and that waits for focus (see onViewableItemsChanged).
+  usePreloadedSceneEffect(() => {
+    void loadFirstPage('initial');
+    void loadSuggested();
+    void reloadTrending();
+    loadedOnce.current = true;
+  });
   useFocusEffectAfterPaint(useCallback(() => {
     void loadFirstPage(loadedOnce.current ? 'focus' : 'initial');
     void loadSuggested();
@@ -926,6 +936,12 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 150 }).current;
   const readIdsRef = useRef(readIds);
   readIdsRef.current = readIds;
+  // A hidden scene (pre-mounted, or a tab the user left) is still laid out,
+  // so its rows report as viewable: only count them as seen while focused,
+  // and hand the rows already on screen to the tracker when focus arrives.
+  const navigation = useNavigation();
+  const focusedRef = useRef(navigation.isFocused());
+  const viewableIdsRef = useRef<string[]>([]);
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const visible: string[] = [];
     for (const token of viewableItems) {
@@ -933,8 +949,17 @@ export default function ActivityCenterScreen({ isTab = false }: { isTab?: boolea
       if (!row?.ids) continue;
       for (const id of row.ids) if (!readIdsRef.current.has(id)) visible.push(id);
     }
-    tracker.setVisible(visible);
+    viewableIdsRef.current = visible;
+    tracker.setVisible(focusedRef.current ? visible : []);
   }).current;
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    tracker.setVisible(viewableIdsRef.current.filter((id) => !readIdsRef.current.has(id)));
+    return () => {
+      focusedRef.current = false;
+      tracker.setVisible([]);
+    };
+  }, [tracker]));
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const clearDots = useCallback((ids: readonly string[]) => {

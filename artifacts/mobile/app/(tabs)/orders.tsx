@@ -18,6 +18,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Icon } from '@/components/ui/Icon';
 
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -945,6 +946,13 @@ export default function OrdersScreen() {
       }
     }, [params.filter, router]),
   );
+
+  // Pre-mounted by the tab preloader: one read so the first visit paints the
+  // list. Badge clearing and the 30s poll stay with the real visit below.
+  usePreloadedSceneEffect(() => {
+    if (!isPreviewMode && (!authLoaded || !isSignedIn || !userId)) return;
+    void loadData(++generationRef.current);
+  });
 
   useFocusEffect(
     useCallback(() => {
