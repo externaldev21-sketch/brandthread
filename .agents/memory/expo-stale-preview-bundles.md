@@ -20,3 +20,9 @@ Check static preview availability with a browser navigation or `Accept: text/htm
 **Why:** The static server deliberately returns a real 404 to non-HTML requests rather than substituting the SPA shell. A plain curl 404 can therefore coexist with a working browser preview. Missing ignored export output is a separate failure and needs a preview-mode rebuild, never substitution of production output.
 
 **How to apply:** Verify the expected export exists, then request the preview with an HTML Accept header and inspect the actual public-origin browser. Localhost screenshot origins can also produce misleading cross-origin API failures.
+
+Run static-export existence checks in the mobile package's working directory, not with a workspace-root-relative path inside an API-owned workflow.
+
+**Why:** The API-owned fast-preview service runs from the API package. A root-relative guard falsely treated a completed export as missing, started a destructive rebuild, and exceeded the startup deadline before opening its port.
+
+**How to apply:** Resolve the check through `pnpm --filter @workspace/mobile exec`. Build cold exports outside the server startup deadline, then restart the managed static service against the completed output.

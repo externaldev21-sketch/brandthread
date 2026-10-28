@@ -51,7 +51,7 @@ paths = [ "/fast-preview" ]
 ensurePreviewReachable = "/fast-preview/status"
 
 [services.development]
-run = "bash -c 'if [ ! -f artifacts/mobile/static-preview-build/index.html ]; then pnpm --filter @workspace/mobile run preview:web:build || exit $?; fi; exec pnpm --filter @workspace/mobile run preview:web:serve'"
+run = "bash -c 'if ! pnpm --filter @workspace/mobile exec test -f static-preview-build/index.html; then pnpm --filter @workspace/mobile run preview:web:build || exit $?; fi; exec pnpm --filter @workspace/mobile run preview:web:serve'"
 
 [services.env]
 PORT = "18116"
