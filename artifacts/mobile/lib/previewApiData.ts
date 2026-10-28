@@ -276,6 +276,12 @@ const RESOLVERS: Record<string, Resolver> = {
   }),
   'finance/transactions': () => ({ transactions: [], connected: false }),
   'finance/payouts': () => ({ payouts: [], connected: false }),
+  // Pop-up mode: a seller without payouts gets the setup gate (#1131).
+  'seller/terminal/status': () => ({
+    enabled: true, paymentsReady: false, needsPayoutSetup: true, terminalUnavailable: false,
+    location: null, hasSellerLocation: false,
+  }),
+  'seller/terminal/catalog': () => ({ products: [] }),
 
   // ── Endpoints added by open PRs (answered here so those screens render the
   // fresh state in the preview as soon as they land). Bodies are what each
