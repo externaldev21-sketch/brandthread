@@ -23,9 +23,12 @@
 import { useEffect, useRef } from 'react';
 import { Tabs, usePathname } from 'expo-router';
 import { RetainedScene } from '@/components/RetainedScene';
+import { TabScenePreloader } from '@/components/navigation/TabScenePreloader';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAuth } from '@clerk/expo';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { useSettled } from '@/lib/animationUtils';
 // Same Instagram/TikTok-style directional slide as the buyer tab layout —
@@ -43,6 +46,10 @@ const _LABEL_PRODUCTS  = 'Products';  // label: 'Products'
 const _LABEL_ORDERS    = 'Orders';    // label: 'Orders'
 const _LABEL_PROFILE   = 'Profile';   // label: 'Profile'
 
+// Main tabs pre-mounted in the background after the first paint, so the first
+// tap on each is as instant as a revisit (components/navigation/TabScenePreloader).
+const PRELOADED_TABS = ['products', 'orders', 'profile', 'index', 'analytics'] as const;
+
 // Suppress "declared but never read" — these exist only for the test scanner.
 void _LABEL_DASHBOARD;
 void _LABEL_PRODUCTS;
@@ -51,6 +58,7 @@ void _LABEL_PROFILE;
 
 export default function TabLayout() {
   const { theme } = useAppTheme();
+  const { isSignedIn } = useAuth();
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
 
@@ -94,6 +102,18 @@ export default function TabLayout() {
       // See the buyer tab layout for why this is false: keeps every tab's
       // native view attached so switching is instant, never a remount.
       detachInactiveScreens={false}
+      layout={({ children, state, navigation }) => (
+        <>
+          {children}
+          <TabScenePreloader
+            state={state}
+            navigation={navigation}
+            group="/(tabs)"
+            routes={PRELOADED_TABS}
+            enabled={!!isSignedIn || isSellerDevPreview()}
+          />
+        </>
+      )}
       screenLayout={({ children, navigation }) => <RetainedScene navigation={navigation} opaque>{children}</RetainedScene>}
       tabBar={() => null}
       // A render crash in one tab shows a friendly per-tab fallback instead

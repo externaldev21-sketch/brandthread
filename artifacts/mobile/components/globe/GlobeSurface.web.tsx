@@ -52,10 +52,20 @@ export function GlobeSurface({ size, view, clock, arcs, activities, selectedId, 
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
     let frame = 0;
+    // What the canvas last drew. The globe's clock only advances while its
+    // frame callback runs (SellerOrderGlobe stops it off screen and on
+    // blur); with nothing new to show, keep the last frame on the canvas
+    // instead of repainting the same image every frame from a hidden tab.
+    let drawn: { v: GlobeView; now: number; props: typeof propsRef.current } | null = null;
 
     const draw = () => {
       const v = view.value;
       const now = clock.value;
+      if (drawn && drawn.v === v && drawn.now === now && drawn.props === propsRef.current) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
+      drawn = { v, now, props: propsRef.current };
       const { activities: list, selectedId: selected, highlightKey: hot, reduceMotion: still } = propsRef.current;
       const r = globeRadius(size, v.zoom);
       const c = size / 2;

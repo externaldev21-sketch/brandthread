@@ -63,7 +63,7 @@ import { clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage
 import { useMessageOutbox } from '@/hooks/useMessageOutbox';
 import { applyReadReceipt, mergeIncomingMessage, TYPING_TTL_MS, useRealtimeConnected, useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
 import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
-import { peekWarmThread } from '@/lib/conversationPrefetch';
+import { peekWarmThread, rememberWarmThread } from '@/lib/conversationPrefetch';
 import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
@@ -369,10 +369,12 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const myCallInitials = isSeller ? (sellerName[0] ?? '?').toUpperCase() : MY_INITIALS;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
-  const [conv, setConv] = useState<Conversation | null>(() => peekWarmThread(userId, params.id)?.conversation ?? null);
+  // Seeded preview threads have no signed-in owner; they get their own scope.
+  const warmOwner = userId ?? (params.id && isPreviewId(params.id) ? 'preview' : null);
+  const [conv, setConv] = useState<Conversation | null>(() => peekWarmThread(warmOwner, params.id)?.conversation ?? null);
   const [loadFailed, setLoadFailed] = useState(false);
   const callLog = useCallLog(conv?.id ?? params.id ?? '');
-  const [messages, setMessages] = useState<Message[]>(() => peekWarmThread(userId, params.id)?.messages ?? []);
+  const [messages, setMessages] = useState<Message[]>(() => peekWarmThread(warmOwner, params.id)?.messages ?? []);
   const [text, setText] = useState('');
   useChatDraft(userId ? conv?.id ?? params.id : null, text, setText, userId ?? null);
   const currentThreadIdRef = useRef(params.id ?? conv?.id);
@@ -383,6 +385,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   // in-flight Accept, so the Accept/Block/Delete row can't double-fire.
   const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Reopening this thread later in the session paints what was on screen when
+  // it was left, on its first frame, instead of an empty header while the
+  // device cache is read back (lib/conversationPrefetch.ts).
+  useEffect(() => {
+    if (!warmOwner || !conv || conv.id !== params.id || welcomeAnimatingRef.current) return;
+    rememberWarmThread(warmOwner, conv.id, { conversation: conv, messages });
+  }, [warmOwner, conv, messages, params.id]);
   const [isSending, setIsSending] = useState(false);
   // Brandthread Agent "typing…": true ONLY during the one-time welcome
   // type-in or while a reply to a message the user just sent is in flight.
@@ -642,6 +651,8 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
             } finally {
               welcomeAnimatingRef.current = false;
               if (isMountedRef.current) setAgentTyping(false);
+              // The type-in is over: a reopen paints the full thread at once.
+              rememberWarmThread(userId ?? 'preview', loadedConv.id, { conversation: loadedConv, messages: seeded });
             }
           }
         } else {

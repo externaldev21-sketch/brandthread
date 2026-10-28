@@ -24,3 +24,17 @@ describe('likely-route warming', () => {
     expect(scheduled).toBe(false);
   });
 });
+
+describe('route warmup queue', () => {
+  it('waits for each chunk to finish loading before scheduling the next', async () => {
+    const work: Array<() => void> = [], warmed: string[] = [];
+    let release = () => {};
+    scheduleRouteWarmup(route => { warmed.push(route); return new Promise<void>(r => { release = r; }); }, 'seller', task => { work.push(task); return () => {}; });
+    work.shift()!();
+    expect(warmed).toEqual(['/(tabs)/products']);
+    expect(work).toHaveLength(0);
+    release();
+    await Promise.resolve(); await Promise.resolve();
+    expect(work).toHaveLength(1);
+  });
+});

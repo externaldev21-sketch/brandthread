@@ -109,6 +109,7 @@ import {
 import { BrandthreadAvatar } from '@/components/branding/BrandthreadAvatar';
 import { keepIfSame } from '@/lib/keepIfSame';
 import { useFocusEffectAfterPaint } from '@/hooks/useFocusEffectAfterPaint';
+import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 import { isOfficialAccountId } from '@/lib/officialAccount';
 import { EmptyState as QuietEmptyState, ScreenHeader, SectionHeader, SegmentTabs } from '@/components/reframe';
 import { IconButton } from '@/components/ui/IconButton';
@@ -380,6 +381,19 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     cachedInbox?.conversations ?? (previewInboxAtMount
       ? (isSeller ? getSellerPreviewConversations() : getPreviewConversations()) : []));
   const localReadClaims = useRef(new Map<string, { signature: string }>());
+  /** Rows opened here read as read until their last message changes — also
+   *  for seeded preview threads, which otherwise came back unread (bold) a
+   *  frame after returning from the thread. */
+  const withLocalReads = useCallback((rows: Conversation[]): Conversation[] => rows.map(conversation => {
+    const claim = localReadClaims.current.get(conversation.id);
+    if (!claim) return conversation;
+    const signature = JSON.stringify([conversation.lastMessageTs, conversation.lastMessageSenderId, conversation.lastMessage, conversation.lastMessageType]);
+    if (claim.signature !== signature) {
+      localReadClaims.current.delete(conversation.id);
+      return conversation;
+    }
+    return { ...conversation, unreadCount: 0 };
+  }), []);
   useEffect(() => { localReadClaims.current.clear(); }, [userId]);
   const [loading, setLoading] = useState(!cachedInbox && !previewInboxAtMount);
   const rowFirstSeenRef = useRef<Map<string, number> | null>(null);
@@ -617,7 +631,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // would have returned, and every preview load showed "No messages
       // yet". Real accounts always have a userId and never hit this branch.
       if (!userId && isPreviewInboxEnabled()) {
-        setConversations(getPreviewConversations());
+        setConversations(withLocalReads(getPreviewConversations()));
         setLoading(false);
         return;
       }
@@ -629,16 +643,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     try {
       const all = await getConversations();
       if (accountRef.current !== userId) return;
-      const visibleConversations = all.map(conversation => {
-        const claim = localReadClaims.current.get(conversation.id);
-        if (!claim) return conversation;
-        const signature = JSON.stringify([conversation.lastMessageTs, conversation.lastMessageSenderId, conversation.lastMessage, conversation.lastMessageType]);
-        if (claim.signature !== signature) {
-          localReadClaims.current.delete(conversation.id);
-          return conversation;
-        }
-        return { ...conversation, unreadCount: 0 };
-      });
+      const visibleConversations = withLocalReads(all);
       if (isSeller) {
         // Sellers only handle buyer↔seller threads.
         const relevant = visibleConversations.filter(c => c.type !== 'buyer_to_buyer');
@@ -654,7 +659,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       // show (see lib/previewInbox.ts) — never for a real signed-in account,
       // never when the API returned real rows, and dead code in production.
       if (!userId && isPreviewInboxEnabled() && convs.length === 0) {
-        setConversations(getPreviewConversations());
+        setConversations(withLocalReads(getPreviewConversations()));
       } else {
         setConversations(convs);
         setCachedTabData('inbox', { conversations: convs });
@@ -716,6 +721,14 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     loadStoryTray();
     loadNotesTray();
   }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]));
+  // Pre-mounted by the buyer tab preloader: same reads, so the first visit
+  // paints the inbox instead of loading it (nothing here marks anything read).
+  usePreloadedSceneEffect(() => {
+    loadData();
+    loadSuggested();
+    loadStoryTray();
+    loadNotesTray();
+  });
 
   useEffect(() => {
     const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); loadNotesTray(); });

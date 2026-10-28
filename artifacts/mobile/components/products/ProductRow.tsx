@@ -4,7 +4,7 @@
  * Tapping the stock text opens the quick stock editor, same as the grid card.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -61,10 +61,13 @@ export const ProductRow = React.memo(function ProductRow({ product, onPress, onP
           <View style={styles.metaRow}>
             <Text style={[styles.price, { color: theme.text }]} numberOfLines={1}>{price}</Text>
             <Text style={[styles.dot, { color: theme.muted }]}>·</Text>
+            {/* Sits inside the row's own button: on web a second
+                role="button" renders a <button> inside a <button> (invalid
+                DOM, and Expo's dev error toast over the tab bar). */}
             <Pressable
               onPress={() => onEditStock(product)}
               hitSlop={{ top: 12, bottom: 12, left: 4, right: 8 }}
-              accessibilityRole="button"
+              accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
               accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
               style={({ pressed }) => [styles.stockWrap, pressed && styles.pressed]}
             >

@@ -182,6 +182,8 @@ vi.mock('expo-router', () => ({
     const ReactActual = require('react') as typeof import('react');
     ReactActual.useEffect(callback, [callback]);
   },
+  // Screens are focused in these tests (usePreloadedSceneEffect only acts on hidden pre-mounts).
+  useNavigation: () => ({ isFocused: () => true }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
