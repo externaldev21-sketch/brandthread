@@ -25,7 +25,11 @@ export function prefetchQuery<T>(
  *  tests) don't have to load the real expo-image native module. */
 export function prefetchImage(uri: string | null | undefined): void {
   if (!uri) return;
-  void import('expo-image').then(({ Image }) => Image.prefetch(uri, { cachePolicy: 'memory-disk' }));
+  // Best-effort warm-up: a failed prefetch (offline, bad URL) must not
+  // surface as an unhandled rejection; the screen loads the image itself.
+  void import('expo-image')
+    .then(({ Image }) => Image.prefetch(uri, { cachePolicy: 'memory-disk' }))
+    .catch(() => {});
 }
 
 /** Combine a query + image prefetch into one press-in handler. */

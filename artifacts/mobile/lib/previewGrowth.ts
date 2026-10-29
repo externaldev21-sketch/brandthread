@@ -11,6 +11,8 @@ import type {
 
 const demo = () => isPreviewDemoMode();
 let links: TrackedLink[] | null = null;
+// Which dataset `links` was seeded for (same reason as `bioDemo` below).
+let linksDemo: boolean | null = null;
 let bio: BioPage | null = null;
 // Which dataset `bio` was built for: demo is URL-only (lib/devPreview), so a
 // page without demo=1 must not keep an earlier page's demo data, or vice versa.
@@ -27,7 +29,11 @@ function seedLinks(): TrackedLink[] {
   });
   return [mk(1, 'Instagram bio', 'instagram', 'social', 412, 9, 58400), mk(2, 'TikTok profile', 'tiktok', 'social', 268, 4, 24900), mk(3, 'Spring email', 'newsletter', 'email', 97, 6, 41200)];
 }
-const L = () => (links ??= seedLinks());
+const L = (): TrackedLink[] => {
+  if (links && linksDemo !== demo()) links = null;
+  linksDemo = demo();
+  return (links ??= seedLinks());
+};
 
 export const previewGrowth = {
   presetsOnly: true,

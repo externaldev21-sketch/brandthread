@@ -175,6 +175,30 @@ export function getPreviewConversations(): Conversation[] {
   return [...runtime, ...cachedConversations];
 }
 
+/** The seeded part of the list (the cache), filled for the current demo mode. */
+function seededPreviewConversations(): Conversation[] {
+  getPreviewConversations();
+  return cachedConversations ?? [];
+}
+
+/**
+ * Applies `update` to one conversation where it lives: a runtime thread in
+ * `runtimeConversations`, a seeded one in `cachedConversations`. Writing the
+ * merged list from getPreviewConversations() back into the cache would copy
+ * every runtime thread into it, so each would then be listed twice (and a
+ * runtime thread's change would be shadowed by its stale runtime entry).
+ */
+function updatePreviewConversation(id: string, update: (c: Conversation) => Conversation): void {
+  const runtime = runtimeConversations.get(id);
+  if (runtime) {
+    runtimeConversations.set(id, update(runtime));
+    return;
+  }
+  const seeded = seededPreviewConversations();
+  if (!seeded.some(c => c.id === id)) return;
+  cachedConversations = seeded.map(c => (c.id === id ? update(c) : c));
+}
+
 export function getPreviewConversation(id: string): Conversation | null {
   return runtimeConversations.get(id) ?? getPreviewConversations().find(c => c.id === id) ?? null;
 }
@@ -230,7 +254,13 @@ export function touchPreviewConversation(conversationId: string, lastMessage: st
  * seeded conversation this module knows about.
  */
 export function acceptPreviewConversationRequest(id: string): Conversation | null {
-  const list = getPreviewConversations();
+  const runtime = runtimeConversations.get(id);
+  if (runtime) {
+    const accepted = acceptConversationInList([runtime], id)[0];
+    runtimeConversations.set(id, accepted);
+    return accepted;
+  }
+  const list = seededPreviewConversations();
   if (!list.some(c => c.id === id)) return null;
   cachedConversations = acceptConversationInList(list, id);
   return cachedConversations[0];
@@ -243,7 +273,8 @@ export function acceptPreviewConversationRequest(id: string): Conversation | nul
  * backend block/delete record to keep in sync with.
  */
 export function deletePreviewConversationRequest(id: string): void {
-  cachedConversations = removeConversationFromList(getPreviewConversations(), id);
+  runtimeConversations.delete(id);
+  cachedConversations = removeConversationFromList(seededPreviewConversations(), id);
 }
 
 /**
@@ -253,22 +284,12 @@ export function deletePreviewConversationRequest(id: string): void {
  * every screen reading getPreviewConversation() in this session.
  */
 export function setPreviewConversationTheme(id: string, themeId: string | null): void {
-  const list = getPreviewConversations();
-  const idx = list.findIndex(c => c.id === id);
-  if (idx < 0) return;
-  const next = list.slice();
-  next[idx] = { ...next[idx], themeId: themeId ?? undefined };
-  cachedConversations = next;
+  updatePreviewConversation(id, c => ({ ...c, themeId: themeId ?? undefined }));
 }
 
 /** Chat details > Disappearing messages, in preview mode: same pattern. */
 export function setPreviewConversationDisappearing(id: string, enabled: boolean): void {
-  const list = getPreviewConversations();
-  const idx = list.findIndex(c => c.id === id);
-  if (idx < 0) return;
-  const next = list.slice();
-  next[idx] = { ...next[idx], disappearingEnabled: enabled };
-  cachedConversations = next;
+  updatePreviewConversation(id, c => ({ ...c, disappearingEnabled: enabled }));
 }
 
 /**
@@ -281,22 +302,23 @@ export function setPreviewConversationDisappearing(id: string, enabled: boolean)
  * un-pins it, matching the real backend's isAgentThread-always-pinned rule.
  */
 export function setPreviewConversationPinned(id: string, pinned: boolean): void {
-  const list = getPreviewConversations();
-  const idx = list.findIndex(c => c.id === id);
-  if (idx < 0) return;
-  if (list[idx].isOfficial) return; // agent thread: always pinned, not user-toggleable
-  const next = list.slice();
-  next[idx] = { ...next[idx], isPinned: pinned };
-  cachedConversations = next;
+  // agent thread: always pinned, not user-toggleable
+  updatePreviewConversation(id, c => (c.isOfficial ? c : { ...c, isPinned: pinned }));
 }
 
 let cachedNotifications: Notification[] | null = null;
+// Demo mode is URL-only (lib/devPreview.ts), so like getPreviewConversations
+// these caches are rebuilt when it changes: a fresh page never keeps an
+// earlier demo page's seeds, and a demo page never keeps a fresh page's [].
+let cachedNotificationsDemoMode: boolean | null = null;
 
 /** Seeded "new follower" notifications for the redesigned inbox's Follows
  *  tab/rail. Fresh install by default — only populated under `demo=1` (see
  *  getPreviewConversations' doc comment). */
 export function getPreviewNotifications(): Notification[] {
-  if (!cachedNotifications) {
+  const demo = isPreviewDemoMode();
+  if (!cachedNotifications || cachedNotificationsDemoMode !== demo) {
+    cachedNotificationsDemoMode = demo;
     cachedNotifications = !isPreviewDemoMode() ? [] : PREVIEW_FOLLOWER_SEEDS.map((f): Notification => ({
       id: f.id,
       category: 'social',
@@ -521,9 +543,14 @@ function toSellerConversation(seed: PreviewConversationSeed): Conversation {
 // the session, e.g. seller-inbox.tsx's Requests tab immediately reflecting a
 // request accepted/deleted from app/seller-conversation.tsx).
 let cachedSellerConversations: Conversation[] | null = null;
+let cachedSellerDemoMode: boolean | null = null;
 
 export function getSellerPreviewConversations(): Conversation[] {
-  if (!cachedSellerConversations) cachedSellerConversations = isPreviewDemoMode() ? SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation) : [];
+  const demo = isPreviewDemoMode();
+  if (!cachedSellerConversations || cachedSellerDemoMode !== demo) {
+    cachedSellerDemoMode = demo;
+    cachedSellerConversations = isPreviewDemoMode() ? SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation) : [];
+  }
   return cachedSellerConversations;
 }
 
@@ -637,11 +664,7 @@ export function setPreviewConversationNickname(id: string, targetUserId: string,
     ...c,
     participants: c.participants.map(p => (p.userId === targetUserId ? { ...p, nickname: value } : p)),
   });
-  const runtime = runtimeConversations.get(id);
-  if (runtime) runtimeConversations.set(id, withNickname(runtime));
-  if (cachedConversations?.some(c => c.id === id)) {
-    cachedConversations = cachedConversations.map(c => (c.id === id ? withNickname(c) : c));
-  }
+  updatePreviewConversation(id, withNickname);
   const sellerList = getSellerPreviewConversations();
   if (sellerList.some(c => c.id === id)) {
     cachedSellerConversations = sellerList.map(c => (c.id === id ? withNickname(c) : c));

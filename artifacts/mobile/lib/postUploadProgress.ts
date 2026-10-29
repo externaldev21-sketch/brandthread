@@ -1,14 +1,16 @@
 /**
  * Shared "posting in progress" state for the feed header pill (item 118).
  *
- * A module-level singleton (not React state) so it survives the composer
- * screen unmounting the moment the user taps Post and is returned to the
- * feed — the actual `POST /api/posts` (or PATCH for an edit) call keeps
- * running in the background after that, updating this store, which
- * `components/feed/UploadProgressPill.tsx` subscribes to via
- * `useSyncExternalStore`. The same start/update/end calls also drive the
- * iOS Live Activity (`lib/uploadLiveActivity.ts`) — one real progress
- * source for both surfaces, not a forked model.
+ * A module-level singleton (not React state) so it can outlive the screen
+ * that starts an upload. `components/feed/UploadProgressPill.tsx` subscribes
+ * to it via `useSyncExternalStore`.
+ *
+ * Not wired to the composer yet: nothing in the app calls startPostUpload /
+ * updatePostUploadProgress / completePostUpload / failPostUpload today except
+ * the pill's test-build bridge (window.__btUploadProgress, used by
+ * scripts/upload-progress-pill-screenshots.mjs), so the pill never shows in a
+ * real session. The iOS Live Activity for story uploads is driven separately
+ * (lib/uploadLiveActivity.ts, from app/buyer-story-create.tsx).
  */
 import { useSyncExternalStore } from 'react';
 
@@ -46,8 +48,11 @@ export function completePostUpload(id: string) {
   entries = entries.map((e) => (e.id === id ? { ...e, status: 'success', progress: 1 } : e));
   emit();
   // Auto-clear the success pill after it's had a moment to register.
+  // Only the success entry itself: an upload restarted under the same id in
+  // the meantime keeps its pill.
   setTimeout(() => {
-    entries = entries.filter((e) => e.id !== id);
+    if (!entries.some((e) => e.id === id && e.status === 'success')) return;
+    entries = entries.filter((e) => !(e.id === id && e.status === 'success'));
     emit();
   }, 2500);
 }

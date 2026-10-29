@@ -63,7 +63,7 @@ export interface PressurePoint {
   size:  number; // effective brush-size multiplier [0,1]
 }
 
-/** Default linear pressure curve (no mapping). */
+/** Default pressure curve: linear from 20% size at no force to full size at full force. */
 export const DEFAULT_PRESSURE_CURVE: PressurePoint[] = [
   { force: 0, size: 0.2 },
   { force: 1, size: 1.0 },

@@ -168,6 +168,26 @@ export function configureNotificationAccountSwitcher(next: NotificationAccountSw
 /** Time for the root layout to re-route to the switched account's home before opening the target. */
 export const ACCOUNT_SWITCH_SETTLE_MS = 700;
 
+/**
+ * Opens `href` for the account the push was addressed to (`data.accountId`):
+ * when that is another signed-in account, switch to it first and open the
+ * screen once the root layout has re-routed; otherwise open it directly.
+ */
+export function openNotificationHref(router: NotificationRouter, href: string | null, rawData: unknown): void {
+  const data = rawData as { accountId?: unknown } | null | undefined;
+  const accountId = typeof data?.accountId === 'string' ? data.accountId : null;
+  const switcher = accountSwitcher;
+  const current = switcher?.currentAccountId() ?? null;
+  if (switcher && accountId && current && accountId !== current) {
+    void switcher.switchTo(accountId).then((switched) => {
+      if (!switched || !href) return;
+      setTimeout(() => router.push(href), ACCOUNT_SWITCH_SETTLE_MS);
+    }).catch(() => {});
+    return;
+  }
+  if (href) router.push(href);
+}
+
 export function createNotificationResponseHandler(
   router: NotificationRouter,
   handledResponseIds = new Set<string>(),
@@ -198,24 +218,15 @@ export function createNotificationResponseHandler(
       (response as NotificationResponseIdentifier).actionIdentifier === SHIP_NOW_ACTION_ID
       && data?.targetType === 'order' && typeof data.targetId === 'string' && data.targetId
     ) {
-      router.push(`/fulfill-order?orderId=${encodeURIComponent(data.targetId)}`);
+      // The order belongs to the account the push was for, so this goes
+      // through the same account switch as a plain tap.
+      openNotificationHref(router, `/fulfill-order?orderId=${encodeURIComponent(data.targetId)}`, data);
       return;
     }
     if (data?.route === '/subscription') {
-      router.push('/subscription');
+      openNotificationHref(router, '/subscription', data);
       return;
     }
-    const href = notificationHref(data);
-    const accountId = typeof data?.accountId === 'string' ? data.accountId : null;
-    const switcher = accountSwitcher;
-    const current = switcher?.currentAccountId() ?? null;
-    if (switcher && accountId && current && accountId !== current) {
-      void switcher.switchTo(accountId).then((switched) => {
-        if (!switched || !href) return;
-        setTimeout(() => router.push(href), ACCOUNT_SWITCH_SETTLE_MS);
-      }).catch(() => {});
-      return;
-    }
-    if (href) router.push(href);
+    openNotificationHref(router, notificationHref(data), data);
   };
 }
