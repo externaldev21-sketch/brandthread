@@ -444,7 +444,8 @@ async function postDetails(postRows: typeof posts.$inferSelect[], viewerId: stri
 // Query params: ?limit=30&offset=0
 router.get("/feed", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
+  // Clamped to 1..50: a negative limit would reach Postgres as LIMIT -n (500).
+  const lim = Math.max(1, Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50));
   const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
   // Optional keyset pagination: pass the X-Next-Cursor header value back as
   // ?cursor= to page without OFFSET. Offset still works unchanged.
@@ -1384,7 +1385,9 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
   const body = req.body as Record<string, unknown>;
   const [existing] = await db.select().from(posts)
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
-  if (!existing) return res.status(404).json({ error: "Post not found" });
+  // A deleted post is gone (its Mux asset is already scheduled for removal);
+  // PATCH must not edit it or bring it back.
+  if (!existing || existing.postStatus === "deleted") return res.status(404).json({ error: "Post not found" });
 
   // Buyer posting rules apply on update too (item 117: buyers can resume
   // their own drafts, but the same restrictions as creation still hold —
@@ -1604,6 +1607,15 @@ router.patch("/:id", requireAuth, validateBody(updatePostBody), async (req, res)
   else if (requestedStatus === "archived") nextStatus = "archived";
   else if (scheduled && scheduled.getTime() > now.getTime()) nextStatus = "scheduled";
   else if (requestedStatus === "published" || body.isDraft === false || body.scheduledAt !== undefined) nextStatus = "published";
+
+  // Going live (draft/archived -> published or scheduled) is posting: the same
+  // suspension / deletion gate as POST /, /schedule and /publish-now.
+  const goesLive = (nextStatus === "published" || nextStatus === "scheduled")
+    && existing.postStatus !== "published" && existing.postStatus !== "scheduled";
+  if (goesLive) {
+    const restriction = await publishingRestriction(clerkId);
+    if (restriction) return res.status(restriction.status).json(restriction.body);
+  }
 
   updates.postStatus = nextStatus;
   updates.scheduledAt = nextStatus === "scheduled" ? scheduled : null;

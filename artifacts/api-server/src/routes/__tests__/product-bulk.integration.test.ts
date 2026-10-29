@@ -297,6 +297,17 @@ describe("POST /duplicate", () => {
     expect(after.filter((p) => p.status === "draft")).toHaveLength(2);
   });
 
+  it("refuses to duplicate a moderation-locked listing (no unlocked twin)", async () => {
+    const owner = `${seller}-dupelock`;
+    const locked = await seed(owner, "Dupe Locked", { status: "archived", removalKind: "moderation_removed" });
+    const fine = await seed(owner, "Dupe Fine");
+    const { status, body } = await call(owner, "/duplicate", "POST", { productIds: [fine, locked] });
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ code: "PRODUCT_MODERATION_LOCKED", lockedIds: [locked] });
+    const after = await db.select({ id: products.id }).from(products).where(eq(products.ownerId, owner));
+    expect(after).toHaveLength(2);
+  });
+
   it("cannot duplicate another seller's product", async () => {
     const theirs = await seed(other, "Theirs dupe");
     const { status } = await call(seller, "/duplicate", "POST", { productIds: [theirs] });
