@@ -866,8 +866,9 @@ router.get("/roles/:role/members", async (req, res) => {
 // Query: limit (≤100), offset, actorClerkId, resourceType
 router.get("/activity", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
-  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  // Whole numbers only: "2.5" or "1e30" would reach LIMIT/OFFSET and 500.
+  const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 20, 1), 100);
+  const offset = Math.min(Math.max(Math.trunc(Number(req.query.offset)) || 0, 0), 1_000_000);
 
   const conds = [eq(teamActivityLogs.ownerId, ownerId)];
   if (typeof req.query.actorClerkId === "string" && req.query.actorClerkId) {

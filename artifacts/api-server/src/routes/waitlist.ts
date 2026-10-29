@@ -12,13 +12,16 @@
  */
 import { Router } from "express";
 import { db, waitlistEntries, products, productVariants } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { productThumbnail } from "../lib/activityEvents";
 import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 import { notifyWaitlistRestock } from "../lib/stockNotifications";
 
 const router = Router();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Product / variant ids are uuids; anything else would 500 in Postgres. */
+const isUuid = (value: unknown): value is string => typeof value === "string" && UUID_RE.test(value);
 
 // Shape + size guards; the handlers require productId themselves.
 const waitlistBody = looseBody({ productId: cappedUnknown(200), variantId: cappedUnknown(200) });
@@ -31,6 +34,10 @@ router.post("/join", validateBody(waitlistBody), async (req, res) => {
   const { productId, variantId } = req.body as { productId?: string; variantId?: string };
 
   if (!productId) { res.status(400).json({ error: "productId required" }); return; }
+  if (!isUuid(productId)) { res.status(404).json({ error: "Product not found" }); return; }
+  if (variantId != null && variantId !== "" && !isUuid(variantId)) {
+    res.status(404).json({ error: "Variant not found" }); return;
+  }
 
   // Resolve product to get sellerId
   const [product] = await db
@@ -46,17 +53,29 @@ router.post("/join", validateBody(waitlistBody), async (req, res) => {
     const [v] = await db
       .select({ size: productVariants.size, color: productVariants.color })
       .from(productVariants)
-      .where(eq(productVariants.id, variantId))
+      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
       .limit(1);
-    if (v) variantLabel = [v.size, v.color].filter(Boolean).join(" / ");
+    // A variant of another product would file this buyer on the wrong waitlist.
+    if (!v) { res.status(404).json({ error: "Variant not found" }); return; }
+    variantLabel = [v.size, v.color].filter(Boolean).join(" / ");
   }
 
-  // Upsert — ignore conflict
+  // Upsert — ignore conflict. The unique key is (product, variant, user) and
+  // Postgres treats NULL variants as distinct, so a product-level join (no
+  // variant) is de-duplicated here instead.
+  if (!variantId) {
+    const [already] = await db.select({ id: waitlistEntries.id }).from(waitlistEntries).where(and(
+      eq(waitlistEntries.productId, productId),
+      isNull(waitlistEntries.variantId),
+      eq(waitlistEntries.userId, userId),
+    )).limit(1);
+    if (already) { res.json({ joined: true }); return; }
+  }
   await db
     .insert(waitlistEntries)
     .values({
       productId,
-      variantId: variantId ?? null,
+      variantId: variantId || null,
       userId,
       sellerId: product.ownerId,
       productName: product.name,
@@ -76,6 +95,8 @@ router.delete("/leave", validateBody(waitlistBody), async (req, res) => {
   const variantId = (req.query.variantId ?? req.body?.variantId) as string | undefined;
 
   if (!productId) { res.status(400).json({ error: "productId required" }); return; }
+  // Nothing to remove for an id that can't exist (and Postgres would 500 on it).
+  if (!isUuid(productId) || (variantId && !isUuid(variantId))) { res.json({ left: true }); return; }
 
   if (variantId) {
     await db.delete(waitlistEntries).where(
@@ -99,6 +120,7 @@ router.delete("/leave", validateBody(waitlistBody), async (req, res) => {
 router.get("/check/:variantId", async (req, res) => {
   const userId   = (req as any).clerkUserId as string;
   const { variantId } = req.params;
+  if (!isUuid(variantId)) { res.json({ joined: false }); return; }
 
   const [entry] = await db
     .select({ id: waitlistEntries.id })
@@ -147,6 +169,7 @@ router.get("/seller", async (req, res) => {
 router.post("/seller/notify/:variantId", async (req, res) => {
   const sellerId  = (req as any).clerkUserId as string;
   const { variantId } = req.params;
+  if (!isUuid(variantId)) { res.status(404).json({ error: "Variant not found or not yours" }); return; }
 
   // Verify the variant belongs to this seller
   const [v] = await db
