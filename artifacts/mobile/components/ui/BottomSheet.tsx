@@ -41,7 +41,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useKeyboardHeight } from '@/components/ui/useKeyboardHeight';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -178,6 +178,19 @@ export function SheetCloseButton({ onPress, label = 'Close' }: { onPress: () => 
   );
 }
 
+/** Keyboard up while at half: go full (Instagram comments), never back down
+ *  on its own. Its own component so only sheets that opt in watch the keyboard. */
+function ExpandOnKeyboard({ keyboard, onKeyboardUp }: {
+  keyboard: SharedValue<number>; onKeyboardUp: (detent: SheetDetent) => void;
+}) {
+  useAnimatedReaction(
+    () => keyboard.value < -1,
+    (up, wasUp) => { if (up && !wasUp) runOnJS(onKeyboardUp)('full'); },
+    [onKeyboardUp],
+  );
+  return null;
+}
+
 /** The grabber row's height: 6 + 5 + 4 (styles.grabberWrap / grabber). */
 const GRABBER_BLOCK_H = 15;
 /** styles.bodyEnd's bottom padding (body without a footer). */
@@ -245,12 +258,6 @@ export function Sheet({
   const syncOverflow = () => bodyOverflows.set(contentH.current > viewportH.current + 1);
 
   const keyboard = useKeyboardHeight();
-  // Keyboard up while at half: go full (Instagram comments), never back down on its own.
-  useAnimatedReaction(
-    () => keyboard.value < -1,
-    (up, wasUp) => { if (detents && expandOnKeyboard && up && !wasUp) runOnJS(snapTo)('full'); },
-    [detents, expandOnKeyboard, snapTo],
-  );
   const restingBottom = Math.max(insets.bottom, 16);
   // Pinned content sits on the keyboard (8pt gap) while it's up, and above
   // the home indicator when it's down — tracked per frame, no jump.
@@ -320,6 +327,7 @@ export function Sheet({
       testID={testID}
     >
       <GestureHandlerRootView style={styles.root}>
+        {detents && expandOnKeyboard ? <ExpandOnKeyboard keyboard={keyboard} onKeyboardUp={snapTo} /> : null}
         <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
           <Pressable
             accessibilityRole="button"
