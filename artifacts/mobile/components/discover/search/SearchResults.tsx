@@ -7,7 +7,8 @@
  * Tabs are Brandthread's: Top, Brands, People, Products, Fits (buyer posts).
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useContentDimensions } from '@/components/web/DesktopShellContext';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -86,7 +87,7 @@ export function SearchResults({
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
-  const { width: winWidth } = useWindowDimensions();
+  const { width: winWidth } = useContentDimensions();
   const [tab, setTab] = useState<SearchResultTab>('top');
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilters = countActiveFilters(filters);

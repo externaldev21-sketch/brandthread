@@ -1,5 +1,6 @@
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 
 /**
  * Geometry for the floating tab bars — buyer and seller share it.
@@ -220,6 +221,9 @@ export function useBuyerTabBarMetrics(sideCircleCount = 1, mode: BuyerTabBarMode
 
 export const useTabBarMetrics = useBuyerTabBarMetrics;
 
+/** Bottom breathing room inside the desktop web shell, which has no floating bar. */
+const DESKTOP_CONTENT_END_GAP = 24;
+
 /**
  * Bottom padding for any buyer screen that renders behind the floating bar.
  * Use it for scroll content `paddingBottom` and for bottom-anchored overlays so
@@ -228,7 +232,9 @@ export const useTabBarMetrics = useBuyerTabBarMetrics;
  * value; only the feed screen (always shown in compact mode) passes 'compact'.
  */
 export function useBuyerTabBarInset(mode: BuyerTabBarMode = 'regular'): number {
-  return useBuyerTabBarMetrics(1, mode).occupiedHeight;
+  const occupiedHeight = useBuyerTabBarMetrics(1, mode).occupiedHeight;
+  // Desktop web shell: no floating bar, just the closing content gap.
+  return useDesktopShell() ? DESKTOP_CONTENT_END_GAP : occupiedHeight;
 }
 
 /** Gap kept between the last scrolled content and the bar (Dev's rule: "+ 16"). */
@@ -246,6 +252,7 @@ const CONTENT_CLEARANCE_GAP = 16;
 export function useTabBarClearance(sideCircleCount = 1, mode: BuyerTabBarMode = 'regular'): number {
   const insets = useSafeAreaInsets();
   const metrics = useBuyerTabBarMetrics(sideCircleCount, mode);
+  if (useDesktopShell()) return DESKTOP_CONTENT_END_GAP;
   return Math.max(
     metrics.capsuleHeight + insets.bottom + CONTENT_CLEARANCE_GAP,
     metrics.occupiedHeight + CONTENT_CLEARANCE_GAP,
@@ -261,5 +268,6 @@ export function useTabBarClearance(sideCircleCount = 1, mode: BuyerTabBarMode = 
  * 'regular' for the same reason as `useBuyerTabBarInset` above.
  */
 export function useBuyerTabBarTopInset(mode: BuyerTabBarMode = 'regular'): number {
-  return useBuyerTabBarMetrics(1, mode).barTopInset;
+  const barTopInset = useBuyerTabBarMetrics(1, mode).barTopInset;
+  return useDesktopShell() ? 0 : barTopInset;
 }

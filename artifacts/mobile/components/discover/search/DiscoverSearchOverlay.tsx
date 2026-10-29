@@ -17,7 +17,8 @@
  * runs it in reverse and hands control back to Discover exactly as it was.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useContentDimensions } from '@/components/web/DesktopShellContext';
 import Animated, { interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
@@ -76,7 +77,7 @@ export function DiscoverSearchOverlay({
   const { goToSignIn } = useSignInGate();
   const topPad = useHeaderTopInset();
   const barInset = useBuyerTabBarInset();
-  const { width: W } = useWindowDimensions();
+  const { width: W } = useContentDimensions();
   const inputRef = useRef<TextInput>(null);
 
   const [query, setQuery] = useState(initialQuery ?? '');

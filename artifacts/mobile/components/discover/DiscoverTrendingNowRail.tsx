@@ -7,7 +7,8 @@
  * — no text over the photo.
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useContentDimensions } from '@/components/web/DesktopShellContext';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -22,7 +23,7 @@ import { trendingRowToTile } from './DiscoverShopRails';
 export function DiscoverTrendingNowRail({ products, onSeeAll }: { products: any[]; onSeeAll?: () => void }) {
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
-  const { width } = useWindowDimensions();
+  const { width } = useContentDimensions();
   if (products.length === 0) return null;
   // ~3/4 of the screen so the next card peeks in, capped for tablets/web.
   const cardWidth = Math.min(300, Math.round((width - SP.md) * 0.72));

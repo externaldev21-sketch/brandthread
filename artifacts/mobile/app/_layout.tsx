@@ -80,6 +80,8 @@ import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
 import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
+import { DesktopShell } from '@/components/web/DesktopShell';
+import { useIsDesktopWeb } from '@/components/web/DesktopShellContext';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import PackerRouteGuard from '@/components/PackerRouteGuard';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
@@ -225,6 +227,7 @@ function IsolatedStackScene({
  */
 function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   const { theme, isHydrated } = useAppTheme();
+  const isDesktopWeb = useIsDesktopWeb();
   const palette = theme as typeof theme & Record<string, any>;
   const background = palette.background ?? '#000000';
   const heroGradient = (palette.heroGradient ?? [background, palette.surface ?? background]) as [string, string, ...string[]];
@@ -305,7 +308,11 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
           barStyle={palette.statusBarStyle ?? 'light-content'}
           backgroundColor={background}
         />
-        <WebAppShell>{children}</WebAppShell>
+        {/* Desktop-width web gets the full-screen sidebar shell; phones and
+            the tablet-width web column keep WebAppShell exactly as before. */}
+        {isDesktopWeb
+          ? <DesktopShell previewRole={PREVIEW_SESSION_ROLE ?? DEV_BYPASS_ROLE}>{children}</DesktopShell>
+          : <WebAppShell>{children}</WebAppShell>}
       </View>
     </NavigationThemeProvider>
   );
@@ -488,6 +495,7 @@ const SellerStudioRadialMenu = React.lazy(() => import('@/components/SellerStudi
 
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
+  const isDesktopWeb = useIsDesktopWeb();
   const segments = useSegments();
   const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
   const [studioCloseRequestKey, setStudioCloseRequestKey] = useState(0);
@@ -529,6 +537,10 @@ function SellerBarGate() {
   }, [pathname]);
 
   if (!showBar) return null;
+  // Desktop-width web: the sidebar and top bar (components/web/DesktopShell)
+  // carry every tab and Studio destination, so neither the bar nor the
+  // radial menu mounts there.
+  if (isDesktopWeb) return null;
 
   // The bar itself stays mounted through a full-screen route so it can
   // slide fully off screen and back (see SellerGlobalTabBar's `hidden`

@@ -10,6 +10,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSettled } from '@/lib/animationUtils';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
+import { useIsDesktopWeb } from '@/components/web/DesktopShellContext';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, subscribeSocial } from '@/services/socialService';
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
@@ -52,6 +53,8 @@ function BuyerTabLayout() {
   const inboxBadgeCount = dmBadgeCount + communityBadgeCount;
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  // Desktop-width web navigates from the sidebar (components/web/DesktopShell).
+  const isDesktopWeb = useIsDesktopWeb();
 
   // Blurry-text fix: drop the slide's `transform` once a tab switch has
   // settled, so the resting (focused) screen's full-screen wrapper carries
@@ -162,7 +165,7 @@ function BuyerTabLayout() {
           <GuestRouteBoundary routeName={route.name} buyerTab>{children}</GuestRouteBoundary>
         </RetainedScene>
       )}
-      tabBar={(props) => <BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />}
+      tabBar={(props) => (isDesktopWeb ? null : <BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />)}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is
       // still the last-resort catch-all above this.

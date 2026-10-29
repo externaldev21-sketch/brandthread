@@ -1,10 +1,16 @@
 import { PixelRatio, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 
 /** Comfortable minimum clearance from a web browser's own chrome (tabs,
  *  bookmarks bar, …), which reports no safe-area inset of its own — see
  *  `useHeaderTopInset`'s doc. */
 const WEB_MIN_TOP_INSET = 54;
+
+/** Inside the desktop web shell the browser chrome is above the shell's own
+ *  top bar (seller) or simply the window edge beside the sidebar (buyer), so
+ *  headers only need ordinary breathing room. */
+const DESKTOP_SHELL_TOP_INSET = { withTopBar: 16, withoutTopBar: 24 } as const;
 
 /**
  * Returns the inset every custom screen header must pad above itself —
@@ -23,6 +29,10 @@ const WEB_MIN_TOP_INSET = 54;
  */
 export function useHeaderTopInset(): number {
   const insets = useSafeAreaInsets();
+  const desktopShell = useDesktopShell();
+  if (desktopShell) {
+    return desktopShell.side === 'seller' ? DESKTOP_SHELL_TOP_INSET.withTopBar : DESKTOP_SHELL_TOP_INSET.withoutTopBar;
+  }
   return roundToDevicePixel(Platform.OS === 'web' ? Math.max(insets.top, WEB_MIN_TOP_INSET) : insets.top);
 }
 

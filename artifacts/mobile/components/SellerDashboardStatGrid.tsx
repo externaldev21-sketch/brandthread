@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 
 export interface SellerDashboardStatTileData {
   key: string;
@@ -23,6 +24,8 @@ export function SellerDashboardStatGrid({
   onSelect: (key: string) => void;
   theme: AppThemePreset;
 }) {
+  // Desktop web: one row of four tiles, like Shopify's home metrics.
+  const desktop = useDesktopShell() !== null;
   return (
     <View style={styles.grid} testID="seller-dashboard-stat-grid">
       {tiles.map((tile) => {
@@ -36,6 +39,7 @@ export function SellerDashboardStatGrid({
             testID={`seller-dashboard-stat-tile-${tile.key}`}
             style={[
               styles.tile,
+              desktop && styles.tileDesktop,
               { backgroundColor: theme.card, borderColor: selected ? theme.accent : theme.borderSubtle },
             ]}
             activeOpacity={0.8}
@@ -84,6 +88,7 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
   },
+  tileDesktop: { flexBasis: '23%' },
   label: {
     fontFamily: FONT.semibold,
     fontSize: 11,

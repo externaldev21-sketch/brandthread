@@ -8,7 +8,7 @@
  * started / dismissed flags.
  */
 import React, { useCallback, useMemo } from 'react';
-import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
+import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 
 import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/ui/Icon';
@@ -32,6 +32,11 @@ import { LAUNCH_STEP_META, launchProgress, type LaunchChecklistResponse, type La
 
 import SetupProgressRing from '@/components/SetupProgressRing';
 import { radius } from '@/constants/radii';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
+
+/** Desktop web shell: the sheet keeps a phone-sheet width, centered, instead
+ *  of spanning the whole browser window. */
+const DESKTOP_SHEET_MAX_WIDTH = 640;
 
 export default function SetupWalkthroughSheet({
   visible,
@@ -85,6 +90,10 @@ export default function SetupWalkthroughSheet({
     } catch { /* ignore */ }
   }, [onClose, onSetupStateChange, router, userId]);
 
+  const desktopShell = useDesktopShell();
+  const { width: windowWidth } = useWindowDimensions();
+  const desktopInset = desktopShell ? Math.max(0, (windowWidth - DESKTOP_SHEET_MAX_WIDTH) / 2) : null;
+
   return (
     <Modal visible={modalVisible} animationType="none" transparent onRequestClose={handleClose}>
       <View style={s.root}>
@@ -98,7 +107,7 @@ export default function SetupWalkthroughSheet({
             <View style={[StyleSheet.absoluteFill, s.backdropFill]} />
           </Pressable>
         </Animated.View>
-        <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
+        <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }, desktopInset !== null && { left: desktopInset, right: desktopInset }, sheetStyle]}>
           <View style={s.grabber} />
 
           <View style={s.header}>

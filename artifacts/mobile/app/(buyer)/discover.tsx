@@ -27,7 +27,8 @@
  * seller product tag.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, FlatList, Platform, StyleSheet, View } from 'react-native';
+import { useContentDimensions, useDesktopShell } from '@/components/web/DesktopShellContext';
 import { BrandsYouMightLikeRow, useBrandsYouMightLike } from '@/components/discover/BrandsYouMightLikeRow';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -95,6 +96,8 @@ let discoverRevealedThisSession = false;
 export default function DiscoverScreen() {
   const listRef = useScrollReset<FlatList<any>>(true, false);
   const tabBarClearance = useTabBarClearance();
+  // Brand / people cards: two per row on the phone, four beside the desktop web sidebar.
+  const cardColumns = useDesktopShell() ? 4 : 2;
   const router = useRouter();
   const { openReport } = useReportSheet();
   const blockUser = useBlockAction();
@@ -479,7 +482,8 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={brands}
           keyExtractor={(b) => b.id}
-          numColumns={2}
+          key={`brands-${cardColumns}`}
+          numColumns={cardColumns}
           columnWrapperStyle={{ gap: X_SPACE[12], paddingHorizontal: X_GUTTER }}
           contentContainerStyle={{ gap: X_SPACE[12], paddingBottom: tabBarClearance }}
           ListHeaderComponent={brandsHeader}
@@ -500,7 +504,8 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={people}
           keyExtractor={(p) => p.userId}
-          numColumns={2}
+          key={`people-${cardColumns}`}
+          numColumns={cardColumns}
           columnWrapperStyle={{ gap: X_SPACE[12], paddingHorizontal: X_GUTTER }}
           contentContainerStyle={{ gap: X_SPACE[12], paddingBottom: tabBarClearance }}
           ListHeaderComponent={header}
@@ -625,7 +630,7 @@ export default function DiscoverScreen() {
 /** Full-screen version of DiscoverGrid's own loading rows — same 3-column,
  *  16pt-gutter, 3pt-gap, 3:4 tiles — so the cross-fade lands on identical geometry. */
 function DiscoverGridSkeleton() {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useContentDimensions();
   const { cell, cellHeight } = gridGeometry(width);
   const rows = Math.max(3, Math.ceil(height / cellHeight));
   return (

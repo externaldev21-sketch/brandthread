@@ -39,6 +39,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useTabBarHiddenByScreen } from '@/lib/tabBarVisibility';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 import { hexToRgba } from '@/lib/backgroundPalette';
 
 /** Root-stack routes whose content is deliberately edge-to-edge media
@@ -122,7 +123,9 @@ export function StatusBarScrollEdge() {
 export function useSceneBottomClearance(active: boolean): number {
   const hiddenByScreen = useTabBarHiddenByScreen();
   const clearance = useTabBarClearance(2); // seller bar: Studio + AI side circles
-  return active && !hiddenByScreen ? clearance : 0;
+  // The desktop web shell has no floating bar to clear.
+  const inDesktopShell = useDesktopShell() !== null;
+  return active && !hiddenByScreen && !inDesktopShell ? clearance : 0;
 }
 
 const styles = StyleSheet.create({
