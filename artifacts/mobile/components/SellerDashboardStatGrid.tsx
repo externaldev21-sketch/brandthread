@@ -1,10 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useDesktopShell } from '@/components/web/DesktopShellContext';
-import { PressableScale } from '@/components/BrandthreadUI';
 
 export interface SellerDashboardStatTileData {
   key: string;
@@ -35,16 +34,15 @@ export function SellerDashboardStatGrid({
         const deltaColor = tile.deltaDirection === 'flat' ? theme.muted : theme.text;
         const deltaArrow = tile.deltaDirection === 'up' ? '↑ ' : tile.deltaDirection === 'down' ? '↓ ' : '';
         return (
-          <View key={tile.key} style={[styles.tileWrap, desktop && styles.tileDesktop]}>
-          <PressableScale
-            noMinHeight
-            rippleEnabled={false}
+          <TouchableOpacity
+            key={tile.key}
             testID={`seller-dashboard-stat-tile-${tile.key}`}
             style={[
               styles.tile,
+              desktop && styles.tileDesktop,
               { backgroundColor: theme.card, borderColor: selected ? theme.accent : theme.borderSubtle },
             ]}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
             onPress={() => onSelect(tile.key)}
             accessibilityRole="button"
             accessibilityLabel={`${tile.label}: ${tile.value}${tile.deltaLabel ? `, ${tile.deltaDirection === 'up' ? 'up ' : tile.deltaDirection === 'down' ? 'down ' : ''}${tile.deltaLabel}` : ''}. Tap to chart this metric.`}
@@ -67,8 +65,7 @@ export function SellerDashboardStatGrid({
                 {deltaArrow}{tile.deltaLabel}
               </Text>
             ) : null}
-          </PressableScale>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -81,12 +78,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: SP.sm,
   },
-  // The slot takes the grid cell; the pressable tile fills it.
-  tileWrap: {
-    flexBasis: '48%',
-    flexGrow: 1,
-  },
   tile: {
+    flexBasis: '48%',
     flexGrow: 1,
     minHeight: 92,
     padding: SP.md,

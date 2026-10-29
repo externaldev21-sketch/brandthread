@@ -54,17 +54,31 @@ export function useProfileTabSwipe({ keys, active, onChange, width, enabled = tr
     Animated.timing(position, { toValue: index, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
   }, [index, position]);
 
-  const responder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, g) => {
+  // Same responder shape as components/ui/SwipeRow: take the touch at start
+  // when nothing deeper wants it (header text, gaps between cells), engage
+  // only on a clearly horizontal move, and yield to the list's scroll until
+  // engaged — otherwise the app root's Pressable holds the touch and React
+  // Native never asks this area about the move.
+  const engaged = useRef(false);
+  const responder = useMemo(() => {
+    const wantsSwipe = (evt: { nativeEvent: { pageX: number } }, g: { dx: number; dy: number }) => {
       const { enabled: on, count } = live.current;
       if (!on || count < 2) return false;
       if (Math.abs(g.dx) <= 12 || Math.abs(g.dx) <= Math.abs(g.dy) * 1.6) return false;
       // Left-edge drags belong to the navigator's back swipe.
       if (g.dx > 0 && evt.nativeEvent.pageX - g.dx < EDGE_GUARD) return false;
       return true;
-    },
+    };
+    return PanResponder.create({
+    onStartShouldSetPanResponder: () => { engaged.current = false; return live.current.enabled && live.current.count > 1; },
+    onMoveShouldSetPanResponderCapture: (evt, g) => { const w = wantsSwipe(evt, g); if (w) engaged.current = true; return w; },
+    onMoveShouldSetPanResponder: (evt, g) => { const w = wantsSwipe(evt, g); if (w) engaged.current = true; return w; },
     onPanResponderGrant: () => { position.stopAnimation(); },
-    onPanResponderMove: (_evt, g) => {
+    onPanResponderMove: (evt, g) => {
+      if (!engaged.current) {
+        if (!wantsSwipe(evt, g)) return;
+        engaged.current = true;
+      }
       const { index: i, count, width: w } = live.current;
       if (w <= 0) return;
       let p = -g.dx / w;
@@ -73,6 +87,8 @@ export function useProfileTabSwipe({ keys, active, onChange, width, enabled = tr
       position.setValue(i + Math.max(-1, Math.min(1, p)));
     },
     onPanResponderRelease: (_evt, g) => {
+      if (!engaged.current) return;
+      engaged.current = false;
       const { index: i, count, keys: k, onChange: change, width: w } = live.current;
       const next = resolveTabSwipe(i, count, g.dx, g.vx, w);
       if (next !== i) {
@@ -83,10 +99,12 @@ export function useProfileTabSwipe({ keys, active, onChange, width, enabled = tr
       Animated.spring(position, { toValue: i, damping: 26, stiffness: 300, mass: 1, useNativeDriver: ND }).start();
     },
     onPanResponderTerminate: () => {
+      engaged.current = false;
       Animated.spring(position, { toValue: live.current.index, damping: 26, stiffness: 300, mass: 1, useNativeDriver: ND }).start();
     },
-    onPanResponderTerminationRequest: () => false,
-  }), [position]);
+    onPanResponderTerminationRequest: () => !engaged.current,
+    });
+  }, [position]);
 
   return { panHandlers: responder.panHandlers, position };
 }

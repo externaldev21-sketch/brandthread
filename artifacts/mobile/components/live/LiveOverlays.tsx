@@ -15,7 +15,6 @@
  * Shared by the buyer viewer (app/live.tsx) and the host's own controls
  * (app/seller-live.tsx), so both sides look the same.
  */
-import { MentionSuggestionsBar } from '@/components/MentionPickerSheet';
 import { activeMentionQuery, insertMentionHandle } from '@/lib/commentMentions';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
@@ -205,6 +204,15 @@ export function LiveChatList({ messages, onLongPressMessage }: {
 
 // ─── "Add a comment…" ───────────────────────────────────────────────────────
 
+/** The shared @mention strip, loaded only once the viewer types "@" — the
+ *  overlay module stays light (MentionPickerSheet pulls in the full people
+ *  sheet, its API client and keyboard handling). */
+function LiveMentionBar(props: React.ComponentProps<typeof import('@/components/MentionPickerSheet').MentionSuggestionsBar>) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { MentionSuggestionsBar } = require('@/components/MentionPickerSheet') as typeof import('@/components/MentionPickerSheet');
+  return <MentionSuggestionsBar {...props} />;
+}
+
 export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => Promise<void> | void; disabled?: boolean }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -223,7 +231,7 @@ export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => 
     <View style={styles.inputPill} testID="live-comment">
       {mentionQuery !== null && (
         <View style={styles.mentionFloat} pointerEvents="box-none">
-          <MentionSuggestionsBar
+          <LiveMentionBar
             query={mentionQuery}
             active
             enabled={!disabled}

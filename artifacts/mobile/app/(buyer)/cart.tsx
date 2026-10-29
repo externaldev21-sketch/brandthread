@@ -402,6 +402,7 @@ export default function CartScreen() {
         message: 'Removed from bag',
         undo: async () => setCart(await restoreCartSnapshot(snapshot)),
         bottom: undoBottom,
+        tone: 'monochrome',
         testID: 'bag-undo-toast',
       });
     }
@@ -436,6 +437,7 @@ export default function CartScreen() {
       message: 'Removed from bag',
       undo: async () => setCart(await restoreCartSnapshot(snapshot)),
       bottom: undoBottom,
+      tone: 'monochrome',
       testID: 'bag-undo-toast',
     });
     try {
@@ -461,6 +463,7 @@ export default function CartScreen() {
           message: 'Removed from bag',
           undo: async () => setCart(await restoreCartSnapshot(snapshot)),
           bottom: undoBottom,
+          tone: 'monochrome',
           testID: 'bag-undo-toast',
         });
       }

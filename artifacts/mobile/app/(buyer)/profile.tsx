@@ -22,7 +22,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useStickyState } from '@/lib/stickyState';
 import { getCachedTabData } from '@/lib/tabDataCache';
 import {
-  View, Text, StyleSheet, Animated, Share, Linking,
+  View, Text, StyleSheet, Animated, Share, Linking, Platform,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
 import { showAlert } from '@/lib/actionSheet';
@@ -1205,7 +1205,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.root} testID="buyer-profile">
       <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
-      <View style={{ flex: 1 }} {...tabSwipe.panHandlers} testID="profile-tab-swipe-area">
+      <View style={[{ flex: 1 }, Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as object) : null]} {...tabSwipe.panHandlers} testID="profile-tab-swipe-area">
       <Animated.FlatList
         key={`buyer-${numColumns}`}
         ref={listRef as any}

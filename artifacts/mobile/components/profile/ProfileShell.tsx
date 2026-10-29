@@ -717,7 +717,9 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
-    swipeArea: { flex: 1 },
+    // Web: keep vertical scrolling native but hand horizontal drags to the
+    // tab-swipe PanResponder (touch-action auto would cancel them).
+    swipeArea: { flex: 1, ...(Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as object) : null) },
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1, backgroundColor: theme.background },
     hero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },

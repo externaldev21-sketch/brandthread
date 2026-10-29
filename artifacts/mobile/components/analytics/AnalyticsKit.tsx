@@ -33,7 +33,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { radius } from '@/constants/radii';
 import { ChartScrubArea, ChartScrubLens, useChartScrub } from '@/components/analytics/ChartScrub';
 import { GlideThumbView, useGlideThumb } from '@/components/motion/GlideThumb';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressScale } from '@/components/motion/PressScale';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -157,16 +157,14 @@ export function PillTabs<T extends string>({
         const active = opt.key === value;
         return (
           <View key={opt.key} onLayout={scroll ? undefined : glide.onItemLayout(i)}>
-          <PressableScale
-            noMinHeight
-            rippleEnabled={false}
+          <PressScale
             onPress={() => { haptic('select'); onChange(opt.key); }}
             style={[s.pill, active && s.pillActiveBorder]}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
           >
             <Text style={[s.pillText, active && s.pillTextActive]}>{opt.label}</Text>
-          </PressableScale>
+          </PressScale>
           </View>
         );
       });

@@ -28,8 +28,6 @@ import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
 import { crispPx } from '@/lib/crispPixel';
 
 import { DISABLED_OPACITY } from '@/constants/states';
-import Reanimated from 'react-native-reanimated';
-import { useBadgeSpring } from '@/components/motion/BadgeSpring';
 
 export interface IconButtonProps {
   name: IconName;
@@ -64,8 +62,6 @@ export function IconButton({
   variant = 'filled', badge, disabled = false, style, testID, rippleEnabled = true,
 }: IconButtonProps) {
   const palette = useColors();
-  // Badge springs in/out (pack 2, item 26).
-  const badgeSpring = useBadgeSpring(typeof badge === 'number' ? badge : 0);
   const scale = React.useRef(new Animated.Value(1)).current;
   // Disabled: the glyph switches to the solid TEXT_DISABLED gray, and the
   // whole button (glyph, fill, badge) is also dimmed to DISABLED_OPACITY below.
@@ -100,12 +96,12 @@ export function IconButton({
           <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
         )}
         <Icon name={name} size={size} color={resolvedColor} />
-        {badgeSpring.visible && (
-          <Reanimated.View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }, badgeSpring.style]}>
+        {typeof badge === 'number' && badge > 0 && (
+          <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }]}>
             <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
-              {badgeSpring.shown > 99 ? '99+' : badgeSpring.shown}
+              {badge > 99 ? '99+' : badge}
             </Animated.Text>
-          </Reanimated.View>
+          </View>
         )}
       </Animated.View>
     </Pressable>

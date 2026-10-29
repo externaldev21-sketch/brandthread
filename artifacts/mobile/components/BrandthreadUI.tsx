@@ -120,7 +120,7 @@ function UndoToastCard({ action, undoing, onUndo }: { action: UndoAction | null;
     const reduce = isMotionReduced();
     if (action) {
       setShown(action);
-      progress.stopAnimation();
+      progress.stopAnimation?.();
       if (reduce) { progress.setValue(1); return; }
       progress.setValue(0);
       Animated.spring(progress, { toValue: 1, damping: 22, stiffness: 260, mass: 0.9, overshootClamping: true, useNativeDriver: NATIVE_DRIVER }).start();

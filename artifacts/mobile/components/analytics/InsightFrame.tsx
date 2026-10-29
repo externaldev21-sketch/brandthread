@@ -10,7 +10,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  * second bar-height gap under every report.
  */
 import { GlideThumbView, useGlideThumb } from '@/components/motion/GlideThumb';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressScale } from '@/components/motion/PressScale';
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 
@@ -104,9 +104,7 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
         const active = o.key === value;
         return (
           <View key={o.key} style={{ flex: 1 }} onLayout={glide.onItemLayout(i)}>
-          <PressableScale
-            noMinHeight
-            rippleEnabled={false}
+          <PressScale
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={o.label}
@@ -118,7 +116,7 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
             }}
           >
             <Text numberOfLines={1} style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: active ? colors.primaryForeground : colors.mutedForeground }}>{o.label}</Text>
-          </PressableScale>
+          </PressScale>
           </View>
         );
       })}
