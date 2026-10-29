@@ -3,6 +3,7 @@
  * Mobbin reference: Shopify "Marketing" campaigns list + Linktree links list.
  */
 import React, { useCallback, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -84,6 +85,7 @@ export default function GrowthLinksScreen() {
           )}
         </ScrollView>
       )}
+      <ScreenExplainer id="explain-growth-links" />
     </View>
   );
 }

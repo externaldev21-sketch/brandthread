@@ -25,6 +25,7 @@ import React, {
   useState, useCallback, useRef, useMemo, useEffect,
 } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, PanResponder, LayoutChangeEvent } from 'react-native';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 import { Image } from 'expo-image';
 
@@ -1291,7 +1292,7 @@ export default function BoostScreen() {
     return <View style={s.screen}>{renderBudget()}</View>;
   }
 
-  return <View style={s.screen}>{renderPicker()}</View>;
+  return <View style={s.screen}>{renderPicker()}<ScreenExplainer id="explain-boost" /></View>;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────

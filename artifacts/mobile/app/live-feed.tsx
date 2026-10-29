@@ -8,6 +8,7 @@
  * https://mobbin.com/flows/ed55f754-472f-46f8-914b-ce7cb7345c7b
  */
 import React from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ export default function LiveFeedScreen() {
         bottomInset={insets.bottom}
         onOpenShow={stream => router.push(liveHref({ streamId: stream.id }) as never)}
       />
+      <ScreenExplainer id="explain-live-feed" />
     </View>
   );
 }

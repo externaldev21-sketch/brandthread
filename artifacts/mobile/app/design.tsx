@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { relativeTime } from '@/lib/activity';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -2119,6 +2120,7 @@ export default function DesignGalleryScreen() {
           loadData();
         }}
       />
+      <ScreenExplainer id="explain-design-gallery" />
     </View>
   );
 }

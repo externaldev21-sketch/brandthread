@@ -3,6 +3,7 @@
  * quote-received counts. Tap through to rfq-compare for the side-by-side view.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -116,6 +117,7 @@ export default function RfqListScreen() {
           <PrimaryButton label="Post a new RFQ" icon="plus" onPress={() => router.push('/rfq-post' as never)} />
         </View>
       )}
+      <ScreenExplainer id="explain-rfq-list" />
     </View>
   );
 }

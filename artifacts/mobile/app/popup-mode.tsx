@@ -13,6 +13,7 @@
  * (lib/tapToPay.ts); without it the Charge step says so instead of charging.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -442,6 +443,7 @@ export default function PopupModeScreen() {
           <PrimaryButton label="Done" onPress={() => setPickerOpen(false)} />
         </View>
       </BottomSheet>
+      <ScreenExplainer id="explain-popup-mode" />
     </View>
   );
 }

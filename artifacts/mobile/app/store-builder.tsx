@@ -1,4 +1,5 @@
 import { haptics } from '@/lib/haptics';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { relativeTime } from '@/lib/activity';
@@ -566,6 +567,7 @@ export default function StoreBuilderScreen() {
               </View>
             )}
       </Sheet>
+      <ScreenExplainer id="explain-store-builder" />
     </View>
   );
 }

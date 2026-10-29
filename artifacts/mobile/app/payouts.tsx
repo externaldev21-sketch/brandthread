@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { radius as ControlRadius } from '@/constants/radii';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -110,7 +111,7 @@ function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
 export default function PayoutsScreen() {
   const age = useAgeStatus();
   if (age.status !== 'ok') return <AgeRestrictedScreen title="Payouts" status={age.status} onResolved={age.setBand} />;
-  return <PayoutsScreenContent />;
+  return <><PayoutsScreenContent /><ScreenExplainer id="explain-payouts" /></>;
 }
 
 function PayoutsScreenContent() {

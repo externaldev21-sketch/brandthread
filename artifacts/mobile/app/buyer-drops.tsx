@@ -1,4 +1,5 @@
 import { radius as ControlRadius } from '@/constants/radii';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 /**
  * Drops browse screen — Live now / Upcoming / Recently dropped tabs.
@@ -222,6 +223,7 @@ export default function BuyerDrops() {
           </>
         )}
       </ScrollView>
+      <ScreenExplainer id="explain-buyer-drops" />
     </View>
   );
 }

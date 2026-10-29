@@ -8,6 +8,7 @@
  * pause/resume, edit budget, duplicate actions.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -310,6 +311,7 @@ export default function MetaAdsManageScreen() {
               />
             </View>
       </Sheet>
+      <ScreenExplainer id="explain-meta-ads" />
     </BrandthreadScreen>
   );
 }

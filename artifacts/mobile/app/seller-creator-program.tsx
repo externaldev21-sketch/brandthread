@@ -4,6 +4,7 @@
  * invite by username, open a creator to pause/remove/override.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -213,6 +214,7 @@ export default function SellerCreatorProgramScreen() {
           </>
         )}
       </ScrollView>
+      <ScreenExplainer id="explain-creator-program" />
     </View>
   );
 }
