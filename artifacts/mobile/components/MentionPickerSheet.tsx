@@ -25,6 +25,7 @@ import { useApi } from '@/lib/api';
 import { withAt } from '@/lib/storyMentionSticker';
 import type { MentionPerson } from '@/services/socialTypes';
 import { radius } from '@/constants/radii';
+import { SLIM_BUTTON_METRICS, SLIM_HIT_SLOP } from '@/components/ui/Button';
 
 /** Follow-first ordering, stable within each group. */
 export function sortFollowingFirst(people: MentionPerson[]): MentionPerson[] {
@@ -113,7 +114,7 @@ export function MentionPickerSheet({
             ) : failed ? (
               <View style={styles.errorWrap}>
                 <Text style={styles.empty}>Couldn’t load people.</Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={retry} accessibilityRole="button" accessibilityLabel="Try again" testID="mention-picker-retry">
+                <TouchableOpacity style={styles.retryBtn} hitSlop={SLIM_HIT_SLOP} onPress={retry} accessibilityRole="button" accessibilityLabel="Try again" testID="mention-picker-retry">
                   <Text style={styles.retryText}>Try again</Text>
                 </TouchableOpacity>
               </View>
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
   initials: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.bold },
   empty: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
   errorWrap: { alignItems: 'center' },
-  retryBtn: { minHeight: 44, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', alignItems: 'center', justifyContent: 'center' },
+  retryBtn: { ...SLIM_BUTTON_METRICS, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', alignItems: 'center', justifyContent: 'center' },
   retryText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
 
   bar: { minHeight: 48, justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },

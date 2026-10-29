@@ -25,6 +25,9 @@ vi.mock('react-native', () => {
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 20, bottom: 0, left: 0, right: 0 }) }));
 vi.mock('@expo/vector-icons', () => ({ Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }) }));
 vi.mock('@/components/ui/ErrorState', () => ({ ErrorState: () => React.createElement('ErrorState') }));
+// The empty-state action is the house Button (size="slim"); a host stub keeps
+// this layout test off Animated/Pressable.
+vi.mock('@/components/ui/Button', () => ({ Button: (props: any) => React.createElement('Button', props) }));
 vi.mock('@/components/profile/ProfileVideoGrid', () => ({ ProfileGridSkeleton: () => React.createElement('Skeleton') }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({

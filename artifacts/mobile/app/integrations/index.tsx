@@ -161,7 +161,7 @@ export default function IntegrationsScreen() {
             <View style={s.errorBox}>
               <Icon name="alert-circle" size={ICON.md} color={colors.mutedForeground} />
               <Text style={[s.errorText, { color: colors.mutedForeground }]}>Couldn't load your integrations.</Text>
-              <Button label="Retry" variant="secondary" size="compact" onPress={load} style={s.retryBtn} />
+              <Button label="Retry" variant="secondary" size="slim" onPress={load} style={s.retryBtn} />
             </View>
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -222,7 +222,7 @@ const s = StyleSheet.create({
   loadingRow: { gap: SP.sm },
   errorBox: { alignItems: 'center', gap: 10, paddingVertical: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular },
-  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', marginTop: 2 },
+  retryBtn: { borderWidth: 1, borderRadius: RADIUS.sm, justifyContent: 'center', marginTop: 2 },
   retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },

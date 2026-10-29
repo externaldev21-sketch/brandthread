@@ -162,7 +162,7 @@ export default function MetafieldDefinitionsScreen() {
             <Text style={[s.emptyText, { color: colors.mutedForeground }]}>
               Add a field to store extra details, like fabric or care instructions.
             </Text>
-            <Button label="Add field" icon="plus" size="small" onPress={openNew} style={{ marginTop: SP.sm }} />
+            <Button label="Add field" icon="plus" size="slim" onPress={openNew} style={{ marginTop: SP.sm }} />
           </View>
         ) : (
           <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

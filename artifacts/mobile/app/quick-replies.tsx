@@ -194,7 +194,7 @@ export default function QuickRepliesScreen() {
             message="Save the answers you send most and insert them from any conversation."
           />
           <View style={styles.emptyCta}>
-            <Button label="New quick reply" onPress={openNew} testID="quick-replies-empty-new" />
+            <Button label="New quick reply" size="slim" onPress={openNew} testID="quick-replies-empty-new" />
           </View>
           {error ? <Text style={[styles.error, { color: colors.foreground }]}>{error}</Text> : null}
         </View>

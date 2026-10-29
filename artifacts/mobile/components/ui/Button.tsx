@@ -23,7 +23,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 
 
-import { COMP, FILL_ELEVATED, FONT, RED } from '@/lib/theme';
+import { COMP, FILL_ELEVATED, FONT, FS, RED } from '@/lib/theme';
 
 
 import { TYPE_SCALE } from '@/constants/typography';
@@ -49,8 +49,21 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive'
  * unchanged, every existing call site keeps its current height. 'compact'
  * (sm, 36pt) is for tight inline row actions (e.g. Accept/Decline on a
  * message-request row) where even 'small' is taller than the row wants.
+ * 'slim' (36pt, 16px sides, 13pt label) is the one empty-state action size —
+ * the seller Products "Add product" button. Every empty/error state's action
+ * uses it (components/layout/EmptyState.tsx, BrandthreadUI's EmptyState,
+ * components/ui/EmptyState.tsx and hand-rolled ones) — pinned by
+ * tests/empty-state-button-size-lint.test.ts.
  */
-export type ButtonSize = 'default' | 'small' | 'compact';
+export type ButtonSize = 'default' | 'small' | 'compact' | 'slim';
+
+/**
+ * The 'slim' box, for the few hand-rolled empty-state actions the house
+ * Button can't draw (an icon beside the label, a bespoke fill) — they spread
+ * these so they stay the same size as the Button, and pass SLIM_HIT_SLOP so
+ * the 36pt box still has a 44pt tap target.
+ */
+export const SLIM_BUTTON_METRICS = { height: 36, paddingHorizontal: SPACING.md, paddingVertical: 0 } as const;
 
 export interface ButtonProps {
   /** Explicit surface contrast, when a product surface requires a fixed monochrome CTA. */
@@ -108,12 +121,14 @@ export function Button({
   const isDisabled = disabled || loading;
   const { outerStyle, innerStyle } = splitButtonStyle(style);
   const disabledFill = theme.id === 'monochrome' ? FILL_ELEVATED : palette.elevated;
-  const height = size === 'compact' ? 36 : size === 'small' ? COMP.buttonHSm : COMP.buttonH;
+  const height = size === 'slim' ? SLIM_BUTTON_METRICS.height : size === 'compact' ? 36 : size === 'small' ? COMP.buttonHSm : COMP.buttonH;
   // Label size scales with the button size — it used to stay fixed at
   // TYPE_SCALE.headline (17px) for every size, which read oversized on a
   // 36pt 'compact' button (Instagram's own-profile buttons are ~13-14pt
   // semibold on ~32-34pt buttons).
-  const labelType = size === 'compact'
+  const labelType = size === 'slim'
+    ? { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold }
+    : size === 'compact'
     ? { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold }
     : size === 'small'
       ? { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold }
@@ -157,8 +172,8 @@ export function Button({
       onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      // 'compact' draws 36pt (icon-only: 36×36); pad its touch area to 44pt.
-      hitSlop={size === 'compact' ? (label ? COMPACT_HIT_SLOP : COMPACT_ICON_HIT_SLOP) : undefined}
+      // 'compact'/'slim' draw 36pt (icon-only: 36×36); pad the touch area to 44pt.
+      hitSlop={size === 'compact' || size === 'slim' ? (label ? COMPACT_HIT_SLOP : COMPACT_ICON_HIT_SLOP) : undefined}
       testID={testID}
       style={[fullWidth && styles.fullWidth, outerStyle]}
       android_ripple={{ color: isFilled ? '#00000026' : `${theme.accent}2E`, borderless: false }}
@@ -168,6 +183,7 @@ export function Button({
           styles.base,
           { height, borderRadius: radius.md, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
+          size === 'slim' && styles.slim,
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
           isFilled && isDisabled && { borderWidth: StyleSheet.hairlineWidth, borderColor: variantStyle.border },
           fullWidth && styles.fullWidth,
@@ -183,7 +199,7 @@ export function Button({
           <>
             {/* Icons only on icon-only buttons (label="" with an
                 accessibilityLabel) — a text button is just its words. */}
-            {icon && !label && <Icon name={icon} size={size === 'compact' ? 16 : 18} color={variantStyle.fg} />}
+            {icon && !label && <Icon name={icon} size={size === 'compact' || size === 'slim' ? 16 : 18} color={variantStyle.fg} />}
             {label ? (
               <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER}>
                 {label}
@@ -228,6 +244,7 @@ export function StickyBottomCTA({ header, containerStyle, ...buttonProps }: Stic
 }
 
 const COMPACT_HIT_SLOP = minHitSlop({ height: 36 });
+export const SLIM_HIT_SLOP = minHitSlop({ height: SLIM_BUTTON_METRICS.height });
 const COMPACT_ICON_HIT_SLOP = minHitSlop({ width: 36, height: 36 });
 
 const styles = StyleSheet.create({
@@ -238,6 +255,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     paddingHorizontal: SPACING.xl,
   },
+  slim: { paddingHorizontal: SLIM_BUTTON_METRICS.paddingHorizontal },
   fullWidth: { width: '100%' },
   label: { fontFamily: FONT.semibold },
   stickyWrap: {

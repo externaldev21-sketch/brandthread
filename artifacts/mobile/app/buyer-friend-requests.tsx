@@ -288,8 +288,8 @@ export default function BuyerFriendRequestsScreen() {
               </View>
             </PressableScaleRow>
             <View style={s.rowActions}>
-              <View style={s.requestBtn}><Button label="Delete" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'decline')} disabled={pending?.userId === row.userId && !isPending(row.userId, 'decline')} onPress={() => handleRequest(row, 'decline')} /></View>
-              <View style={s.requestBtn}><Button label="Confirm" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'approve')} disabled={pending?.userId === row.userId && !isPending(row.userId, 'approve')} onPress={() => handleRequest(row, 'approve')} /></View>
+              <View style={s.requestBtn}><Button label="Delete" variant="secondary" size="compact" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'decline')} disabled={pending?.userId === row.userId && !isPending(row.userId, 'decline')} onPress={() => handleRequest(row, 'decline')} /></View>
+              <View style={s.requestBtn}><Button label="Confirm" variant="primary" size="compact" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'approve')} disabled={pending?.userId === row.userId && !isPending(row.userId, 'approve')} onPress={() => handleRequest(row, 'approve')} /></View>
             </View>
           </View>
         ))}
@@ -330,8 +330,8 @@ export default function BuyerFriendRequestsScreen() {
               </View>
             </PressableScaleRow>
             <View style={s.rowActions}>
-              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="small" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => { void handleDismiss(row); }} /></View>
-              <View style={s.requestBtn}><Button label="Follow" variant="primary" size="small" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'follow')} onPress={() => handleFollowBack(row)} /></View>
+              <View style={s.requestBtn}><Button label="Dismiss" variant="secondary" size="compact" fullWidth style={{ paddingHorizontal: 12 }} onPress={() => { void handleDismiss(row); }} /></View>
+              <View style={s.requestBtn}><Button label="Follow" variant="primary" size="compact" fullWidth style={{ paddingHorizontal: 12 }} loading={isPending(row.userId, 'follow')} onPress={() => handleFollowBack(row)} /></View>
             </View>
           </View>
         )}
@@ -428,7 +428,7 @@ export default function BuyerFriendRequestsScreen() {
                     <Text style={[TYPE_SCALE.caption, s.requestedPillText, { color: theme.accent }]}>{requestedIds.has(sug.userId) ? 'Requested' : 'Following'}</Text>
                   </View>
                 ) : (
-                  <Button label="Follow" variant="primary" size="small" onPress={() => handleFollowSuggestion(sug)} />
+                  <Button label="Follow" variant="primary" size="compact" onPress={() => handleFollowSuggestion(sug)} />
                 )}
               </View>
             </View>

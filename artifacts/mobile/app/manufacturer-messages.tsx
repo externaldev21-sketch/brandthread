@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { Sheet } from '@/components/ui/BottomSheet';
@@ -28,7 +29,7 @@ import { useFocusedInterval } from '@/hooks/useFocusedInterval';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
-import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState as LayoutEmptyState } from '@/components/layout/EmptyState';
 import Composer from '@/components/ui/Composer';
@@ -408,7 +409,9 @@ export default function ManufacturerMessagesScreen() {
         {header}
         <View style={s.center}>
           <EmptyState icon="wifi-off" title="Conversation unavailable" description={loadError} />
-          <SecondaryButton
+          <Button
+            variant="secondary"
+            size="slim"
             label={isSellerDevPreview() ? 'Back' : 'Try again'}
             onPress={() => {
               if (isSellerDevPreview()) goBackOr(router);

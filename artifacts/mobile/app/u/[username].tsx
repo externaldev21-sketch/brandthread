@@ -47,7 +47,7 @@ import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { TILE_ASPECT_3_4, useProfileLayout } from '@/components/profile/profileLayout';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { radius } from '@/constants/radii';
-import { SPACING } from '@/constants/spacing';
+import { SLIM_BUTTON_METRICS } from '@/components/ui/Button';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -261,6 +261,7 @@ export default function PublicProfileRoute() {
           </Text>
           <PressableScale
             style={styles.homeBtn}
+            noMinHeight
             onPress={() => { router.replace('/' as never); }}
             accessibilityRole="button"
             accessibilityLabel="Go to Brandthread home"
@@ -283,6 +284,7 @@ export default function PublicProfileRoute() {
           <Text style={styles.notFoundDesc}>{state.message}</Text>
           <PressableScale
             style={styles.retryBtn}
+            noMinHeight
             onPress={() => { load(); }}
             accessibilityRole="button"
             accessibilityLabel="Retry"
@@ -344,25 +346,21 @@ function makeStyles(theme: AppThemePreset) {
   },
   homeBtn: {
     marginTop: SP.sm,
-    paddingHorizontal: SP.xl,
-    paddingVertical: SPACING.sm,
+    ...SLIM_BUTTON_METRICS,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,
-    minHeight: COMP.buttonHSm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
   retryBtn: {
     marginTop: SP.sm,
-    paddingHorizontal: SP.xl,
-    paddingVertical: SPACING.sm,
+    ...SLIM_BUTTON_METRICS,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.text,
-    minHeight: COMP.buttonHSm,
     alignItems: 'center',
     justifyContent: 'center',
   },

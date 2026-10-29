@@ -32,7 +32,8 @@ export function EmptyState({ title, action, style, testID }: EmptyStateProps) {
           label={action.label}
           onPress={action.onPress}
           variant="secondary"
-          size="small"
+          // The one empty-state action size (tests/empty-state-button-size-lint.test.ts).
+          size="slim"
           testID={testID ? `${testID}-action` : undefined}
         />
       )}

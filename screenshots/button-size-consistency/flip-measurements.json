@@ -1,0 +1,94 @@
+{
+  "flips": [
+    {
+      "flip": 1,
+      "tab": "Orders",
+      "button": {
+        "text": "Share store",
+        "width": 104,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    },
+    {
+      "flip": 2,
+      "tab": "Products",
+      "button": {
+        "text": "Add product",
+        "width": 110,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    },
+    {
+      "flip": 3,
+      "tab": "Orders",
+      "button": {
+        "text": "Share store",
+        "width": 104,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    },
+    {
+      "flip": 4,
+      "tab": "Products",
+      "button": {
+        "text": "Add product",
+        "width": 110,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    },
+    {
+      "flip": 5,
+      "tab": "Orders",
+      "button": {
+        "text": "Share store",
+        "width": 104,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    },
+    {
+      "flip": 6,
+      "tab": "Products",
+      "button": {
+        "text": "Add product",
+        "width": 110,
+        "height": 36,
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "borderRadius": "12px",
+        "fontSize": "13px",
+        "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "fontWeight": "600"
+      }
+    }
+  ]
+}

@@ -1,4 +1,3 @@
-import { radius as ControlRadius } from '@/constants/radii';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -6,8 +5,8 @@ import { type IconName } from '@/components/ui/Icon';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import { Button } from '@/components/ui/Button';
 import { EmptyStateBadge } from './EmptyStateBadge';
-import { radius } from '@/constants/radii';
 
 /**
  * One shared empty/error state used on every list and grid: the shared
@@ -38,12 +37,9 @@ export function EmptyState({
   /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
   illustration,
   /** `text` = Instagram-style link action (accent text, no pill); `pill` =
-   *  slim white fit-to-text pill (black text, 36px, equal side padding);
-   *  default `button`. */
+   *  white fit-to-text pill (black text); default `button` (accent fill).
+   *  Pill and button are both Button size="slim" (36pt, 16px sides). */
   actionStyle = 'button',
-  /** `slim` = a compact fit-to-text pill (36pt tall, 16px sides) for a
-   *  secondary next step; default keeps the original 44pt pill. */
-  actionSize = 'default',
 }: {
   icon: IconName;
   title?: string;
@@ -59,7 +55,6 @@ export function EmptyState({
    *  (Dev: one badge for every empty state). */
   illustration?: ThreadMotif;
   actionStyle?: 'button' | 'text' | 'pill';
-  actionSize?: 'default' | 'slim';
 }) {
   const { theme } = useAppTheme();
   const textAction = actionStyle === 'text';
@@ -84,32 +79,31 @@ export function EmptyState({
             message renders nothing (no blank line). */}
         {compact || !message ? null : <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>}
       </View>
-      {actionLabel && onAction && (
+      {actionLabel && onAction && (textAction ? (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           onPress={onAction}
-          style={
-            textAction ? styles.actionText
-              : pillAction ? [styles.actionPill, { backgroundColor: theme.text }]
-              : [styles.actionBtn, actionSize === 'slim' && styles.actionBtnSlim, { backgroundColor: theme.accent }]
-          }
-          hitSlop={actionSize === 'slim' ? { top: 4, bottom: 4 } : undefined}
+          style={styles.actionText}
           testID={testID ? `${testID}-action` : undefined}
         >
-          <Text
-            style={[
-              styles.actionLabel,
-              pillAction && styles.actionPillLabel,
-              actionSize === 'slim' && styles.actionLabelSlim,
-              { color: textAction ? theme.accentLight : pillAction ? theme.background : theme.onAccent },
-            ]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.actionLabel, { color: theme.accentLight }]} numberOfLines={1}>
             {actionLabel}
           </Text>
         </TouchableOpacity>
-      )}
+      ) : (
+        // The one empty-state action size (Button 'slim' — the seller
+        // Products "Add product" button), whichever look the pill/button
+        // takes; tests/empty-state-button-size-lint.test.ts pins it.
+        <Button
+          label={actionLabel}
+          onPress={onAction}
+          size="slim"
+          colors={pillAction ? { background: theme.text, foreground: theme.background } : undefined}
+          style={pillAction ? undefined : styles.actionBtn}
+          testID={testID ? `${testID}-action` : undefined}
+        />
+      ))}
     </View>
   );
 }
@@ -138,35 +132,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  actionBtn: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.sm + 2,
-    borderRadius: radius.md,
-    marginTop: SP.xs,
-  },
-  actionBtnSlim: {
-    minHeight: 36,
-    paddingHorizontal: SP.md,
-    paddingVertical: 0,
-    alignItems: 'center',
-  },
+  actionBtn: { marginTop: SP.xs },
   actionText: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
-  // Slim white fit-to-text pill: 36px tall, equal 16px side padding, black
-  // text — never stretched, never a fixed width.
-  actionPill: {
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: SP.md,
-    borderRadius: ControlRadius.md,
-  },
-  actionPillLabel: { fontSize: FS.sm },
   actionLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
-  actionLabelSlim: { fontSize: FS.sm },
 });
