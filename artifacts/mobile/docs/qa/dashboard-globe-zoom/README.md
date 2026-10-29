@@ -33,7 +33,12 @@ dashboard card and in the expanded (full-screen) Live view.
 - Dots and arcs draw after (above) the border and label layers, unchanged.
 
 Gestures (card and expanded view): pinch (native, and two-finger touch on
-web) and scroll-wheel/trackpad (web) zoom about the fingers/cursor. Drag still
+web) and scroll-wheel/trackpad (web) zoom about the fingers/cursor. On web,
+wheel and two-finger touch are DOM listeners on the globe's box in the
+capture phase, so any wheel or touch aimed inside the globe zooms it, real or
+script-dispatched, bubbling or not (the gesture library's pinch only saw
+pointer events, so a dispatched touch pinch did nothing); native keeps the
+gesture handler's pinch. Drag still
 spins at the default zoom (a vertical drag is left to the page scroll there);
 zoomed in past 1.15, a drag in any direction moves the map. Auto-rotation is
 unchanged at the default zoom and eases off as you zoom in, so the state
@@ -61,7 +66,8 @@ Bundled; nothing is fetched at runtime.
 | Overlapping labels / labels cut by the box edge, every step | 0 / 0 | 0 / 0 |
 | Order dots on top at the state level (core pixel near-white) | 5/5 | 5/5 |
 | Zoomed back out | 0 labels (the plain globe) | n/a |
-| Two-finger touch pinch | zoom 1 → 2 | n/a |
+| Two-finger touch pinch (browser touch input) | zoom 1 → 4.5 (fingers spread 4.5×) | n/a |
+| Two-finger pinch from dispatched TouchEvents on the globe | zoom 1 → 4.5 | zoom 1 → 4.5 |
 | Vertical drag when zoomed | tilts the globe; page doesn't scroll | n/a |
 | Frame pacing dragging at state level (2.5 s) | 58.8 fps avg, p95 16.8 ms | n/a |
 | Frame pacing at country level while auto-rotating (zoom 1.48, 3 s) | 60 fps avg, p95 16.7 ms | n/a |
@@ -78,6 +84,15 @@ the land with the even-odd rule, labels recorded into an SkPicture with
 `drawText` in Inter Bold, solid black) on CanvasKit, Skia's own WASM build; all path
 strings parse. Not run on a device or simulator in this environment.
 
+Production preview export (what `/fast-preview` serves), seller preview with
+the screenshot harness's fake clock and reduced motion
+(`harness/fast-preview-zoom-probe.mjs`): in both the card and the full-screen
+view, a dispatched two-finger pinch, mouse-wheel zoom and a non-bubbling wheel
+dispatched on the canvas all zoom the globe (`fast-preview/*.png`); before
+this fix the dispatched pinch did nothing there. On that preview the seller
+dashboard opens a "Set up your store" sheet over the page first; it has to be
+dismissed before anything on the dashboard, the globe included, gets input.
+
 ## Screenshots
 
 Dashboard card, zooming in over the US:
@@ -88,7 +103,8 @@ the plain globe again), `card-7-after-pinch.png` (two-finger touch pinch) and
 `card-7-central-america.png` (small countries: full names only).
 
 Expanded view: `full-0-default.png` … `full-5-northeast.png`,
-`full-7-central-america.png` and `full-screen-390x844.png`.
+`full-7-central-america.png`, `full-screen-390x844.png` and
+`full-8-dispatched-pinch.png` (zoomed by a dispatched TouchEvent pinch).
 
 ## Re-running
 

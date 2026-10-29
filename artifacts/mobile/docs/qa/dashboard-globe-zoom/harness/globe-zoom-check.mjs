@@ -6,7 +6,8 @@
  *   - which layers show at each step (borders, country labels, state labels),
  *   - no two visible labels overlap and none is cut by the globe's box,
  *   - order dots still draw on top (pixel at a front order dot stays white),
- *   - a two-finger touch pinch zooms (web touch), a vertical drag tilts the
+ *   - a two-finger touch pinch zooms (browser touch input through CDP, and
+ *     script-dispatched TouchEvents on the globe element), a vertical drag tilts the
  *     zoomed globe instead of scrolling the page,
  *   - frame pacing while dragging the zoomed globe, and at country level
  *     while it still auto-rotates.
@@ -162,6 +163,40 @@ async function dotOnTop(testId) {
   }, testId);
 }
 
+/**
+ * A two-finger pinch built from script-created TouchEvents dispatched on the
+ * globe element (no browser input pipeline, no pointer events), from world
+ * view; returns the zoom before and after.
+ */
+async function dispatchedPinch(testId) {
+  const canvas = page.getByTestId(testId).getByTestId('seller-globe-canvas');
+  const b = await canvas.boundingBox();
+  for (let k = 0; k < 40 && (await page.evaluate(() => globalThis.__btOrderGlobe.view().zoom)) > 1.001; k += 1) {
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.wheel(0, 200);
+  }
+  await page.waitForTimeout(300);
+  const from = await page.evaluate(() => globalThis.__btOrderGlobe.view().zoom);
+  await page.evaluate(async ({ id, cx, cy }) => {
+    const target = document.querySelector(`[data-testid="${id}"] [data-testid="seller-globe-canvas"]`);
+    const touch = (d, n) => new Touch({ identifier: n, target, clientX: cx + (n ? d : -d), clientY: cy });
+    const fire = (type, d) => {
+      const all = [touch(d, 0), touch(d, 1)];
+      const now = type === 'touchend' ? [] : all;
+      target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: now, targetTouches: now, changedTouches: all }));
+    };
+    fire('touchstart', 20);
+    for (let d = 24; d <= 90; d += 6) {
+      fire('touchmove', d);
+      await new Promise((r) => setTimeout(r, 16));
+    }
+    fire('touchend', 90);
+  }, { id: testId, cx: b.x + b.width / 2, cy: b.y + b.height / 2 });
+  await page.waitForTimeout(400);
+  const to = await page.evaluate(() => globalThis.__btOrderGlobe.view().zoom);
+  return { from: +from.toFixed(2), to: +to.toFixed(2) };
+}
+
 const scroll = () => page.evaluate(() => document.querySelector('[data-testid="seller-dashboard-scroll"]')?.scrollTop ?? 0);
 
 const cardSteps = await zoomOver('seller-order-globe', 'card');
@@ -227,6 +262,7 @@ await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }
 await page.waitForTimeout(400);
 const z1 = await page.evaluate(() => globalThis.__btOrderGlobe.view().zoom);
 const pinch = { from: +z0.toFixed(2), to: +z1.toFixed(2) };
+const cardDispatchedPinch = await dispatchedPinch('seller-order-globe');
 await page.getByTestId('seller-order-globe').screenshot({ path: `${OUT}-card-7-after-pinch.png` });
 for (let k = 0; k < 40; k += 1) { await page.mouse.move(mx, my); await page.mouse.wheel(0, 200); }
 
@@ -236,7 +272,9 @@ await page.getByTestId('seller-live-map-full-map').waitFor({ timeout: 10000 });
 await page.waitForTimeout(1200);
 const fullSteps = await zoomOver('seller-live-map-full-map', 'full');
 await page.screenshot({ path: `${OUT}-full-screen-390x844.png` });
+const fullDispatchedPinch = await dispatchedPinch('seller-live-map-full-map');
+await page.getByTestId('seller-live-map-full-map').screenshot({ path: `${OUT}-full-8-dispatched-pinch.png` });
 
 await ctx.close();
 await browser.close();
-console.log(JSON.stringify({ cardSteps, verticalDrag, fps, fpsCountryLevel, backOut, pinch, fullSteps, errors }, null, 1));
+console.log(JSON.stringify({ cardSteps, verticalDrag, fps, fpsCountryLevel, backOut, pinch, cardDispatchedPinch, fullSteps, fullDispatchedPinch, errors }, null, 1));
