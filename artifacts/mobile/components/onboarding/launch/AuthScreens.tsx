@@ -191,7 +191,7 @@ export function CodeScreen({
         style={s.inlineButton}
       />
       {seconds > 0 ? (
-        <Text style={[s.resendWait, { color: theme.subtle }]}>You can resend again in {seconds} seconds</Text>
+        <Text style={[s.resendWait, { color: theme.subtle }]}>You can resend again in {seconds} {seconds === 1 ? 'second' : 'seconds'}</Text>
       ) : (
         <TextLink testID="onboarding-code-resend" label="Resend code" onPress={() => { void resend(); }} />
       )}

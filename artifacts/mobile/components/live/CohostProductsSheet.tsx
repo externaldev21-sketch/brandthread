@@ -28,16 +28,29 @@ export function CohostProductsSheet({ streamId, myId, visible, onClose }: {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Save replaces this co-host's whole product set on the server (PUT), so it
+  // must only run on a selection that was actually loaded: an unread bag would
+  // look like "nothing selected" and Save would wipe what is already live.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!visible) return undefined;
     let alive = true;
     setLoading(true);
+    setLoadFailed(false);
+    setError('');
     Promise.all([
       api.products.list().catch(() => null),
-      fetchLiveBag(streamId).catch(() => []),
+      fetchLiveBag(streamId).catch(() => null),
     ]).then(([mine, bag]) => {
       if (!alive) return;
+      if (mine === null || bag === null) {
+        setProducts([]);
+        setSelected(new Set());
+        setLoadFailed(true);
+        setError('Couldn’t load your products. Close and try again.');
+        return;
+      }
       const list: any[] = Array.isArray(mine) ? mine : (mine?.products ?? []);
       setProducts(list.filter(p => p?.status === undefined || p.status === 'active').map(p => ({
         id: String(p.id), name: String(p.name ?? ''), priceCents: Number(p.priceCents ?? p.variants?.[0]?.priceCents ?? 0),
@@ -57,6 +70,7 @@ export function CohostProductsSheet({ streamId, myId, visible, onClose }: {
   }
 
   async function save() {
+    if (loadFailed) return;
     setSaving(true);
     setError('');
     try {
@@ -89,11 +103,11 @@ export function CohostProductsSheet({ streamId, myId, visible, onClose }: {
               </Pressable>
             );
           })}
-          {products.length === 0 ? <Text style={styles.empty}>No products found</Text> : null}
+          {products.length === 0 && !loadFailed ? <Text style={styles.empty}>No products found</Text> : null}
         </ScrollView>
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button label="Save" onPress={() => void save()} loading={saving} fullWidth />
+      <Button label="Save" onPress={() => void save()} loading={saving} disabled={loading || loadFailed} fullWidth />
       </View>
     </BottomSheet>
   );

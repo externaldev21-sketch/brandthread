@@ -89,6 +89,9 @@ export function MediaCropper({
   useEffect(() => {
     if (!visible || !uri) return;
     let cancelled = false;
+    // A new source must never be cropped with the previous image's size:
+    // show the loading state (Done disabled) until this one is measured.
+    setSourceSize(null);
     RNImage.getSize(uri, (width, height) => {
       if (cancelled) return;
       setSourceSize({ width, height });

@@ -580,8 +580,7 @@ function BuyerLiveNativeScreen() {
     if (message) setOrderSnackbar(message);
   };
   const payAuction = (a: LiveAuction) => {
-    setPayingAuction(a);
-    void openPurchase({ productId: a.productId, productName: a.productName, priceCents: a.currentBidCents ?? a.startingBidCents });
+    void openPurchase({ productId: a.productId, productName: a.productName, priceCents: a.currentBidCents ?? a.startingBidCents }, a);
   };
   // Opened from the LIVE pager's "Pay" (app/live.tsx): go straight to paying.
   const payParamHandled = useRef(false);
@@ -593,7 +592,15 @@ function BuyerLiveNativeScreen() {
   }, [auctionState.auction, params.payAuction]); // eslint-disable-line react-hooks/exhaustive-deps
   const auctionPaying = !!payingAuction && purchaseTag?.productId === payingAuction.productId;
 
-  async function openPurchase(tag: ProductTag) {
+  /** Closes the buy sheet; the auction being paid (if any) ends with it. */
+  function closePurchase() {
+    setPurchaseTag(null);
+    setPayingAuction(null);
+  }
+
+  /** `auction` only when paying a won auction; every other open is a plain buy. */
+  async function openPurchase(tag: ProductTag, auction: LiveAuction | null = null) {
+    setPayingAuction(auction);
     setPurchaseTag(tag);
     setPurchaseProduct(null);
     setSelectedVariantId('');
@@ -650,10 +657,17 @@ function BuyerLiveNativeScreen() {
       // Closing the page is not proof of a cancel: ask Stripe first.
       const attempts = browser.type === 'success' && !/[?&]cancelled=1/.test(returnedUrl ?? '') ? 6 : 2;
       let verification: any = null;
-      for (let attempt = 0; attempt < attempts; attempt++) {
-        verification = await api.buyer.checkout.verifySession(result.sessionId);
-        if (verification?.paymentStatus === 'paid' || verification?.orderNumber) break;
-        if (attempt < attempts - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+      let verifyFailed = false;
+      try {
+        for (let attempt = 0; attempt < attempts; attempt++) {
+          verification = await api.buyer.checkout.verifySession(result.sessionId);
+          if (verification?.paymentStatus === 'paid' || verification?.orderNumber) break;
+          if (attempt < attempts - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch {
+        // The checkout page has already been shown: the charge may exist, so
+        // this is never "couldn't start checkout" (same rule as BuyNowFlow).
+        verifyFailed = true;
       }
       const verdict = hostedCheckoutVerdict({
         browserType: browser.type,
@@ -662,7 +676,7 @@ function BuyerLiveNativeScreen() {
         orderId: verification?.orderId,
         declineReason: verification?.declineReason,
       });
-      if (verdict === 'cancelled') {
+      if (verdict === 'cancelled' && !verifyFailed) {
         setCheckoutError('Payment was cancelled. The live stream is still playing.');
         return;
       }
@@ -676,7 +690,7 @@ function BuyerLiveNativeScreen() {
       setOrderSnackbar(verification.orderNumber
         ? `Order ${verification.orderNumber} confirmed`
         : 'Order confirmed');
-      setPurchaseTag(null);
+      closePurchase();
     } catch (error: any) {
       setCheckoutError('Couldn’t start checkout. Try again.');
     } finally {
@@ -952,7 +966,7 @@ function BuyerLiveNativeScreen() {
               <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
-              onPress={() => { haptic('sheet'); setPurchaseTag(null); }}
+              onPress={() => { haptic('sheet'); closePurchase(); }}
               style={s.purchaseClose}
               hitSlop={6}
               accessibilityRole="button"

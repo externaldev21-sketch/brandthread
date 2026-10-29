@@ -93,7 +93,7 @@ export function LiveEmptyState({
                 <Pressable onPress={() => onOpenCreator(c.host.id)} style={{ alignItems: 'center' }} accessibilityRole="button" accessibilityLabel={`Open ${c.host.name}`}>
                   <LiveHostAvatar host={c.host} size={56} />
                   <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>{c.host.name}</Text>
-                  <Text style={[styles.cardMeta, { color: theme.muted }]}>{formatViewerCount(c.followerCount)} followers</Text>
+                  <Text style={[styles.cardMeta, { color: theme.muted }]}>{formatViewerCount(c.followerCount)} {c.followerCount === 1 ? 'follower' : 'followers'}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => onFollow(c.host.id, !c.following)}

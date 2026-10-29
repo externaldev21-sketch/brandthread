@@ -67,7 +67,11 @@ export default function NotificationBanner() {
       dismissTimer.current = setTimeout(hide, AUTO_DISMISS_MS);
     };
     setNotificationBannerListener(onShow);
-    return () => setNotificationBannerListener(null);
+    return () => {
+      setNotificationBannerListener(null);
+      // No auto-dismiss (animation + setState) after the banner is gone.
+      if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null; }
+    };
   }, [hide, translateY]);
 
   const panResponder = useRef(
