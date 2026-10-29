@@ -78,3 +78,28 @@ product decision; each is listed in its chunk log and in the PR.
   nested so `streamId` narrows for the `liveGift` call (typecheck). There is
   no behaviour change.
 - Audit tests compare renderer node types as `unknown`, so they typecheck.
+
+## Round 2: judgment calls re-checked
+
+After the 25 chunks, the lead went through every "judgment calls — not
+changed" entry and pulled out about 30 that looked like real defects (wrong
+dates, cross-account leaks, swallowed failures, comments that contradict the
+code) rather than product choices. Each one was verified again before any
+fix, and every code fix has a failing-first test (`*.audit2.test.*`). Results:
+[round2-A](round2-A.md) (components/hooks), [round2-B](round2-B.md) (lib),
+[round2-C](round2-C.md) (services).
+
+The lead reverted two round 2 fixes because each needs a matching change in
+`app/`, which is outside this slice:
+- `services/storeService.ts` `restoreVersion` throwing when nothing was
+  restored: `app/store-versions.tsx:78` awaits it with no try/catch, so the
+  user would get no message at all instead of the false "Restored".
+- `lib/checkout/giftOptionStore.ts` reset on `onServicesConfigured`: that
+  hook re-fires whenever `app/_layout.tsx`'s `ServiceConfigurer` effect
+  re-runs (its deps include Clerk's `getToken`), so it could wipe a buyer's
+  gift option in the middle of checkout. It needs a user-id-keyed reset.
+
+The lead added two more fixes the round 2 agents flagged:
+`ConversationThread` handleSend (a direct send that succeeded was handed back
+as "not sent" when the refresh failed) and `components/discounts/ActiveDatesFields.tsx`
+(per-field zone abbreviation across DST).
