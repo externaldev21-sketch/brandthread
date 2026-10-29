@@ -1,8 +1,10 @@
 /**
  * Instagram's saved-post bar (F6 item 89): after a post is saved, a bar slides
- * up with the post's thumbnail, "Saved" and a "Save to collection" action that
- * opens the "Save to…" sheet for that post. Built here (pure) and shown by the
- * app-root SaveHeartHost via the save-heart bus.
+ * up with the post's thumbnail, "Added to Favorites" and a "Manage" action
+ * that opens the "Save to…" sheet for that post (the same "Added to
+ * Favorites" wording SaveHeartHost uses when that sheet saves without a
+ * collection). Built here (pure) and shown by the app-root SaveHeartHost via
+ * the save-heart bus.
  */
 import type { SaveHeartToast } from './saveHeartBus';
 

@@ -47,6 +47,8 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 let wired = false;
+/** Bumped by reconnectNow (account switch, foreground): a connect already awaiting a token is stale. */
+let generation = 0;
 
 const BASE_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -116,8 +118,13 @@ async function connect(): Promise<void> {
   if (socket || connecting || listeners.size === 0 || typeof WebSocket === 'undefined' || previewMode()) return;
   if (!API_BASE_URL) return;
   connecting = true;
+  const gen = generation;
+  let restart = false;
   try {
     const token = await getServiceToken();
+    // reconnectNow ran while the token was being fetched (e.g. the account
+    // changed): this token may belong to the previous session — start over.
+    if (gen !== generation) { restart = true; return; }
     if (listeners.size === 0) return;
     if (!token) { scheduleReconnect(); return; }
     let ws: WebSocket;
@@ -144,11 +151,13 @@ async function connect(): Promise<void> {
     };
   } finally {
     connecting = false;
+    if (restart) void connect();
   }
 }
 
 function reconnectNow(): void {
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+  generation += 1;
   attempts = 0;
   teardown();
   void connect();

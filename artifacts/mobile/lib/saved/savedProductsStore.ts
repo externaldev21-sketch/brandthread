@@ -43,7 +43,11 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
   let signedIn = false;
   let currentKey: string | null = null;
   let generation = 0;
+  /** Local changes, numbered, so a list read that started earlier never undoes them. */
+  let changeSeq = 0;
+  const changedAt = new Map<string, number>();
   const listeners = new Set<Listener>();
+  const noteChange = (productId: string) => { changedAt.set(productId, ++changeSeq); };
 
   const emit = () => listeners.forEach((l) => l());
 
@@ -52,14 +56,21 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
     if (loaded && !force) return;
     if (inflight) return inflight;
     const gen = generation;
+    const seqAtStart = changeSeq;
     const run = (async () => {
       try {
         const rows = await deps.fetchSaved();
         if (gen !== generation) return;
         const next = new Set<string>();
         for (const r of rows) if (r.type === 'product') next.add(r.targetId);
-        // A toggle in flight is newer than this snapshot — keep its optimistic value.
-        for (const id of pending) {
+        // A toggle in flight — or one that finished after this read started —
+        // is newer than this snapshot: keep the local value for it.
+        const newer = new Set(pending);
+        for (const [id, seq] of changedAt) {
+          if (seq > seqAtStart) newer.add(id);
+          else changedAt.delete(id);
+        }
+        for (const id of newer) {
           if (ids.has(id)) next.add(id); else next.delete(id);
         }
         ids = next;
@@ -98,6 +109,7 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
       loaded = false;
       inflight = null;
       pending.clear();
+      changedAt.clear();
       emit();
       if (next) void load();
     },
@@ -105,6 +117,7 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
     markSaved(productId: string): void {
       if (ids.has(productId)) return;
       ids = new Set(ids).add(productId);
+      noteChange(productId);
       emit();
     },
     async toggle(draft: SavedProductDraft): Promise<ToggleResult> {
@@ -116,6 +129,7 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
       if (wasSaved) next.delete(productId); else next.add(productId);
       ids = next;
       pending.add(productId);
+      noteChange(productId);
       const gen = generation;
       emit();
       try {
@@ -127,6 +141,7 @@ export function createSavedProductsStore(deps: SavedProductsDeps) {
           const back = new Set(ids);
           if (wasSaved) back.add(productId); else back.delete(productId);
           ids = back;
+          noteChange(productId);
         }
         return { ok: false, saved: wasSaved, reason: 'error' };
       } finally {

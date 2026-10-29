@@ -6,10 +6,12 @@
  * the safety net, so a dropped socket only ever means a slower update.
  *
  * One shared socket per app session: it opens when the first subscriber
- * arrives, reconnects with backoff, and closes shortly after the last one
- * leaves. No-op where there is no signed-in session.
+ * arrives, reconnects with backoff (and straight away when the active account
+ * changes, so the socket always carries the current session's token), and
+ * closes shortly after the last one leaves. No-op where there is no signed-in
+ * session.
  */
-import { serviceSession } from '@/lib/serviceConfig';
+import { onServicesConfigured, serviceSession } from '@/lib/serviceConfig';
 
 export type UserEvent =
   | { type: 'conversation.updated'; conversationId: string; reason: 'message' | 'read' | 'typing' | 'accepted' | 'deleted' }
@@ -24,6 +26,9 @@ let attempts = 0;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let open = false;
+/** Bumped on every account switch: a connect that started earlier is stale. */
+let generation = 0;
+let wired = false;
 
 const MAX_BACKOFF_MS = 30_000;
 
@@ -41,8 +46,14 @@ function scheduleReconnect(): void {
 async function connect(): Promise<void> {
   if (socket || connecting || listeners.size === 0 || typeof WebSocket === 'undefined') return;
   connecting = true;
+  const gen = generation;
+  let restart = false;
   try {
     const session = await serviceSession();
+    // The account changed while the token was being fetched: that token
+    // belongs to the previous session, so start over with the current one.
+    if (gen !== generation) { restart = true; return; }
+    if (listeners.size === 0) return;
     if (!session || !session.base) { scheduleReconnect(); return; }
     const url = `${session.base.replace(/^http/, 'ws')}/ws/user?token=${encodeURIComponent(session.token)}`;
     let ws: WebSocket;
@@ -60,8 +71,13 @@ async function connect(): Promise<void> {
       open = false;
       scheduleReconnect();
     };
+  } catch {
+    // A failed session lookup must not leave the socket down for good (nor
+    // surface as an unhandled rejection from the fire-and-forget callers).
+    scheduleReconnect();
   } finally {
     connecting = false;
+    if (restart) void connect();
   }
 }
 
@@ -73,7 +89,25 @@ function disconnect(): void {
   if (s) { s.onopen = s.onmessage = s.onerror = s.onclose = null; try { s.close(); } catch { /* already closed */ } }
 }
 
+function reconnectNow(): void {
+  generation += 1;
+  attempts = 0;
+  disconnect();
+  void connect();
+}
+
+function wireOnce(): void {
+  if (wired) return;
+  wired = true;
+  // Sign-in / sign-out / account switch: the socket must carry the new token
+  // (or close when there is none) instead of staying on the previous user.
+  try {
+    onServicesConfigured(() => { if (listeners.size > 0) reconnectNow(); else { generation += 1; disconnect(); } });
+  } catch { /* serviceConfig unavailable (tests) */ }
+}
+
 export function subscribeUserEvents(fn: Listener): () => void {
+  wireOnce();
   listeners.add(fn);
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   void connect();

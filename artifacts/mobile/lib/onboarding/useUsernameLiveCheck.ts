@@ -22,6 +22,10 @@ export function useUsernameLiveCheck(username: string): {
 
   useEffect(() => {
     const trimmed = username.trim();
+    // Any change retires the check in flight for the previous value, even when
+    // this value is never sent (empty or locally invalid) — otherwise its late
+    // reply would show "taken" under a name the field no longer holds.
+    const id = ++requestId.current;
     if (trimmed.length === 0) { setError(''); setChecking(false); return; }
     if (!USERNAME_REGEX.test(trimmed)) {
       // Local format validation (length, allowed characters) owns this case;
@@ -31,7 +35,6 @@ export function useUsernameLiveCheck(username: string): {
       return;
     }
 
-    const id = ++requestId.current;
     setChecking(true);
     const timer = setTimeout(() => {
       api.auth.checkUsernamePublic(trimmed)

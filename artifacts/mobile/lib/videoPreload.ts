@@ -42,17 +42,19 @@ export function isHlsUri(uri: string): boolean {
   return /\.m3u8(?:$|[?#])/i.test(uri);
 }
 
-/**
- * The uri a feed video should play: the adaptive HLS stream when the server
- * has one (https only) on iOS/Android, otherwise the original MP4. Web keeps
- * the MP4: only Safari plays HLS in a plain <video> element.
- */
+/** True on a data-saver or slow connection (web Network Information API), where the 480p feed rendition is preferred. */
 export function preferLowFeedRendition(connection?: { saveData?: boolean; effectiveType?: string; downlink?: number }): boolean {
   return !!connection?.saveData
     || /^(slow-2g|2g|3g)$/.test(connection?.effectiveType ?? '')
     || (typeof connection?.downlink === 'number' && connection.downlink > 0 && connection.downlink < 2);
 }
 
+/**
+ * The uri a feed video should play: the adaptive HLS stream when the server
+ * has one (https only) on iOS/Android, otherwise the original MP4. Web keeps
+ * the MP4 (only Safari plays HLS in a plain <video> element), switching a
+ * feed-stream 720p file to its 480p sibling on a slow / data-saver connection.
+ */
 export function pickPlaybackUri(hlsUrl: string | null | undefined, mp4Uri: string, native: boolean): string {
   // Native AVPlayer/ExoPlayer adapts between 480/720 from the HLS master.
   if (native && typeof hlsUrl === 'string' && /^https:\/\//i.test(hlsUrl) && isHlsUri(hlsUrl)) return hlsUrl;

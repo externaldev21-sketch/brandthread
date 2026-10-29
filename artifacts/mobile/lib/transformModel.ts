@@ -150,6 +150,20 @@ export function applyRotateHandle(orig: DesignTransform, deltaDeg: number): Desi
   return { ...orig, rotation: (orig.rotation ?? 0) + deltaDeg };
 }
 
+/**
+ * The moved leading edge (left or top) of a resize, given its new unsnapped
+ * position `start`, the anchored opposite edge `end` and the unsnapped size.
+ * With snapping on, the moved edge lands on the grid and the size is taken
+ * from the anchored edge, so the opposite edge never drifts by the snap
+ * remainder. Returns [start, size].
+ */
+function pinStart(start: number, end: number, size: number, snap: boolean, grid: number): [number, number] {
+  if (!snap) return [start, size];
+  const snapped = snapValue(start, grid);
+  const pinned = Math.max(TRANSFORM_MIN_DIM, end - snapped);
+  return [end - pinned, pinned];
+}
+
 // ─── Freeform resize ──────────────────────────────────────────────────────────
 
 /**
@@ -170,30 +184,36 @@ export function applyFreeformHandle(
   const sn = (v: number) => maybeSnap(v, snap, snapGrid);
 
   let { width: w, height: h } = orig;
+  const right = orig.x + orig.width;
+  const bottom = orig.y + orig.height;
+  // Moving the left / top edge keeps the right / bottom edge where it was.
+  const left = (width: number) => pinStart(right - width, right, width, snap, snapGrid);
+  const top = (height: number) => pinStart(bottom - height, bottom, height, snap, snapGrid);
+  let x: number, y: number;
 
   switch (handle) {
     case 'move':
       return { ...orig, x: sn(orig.x + ddx), y: sn(orig.y + ddy) };
     case 'tl':
-      w = Math.max(MIN, orig.width  - ddx);
-      h = Math.max(MIN, orig.height - ddy);
-      return { ...orig, x: sn(orig.x + orig.width  - w), y: sn(orig.y + orig.height - h), width: w, height: h };
+      [x, w] = left(Math.max(MIN, orig.width  - ddx));
+      [y, h] = top(Math.max(MIN, orig.height - ddy));
+      return { ...orig, x, y, width: w, height: h };
     case 'tc':
-      h = Math.max(MIN, orig.height - ddy);
-      return { ...orig, y: sn(orig.y + orig.height - h), height: h };
+      [y, h] = top(Math.max(MIN, orig.height - ddy));
+      return { ...orig, y, height: h };
     case 'tr':
       w = Math.max(MIN, orig.width  + ddx);
-      h = Math.max(MIN, orig.height - ddy);
-      return { ...orig, y: sn(orig.y + orig.height - h), width: w, height: h };
+      [y, h] = top(Math.max(MIN, orig.height - ddy));
+      return { ...orig, y, width: w, height: h };
     case 'ml':
-      w = Math.max(MIN, orig.width  - ddx);
-      return { ...orig, x: sn(orig.x + orig.width - w), width: w };
+      [x, w] = left(Math.max(MIN, orig.width  - ddx));
+      return { ...orig, x, width: w };
     case 'mr':
       return { ...orig, width: Math.max(MIN, orig.width + ddx) };
     case 'bl':
-      w = Math.max(MIN, orig.width  - ddx);
+      [x, w] = left(Math.max(MIN, orig.width  - ddx));
       h = Math.max(MIN, orig.height + ddy);
-      return { ...orig, x: sn(orig.x + orig.width - w), width: w, height: h };
+      return { ...orig, x, width: w, height: h };
     case 'bc':
       return { ...orig, height: Math.max(MIN, orig.height + ddy) };
     case 'br':
@@ -236,15 +256,27 @@ export function applyUniformHandle(
   const newW = Math.max(MIN, orig.width  + sign * dominant);
   const newH = Math.max(MIN, newW / ratio);
 
-  const sn = (v: number) => maybeSnap(v, snap, snapGrid);
+  // The opposite corner is the anchor: a snapped left/top edge takes its size
+  // from the anchored edge instead of letting that edge drift.
+  const right = orig.x + orig.width;
+  const bottom = orig.y + orig.height;
+  const left = () => pinStart(right - newW, right, newW, snap, snapGrid);
+  const top = () => pinStart(bottom - newH, bottom, newH, snap, snapGrid);
 
   switch (handle) {
-    case 'tl':
-      return { ...orig, x: sn(orig.x + orig.width - newW), y: sn(orig.y + orig.height - newH), width: newW, height: newH };
-    case 'tr':
-      return { ...orig, y: sn(orig.y + orig.height - newH), width: newW, height: newH };
-    case 'bl':
-      return { ...orig, x: sn(orig.x + orig.width - newW), width: newW, height: newH };
+    case 'tl': {
+      const [x, w] = left();
+      const [y, h] = top();
+      return { ...orig, x, y, width: w, height: h };
+    }
+    case 'tr': {
+      const [y, h] = top();
+      return { ...orig, y, width: newW, height: h };
+    }
+    case 'bl': {
+      const [x, w] = left();
+      return { ...orig, x, width: w, height: newH };
+    }
     case 'br':
       return { ...orig, width: newW, height: newH };
     default:
