@@ -17,13 +17,14 @@
  * Zoomed in, the zoom-detail layers (lib/liveMap/globeDetail.ts) draw
  * between the land and the dots, also from the shared view on the UI
  * thread: country and state/province borders as stroked paths clipped to
- * the land, and labels recorded into one SkPicture per view (Inter
- * SemiBold, loaded with useFont). At the default zoom they draw nothing.
+ * the land, and labels recorded into one SkPicture per view (Inter Bold in
+ * solid black, no outline, loaded with useFont). At the default zoom they draw nothing.
  *
  * Web uses GlobeSurface.web.tsx (canvas 2D, same projection).
  */
 import React from 'react';
-import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import { PixelRatio } from 'react-native';
+import { useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { loadSkia } from '@/lib/skiaAvailability';
 import { globeRadius, LAND_RING_STARTS, LAND_RINGS, landPath, projectLatLng, pulsePhase, type GlobeView } from '@/lib/liveMap/globe';
@@ -33,6 +34,7 @@ import {
   countryBorderLines,
   countryLabelTable,
   detailLevels,
+  fadeLabels,
   hasDetail,
   LAND_HI_ZOOM,
   landHiRings,
@@ -69,7 +71,9 @@ const RINGS = Array.from(LAND_RINGS);
 const STARTS = Array.from(LAND_RING_STARTS);
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const INTER_SEMIBOLD = require('@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf');
+const INTER_BOLD = require('@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf');
+/** Device pixels per point: label origins snap to the pixel grid so text stays crisp. */
+const PIXEL_RATIO = PixelRatio.get();
 const NO_PATH = 'M0 0';
 
 /**
@@ -77,7 +81,14 @@ const NO_PATH = 'M0 0';
  * UI thread. The detail geometry is decoded on first use, so only a screen
  * that draws a globe pays for it.
  */
-function useZoomDetail(skia: any, view: SharedValue<GlobeView>, land: SharedValue<string>, size: number) {
+function useZoomDetail(
+  skia: any,
+  view: SharedValue<GlobeView>,
+  clock: SharedValue<number>,
+  land: SharedValue<string>,
+  size: number,
+  reduceMotion: boolean,
+) {
   const hi = landHiRings();
   const cb = countryBorderLines();
   const rb = regionBorderLines();
@@ -89,15 +100,13 @@ function useZoomDetail(skia: any, view: SharedValue<GlobeView>, land: SharedValu
   const cbStarts = cb.starts;
   const rbPts = rb.pts;
   const rbStarts = rb.starts;
-  const countryFont = skia?.useFont?.(INTER_SEMIBOLD, COUNTRY_FONT) ?? null;
-  const regionFont = skia?.useFont?.(INTER_SEMIBOLD, REGION_FONT) ?? null;
+  const countryFont = skia?.useFont?.(INTER_BOLD, COUNTRY_FONT) ?? null;
+  const regionFont = skia?.useFont?.(INTER_BOLD, REGION_FONT) ?? null;
   const Skia = skia?.Skia;
   const createPicture = skia?.createPicture;
   const evenOdd = skia?.FillType?.EvenOdd ?? 1;
-  const strokeStyle = skia?.PaintStyle?.Stroke ?? 1;
-  const roundJoin = skia?.StrokeJoin?.Round ?? 1;
-  const halo = GLOBE_COLORS.labelHaloRgb;
   const ink = GLOBE_COLORS.labelInkRgb;
+  const pr = PIXEL_RATIO;
 
   const hiLand = useDerivedValue(() => (view.value.zoom > LAND_HI_ZOOM ? landPath(hiPts, hiStarts, view.value, size) : land.value));
   const levels = useDerivedValue(() => detailLevels(view.value.zoom));
@@ -111,30 +120,36 @@ function useZoomDetail(skia: any, view: SharedValue<GlobeView>, land: SharedValu
     p.setFillType(evenOdd);
     return p;
   });
+  // Which labels show, per view; then a short wall-clock fade as one switches
+  // on or off (fadeLabels), so at rest every label is solid black.
+  const layout = useDerivedValue(() => labelLayout(countries, regions, view.value, size));
+  const fade = useSharedValue<{ state: Record<string, number>; at: number; items: unknown; picture: unknown }>({ state: {}, at: 0, items: null, picture: null });
   const labels = useDerivedValue(() => {
     if (!Skia || !createPicture) return null;
-    return createPicture((canvas: any) => {
+    const items = layout.value;
+    const now = clock.value;
+    const prev = fade.value;
+    // Settled on this layout: the last picture still holds.
+    if (prev.items === items && prev.picture) return prev.picture;
+    const faded = fadeLabels(items, prev.state, now - prev.at, reduceMotion);
+    const picture = createPicture((canvas: any) => {
       if (!countryFont || !regionFont) return;
-      const items = labelLayout(countries, regions, view.value, size);
-      if (items.length === 0) return;
-      const haloPaint = Skia.Paint();
-      haloPaint.setAntiAlias(true);
-      haloPaint.setStyle(strokeStyle);
-      haloPaint.setStrokeWidth(2.5);
-      haloPaint.setStrokeJoin(roundJoin);
+      // One style for every label: solid black Inter Bold, no outline,
+      // origin snapped to the device pixel grid.
       const inkPaint = Skia.Paint();
       inkPaint.setAntiAlias(true);
-      for (let i = 0; i < items.length; i += 1) {
-        const l = items[i];
+      for (let i = 0; i < faded.draw.length; i += 1) {
+        const l = faded.draw[i];
         const font = l.font >= COUNTRY_FONT ? countryFont : regionFont;
-        const x = l.x - l.width / 2;
-        const y = l.y + l.font * 0.36;
-        haloPaint.setColor(Skia.Color(`rgba(${halo},${(0.55 * l.alpha).toFixed(3)})`));
-        canvas.drawText(l.text, x, y, haloPaint, font);
-        inkPaint.setColor(Skia.Color(`rgba(${ink},${(0.9 * l.alpha).toFixed(3)})`));
+        const x = Math.round((l.x - l.width / 2) * pr) / pr;
+        const y = Math.round((l.y + l.font * 0.36) * pr) / pr;
+        inkPaint.setColor(Skia.Color(`rgba(${ink},${l.alpha.toFixed(3)})`));
         canvas.drawText(l.text, x, y, inkPaint, font);
       }
     }, { width: size, height: size });
+    // Cache only a finished picture: settled, and drawn with the fonts loaded.
+    fade.value = { state: faded.state, at: now, items: faded.settled && countryFont && regionFont ? items : null, picture };
+    return picture;
   });
   return { hiLand, country, region, countryOpacity, regionOpacity, clip, labels };
 }
@@ -235,7 +250,7 @@ export function GlobeSurface({ size, view, clock, arcs, activities, selectedId, 
   const skia = loadSkia() as any;
 
   const baseLand = useDerivedValue(() => landPath(RINGS, STARTS, view.value, size));
-  const detail = useZoomDetail(skia, view, baseLand, size);
+  const detail = useZoomDetail(skia, view, clock, baseLand, size, reduceMotion);
   // Zoomed in, the finer coastline takes over from the default one.
   const land = detail.hiLand;
   const radius = useDerivedValue(() => globeRadius(size, view.value.zoom));

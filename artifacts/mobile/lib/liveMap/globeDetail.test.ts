@@ -4,13 +4,16 @@ import {
   countryBorderLines,
   countryLabelTable,
   detailLevels,
+  fadeLabels,
   hasDetail,
+  LABEL_FADE_MS,
   labelLayout,
   landHiRings,
   linesPath,
   regionBorderLines,
   regionLabelTable,
 } from './globeDetail';
+import { COUNTRY_LABEL_ROWS, REGION_LABEL_ROWS } from './globeDetailData';
 
 const SIZE = 358;
 /** The view with (lat, lng) dead centre (viewCenteredOn tilts north a little). */
@@ -60,12 +63,33 @@ describe('globe zoom detail', () => {
     expect(country).toContain('United States');
     expect(country.some((t) => t === 'Texas' || t === 'TX')).toBe(false);
     const states = layout(39, -96, 5).map((l) => l.text);
-    expect(states.some((t) => t === 'Texas' || t === 'TX')).toBe(true);
-    expect(states.some((t) => t === 'Kansas' || t === 'KS')).toBe(true);
+    expect(states).toContain('TX');
+    expect(states).toContain('KS');
     // The country name steps aside for its states.
     expect(states).not.toContain('United States');
     const northeast = layout(41.6, -72.5, ZOOM_MAX).map((l) => l.text);
-    expect(northeast.some((t) => t === 'RI' || t === 'Rhode Island')).toBe(true);
+    expect(northeast).toContain('RI');
+  });
+
+  it('writes every country out in full and every state as its abbreviation, at any zoom', () => {
+    for (const [abbr, name] of COUNTRY_LABEL_ROWS) {
+      expect(abbr).toBe(name);
+      expect(name).not.toMatch(/\./);
+      expect(name).not.toMatch(/^[A-Z]{2,3}$/);
+    }
+    const stateNames = new Set(REGION_LABEL_ROWS.map((row) => row[1]));
+    const codes = new Set(REGION_LABEL_ROWS.map((row) => row[0]));
+    for (let zoom = 2.6; zoom <= ZOOM_MAX; zoom *= 1.25) {
+      for (const [lat, lng] of [[39, -96], [41.6, -72.5], [-25, 134], [-12, -50], [56, -100]]) {
+        for (const l of layout(lat, lng, zoom)) {
+          expect(stateNames.has(l.text) && !codes.has(l.text), `${l.text} ×${zoom.toFixed(1)}`).toBe(false);
+        }
+      }
+    }
+    // Central America at country level: names, not codes.
+    const central = layout(15, -90, 10).map((l) => l.text);
+    expect(central).toContain('Guatemala');
+    expect(central.some((t) => /^[A-Z]{3}$/.test(t))).toBe(false);
   });
 
   it('never overlaps two labels or cuts one at the box edge, across views and zooms', () => {
@@ -112,6 +136,44 @@ describe('globe zoom detail', () => {
     }
     // Borders on the far side of the globe draw nothing.
     expect(linesPath(rb.pts, rb.starts, viewCenteredOn(-50, -150, 3), SIZE)).toBe('M0 0');
+  });
+});
+
+describe('label fade', () => {
+  const label = (key: string, alpha: number) => ({ key, text: key, x: 10, y: 10, alpha, font: 10, width: 20 });
+
+  it('shows labels in full or not at all once settled, fading between over a short time', () => {
+    const items = [label('a', 0.9), label('b', 0.3), label('c', 0.5)];
+    const start = fadeLabels(items, {}, 16, false);
+    expect(start.settled).toBe(false);
+    expect(start.draw.map((l) => l.key)).toEqual(['a', 'c']);
+    expect(start.draw[0].alpha).toBeCloseTo(16 / LABEL_FADE_MS);
+    let state = start.state;
+    let res = start;
+    for (let t = 0; t < LABEL_FADE_MS; t += 16) {
+      res = fadeLabels(items, state, 16, false);
+      state = res.state;
+    }
+    expect(res.settled).toBe(true);
+    expect(res.draw.map((l) => [l.key, l.alpha])).toEqual([['a', 1], ['c', 1]]);
+    // Switching off fades out, then drops the label.
+    const off = fadeLabels([label('a', 0.1), label('c', 1)], state, LABEL_FADE_MS / 2, false);
+    expect(off.draw.find((l) => l.key === 'a')?.alpha).toBeCloseTo(0.5);
+    expect(fadeLabels([label('a', 0.1)], off.state, LABEL_FADE_MS, false).draw).toEqual([]);
+  });
+
+  it('skips the fade with Reduce Motion', () => {
+    const res = fadeLabels([label('a', 0.8)], {}, 1, true);
+    expect(res.settled).toBe(true);
+    expect(res.draw[0].alpha).toBe(1);
+  });
+
+  it('settled layouts draw every label at the same full strength', () => {
+    for (const zoom of [1.8, 2.3, 4, 8, 16]) {
+      const items = layout(39, -96, zoom);
+      const drawn = fadeLabels(items, {}, 0, true).draw;
+      expect(drawn.every((l) => l.alpha === 1)).toBe(true);
+    }
   });
 });
 
