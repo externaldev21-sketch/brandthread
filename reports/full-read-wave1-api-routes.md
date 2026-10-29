@@ -502,7 +502,7 @@ Root cause behind several of these gate bypasses: Express 5 matches routes ignor
 |---|---|---|---|---|
 | src/routes/orders.ts | 1253 | 1253 | 5 | 5 |
 | src/routes/package-presets.ts | 108 | 108 | 3 | 3 |
-| src/routes/photography.ts | 573 | 573 | 0 (+1 found by s07, fixed by coordinator) | — |
+| src/routes/photography.ts | 573 | 573 | 0 (s07 flagged a rate-limit key; it is an unused variable, no bucket exists) | 0 |
 | src/routes/places.ts | 244 | 244 | 1 | 1 |
 | src/routes/post-captions.ts | 203 | 203 | 0 | 0 |
 | src/routes/post-carousel.ts | 202 | 202 | 1 | 1 |
