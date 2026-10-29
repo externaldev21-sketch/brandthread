@@ -156,6 +156,8 @@ export default function TabLayout() {
       <Tabs.Screen name="following" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null }} />
       <Tabs.Screen name="marketing" options={{ href: null }} />
+      {/* Studio menu's Watch Threads — a tab so the seller bar stays and the feed keeps its place. */}
+      <Tabs.Screen name="watch-threads" options={{ href: null }} />
     </Tabs>
   );
 }

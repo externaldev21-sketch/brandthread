@@ -2471,11 +2471,16 @@ interface FeedScreenProps {
    */
   anchorPostId?: string;
   /**
-   * Watch Threads (app/watch-threads.tsx): the feed is pushed over the
-   * seller app rather than being a tab, so the top row leads with a Back
-   * control that pops to wherever the seller came from.
+   * Watch Threads (app/(tabs)/watch-threads.tsx): the top row leads with a
+   * Back control to wherever the seller came from.
    */
   onBack?: () => void;
+  /**
+   * Watch Threads sits above the seller's floating tab bar (regular size,
+   * Studio + AI circles) instead of buyer Home's compact one, so the
+   * rail, caption and progress line clear that bar instead.
+   */
+  overSellerTabBar?: boolean;
 }
 
 export default function FeedScreen(props: FeedScreenProps) {
@@ -2489,6 +2494,7 @@ function FeedScreenContent({
   creatorFeed,
   anchorPostId,
   onBack,
+  overSellerTabBar = false,
 }: FeedScreenProps) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
@@ -2549,18 +2555,25 @@ function FeedScreenContent({
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
   // other buyer screen still gets.
-  const buyerBarInset = useBuyerTabBarInset('compact');
+  const compactBarInset = useBuyerTabBarInset('compact');
   // Distinct from `buyerBarInset` above (which pads ordinary chrome with
   // extra breathing room) — this is the tab bar's own top pixel, the exact
   // "line" the immersive video frame stops at. See videoFrameInset's doc
   // comment on SpotlightPageImpl for why the two must stay separate.
-  const buyerBarTopInset = useBuyerTabBarTopInset('compact');
+  const compactBarTopInset = useBuyerTabBarTopInset('compact');
   // The compact capsule is the regular one scaled down about its centre
   // (BuyerTabBar's capsuleAnimatedStyle), so its visible top edge sits half
   // the height difference below the compact layout's barTopInset.
   const regularBarMetrics = useBuyerTabBarMetrics(1, 'regular');
   const compactBarMetrics = useBuyerTabBarMetrics(1, 'compact');
-  const buyerBarVisualTop = buyerBarTopInset + (regularBarMetrics.capsuleHeight - compactBarMetrics.capsuleHeight) / 2;
+  const compactBarVisualTop = compactBarTopInset + (regularBarMetrics.capsuleHeight - compactBarMetrics.capsuleHeight) / 2;
+  // Watch Threads: the seller bar (2 side circles, regular size, never
+  // scaled) — its occupied height, and its own top pixel for the video frame
+  // and the progress line.
+  const sellerBarMetrics = useBuyerTabBarMetrics(2, 'regular');
+  const buyerBarInset = overSellerTabBar ? sellerBarMetrics.occupiedHeight : compactBarInset;
+  const buyerBarTopInset = overSellerTabBar ? sellerBarMetrics.barTopInset : compactBarTopInset;
+  const buyerBarVisualTop = overSellerTabBar ? sellerBarMetrics.barTopInset : compactBarVisualTop;
   const router = useRouter();
   const shopperRoutes = useShopperRoutes();
   const { userId, isLoaded: authLoaded } = useAuth();
