@@ -10,6 +10,7 @@
  */
 import type { FirstRunTipStep, GestureKind } from '@/components/first-run-tips/types';
 import type { FullScreenGuideRow } from '@/components/first-run-tips/FullScreenGuideTip';
+import type { ExplainerStep } from '@/components/first-run-tips/ExplainerSheet';
 
 export const SELLER_DASHBOARD_STEPS: FirstRunTipStep[] = [
   { title: 'This is your dashboard', body: 'Sales, orders, and store health at a glance — updates in real time.' },
@@ -60,275 +61,96 @@ export const LIVE_VIEWER_GESTURE: { gesture: GestureKind; title: string; body: s
 /**
  * One-time "what is this screen" explainers (the `explainer` variant),
  * keyed by tip id. Each screen mounts <ScreenExplainer id="..." />, which
- * reads its copy from here. First line says what the screen is; the rest
- * say what to do there. 2–4 lines, plain words, no emoji.
+ * reads its copy from here: the screen's name and 2–3 swipeable mini-cards,
+ * ONE idea each (icon, a few-word title, one line). Plain words, no emoji.
  *
- * Screens that already had a gesture/spotlight tip (seller orders, products,
- * analytics, buyer discover) keep their old tip id so an account that saw
- * the old tip never gets a second pop-up on the same screen; the old tip's
- * gesture now lives in one of the lines.
+ * MAJOR screens only (Dev): a screen that is self-evident, or a sub-step of
+ * one already explained (sale, share, stories, small settings, sub-flows),
+ * gets no pop-up. The Dashboard's explainer is its 3-step tour and the
+ * buyer Feed's is its "Watching Threads" guide, so neither is listed here.
+ *
+ * Analytics and Discover keep the tip ids their old gesture/spotlight tips
+ * used, so an account that saw the old tip never gets a second pop-up.
  */
 export interface ScreenExplainerCopy {
   title: string;
-  lines: string[];
+  steps: ExplainerStep[];
 }
 
 export const SCREEN_EXPLAINERS = {
   // ─── Seller ────────────────────────────────────────────────────────────
   'explain-design-gallery': {
     title: 'Design Studio',
-    lines: [
-      'Every design you make for your brand is saved here.',
-      'Tap + to start a new canvas, or Import / Photo to bring in artwork you already have.',
-      'Tap a design to keep working on it. Tap Select to delete several at once.',
-    ],
-  },
-  'explain-design-canvas': {
-    title: 'Your canvas',
-    lines: [
-      'Draw and lay out a design here. It saves as you go.',
-      'Brush, Smudge and Eraser paint. Layers keeps each part of the design separate. The circle picks a color.',
-      'Tap Modify for more: the wrench adds photos and text and exports, the lightning bolt adjusts color, the arrow moves and resizes.',
-      'Pinch to zoom in on details.',
+    steps: [
+      { icon: 'grid', title: 'Your designs', body: 'Everything you design for your brand is saved here.' },
+      { icon: 'plus', title: 'Start one', body: 'Tap + for a blank canvas, or Import a photo or artwork you already have.' },
+      { icon: 'edit-2', title: 'Draw on the canvas', body: 'Brush, Eraser and Layers along the top. Tap Modify for text, photos and export.' },
     ],
   },
   'explain-manufacturer-hub': {
     title: 'Manufacturer Hub',
-    lines: [
-      'Find a factory to make your clothes, and track every job you send them.',
-      'Find a manufacturer browses factories by category. Already have one? Invite your factory.',
-      'Quotes, Samples, Orders and Messages follow each job from first price to finished stock.',
+    steps: [
+      { icon: 'search', title: 'Find a factory', body: 'Browse manufacturers by category, or invite the one you already use.' },
+      { icon: 'file-text', title: 'Quotes and samples', body: 'Ask what they’d charge, then order a sample before you commit.' },
+      { icon: 'package', title: 'Track production', body: 'Orders and Messages follow each job until your stock is done.' },
     ],
   },
   'seller-analytics': {
     title: 'Analytics',
-    lines: [
-      'How your store is doing: revenue, visits and what sells.',
-      'Switch between Today, Week and Month at the top to compare.',
-      'Tap the Revenue tile for the full breakdown.',
-    ],
-  },
-  'seller-products': {
-    title: 'Products',
-    lines: [
-      'Everything you sell. Buyers see these on your store and in the feed.',
-      'Tap + to add a product. Tap one to change its photos, price, sizes or stock.',
-      'Hold a product and drag it to change the order it shows on your store.',
-    ],
-  },
-  'seller-orders': {
-    title: 'Orders',
-    lines: [
-      'Every order buyers place with you, newest first.',
-      'Open an order to ship it, refund it or message the buyer.',
-      'Swipe an order left to fulfill it without opening it. Hold one to select several.',
-    ],
-  },
-  'explain-store-builder': {
-    title: 'Store Builder',
-    lines: [
-      'Your brand’s own storefront, outside the feed.',
-      'Open Store Editor to change the theme, pages and sections.',
-      'Moving from Shopify? Paste your store URL and your products come over.',
-    ],
-  },
-  'explain-boost': {
-    title: 'Boost a post',
-    lines: [
-      'Pay to show one of your posts to more buyers in the feed.',
-      'Pick a post, set your budget and how many days it runs, then pay.',
-      'It starts running as soon as the payment clears.',
-    ],
-  },
-  'explain-meta-ads': {
-    title: 'Meta ads',
-    lines: [
-      'Ads for your brand on Instagram and Facebook, run from here.',
-      'Connect your Meta account once, then advertise a product, your store or a video.',
-      'Pause, resume, change the budget or duplicate any campaign from its row.',
+    steps: [
+      { icon: 'bar-chart-2', title: 'How your store is doing', body: 'Revenue, visits and what sells, updated as orders come in.' },
+      { icon: 'calendar', title: 'Compare periods', body: 'Switch between Today, Week and Month at the top.' },
+      { icon: 'pie-chart', title: 'Dig in', body: 'Tap the Revenue tile for the full breakdown.' },
     ],
   },
   'explain-popup-mode': {
     title: 'Pop-up mode',
-    lines: [
-      'Sell in person at markets and pop-ups. Buyers tap their card on your iPhone.',
-      'Add the products they’re buying, set quantities, then charge.',
-      'Each sale becomes a normal order and comes out of your stock.',
+    steps: [
+      { icon: 'map-pin', title: 'Sell in person', body: 'At markets and pop-ups. Buyers tap their card on your iPhone.' },
+      { icon: 'shopping-cart', title: 'Ring it up', body: 'Add the products, set quantities, then charge.' },
+      { icon: 'check-circle', title: 'A normal order', body: 'Each sale shows in Orders and comes out of your stock.' },
     ],
   },
   'explain-payouts': {
     title: 'Payouts',
-    lines: [
-      'Where the money from your sales gets sent to your bank.',
-      'Finish verification and add your bank first. Nothing pays out until then.',
-      'Thread Cash buyers paid you sits in its own card. Cash out moves it to your bank.',
-      'See what’s pending, in transit and paid, and set how often you get paid.',
+    steps: [
+      { icon: 'shield', title: 'Get verified first', body: 'Verify your identity and add your bank. Nothing pays out until then.' },
+      { icon: 'clock', title: 'Track your money', body: 'See what’s pending, in transit and paid, and set how often you’re paid.' },
+      { icon: 'dollar-sign', title: 'Thread Cash', body: 'Thread Cash buyers paid you has its own card. Cash out sends it to your bank.' },
     ],
   },
-  'explain-plans': {
-    title: 'Plans',
-    lines: [
-      'The monthly plan your brand runs on. It sets your features and what we take per sale.',
-      'Starter covers your store. Growth adds Design Studio, Manufacturer Hub and Live. Pro adds your team and deeper analytics.',
-      'Every plan starts with a free trial. Paying yearly gets you two months free.',
+  'explain-create-ad': {
+    title: 'Create ad',
+    steps: [
+      { icon: 'eye', title: 'See it as buyers will', body: 'The preview at the top is exactly how the ad shows in the feed.' },
+      { icon: 'image', title: 'Build the ad', body: 'Add a video or photos, a headline and a button.' },
+      { icon: 'users', title: 'Budget and launch', body: 'Set a daily budget and days, check who it will reach, then Launch.' },
     ],
   },
-  'explain-go-live': {
-    title: 'Go live',
-    lines: [
-      'Run a live shopping show. Buyers watch, chat and buy while you’re on air.',
-      'Name the show, add a cover photo and pin the products you’ll sell.',
-      'Then check your camera and mic, and tap Start show.',
-    ],
-  },
-  'explain-marketing': {
-    title: 'Marketing',
-    lines: [
-      'Every way to get buyers to your store, in one place.',
-      'Discount codes, email, follower push and giveaways reach people who already know you.',
-      'Links, link in bio, catalogs and pixels grow and track traffic from Instagram, TikTok and Meta.',
-    ],
-  },
-  'explain-email-campaigns': {
-    title: 'Email campaigns',
-    lines: [
-      'Email the buyers and fans who signed up to hear from you.',
-      'Audience shows who’s on your list. Sender details sets the name they see.',
-      'Tap New campaign to write one and send it.',
-    ],
-  },
-  'explain-seller-drops': {
-    title: 'Drops',
-    lines: [
-      'Release a product at a set time so fans line up for it.',
-      'Tap New drop, pick the product and choose when it goes live.',
-      'Waitlist shows who asked to be notified before it drops.',
-    ],
-  },
-  'explain-seller-giveaways': {
-    title: 'Giveaways',
-    lines: [
-      'Give away a product to grow your following.',
-      'Tap New giveaway, pick the prize, how people enter and how long it runs.',
-      'Winners are picked when it ends.',
-    ],
-  },
-  'explain-discounts': {
-    title: 'Discount codes',
-    lines: [
-      'Codes buyers enter at checkout for money off.',
-      'Type a code or generate one, then set the amount and when it ends.',
-      'Tap a code to edit, copy, pause or delete it.',
-    ],
-  },
-  'explain-growth-links': {
-    title: 'Links',
-    lines: [
-      'Trackable links to your store for anywhere you post.',
-      'Make one for each place: your Instagram bio, a TikTok, an email.',
-      'Each link counts its own clicks, orders and revenue, so you know what works.',
-    ],
-  },
-  'explain-link-in-bio': {
-    title: 'Link in bio',
-    lines: [
-      'One page of links for your Instagram or TikTok bio.',
-      'Add links, switch them on or off and drag to reorder. The preview updates as you go.',
-    ],
-  },
-  'explain-follower-push': {
-    title: 'Follower push',
-    lines: [
-      'Send a notification straight to your followers’ phones.',
-      'Write a title and message, add a link if you want, and check the preview.',
-      'You get one push a day to followers, and one a week to past buyers.',
-    ],
-  },
-  'explain-creator-program': {
-    title: 'Creator program',
-    lines: [
-      'Creators sell your products and earn a cut of each sale.',
-      'Turn the program on, then invite creators by username.',
-      'Tap a creator to see their clicks and sales, or pause them.',
-    ],
-  },
-  'explain-membership-levels': {
-    title: 'Membership levels',
-    lines: [
-      'Reward your best buyers. They move from Member to Insider to Inner Circle as they spend.',
-      'Set how much it takes to reach each level.',
-      'Give Inner Circle early access to your drops.',
-    ],
-  },
-  'explain-rfq-list': {
-    title: 'Requests for quote',
-    lines: [
-      'Requests you’ve sent factories asking what they’d charge.',
-      'Each row shows how many quotes came back.',
-      'Tap one to compare quotes side by side and pick a factory.',
+  'explain-boost': {
+    title: 'Boost a post',
+    steps: [
+      { icon: 'trending-up', title: 'Reach more buyers', body: 'Pay to show one of your posts to more people in the feed.' },
+      { icon: 'sliders', title: 'Set it up', body: 'Pick a post, then your budget and how many days it runs.' },
+      { icon: 'credit-card', title: 'Pay and go', body: 'It starts running as soon as the payment clears.' },
     ],
   },
 
   // ─── Buyer ─────────────────────────────────────────────────────────────
   'buyer-discover': {
     title: 'Discover',
-    lines: [
-      'Find brands, people and pieces you don’t follow yet.',
-      'Search at the top, or switch between For You, Fits, Brands, People and Drops.',
-      'Swipe up to keep exploring. Tap anything to open it.',
+    steps: [
+      { icon: 'compass', title: 'New to you', body: 'Brands, people and pieces you don’t follow yet.' },
+      { icon: 'sliders', title: 'Pick a lane', body: 'For You, Fits, Brands, People or Drops, or search at the top.' },
+      { icon: 'chevrons-up', title: 'Keep going', body: 'Swipe up for more. Tap anything to open it.' },
     ],
   },
   'explain-thread-cash': {
     title: 'Thread Cash',
-    lines: [
-      'Credit you earn on Brandthread to spend on your next order.',
-      'Keep your streak going to earn more. How it works has the rules.',
-      'Use it at checkout. It can’t be cashed out.',
-    ],
-  },
-  'explain-bag': {
-    title: 'Your bag',
-    lines: [
-      'Everything you’ve added, ready to buy.',
-      'Change size or quantity right here. Shipping shows each seller’s real rate.',
-      'Go to checkout pays for everything at once. Each seller ships their own items.',
-    ],
-  },
-  'explain-checkout': {
-    title: 'Checkout',
-    lines: [
-      'Review your items, then add shipping and payment, all on this one page.',
-      'If your phone has Apple Pay or Google Pay, it fills everything in for you.',
-      'Add a promo code or Thread Cash before you tap Pay.',
-    ],
-  },
-  'explain-buyer-orders': {
-    title: 'My orders',
-    lines: [
-      'Everything you’ve bought, newest first.',
-      'Tap an order to track it, message the seller or start a return.',
-      'Search finds any past order.',
-    ],
-  },
-  'explain-live-feed': {
-    title: 'LIVE',
-    lines: [
-      'Brands streaming right now.',
-      'Tap a show to join. Watch, chat and buy what they’re showing before it sells out.',
-    ],
-  },
-  'explain-buyer-drops': {
-    title: 'Drops',
-    lines: [
-      'Limited releases from brands, at a set time.',
-      'Live now is buyable. Upcoming lets you get notified the moment it drops.',
-    ],
-  },
-  'explain-community': {
-    title: 'Community',
-    lines: [
-      'Group chats about the things you’re into.',
-      'Join an official Brandthread group or a popular one. Yours stay at the top.',
+    steps: [
+      { icon: 'gift', title: 'Credit to spend', body: 'Thread Cash comes off your next order on Brandthread.' },
+      { icon: 'zap', title: 'Earn more', body: 'Keep your streak going. How it works has the rules.' },
+      { icon: 'shopping-bag', title: 'Use it at checkout', body: 'Apply it before you pay. It can’t be cashed out.' },
     ],
   },
 } satisfies Record<string, ScreenExplainerCopy>;

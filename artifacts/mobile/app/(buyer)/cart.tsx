@@ -1,5 +1,4 @@
 import { haptics, haptic } from '@/lib/haptics';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 /**
  * Brandthread bag — SSENSE's Shopping bag flow 1:1, reskinned
@@ -842,7 +841,6 @@ export default function CartScreen() {
           onConfirm={handleConfirmVariant}
         />
       )}
-      <ScreenExplainer id="explain-bag" />
     </View>
   );
 }

@@ -25,7 +25,6 @@ const {
   alertMock: vi.fn(),
 }));
 
-vi.mock('@/components/first-run-tips/ScreenExplainer', () => ({ ScreenExplainer: () => null }));
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {

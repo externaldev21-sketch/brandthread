@@ -96,7 +96,6 @@ import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { groupOrdersByRecency } from '@/lib/groupOrdersByRecency';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { tipTargetProps } from '@/components/first-run-tips/tipTargets';
 
 import { readSellerOrdersCache, saveSellerOrdersCache } from '@/lib/sellerOrdersCache';
@@ -1439,7 +1438,6 @@ export default function OrdersScreen() {
         onSelect={handleBulkOption}
       />
 
-      <ScreenExplainer id="seller-orders" contentReady={!loading} />
     </View>
   );
 

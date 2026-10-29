@@ -70,9 +70,13 @@ function App({ screen }: { screen: Screen }) {
 const shown = (r: ReactTestRenderer, id: string) =>
   r.root.findAll((n) => n.props.testID === `first-run-tip-explainer-${id}` && typeof n.type === 'string').length > 0;
 
+/** Next through the cards, then Got it on the last one. */
 async function gotIt(r: ReactTestRenderer) {
-  const ok = r.root.findAll((n) => n.props.testID === 'first-run-tip-explainer-ok' && typeof n.props.onPress === 'function')[0];
-  await act(async () => ok.props.onPress());
+  const find = (id: string) => r.root.findAll((n) => n.props.testID === id && typeof n.props.onPress === 'function')[0];
+  for (let next = find('first-run-tip-explainer-next'); next; next = find('first-run-tip-explainer-next')) {
+    await act(async () => next.props.onPress());
+  }
+  await act(async () => find('first-run-tip-explainer-ok').props.onPress());
 }
 
 describe('explainer dismissal in the dev preview (&tips=1)', () => {

@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
@@ -384,7 +383,6 @@ export default function MarketingScreen() {
         <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
     </ScrollView>
-      <ScreenExplainer id="explain-marketing" />
     </View>
   );
 }

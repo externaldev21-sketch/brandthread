@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 /**
  * Brandthread Seller Discounts
  * Route: /discounts
@@ -753,7 +752,6 @@ export default function DiscountsScreen() {
       </Modal>
 
       <RedemptionsSheet code={redemptionsFor} onClose={() => setRedemptionsFor(null)} previewOnly={previewOnly} />
-      <ScreenExplainer id="explain-discounts" />
     </View>
   );
 }

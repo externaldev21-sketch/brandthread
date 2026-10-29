@@ -1,5 +1,4 @@
 import { Pressable, ScrollView, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { Icon as Feather } from '@/components/ui/Icon';
@@ -912,7 +911,6 @@ export default function BuyerOrdersScreen() {
         </>
       )}
       {reorderElement}
-      <ScreenExplainer id="explain-buyer-orders" />
     </BrandthreadScreen>
   );
 }

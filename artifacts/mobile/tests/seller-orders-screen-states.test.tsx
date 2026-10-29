@@ -4,7 +4,6 @@
  * mounting the real screen component.
  */
 import React from 'react';
-vi.mock('@/components/first-run-tips/ScreenExplainer', () => ({ ScreenExplainer: () => null }));
 vi.mock('@/components/first-run-tips/FirstRunTip', () => ({ FirstRunTip: () => null }));
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';

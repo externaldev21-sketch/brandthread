@@ -32,7 +32,6 @@
  * product is configured; until then dismissing the drawer just exits.
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { ActivityIndicator, Alert, AppState, AppStateStatus, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -668,7 +667,6 @@ export default function PlansScreen() {
         loading={loadingId === selectedPlan.id}
         ctaDisabled={selectedCtaDisabled}
       />
-      <ScreenExplainer id="explain-plans" />
     </View>
   );
 }
