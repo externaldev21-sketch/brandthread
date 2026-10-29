@@ -203,11 +203,25 @@ export function useCommunityChat(communityId: string | undefined) {
         if (event.userId === '' || event.userId === myId) setStatus('removed');
         else setCommunity((c) => (c ? { ...c, memberCount: Math.max(0, c.memberCount - 1) } : c));
         break;
+      case 'community.updated': {
+        const { type: _type, ...changed } = event;
+        setCommunity((c) => (c ? { ...c, ...changed, iconUrl: 'iconUrl' in changed ? changed.iconUrl ?? undefined : c.iconUrl } : c));
+        break;
+      }
       case 'community.deleted':
         setStatus('deleted');
         break;
     }
   }, [commit, handleCreated, myId]);
+
+  // Back from Group info (photo / name / role changes): refresh the header quietly.
+  const loaded = status === 'ready';
+  const seenFocusRef = useRef(false);
+  useEffect(() => {
+    if (!communityId || !loaded || !focused) return;
+    if (!seenFocusRef.current) { seenFocusRef.current = true; return; }
+    client.get(communityId).then((c) => { if (aliveRef.current) setCommunity(c); }).catch(() => {});
+  }, [client, communityId, focused, loaded]);
 
   const ready = status === 'ready';
   useEffect(() => {

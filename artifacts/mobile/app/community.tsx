@@ -20,6 +20,7 @@ import { SignInPrompt } from '@/components/community/SignInPrompt';
 import { VerifiedMark } from '@/components/community/VerifiedMark';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useCommunityClient } from '@/lib/communities/useCommunityClient';
+import { withPreviewDemo } from '@/lib/communities/previewHref';
 import { formatMemberCount, type Community } from '@/lib/communities/types';
 import { describeCommunityError } from '@/lib/communities/errors';
 import { haptics } from '@/lib/haptics';
@@ -61,6 +62,10 @@ export default function CommunityScreen() {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [preview, setPreview] = useState<Community | null>(null);
+  // Chat to open once the preview sheet has finished closing. Navigating in the
+  // same tick froze this screen mid-close, leaving the sheet's invisible
+  // backdrop over the chat and swallowing every tap there.
+  const openAfterSheet = useRef<string | null>(null);
 
   const generation = useRef(0);
   const searching = debounced.length > 0;
@@ -124,7 +129,7 @@ export default function CommunityScreen() {
 
   const openChat = useCallback((id: string) => {
     Keyboard.dismiss();
-    router.push(`/community-chat?id=${encodeURIComponent(id)}` as never);
+    router.push(withPreviewDemo(`/community-chat?id=${encodeURIComponent(id)}`) as never);
   }, [router]);
 
   /** Optimistic join; rolls back with a calm inline message on failure. Resolves true on success. */
@@ -210,7 +215,7 @@ export default function CommunityScreen() {
 
       {!searching ? (
         <PressableScale
-          onPress={() => { router.push('/community-create' as never); }}
+          onPress={() => { router.push(withPreviewDemo('/community-create') as never); }}
           style={[styles.createRow, { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel="Create a group"
@@ -281,7 +286,7 @@ export default function CommunityScreen() {
             icon="users"
             title={searching ? 'No groups found' : 'No groups yet'}
             description={searching ? 'Try a different search, or start the group yourself.' : 'Be the first to start one.'}
-            action={{ label: 'Create a group', onPress: () => router.push('/community-create' as never) }}
+            action={{ label: 'Create a group', onPress: () => router.push(withPreviewDemo('/community-create') as never) }}
             compact
           />
         }
@@ -312,7 +317,15 @@ export default function CommunityScreen() {
       </View>
       {body()}
 
-      <BottomSheet visible={!!preview} onClose={() => setPreview(null)}>
+      <BottomSheet
+        visible={!!preview}
+        onClose={() => {
+          setPreview(null);
+          const next = openAfterSheet.current;
+          openAfterSheet.current = null;
+          if (next) openChat(next);
+        }}
+      >
         {preview ? (
           <PreviewSheetBody
             community={preview}
@@ -322,9 +335,9 @@ export default function CommunityScreen() {
             needsSignIn={needsSignIn}
             onJoin={async () => {
               const ok = await join(preview);
-              if (ok) { const id = preview.id; setPreview(null); openChat(id); }
+              if (ok) { openAfterSheet.current = preview.id; setPreview(null); }
             }}
-            onOpen={() => { const id = preview.id; setPreview(null); openChat(id); }}
+            onOpen={() => { openAfterSheet.current = preview.id; setPreview(null); }}
           />
         ) : null}
       </BottomSheet>

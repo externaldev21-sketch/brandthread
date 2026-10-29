@@ -32,6 +32,20 @@ vi.mock("../../middlewares/requireAuth", async (orig) => ({
     next();
   },
 }));
+// Group photos go through the profile-photo pipeline's screening; pure red = rejected.
+const rejectedUploads: { ownerId: string; surface: string }[] = [];
+vi.mock("../../lib/mediaModeration", async (orig) => ({
+  ...(await orig<typeof import("../../lib/mediaModeration")>()),
+  screenImageBuffer: async (buffer: Buffer) => {
+    const [r, g, b] = (await sharp(buffer).stats()).channels.map((c) => c.mean);
+    const reject = r > 200 && g < 60 && b < 60;
+    return { verdict: reject ? "reject" : "allow", categories: reject ? ["violence/graphic"] : [], scores: {}, maxScore: 0, framesChecked: 1, provider: "test" };
+  },
+}));
+vi.mock("../../lib/mediaModerationStore", async (orig) => ({
+  ...(await orig<typeof import("../../lib/mediaModerationStore")>()),
+  recordRejectedUpload: async (input: { ownerId: string; surface: string }) => { rejectedUploads.push(input); },
+}));
 vi.mock("../../lib/push", async (orig) => ({
   ...(await orig<typeof import("../../lib/push")>()),
   sendPushToUser: async (userId: string, payload: { title: string; body: string }) => {
@@ -456,7 +470,7 @@ describe("user-created groups", () => {
     expect((await fetch(`${base}/api/communities/invite/${code}`)).status).toBe(404);
   });
 
-  it("owner tools: edit, promote, remove, ban (no rejoin), delete messages, transfer, delete group", async () => {
+  it("owner tools: edit, promote, remove, ban (no rejoin), delete messages, delete group", async () => {
     const { json: g } = await create(ALICE, { name: `${P} Owners Room`, visibility: "public" });
     for (const u of [BOB, CARA, DAN]) await post(u, `/communities/${g.id}/join`);
 
@@ -488,12 +502,11 @@ describe("user-created groups", () => {
     expect((await del(ALICE, `/communities/${g.id}/bans/${CARA}`)).status).toBe(200);
     expect((await post(CARA, `/communities/${g.id}/join`)).status).toBe(200);
 
-    // owner can't leave, but can transfer then leave
+    // the creator can't leave or hand the group over — only delete it
     expect((await post(ALICE, `/communities/${g.id}/leave`)).status).toBe(409);
-    expect((await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "owner" })).status).toBe(200);
-    expect((await post(ALICE, `/communities/${g.id}/leave`)).status).toBe(200);
-    expect((await del(ALICE, `/communities/${g.id}`)).status).toBe(403);
-    expect((await del(BOB, `/communities/${g.id}`)).status).toBe(200);
+    expect((await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "owner" })).status).toBe(400);
+    expect((await del(BOB, `/communities/${g.id}`)).status).toBe(403);
+    expect((await del(ALICE, `/communities/${g.id}`)).status).toBe(200);
     expect((await as(DAN, `/communities/${g.id}`)).status).toBe(404);
     expect(await (await as(DAN, "/communities/mine")).json()).toEqual([]);
   });
@@ -541,6 +554,131 @@ describe("user-created groups", () => {
     const capped = await post(DAN, "/communities", { name: `${P} One Too Many` });
     expect(capped.status).toBe(429);
     expect(await capped.json()).toMatchObject({ code: "GROUP_LIMIT" });
+  });
+});
+
+describe("group photo + creator / admin permissions", () => {
+  async function photoBytes(color: { r: number; g: number; b: number }) {
+    return sharp({ create: { width: 96, height: 96, channels: 3, background: color } }).png().toBuffer();
+  }
+  const uploadPhoto = (u: string, id: string, body: Buffer | string, contentType = "image/png") =>
+    as(u, `/communities/${id}/photo`, { method: "POST", body: body as any, headers: { "content-type": contentType } });
+  async function group() {
+    const g = await (await post(ALICE, "/communities", { name: `${P} Photo Club`, visibility: "public" })).json() as any;
+    for (const u of [BOB, CARA]) await post(u, `/communities/${g.id}/join`);
+    return g as { id: string };
+  }
+  const detail = async (u: string, id: string) => (await as(u, `/communities/${id}`)).json() as Promise<any>;
+
+  beforeEach(() => { rejectedUploads.length = 0; });
+
+  it("the creator sets, changes and removes the photo; it shows for every member", async () => {
+    const g = await group();
+    const first = await uploadPhoto(ALICE, g.id, await photoBytes(SAFE));
+    expect(first.status).toBe(201);
+    const set = await first.json() as any;
+    expect(set.iconUrl).toMatch(new RegExp(`^https://storage.googleapis.com/${BUCKET}/community/`));
+    expect(set.role).toBe("owner");
+    expect((await detail(CARA, g.id)).iconUrl).toBe(set.iconUrl);
+    const row = (await (await as(CARA, "/communities/mine")).json() as any[]).find((c) => c.id === g.id);
+    expect(row.iconUrl).toBe(set.iconUrl);
+
+    const changed = await (await uploadPhoto(ALICE, g.id, await photoBytes({ r: 200, g: 200, b: 200 }))).json() as any;
+    expect(changed.iconUrl).not.toBe(set.iconUrl);
+    expect(uploaded).toHaveLength(2);
+
+    const removed = await del(ALICE, `/communities/${g.id}/photo`);
+    expect(removed.status).toBe(200);
+    expect((await detail(BOB, g.id)).iconUrl).toBeUndefined();
+  });
+
+  it("regular members and outsiders are rejected for every photo / name / description mutation", async () => {
+    const g = await group();
+    await uploadPhoto(ALICE, g.id, await photoBytes(SAFE));
+    const before = await detail(ALICE, g.id);
+    uploaded.length = 0;
+
+    for (const u of [CARA, DAN]) {
+      const up = await uploadPhoto(u, g.id, await photoBytes(SAFE));
+      expect(up.status).toBe(403);
+      expect((await del(u, `/communities/${g.id}/photo`)).status).toBe(403);
+      expect((await patch(u, `/communities/${g.id}`, { name: `${P} Taken Over` })).status).toBe(403);
+      expect((await patch(u, `/communities/${g.id}`, { description: "mine now" })).status).toBe(403);
+      expect((await patch(u, `/communities/${g.id}/members/${BOB}/role`, { role: "admin" })).status).toBe(403);
+    }
+    // Nothing was stored, and the group is exactly as it was.
+    expect(uploaded).toHaveLength(0);
+    const after = await detail(ALICE, g.id);
+    expect(after).toMatchObject({ name: before.name, description: before.description, iconUrl: before.iconUrl });
+  });
+
+  it("the creator promotes admins, who can then edit the photo, name and description; demoting takes it away", async () => {
+    const g = await group();
+    expect((await uploadPhoto(BOB, g.id, await photoBytes(SAFE))).status).toBe(403);
+
+    expect((await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "admin" })).status).toBe(200);
+    const byAdmin = await uploadPhoto(BOB, g.id, await photoBytes(SAFE));
+    expect(byAdmin.status).toBe(201);
+    expect((await byAdmin.json() as any).role).toBe("admin");
+    const edited = await patch(BOB, `/communities/${g.id}`, { name: `${P} Photo Club 2`, description: "Film + digital" });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ name: `${P} Photo Club 2`, description: "Film + digital" });
+    expect((await del(BOB, `/communities/${g.id}/photo`)).status).toBe(200);
+
+    // Admins can't hand out roles — that's the creator's alone.
+    expect((await patch(BOB, `/communities/${g.id}/members/${CARA}/role`, { role: "admin" })).status).toBe(403);
+    expect((await patch(BOB, `/communities/${g.id}/members/${ALICE}/role`, { role: "member" })).status).toBe(403);
+
+    expect((await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "member" })).status).toBe(200);
+    expect((await uploadPhoto(BOB, g.id, await photoBytes(SAFE))).status).toBe(403);
+    expect((await patch(BOB, `/communities/${g.id}`, { description: "still me?" })).status).toBe(403);
+  });
+
+  it("the creator role is set at creation and can't be transferred, demoted or removed", async () => {
+    const g = await group();
+    const members = await (await as(CARA, `/communities/${g.id}/members`)).json() as any;
+    expect(members.members[0]).toMatchObject({ userId: ALICE, role: "owner" });
+
+    const transfer = await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "owner" });
+    expect(transfer.status).toBe(400);
+    expect(await transfer.json()).toMatchObject({ code: "CREATOR_IMMUTABLE" });
+    expect((await patch(ALICE, `/communities/${g.id}/members/${ALICE}/role`, { role: "member" })).status).toBe(400);
+    expect((await post(ALICE, `/communities/${g.id}/leave`)).status).toBe(409);
+
+    await patch(ALICE, `/communities/${g.id}/members/${BOB}/role`, { role: "admin" });
+    expect((await del(BOB, `/communities/${g.id}/members/${ALICE}`)).status).toBe(403);
+    expect((await post(BOB, `/communities/${g.id}/members/${ALICE}/ban`)).status).toBe(403);
+
+    const [row] = await db.select().from(communities).where(eq(communities.id, g.id));
+    expect(row.ownerId).toBe(ALICE);
+    expect((await detail(ALICE, g.id)).role).toBe("owner");
+  });
+
+  it("uses the profile-photo pipeline: type, signature and screening checks; rejects store nothing", async () => {
+    const g = await group();
+    uploaded.length = 0;
+    const gore = await uploadPhoto(ALICE, g.id, await photoBytes(GORE));
+    expect(gore.status).toBe(422);
+    expect(await gore.json()).toMatchObject({ code: "IMAGE_REJECTED" });
+    await until(() => rejectedUploads.length > 0); // recorded fire-and-forget
+    expect(rejectedUploads).toEqual([expect.objectContaining({ ownerId: ALICE, surface: "group photo" })]);
+
+    expect((await uploadPhoto(ALICE, g.id, Buffer.from("GIF89a....."), "image/gif")).status).toBe(400);
+    const jpegLabelledPng = await sharp({ create: { width: 8, height: 8, channels: 3, background: SAFE } }).jpeg().toBuffer();
+    expect((await uploadPhoto(ALICE, g.id, jpegLabelledPng, "image/png")).status).toBe(400);
+    expect((await post(ALICE, `/communities/${g.id}/photo`, { data: "not raw" })).status).toBe(400);
+
+    expect(uploaded).toHaveLength(0);
+    expect((await detail(ALICE, g.id)).iconUrl).toBeUndefined();
+  });
+
+  it("official communities: only platform moderators can change the photo", async () => {
+    const g = await official("graphic-design");
+    await post(ALICE, `/communities/${g.id}/join`);
+    expect((await uploadPhoto(ALICE, g.id, await photoBytes(SAFE))).status).toBe(403);
+    const byMod = await uploadPhoto(ADMIN, g.id, await photoBytes(SAFE));
+    expect(byMod.status).toBe(201);
+    await db.update(communities).set({ iconUrl: g.iconUrl }).where(eq(communities.id, g.id));
   });
 });
 

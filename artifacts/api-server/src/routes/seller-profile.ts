@@ -25,6 +25,7 @@ import {
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { MEDIA_REJECTED_MESSAGE, screenImageBuffer } from "../lib/mediaModeration";
 import { acceptUploadSession } from "../lib/uploadSessions";
+import { checkProfileImageUpload, hasValidImageSignature, MAX_PROFILE_IMAGE_BYTES, PROFILE_IMAGE_MIMES } from "../lib/profileImageUpload";
 import { SELLER_CANCEL_WINDOW_HOURS, parseSellerCancelWindowHours } from "../lib/buyerCancellationPolicy";
 import { decideUsernameChange, USERNAME_COOLDOWN_MESSAGE } from "../lib/usernameCooldown";
 import { getOrCreateStorefront } from "./store";
@@ -78,23 +79,9 @@ const onboardingDataBody = bodyObject({
 });
 const objectStorage = new ObjectStorageService();
 
-const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-// Originals now arrive untouched from the app (no client re-encode), so the caps
-// fit a full-res phone photo; the server does the one encode (lib/productImageResize).
-const MAX_AVATAR_BYTES = 15 * 1024 * 1024;
+const IMAGE_MIMES = PROFILE_IMAGE_MIMES;
+const MAX_AVATAR_BYTES = MAX_PROFILE_IMAGE_BYTES;
 const MAX_BANNER_BYTES = 20 * 1024 * 1024;
-
-function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
-  if (contentType === "image/jpeg" || contentType === "image/jpg") {
-    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-  if (contentType === "image/png") {
-    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-  }
-  return bytes.length >= 12
-    && bytes.subarray(0, 4).toString() === "RIFF"
-    && bytes.subarray(8, 12).toString() === "WEBP";
-}
 
 async function displayProfileImage(
   uploadedImagePath: string | null,
@@ -227,27 +214,9 @@ function createProfileImageUploadHandler(
     async (req: express.Request, res: express.Response): Promise<void> => {
       const clerkId = (req as any).clerkUserId as string;
       const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
-      const bytes = req.body as Buffer;
-
-      if (!IMAGE_MIMES.has(contentType)) {
-        res.status(400).json({ error: `Use a JPEG, PNG, or WebP image for your ${label}.` });
-        return;
-      }
-      if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > maxBytes) {
-        res.status(400).json({ error: `Your ${label} image must be no larger than ${Math.round(maxBytes / (1024 * 1024))} MB.` });
-        return;
-      }
-      if (!hasValidImageSignature(bytes, contentType)) {
-        res.status(400).json({ error: "The uploaded file does not match its declared image type." });
-        return;
-      }
-
-      // Automatic screening (off when the AI integration env is missing).
-      // Identity images have no held state, so flagged images are refused.
-      const screened = await screenImageBuffer(bytes, contentType);
-      if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
-        void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: label, verdict: { ...screened, verdict: "reject" } }));
-        res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
+      const check = await checkProfileImageUpload({ bytes: req.body, contentType, maxBytes, label, ownerId: clerkId });
+      if (!check.ok) {
+        res.status(check.status).json(check.body);
         return;
       }
 
@@ -263,7 +232,7 @@ function createProfileImageUploadHandler(
 
       let objectPath: string | null = null;
       try {
-        const stored = await normalizeUploadedImage(bytes, contentType);
+        const stored = check.image;
         objectPath = await objectStorage.createObjectEntityFromBuffer(stored.buffer, stored.contentType);
         await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
           owner: clerkId,

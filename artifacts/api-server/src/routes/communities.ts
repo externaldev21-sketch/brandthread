@@ -18,6 +18,8 @@
  *   POST   /api/communities/upload-photo           moderated photo upload (icon, cover, chat)
  *   GET    /api/communities/:id                    detail
  *   PATCH  /api/communities/:id                    edit (admin)        DELETE /:id  delete (owner)
+ *   POST   /api/communities/:id/photo              set the group photo (creator/admin; profile-photo pipeline)
+ *   DELETE /api/communities/:id/photo              remove the group photo (creator/admin)
  *   POST   /api/communities/:id/join | /leave
  *   PATCH  /api/communities/:id/mute               { muted }
  *   PATCH  /api/communities/:id/read               { seq? }  move my read cursor
@@ -26,7 +28,7 @@
  *   GET    /api/communities/:id/members            paginated member list
  *   DELETE /api/communities/:id/members/:userId    remove (admin)
  *   POST   /api/communities/:id/members/:userId/ban | DELETE /:id/bans/:userId
- *   PATCH  /api/communities/:id/members/:userId/role
+ *   PATCH  /api/communities/:id/members/:userId/role  { role: admin|member } (creator only)
  *   GET    /api/communities/:id/requests           pending join requests (admin)
  *   POST   /api/communities/:id/requests/:userId/approve | /deny
  *   GET    /api/communities/:id/messages           cursor history (before / after seq)
@@ -34,11 +36,16 @@
  *   DELETE /api/communities/:id/messages/:mid      delete own / admin removes
  *   PUT|DELETE /api/communities/:id/messages/:mid/reactions
  *
+ * Roles: the creator ("owner") is set at creation and never changes — it can't
+ * be transferred, demoted, removed or leave (only delete the group). The
+ * creator promotes/demotes admins. Creator and admins edit the group's photo,
+ * name and description; members can't, and every such mutation is checked here.
+ *
  * Reporting goes through the existing POST /api/reports with targetType
  * "community_message" | "community"; blocking through POST /api/social/block
  * (a blocked member's messages are hidden from the blocker's history here).
  */
-import { Router } from "express";
+import express, { Router } from "express";
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import {
@@ -59,6 +66,8 @@ import {
 import { broadcastToCommunity, closeCommunityRoom, kickFromCommunity } from "../ws/communityHub";
 import { noteCommunityMessage } from "../lib/communityPush";
 import { getWebOrigin } from "../lib/webOrigin";
+import { acceptUploadSession } from "../lib/uploadSessions";
+import { checkProfileImageUpload, MAX_PROFILE_IMAGE_BYTES } from "../lib/profileImageUpload";
 import { logger } from "../lib/logger";
 import { cappedUnknown, jsonList, LIMITS, looseBody, optBoolish, optNumberish, validateBody } from "../middlewares/bodySchemas";
 
@@ -195,7 +204,7 @@ async function requireAdmin(req: any, res: any): Promise<{ community: CommunityR
   const member = await loadMember(community.id, userId);
   if (isGroupAdmin(member) && community.kind !== "official") return { community, member, userId };
   if (await isPlatformAdmin(userId)) return { community, member, userId };
-  return res.status(403).json({ error: "Only group admins can do that.", code: "FORBIDDEN" });
+  res.status(403).json({ error: "Only group admins can do that.", code: "FORBIDDEN" });
   return null;
 }
 
@@ -564,6 +573,7 @@ router.patch("/:id", validateBody(updateCommunityBody), async (req, res) => {
   const blockedText = checkGroupText(patch.name, patch.description);
   if (blockedText) return res.status(422).json({ error: blockedText, code: "MODERATED" });
   const [updated] = await db.update(communities).set(patch).where(eq(communities.id, ctx.community.id)).returning();
+  broadcastToCommunity(updated.id, { type: "community.updated", name: updated.name, description: updated.description, iconUrl: updated.iconUrl });
   return res.json(communityView(updated, ctx.member));
 });
 
@@ -578,6 +588,53 @@ router.delete("/:id", async (req, res) => {
   broadcastToCommunity(c.id, { type: "community.deleted" });
   closeCommunityRoom(c.id);
   return res.json({ ok: true });
+});
+
+// ─── Group photo (same pipeline as a person's profile photo) ──────────────────
+
+/** Gate BEFORE the body is read, so a member never gets as far as uploading bytes. */
+async function requireEditor(req: any, res: any, next: () => void) {
+  const ctx = await requireAdmin(req, res);
+  if (!ctx) return;
+  res.locals.community = ctx;
+  next();
+}
+
+router.post(
+  "/:id/photo",
+  rateLimit("mutation"),
+  requireEditor,
+  acceptUploadSession({ allowedTypes: ["image/*"], maxBytes: MAX_PROFILE_IMAGE_BYTES }),
+  express.raw({ type: "image/*", limit: MAX_PROFILE_IMAGE_BYTES }),
+  async (req, res) => {
+    const ctx = res.locals.community as { community: CommunityRow; member: MemberRow | null; userId: string };
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const check = await checkProfileImageUpload({
+      bytes: req.body, contentType, maxBytes: MAX_PROFILE_IMAGE_BYTES, label: "group photo", ownerId: ctx.userId,
+    });
+    if (!check.ok) return res.status(check.status).json(check.body);
+    let iconUrl: string;
+    try {
+      iconUrl = await storeCommunityImage({ buffer: check.image.buffer, mimeType: check.image.contentType, userId: ctx.userId });
+    } catch (err) {
+      if (err instanceof StorageNotConfiguredError) return res.status(503).json({ error: "Photo upload isn't available right now." });
+      logger.error({ err, communityId: ctx.community.id }, "Failed to store group photo");
+      return res.status(500).json({ error: "Could not save the group photo. Please try again." });
+    }
+    const [updated] = await db.update(communities).set({ iconUrl, updatedAt: new Date() })
+      .where(eq(communities.id, ctx.community.id)).returning();
+    broadcastToCommunity(updated.id, { type: "community.updated", iconUrl });
+    return res.status(201).json(communityView(updated, ctx.member));
+  },
+);
+
+router.delete("/:id/photo", async (req, res) => {
+  const ctx = await requireAdmin(req, res);
+  if (!ctx) return;
+  const [updated] = await db.update(communities).set({ iconUrl: null, updatedAt: new Date() })
+    .where(eq(communities.id, ctx.community.id)).returning();
+  broadcastToCommunity(updated.id, { type: "community.updated", iconUrl: null });
+  return res.json(communityView(updated, ctx.member));
 });
 
 // ─── Join / leave / mute / read ───────────────────────────────────────────────
@@ -600,7 +657,7 @@ router.post("/:id/leave", async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
   if (ctx.member.role === "owner" && ctx.community.kind === "user") {
-    return res.status(409).json({ error: "Transfer ownership or delete the group before leaving.", code: "OWNER_CANNOT_LEAVE" });
+    return res.status(409).json({ error: "You created this group, so you can't leave it. You can delete it instead.", code: "OWNER_CANNOT_LEAVE" });
   }
   await removeMember(ctx.community.id, ctx.userId);
   return res.json({ ok: true });
@@ -755,20 +812,16 @@ router.patch("/:id/members/:userId/role", validateBody(roleBody), async (req, re
     return res.status(403).json({ error: "Only the owner can change roles.", code: "FORBIDDEN" });
   }
   const role = req.body?.role;
-  if (role !== "admin" && role !== "member" && role !== "owner") return res.status(400).json({ error: "Invalid role", code: "VALIDATION_ERROR" });
+  // The creator is fixed for the life of the group: there is no "owner" to hand out.
+  if (role === "owner") return res.status(400).json({ error: "The group's creator can't be changed.", code: "CREATOR_IMMUTABLE" });
+  if (role !== "admin" && role !== "member") return res.status(400).json({ error: "Invalid role", code: "VALIDATION_ERROR" });
   const targetId = String(req.params.userId);
   if (targetId === userId) return res.status(400).json({ error: "You can't change your own role.", code: "FORBIDDEN" });
   const target = await loadMember(c.id, targetId);
   if (!target) return res.status(404).json({ error: "Member not found", code: "NOT_FOUND" });
-  await db.transaction(async (tx) => {
-    await tx.update(communityMembers).set({ role })
-      .where(and(eq(communityMembers.communityId, c.id), eq(communityMembers.userId, targetId)));
-    if (role === "owner") {
-      await tx.update(communityMembers).set({ role: "admin" })
-        .where(and(eq(communityMembers.communityId, c.id), eq(communityMembers.userId, userId)));
-      await tx.update(communities).set({ ownerId: targetId, updatedAt: new Date() }).where(eq(communities.id, c.id));
-    }
-  });
+  if (target.role === "owner") return res.status(403).json({ error: "The group's creator can't be changed.", code: "CREATOR_IMMUTABLE" });
+  await db.update(communityMembers).set({ role })
+    .where(and(eq(communityMembers.communityId, c.id), eq(communityMembers.userId, targetId)));
   return res.json({ ok: true, role });
 });
 
