@@ -49,16 +49,16 @@ vi.mock("@workspace/db", () => {
       insert: () => ({
         values: (values: Record<string, unknown>) => {
           state.inserted.push(values);
-          return { returning: async () => [{ id: "preset-1", ...values }] };
+          return { returning: async () => [{ id: "7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a", ...values }] };
         },
       }),
       update: () => ({
         set: (values: Record<string, unknown>) => ({
-          where: () => ({ returning: async () => [{ id: "preset-1", ...values }] }),
+          where: () => ({ returning: async () => [{ id: "7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a", ...values }] }),
         }),
       }),
       delete: () => ({
-        where: () => ({ returning: async () => [{ id: "preset-1" }] }),
+        where: () => ({ returning: async () => [{ id: "7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a" }] }),
       }),
     },
   };
@@ -118,7 +118,7 @@ describe("package presets route", () => {
     expect(state.inserted).toEqual([{
       ownerId: state.ownerId, name: "Small box", weightOz: 8, lengthIn: "6.00", widthIn: "4.00", heightIn: "2.00",
     }]);
-    expect(res.body.preset).toMatchObject({ id: "preset-1", name: "Small box" });
+    expect(res.body.preset).toMatchObject({ id: "7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a", name: "Small box" });
   });
 
   it("rejects invalid input with a readable error instead of saving", async () => {
@@ -129,11 +129,11 @@ describe("package presets route", () => {
   });
 
   it("updates and deletes a preset", async () => {
-    const patched = await request("/api/package-presets/preset-1", "PATCH", { name: "Big box", heightIn: 10 });
+    const patched = await request("/api/package-presets/7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a", "PATCH", { name: "Big box", heightIn: 10 });
     expect(patched.status).toBe(200);
     expect(patched.body.preset).toMatchObject({ name: "Big box", heightIn: "10.00" });
 
-    const removed = await request("/api/package-presets/preset-1", "DELETE");
+    const removed = await request("/api/package-presets/7c1e2a4b-0d3f-4e5a-9b6c-1f2e3d4c5b6a", "DELETE");
     expect(removed.status).toBe(200);
     expect(removed.body).toEqual({ ok: true });
   });

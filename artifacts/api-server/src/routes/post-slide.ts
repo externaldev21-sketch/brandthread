@@ -20,7 +20,7 @@ import { promisify } from "node:util";
 import { db, posts, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import {
   validateOverlaysArray,
@@ -367,6 +367,11 @@ router.post("/compose-slideshow", requireAuth, validateBody(composeSlideshowBody
       outputObjects.map((p) => storage.deleteObjectEntity(p).catch(() => {})),
     );
     if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
+    // A source upload that no longer exists (expired, already composed, or a
+    // made-up path) is the client's stale state, not a server failure.
+    if (err instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "A slide upload was not found. Please re-upload and try again.", code: "UPLOAD_NOT_FOUND" });
+    }
     req.log.error({ err, clerkId }, "Could not compose slideshow");
     return res.status(500).json({ error: "Slideshow could not be composed" });
   } finally {

@@ -26,7 +26,7 @@
  * who wrote it, never rewritten to a store owner.
  */
 import { Router } from "express";
-import { and, asc, count, desc, eq, gt, inArray, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 import { db, interactions, postCommentLikes, postCommentMedia, postComments, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -247,11 +247,16 @@ router.get("/:postId/comments", async (req, res) => {
       .then((rows) => rows.map((r) => r.row));
     const overflowParents = new Set<string>();
     const replyCountByParent = new Map<string, number>();
+    // Last inline reply per root before viewer filtering (blocked / muted),
+    // so the replies cursor resumes after everything this page covered even
+    // when the final replies were hidden from this viewer.
+    const lastInlineReplyAt = new Map<string, Date>();
     const cappedReplies = replies.filter((reply) => {
       const pid = reply.parentId as string;
       const n = (replyCountByParent.get(pid) ?? 0) + 1;
       replyCountByParent.set(pid, n);
       if (n > REPLIES_PER_ROOT) { overflowParents.add(pid); return false; }
+      lastInlineReplyAt.set(pid, reply.createdAt);
       return true;
     });
 
@@ -342,8 +347,8 @@ router.get("/:postId/comments", async (req, res) => {
     for (const root of roots) {
       const more = overflowParents.has(root.id);
       root.hasMoreReplies = more;
-      root.repliesNextCursor = more && root.replies.length > 0
-        ? root.replies[root.replies.length - 1].createdAt
+      root.repliesNextCursor = more
+        ? lastInlineReplyAt.get(root.id)?.toISOString() ?? null
         : null;
     }
 
@@ -405,7 +410,10 @@ router.get("/:postId/comments/:commentId/replies", async (req, res) => {
         eq(postComments.parentId, rootId),
         visibility,
         standing,
-        after ? gt(postComments.createdAt, after) : undefined,
+        // The cursor is a millisecond ISO string while created_at keeps
+        // microseconds, so compare at millisecond precision — otherwise the
+        // reply the cursor names is returned again at the top of this page.
+        after ? sql`date_trunc('milliseconds', ${postComments.createdAt}) > ${after.toISOString()}::timestamptz` : undefined,
       ))
       .orderBy(asc(postComments.createdAt), asc(postComments.id))
       .limit(REPLIES_PER_ROOT + 1);

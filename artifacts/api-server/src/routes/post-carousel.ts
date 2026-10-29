@@ -20,7 +20,7 @@ import { promisify } from "node:util";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { CAROUSEL_CANVAS, MAX_CAROUSEL_VIDEO_SECONDS, MAX_SLIDES_BY_SURFACE } from "../lib/postLimits";
 import { adjustFilters, cropFilter, parseAdjust, parseCrop, type Adjust, type CropRect } from "../lib/carouselAdjust";
@@ -192,6 +192,11 @@ router.post("/compose-carousel", requireAuth, validateBody(composeCarouselBody),
     return res.json({ items: result });
   } catch (err) {
     await Promise.all(created.map((p) => storage.deleteObjectEntity(p).catch(() => {})));
+    // A source upload that no longer exists (expired, already composed, or a
+    // made-up path) is the client's stale state, not a server failure.
+    if (err instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "A slide upload was not found. Please re-upload and try again.", code: "UPLOAD_NOT_FOUND" });
+    }
     req.log.error({ err, clerkId }, "Could not compose carousel");
     return res.status(500).json({ error: "Post could not be composed" });
   } finally {

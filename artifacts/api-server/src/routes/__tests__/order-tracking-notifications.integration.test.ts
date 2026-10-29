@@ -83,7 +83,7 @@ describe("PATCH /api/orders/:id/tracking buyer alerts", () => {
 
     expect(first.status).toBe(200);
     expect(repeated.status).toBe(200);
-    expect(publishNotification).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(publishNotification).toHaveBeenCalledTimes(1));
     expect(publishNotification).toHaveBeenCalledWith(expect.objectContaining({
       userId: buyerId,
       type: "order_out_for_delivery",
@@ -100,7 +100,9 @@ describe("PATCH /api/orders/:id/tracking buyer alerts", () => {
     const response = await updateTrackingStatus(trackingStatus);
 
     expect(response.status).toBe(200);
-    expect(publishNotification).toHaveBeenCalledTimes(1);
+    // The alert is published after the response (it first loads the order's
+    // thumbnail via withOrderImage), so wait for it rather than racing it.
+    await vi.waitFor(() => expect(publishNotification).toHaveBeenCalledTimes(1));
     expect(publishNotification).toHaveBeenCalledWith(expect.objectContaining({
       userId: buyerId,
       type,
