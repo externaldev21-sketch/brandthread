@@ -11,7 +11,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { FONT, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InteractionLayer } from './ProfileControls';
 import { crispPx } from '@/lib/crispPixel';
@@ -96,7 +96,8 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
     borderRadius: RADIUS.sm, overflow: 'hidden',
   },
-  switcherText: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1, minWidth: 0 },
+  // One step under FS.md (Dev: the name read too big next to the icons).
+  switcherText: { fontFamily: FONT.semibold, fontSize: FS.base, flexShrink: 1, minWidth: 0 },
   overMedia: {
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
   },

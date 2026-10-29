@@ -27,8 +27,12 @@ describe('seller profile action layout', () => {
   // reachable from the top-bar share icon) and Contact was folded into the
   // new Messages button. Settings stays in the top-right gear; Go Live and
   // Create Post live in the Studio control center.
-  it('shows the Professional dashboard row and the Edit profile + Share profile row below it', () => {
-    expect(profileSource).toContain('Professional dashboard');
+  it('shows the Edit profile + Share profile row with no Professional dashboard row above it', () => {
+    // Dev: the dashboard row was removed from the own profile; the
+    // Dashboard stays one tap away as the first tab.
+    expect(profileSource).not.toContain('Professional dashboard');
+    expect(profileSource).not.toContain('profile-dashboard-row');
+    expect(profileSource).not.toContain('dashboardRow');
     // Polish #99: on your own profile Edit and Share are equal secondary
     // buttons (Depop own shop / the buyer own profile); Messages is no
     // longer the filled "primary" action, and the labelled Share button

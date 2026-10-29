@@ -2,8 +2,8 @@
  * Seller's own Profile tab — ProfileShell in its Instagram own-profile
  * `headerVariant="video"` (profile video behind the controls, avatar, name
  * and bio, fading to solid at the stats row), with the owner's tools:
- * account switcher, notifications / share / settings, Edit Profile (brand
- * name + bio sheet), Go Live, Create Post, quick actions, and Instagram's
+ * account switcher, notifications, the ••• menu (settings, view as
+ * visitor), Edit profile + Share profile, Go Live, Create Post, quick actions, and Instagram's
  * icon-only Posts / Shop / Tagged tabs over a 4:5 grid.
  *
  * Drafts and scheduled posts (formerly their own tabs) are a sub-filter under
@@ -12,13 +12,11 @@
  * an honest empty state (sellers have no tagged-post data yet).
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 import { useStickyState } from '@/lib/stickyState';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, TouchableOpacity,
 } from 'react-native';
-import { showAlert } from '@/lib/actionSheet';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,17 +24,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { haptics } from '@/lib/haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import { reportNetworkError } from '@/lib/networkNotice';
 import {
   CARD, BORDER, FG, MUTED,
-  FONT, FS, SP, RADIUS, SURFACE,
+  FONT, FS, SP,
 } from '@/lib/theme';
-import { Sheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
-import { ListRow } from '@/components/ui/ListRow';
 import { followingCountAfter, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
@@ -189,15 +184,11 @@ export default function ProfileScreen() {
   const tagged = useTaggedPosts(userId, activeTab === 'Tagged' && !!userId && !isSellerDevPreview());
   const [socialCounts, setSocialCounts] = useStickyState<SocialCounts>('sellerProfile:socialCounts', { followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
-  const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   const caps = profileCapabilities('seller', 'owner');
-  const [brandNameInput, setBrandNameInput] = useState('');
-  const [bioInput, setBioInput] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Gates the stats row's "–" placeholder. Tied only to the FIRST load
   // attempt settling (success or failure) via Promise.allSettled below —
@@ -458,60 +449,6 @@ export default function ProfileScreen() {
     router.push(route as never);
   }
 
-  function openProfileEditor() {
-    setBrandNameInput(profile?.brandName ?? profile?.displayName ?? '');
-    setBioInput(profile?.bio ?? '');
-    setProfileEditorVisible(true);
-  }
-
-  function closeProfileEditor() {
-    if (!savingProfile) setProfileEditorVisible(false);
-  }
-
-  async function saveProfileDetails() {
-    const brandName = brandNameInput.trim();
-    const bio = bioInput.trim();
-    if (!brandName) {
-      showAlert('Add a brand name', 'Your Profile needs a brand name before you can save.');
-      return;
-    }
-    if (savingProfile) return;
-
-    setSavingProfile(true);
-    try {
-      const updated = await api.auth.updateProfile({ brandName, bio });
-      setProfile((current) => ({
-        brandName: updated.brandName ?? brandName,
-        username: current?.username ?? null,
-        displayName: updated.displayName ?? current?.displayName ?? null,
-        bio: updated.bio ?? bio,
-        subscriptionStatus: current?.subscriptionStatus ?? null,
-        subscriptionPlanId: current?.subscriptionPlanId ?? null,
-        totalLikes: current?.totalLikes ?? 0,
-        profileImageUrl: current?.profileImageUrl ?? null,
-        verified: current?.verified ?? false,
-        coverVideoUrl: current?.coverVideoUrl ?? null,
-        coverPosterUrl: current?.coverPosterUrl ?? null,
-        avatarVideoUrl: current?.avatarVideoUrl ?? null,
-        avatarPosterUrl: current?.avatarPosterUrl ?? null,
-        metrics: current?.metrics ?? {
-          revenueCents: 0,
-          visitors: 0,
-          orders: 0,
-          conversionRate: 0,
-        },
-      }));
-      setProfileEditorVisible(false);
-      haptics.success();
-      void loadProfile();
-    } catch (error) {
-      reportNetworkError(error, saveProfileDetails);
-      showAlert('Could not save changes', 'Check your connection and try again.');
-    } finally {
-      setSavingProfile(false);
-    }
-  }
-
   // In the dev preview there is no account, so the one shared preview identity is shown here and in Settings / Edit profile.
   const brandTitle = previewSellerBrandName() ?? (profile?.brandName || profile?.displayName || 'My Brand');
   const avatarInitials = brandTitle
@@ -707,13 +644,8 @@ export default function ProfileScreen() {
         banner={banner}
         bannerNote={bannerNote}
         onAddBanner={bannerFlow.openSheet}
-        topLeft={(
-          <>
-            {/* Banner layout (TikTok): the edit pencil leads the top bar. */}
-            <ProfileTopBarIcon name="edit-2" onPress={() => nav('/edit-profile')} accessibilityLabel="Edit profile" testID="profile-banner-edit" />
-            {accountSwitcher}
-          </>
-        )}
+        // No edit pencil: "Edit profile" in the action row is its one home.
+        topLeft={accountSwitcher}
         topRight={(
           <ProfileTopBarIconRow>
             <ProfileTopBarIcon name="bell"
@@ -739,30 +671,6 @@ export default function ProfileScreen() {
         statsLoading={statsInitialLoading}
         actions={(
           <>
-            {/* Instagram's own business-profile shape (mobbin.com/screens/
-                7b7b7c39-39a7-4ba6-bf3a-45c009a4769d, same reference used for
-                the visited /seller-profile route in PR #232): a full-width
-                "Professional dashboard" row above the action row below.
-                Dev's call: drop Share and Contact from the action row
-                entirely (Share stays reachable from the top-bar share
-                icon above) and replace the old three-button row with just
-                Edit (compact, left) + one long Messages button (fills the
-                rest of the row) — the nearest real destination for "how
-                buyers reach me". Go Live and Create Post live in the Studio
-                control center's Sell section (the "+" grid button in the
-                tab bar) — Create Post was already there as "Post video";
-                Go Live is added alongside it. Settings was already
-                duplicated in the top-right gear above. */}
-            <ListRow
-              icon="bar-chart-2"
-              title="Professional dashboard"
-              subtitle="Views, followers and content stats"
-              subtitleNumberOfLines={2}
-              chevron
-              onPress={() => nav('/(tabs)/')}
-              style={s.dashboardRow}
-              testID="profile-dashboard-row"
-            />
             {/* Polish #99 / #86: on your OWN profile the two actions are
                 Edit profile + Share profile, both secondary and equal —
                 Depop's own shop (mobbin.com/screens/2cf32147-3d07-4b1e-
@@ -851,67 +759,17 @@ export default function ProfileScreen() {
         title={brandTitle}
         onClose={() => setMenuOpen(false)}
         items={[
-          { key: 'activity', icon: 'bell', label: hasUnreadActivity ? 'Activity, new' : 'Activity', onPress: () => nav('/seller-activity') },
+          // Only what has no other home on this page: Activity is the bell,
+          // Edit profile / Share profile are the action row, and Share store
+          // lives on the Dashboard and My store.
           // One menu (polish #98): Settings moved here from its own gear icon.
           { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => nav('/settings') },
-          // Was Edit's long-press (the shared Button has no long press).
-          { key: 'quick-edit', icon: 'edit-3', label: 'Edit name and bio', onPress: openProfileEditor },
-          // "Share profile" is the labelled button under the bio — not repeated here.
-          // The store website link (brandthread.app/@handle) — the same Share store sheet as the Dashboard.
-          caps.showShare && { key: 'share-store', icon: 'shopping-bag', label: 'Share store', onPress: () => openShareStoreSheet() },
           caps.showViewAsVisitor && userId && {
             key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
             onPress: () => nav(viewAsVisitorHref('seller', userId)),
           },
         ].filter(Boolean) as ProfileMenuItem[]}
       />
-
-      {/* ── Profile editor sheet ── */}
-      <Sheet
-        visible={profileEditorVisible}
-        onClose={closeProfileEditor}
-        title="Edit brand"
-        testID="profile-edit-sheet"
-        primaryAction={{
-          label: 'Save changes',
-          onPress: () => { void saveProfileDetails(); },
-          loading: savingProfile,
-          disabled: savingProfile,
-          testID: 'profile-edit-save',
-        }}
-      >
-        <Text style={s.inputLabel}>Brand name</Text>
-        <TextInput
-          value={brandNameInput}
-          onChangeText={setBrandNameInput}
-          style={s.textInput}
-          placeholder="Your brand name"
-          placeholderTextColor={MUTED}
-          autoCapitalize="words"
-          autoCorrect={false}
-          maxLength={80}
-          returnKeyType="next"
-          editable={!savingProfile}
-          testID="profile-edit-brand-name"
-        />
-
-        <View style={s.bioLabelRow}>
-          <Text style={s.inputLabel}>Bio</Text>
-          <Text style={s.characterCount}>{bioInput.length}/280</Text>
-        </View>
-        <TextInput
-          value={bioInput}
-          onChangeText={setBioInput}
-          style={[s.textInput, s.bioInput]}
-          placeholder="Tell people about your brand"
-          placeholderTextColor={MUTED}
-          multiline
-          maxLength={280}
-          textAlignVertical="top"
-          editable={!savingProfile}
-          testID="profile-edit-bio"
-        />
-      </Sheet>
 
       <CoverCoachmarkSheet
         visible={coverFlow.coachmarkVisible}
@@ -945,14 +803,6 @@ export default function ProfileScreen() {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  dashboardRow: {
-    backgroundColor: CARD, borderColor: BORDER, borderWidth: 1,
-    borderRadius: RADIUS.md, marginBottom: SP.sm,
-    // ListRow has no side padding of its own (it lives inside padded
-    // cards); this bordered row needs its own, or the icon tile sits on
-    // the border and the rounded corner clips it.
-    paddingHorizontal: SP.md,
-  },
   actionRow: { flexDirection: 'row', gap: SP.sm },
   actionFlex: { flex: 1, minWidth: 0 },
   actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
@@ -963,15 +813,4 @@ const s = StyleSheet.create({
   },
   draftsTileTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.meta, color: MUTED },
-
-  // Profile editor sheet
-  inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
-  bioLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
-  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm, fontVariant: ['tabular-nums'] },
-  textInput: {
-    minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: SURFACE, color: FG, fontFamily: FONT.regular, fontSize: FS.base,
-    paddingHorizontal: SP.md, paddingVertical: 12,
-  },
-  bioInput: { minHeight: 96, maxHeight: 128 },
 });

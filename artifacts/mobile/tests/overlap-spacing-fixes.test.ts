@@ -27,7 +27,7 @@ describe('range pill row', () => {
 });
 
 describe('profile "Professional dashboard" row', () => {
-  it.each(['app/(tabs)/profile.tsx', 'app/seller-profile.tsx'])('%s pads the bordered row so its icon tile clears the rounded edge', (file) => {
+  it.each(['app/seller-profile.tsx'])('%s pads the bordered row so its icon tile clears the rounded edge', (file) => {
     expect(styleBlock(read(file), 'dashboardRow')).toMatch(/paddingHorizontal: SP\.md/);
   });
 });

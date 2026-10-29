@@ -43,7 +43,17 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).toContain("import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar'");
     expect(sellerProfile).toContain('<ProfileAccountSwitcher');
     expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
-    expect(sellerProfile).toContain("key: 'activity', icon: 'bell'");
+    // De-clutter (Dev): every action has one home. Activity is the bell, so
+    // the ••• menu doesn't repeat it; Edit profile / Share profile are the
+    // action row only (no top-bar pencil, no "Edit name and bio" quick
+    // sheet, no "Share store" — that lives on the Dashboard and My store).
+    expect(sellerProfile).not.toContain("key: 'activity'");
+    expect(sellerProfile).not.toContain('name="edit-2"');
+    expect(sellerProfile).not.toContain('profile-banner-edit');
+    expect(sellerProfile).not.toContain("key: 'quick-edit'");
+    expect(sellerProfile).not.toContain('profile-edit-sheet');
+    expect(sellerProfile).not.toContain("key: 'share-store'");
+    expect(sellerProfile).toContain("key: 'view-as-visitor'");
     // Share profile is the labelled button under the bio only — the ••• menu
     // no longer repeats it (audit: "Share profile" was offered twice).
     expect(sellerProfile).not.toContain("key: 'share', icon: 'share-2'");
@@ -58,5 +68,20 @@ describe('seller Profile tab navigation', () => {
     // The old pill-switcher style is gone entirely, not just unused.
     expect(sellerProfile).not.toContain('switcher: {');
     expect(sellerProfile).not.toContain('brandNameTitle: {');
+  });
+
+  it('keeps both own-profile headers to the name switcher + icons: no edit pencil, name one step under FS.md', () => {
+    const topBar = readFileSync(resolve(process.cwd(), 'components/profile/ProfileTopBar.tsx'), 'utf8');
+    // Dev: the switcher name read too big; FS.base is one step under FS.md (17).
+    expect(topBar).toMatch(/switcherText: \{ fontFamily: FONT\.semibold, fontSize: FS\.base,/);
+    // The name stays the account switcher, chevron and all.
+    expect(topBar).toContain('<Icon name="chevron-down"');
+    for (const file of ['app/(tabs)/profile.tsx', 'app/(buyer)/profile.tsx']) {
+      const src = readFileSync(resolve(process.cwd(), file), 'utf8');
+      expect(src).toContain('<ProfileAccountSwitcher');
+      // Edit profile's one home is the labelled button under the bio.
+      expect(src).not.toMatch(/<ProfileTopBarIcon name="edit-[23]"/);
+      expect(src).not.toContain('profile-banner-edit');
+    }
   });
 });
