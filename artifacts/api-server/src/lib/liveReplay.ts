@@ -140,7 +140,7 @@ export async function stopCloudRecordingAndMaybeFinalize(
     logger.error({ err, streamId: stream.id }, "Agora Cloud Recording failed to stop");
     await db.execute(sql`
       UPDATE live_streams SET recording_status = 'failed', recording_error = ${errMessage(err)}
-      WHERE id = ${stream.id}::uuid
+      WHERE id = ${stream.id}::uuid AND recording_status = 'stopping'
     `);
     return { postId: null };
   }
@@ -160,39 +160,53 @@ export async function finalizeReplay(
     .map((t: any) => t.productId)
     .filter(Boolean);
 
-  const postResult = await db.execute(sql`
-    INSERT INTO posts (user_id, media_url, media_type, caption, style_tags)
-    VALUES (
-      ${stream.seller_id},
-      ${replayUrl},
-      'video',
-      ${"🔴 Live replay: " + stream.title + (stream.description ? " — " + stream.description : "")},
-      '["live","replay"]'::json
-    )
-    RETURNING id
-  `);
-  const postId = (postResult.rows[0] as any).id as string;
+  // The /end request (stop response names the file) and the poll job (a
+  // /query while that stop is still running) can both get here for one
+  // stream. Lock the row and reuse an existing replay so exactly one post
+  // is ever created per stream.
+  const { postId, created } = await db.transaction(async (tx) => {
+    const locked = await tx.execute(sql`
+      SELECT replay_post_id FROM live_streams WHERE id = ${stream.id}::uuid FOR UPDATE
+    `);
+    const existing = (locked.rows[0] as any)?.replay_post_id;
+    if (existing) return { postId: String(existing), created: false };
 
-  for (let i = 0; i < productTagIds.length; i++) {
-    try {
-      await db.execute(sql`
-        INSERT INTO post_tagged_products (post_id, product_id, position)
-        VALUES (${postId}::uuid, ${productTagIds[i]}::uuid, ${i})
-        ON CONFLICT DO NOTHING
-      `);
-    } catch {}
-  }
+    const postResult = await tx.execute(sql`
+      INSERT INTO posts (user_id, media_url, media_type, caption, style_tags)
+      VALUES (
+        ${stream.seller_id},
+        ${replayUrl},
+        'video',
+        ${"🔴 Live replay: " + stream.title + (stream.description ? " — " + stream.description : "")},
+        '["live","replay"]'::json
+      )
+      RETURNING id
+    `);
+    const newPostId = (postResult.rows[0] as any).id as string;
 
-  await db.execute(sql`
-    UPDATE live_streams
-    SET replay_url = ${replayUrl},
-        replay_post_id = ${postId}::uuid,
-        recording_status = 'uploaded',
-        recording_error = NULL
-    WHERE id = ${stream.id}::uuid
-  `);
+    for (let i = 0; i < productTagIds.length; i++) {
+      // Savepoint per tag: a stale/deleted product must not abort the replay.
+      await tx.transaction(async (sp) => {
+        await sp.execute(sql`
+          INSERT INTO post_tagged_products (post_id, product_id, position)
+          VALUES (${newPostId}::uuid, ${productTagIds[i]}::uuid, ${i})
+          ON CONFLICT DO NOTHING
+        `);
+      }).catch(() => {});
+    }
 
-  logger.info({ streamId: stream.id, postId }, "Live replay post created from Agora Cloud Recording");
+    await tx.execute(sql`
+      UPDATE live_streams
+      SET replay_url = ${replayUrl},
+          replay_post_id = ${newPostId}::uuid,
+          recording_status = 'uploaded',
+          recording_error = NULL
+      WHERE id = ${stream.id}::uuid
+    `);
+    return { postId: newPostId, created: true };
+  });
+
+  if (created) logger.info({ streamId: stream.id, postId }, "Live replay post created from Agora Cloud Recording");
   return postId;
 }
 
@@ -234,7 +248,7 @@ export async function pollStoppingRecordings(now: Date = new Date()): Promise<vo
       logger.error({ streamId: row.id }, "Agora Cloud Recording upload timed out, giving up");
       await db.execute(sql`
         UPDATE live_streams SET recording_status = 'failed', recording_error = 'Upload confirmation timed out'
-        WHERE id = ${row.id}::uuid
+        WHERE id = ${row.id}::uuid AND recording_status = 'stopping'
       `);
     }
   }

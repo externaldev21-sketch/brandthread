@@ -127,11 +127,25 @@ const VARIANT_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 function stripeStub(paymentMethod: Record<string, unknown> | null = { id: "pm_1", type: "card", customer: "cus_buyer", card: { brand: "visa", last4: "4242" } }) {
   const created: any[] = [];
+  // Whether the checkout row carried the intent id at the moment the payment
+  // succeeded (when Stripe fires payment_intent.succeeded at the webhook).
+  const linkedAtSuccess: boolean[] = [];
+  const succeed = (id: string, amount: number) => {
+    linkedAtSuccess.push((state.tables.checkout_sessions ?? []).some((r) => r.stripePaymentIntentId === id));
+    return { id, status: "succeeded", client_secret: "secret", amount };
+  };
   return {
     created,
+    linkedAtSuccess,
     paymentIntents: {
       retrieve: vi.fn(async () => ({ id: "pi_original", payment_method: paymentMethod })),
-      create: vi.fn(async (params: any) => { created.push(params); return { id: "pi_upsell", status: "succeeded", client_secret: "secret", amount: params.amount }; }),
+      create: vi.fn(async (params: any) => {
+        created.push(params);
+        return params.confirm
+          ? succeed("pi_upsell", params.amount)
+          : { id: "pi_upsell", status: "requires_confirmation", client_secret: "secret", amount: params.amount };
+      }),
+      confirm: vi.fn(async (id: string) => succeed(id, created.at(-1)?.amount)),
       cancel: vi.fn(async () => ({})),
     },
     tax: {},
@@ -236,9 +250,10 @@ describe("acceptOffer", () => {
     // $60.00 − 20% = $48.00, no shipping, 10% tax = $4.80.
     expect(result).toMatchObject({ paymentIntentId: "pi_upsell", status: "succeeded", amountCents: 5_280, subtotalCents: 6_000, discountCents: 1_200, taxCents: 480, clientSecret: null });
     expect(stripe.created[0]).toMatchObject({
-      amount: 5_280, currency: "usd", customer: "cus_buyer", payment_method: "pm_1", confirm: true,
+      amount: 5_280, currency: "usd", customer: "cus_buyer", payment_method: "pm_1",
       metadata: { kind: "cart_checkout", upsellOfOrderId: ORDER_ID },
     });
+    expect(stripe.paymentIntents.confirm).toHaveBeenCalledWith("pi_upsell", expect.objectContaining({ payment_method: "pm_1" }), expect.anything());
     const row = state.tables.checkout_sessions[0];
     expect(row).toMatchObject({
       upsellOfOrderId: ORDER_ID, chargeModel: "transfer", shippingCents: 0, amountTotalCents: 5_280,
@@ -262,13 +277,29 @@ describe("acceptOffer", () => {
     await expect(acceptOffer(stripeStub(), { buyerId: "buyer_1", orderId: ORDER_ID, variantId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", clientIdempotencyKey: "key-12345678" }))
       .rejects.toMatchObject({ code: "INVALID_VARIANT" });
     const stripe = stripeStub();
-    stripe.paymentIntents.create.mockRejectedValueOnce(Object.assign(new Error("Your card was declined."), {
+    stripe.paymentIntents.confirm.mockRejectedValueOnce(Object.assign(new Error("Your card was declined."), {
       type: "StripeCardError", code: "card_declined", decline_code: "insufficient_funds", raw: { payment_intent: { id: "pi_failed" } },
     }));
     await expect(acceptOffer(stripe, { buyerId: "buyer_1", orderId: ORDER_ID, variantId: VARIANT_ID, clientIdempotencyKey: "key-12345678" }))
       .rejects.toMatchObject({ status: 402, code: "insufficient_funds" });
-    expect(stripe.paymentIntents.cancel).toHaveBeenCalledWith("pi_failed");
+    expect(stripe.paymentIntents.cancel).toHaveBeenCalledWith("pi_upsell");
     expect(state.released).toHaveLength(1);
     expect(state.tables.checkout_sessions).toHaveLength(0);
+  });
+
+  it("links the checkout row to the intent before the charge can succeed (the webhook finds the row by intent id)", async () => {
+    const stripe = stripeStub();
+    await acceptOffer(stripe, { buyerId: "buyer_1", orderId: ORDER_ID, variantId: VARIANT_ID, clientIdempotencyKey: "key-12345678" });
+    expect(stripe.linkedAtSuccess).toEqual([true]);
+  });
+
+  it("keeps the linked row when a confirm error leaves an intent it can't cancel (it may have been charged)", async () => {
+    const stripe = stripeStub();
+    stripe.paymentIntents.confirm.mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { type: "StripeConnectionError" }));
+    stripe.paymentIntents.cancel.mockRejectedValueOnce(new Error("This PaymentIntent has already succeeded"));
+    await expect(acceptOffer(stripe, { buyerId: "buyer_1", orderId: ORDER_ID, variantId: VARIANT_ID, clientIdempotencyKey: "key-12345678" }))
+      .rejects.toMatchObject({ status: 502 });
+    expect(state.released).toHaveLength(0);
+    expect(state.tables.checkout_sessions).toMatchObject([{ stripePaymentIntentId: "pi_upsell" }]);
   });
 });

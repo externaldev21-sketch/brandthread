@@ -25,6 +25,7 @@ import { formatMoney, manufacturerNetCents } from "@workspace/manufacturer-flow"
 import { requireStripe } from "../stripe";
 import { postLedgerTransaction, type LedgerPosting } from "../money/ledger";
 import { disputeFeeCents, mapDisputeStatus } from "../disputes/webhook";
+import { isFinalDisputeStatus } from "../disputes/evidence";
 import { logger } from "../logger";
 
 /** When true the payee's reversal also covers Stripe's dispute fee. Default: Brandthread absorbs the fee. */
@@ -165,10 +166,12 @@ export async function processB2bDisputeEvent(event: StripeEventLike, notify: Not
     customerClaim: `B2B ${target.kind === "sample_order" ? "order card" : "freelancer job"} dispute: ${d.reason ?? "unknown reason"}`,
   }).onConflictDoNothing({ target: disputes.stripeDisputeId });
   const [dispute] = await db.select().from(disputes).where(eq(disputes.stripeDisputeId, d.id)).limit(1);
-  const finalStatus = ["won", "lost", "warning_closed", "charge_refunded"].includes(dispute.status);
+  // Statuses are stored mapped (warning_closed / charge_refunded → "closed"),
+  // so finality is checked on the mapped values: a late open-status event
+  // never reopens a closed dispute.
   await db.update(disputes).set({
     ...ids,
-    ...(finalStatus && !["won", "lost", "warning_closed", "charge_refunded"].includes(status) ? {} : { status }),
+    ...(isFinalDisputeStatus(dispute.status) && !isFinalDisputeStatus(status) ? {} : { status }),
     updatedAt: new Date(),
   }).where(eq(disputes.id, dispute.id));
   const fee = disputeFeeCents(d) ?? 0;

@@ -82,6 +82,10 @@ export function removeBackground(image: Buffer): Promise<CutoutResult> {
     const timer = setTimeout(() => {
       pending.delete(id);
       reject(new Error("Background removal timed out"));
+      // The idle timer was cleared when this request started; without this a
+      // timed-out last request would keep the warm worker (and its model
+      // memory) alive forever.
+      scheduleIdle();
     }, TIMEOUT_MS);
     pending.set(id, { resolve, reject, timer });
     if (idleTimer) clearTimeout(idleTimer);

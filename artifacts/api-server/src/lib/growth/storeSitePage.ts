@@ -105,7 +105,7 @@ var body={items:[{productId:f.getAttribute('data-product'),variantId:v('variant'
 successUrl:done+'?session_id={CHECKOUT_SESSION_ID}',cancelUrl:location.href,contactEmail:v('email'),contactPhone:v('phone'),
 shippingAddress:{name:v('name'),street:v('street'),line2:v('line2')||null,city:v('city'),state:v('state'),zip:v('zip'),country:v('country'),phone:v('phone')},
 clientIdempotencyKey:'site_'+key(),
-attribution:{source:q.get('utm_source')||'brandthread_site',medium:q.get('utm_medium')||'link_in_bio',campaign:q.get('utm_campaign')||undefined,code:q.get('l')||undefined}};
+attribution:{source:q.get('utm_source')||'brandthread_site',medium:q.get('utm_medium')||'link_in_bio',campaign:q.get('utm_campaign')||undefined,code:q.get('bt_lc')||q.get('l')||undefined}};
 if(pk)body.uiMode='embedded';
 fetch('/api/guest/checkout/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
 .then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,j:j}})})

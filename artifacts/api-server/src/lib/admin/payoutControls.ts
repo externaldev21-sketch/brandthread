@@ -173,6 +173,13 @@ export async function releasePayouts(input: {
       ? restoreScheduleParams(row.previousSchedule ?? null)
       : { delay_days: "minimum" as const };
     if (row.state === "held" && row.previousSchedule == null) schedule.delay_days = "minimum";
+    // Held during the new-account window but released after it ended: the
+    // snapshot still carries the new-account delay, and a released row is never
+    // stepped down by the payout-review job, so restore Stripe's minimum instead.
+    if (row.state === "held" && row.delayDays != null && schedule.delay_days === row.delayDays
+      && (row.delayUntil == null || row.delayUntil <= now)) {
+      schedule.delay_days = "minimum";
+    }
     await client.accounts.update(acct, { settings: { payouts: { schedule } } });
     const stillInNewWindow = row.state === "held" && typeof schedule.delay_days === "number"
       && row.delayUntil != null && row.delayUntil > now && row.delayDays != null;

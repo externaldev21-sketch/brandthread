@@ -273,7 +273,9 @@ export async function reserveForCheckout(exec: Exec, input: {
 async function redeemStates(exec: Exec, checkoutSessionId: string): Promise<Array<{ redeem: GiftCardTxRow; settled: GiftCardTxRow | null; released: GiftCardTxRow | null }>> {
   const all = await exec.select().from(giftCardTransactions)
     .where(and(eq(giftCardTransactions.checkoutSessionId, checkoutSessionId), inArray(giftCardTransactions.type, ["redeem", "settle", "release"])));
-  return all.filter((row) => row.type === "redeem").map((redeem) => ({
+  // One state per card: a `redeem-late/` row re-takes the same reservation
+  // (settleForCheckout) and must not count as a second one.
+  return all.filter((row) => row.type === "redeem" && !row.idempotencyKey.startsWith("redeem-late/")).map((redeem) => ({
     redeem,
     settled: all.find((r) => r.type === "settle" && r.giftCardId === redeem.giftCardId) ?? null,
     released: all.find((r) => r.type === "release" && r.giftCardId === redeem.giftCardId) ?? null,
@@ -364,12 +366,15 @@ export async function settledRedemptions(exec: Exec, orderId: string): Promise<A
     .where(and(eq(giftCardTransactions.orderId, orderId), eq(giftCardTransactions.type, "settle")));
   const out: Array<{ cardId: string; checkoutSessionId: string; amountCents: number }> = [];
   for (const settle of settles) {
-    const redeems = await exec.select().from(giftCardTransactions).where(and(
+    // Net of releases: a hold released before a late payment, then re-taken
+    // (settleForCheckout's `redeem-late`), is redeem − release + redeem =
+    // one amount, and a re-take the card couldn't cover nets to nothing.
+    const moves = await exec.select().from(giftCardTransactions).where(and(
       eq(giftCardTransactions.checkoutSessionId, settle.checkoutSessionId!),
       eq(giftCardTransactions.giftCardId, settle.giftCardId),
-      eq(giftCardTransactions.type, "redeem"),
+      inArray(giftCardTransactions.type, ["redeem", "release"]),
     ));
-    const amount = -redeems.reduce((sum, r) => sum + r.amountCents, 0);
+    const amount = -moves.reduce((sum, r) => sum + r.amountCents, 0);
     if (amount > 0) out.push({ cardId: settle.giftCardId, checkoutSessionId: settle.checkoutSessionId!, amountCents: amount });
   }
   return out;

@@ -38,7 +38,7 @@ vi.mock("@workspace/db", async () => {
       select: () => selectChain(actual.metaCampaigns),
       update: (table: any) => ({
         set: (values: Record<string, unknown>) => ({
-          where: async () => {
+          where: () => {
             state.updates.push(values);
             // Keep the in-memory campaign row in sync so subsequent reads in
             // the same launch (there are none today, but keeps this robust)
@@ -46,7 +46,11 @@ vi.mock("@workspace/db", async () => {
             if (table === actual.metaCampaigns && state.campaignRow) {
               state.campaignRow = { ...state.campaignRow, ...values };
             }
-            return undefined;
+            // `.returning()` answers the launch claim (conditions are not
+            // evaluated here; metaAdsLaunch.audit.test.ts covers them).
+            return Object.assign(Promise.resolve(undefined), {
+              returning: async () => (state.campaignRow ? [{ id: state.campaignRow.id }] : []),
+            });
           },
         }),
       }),

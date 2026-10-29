@@ -206,15 +206,15 @@ export async function sellerRefundChargebackRates(w: Window, limit = 100): Promi
   const result = await rows<Row>(sql`
     SELECT o.owner_id AS clerk_id,
            COALESCE(NULLIF(u.brand_name, ''), NULLIF(u.display_name, ''), u.name) AS name, u.username,
-           count(*) AS orders,
-           count(*) FILTER (WHERE o.refunded_cents > 0) AS refunded,
+           count(DISTINCT o.id) AS orders,
+           count(DISTINCT o.id) FILTER (WHERE o.refunded_cents > 0) AS refunded,
            count(DISTINCT d.id) AS chargebacks
     FROM orders o
     LEFT JOIN users u ON u.clerk_id = o.owner_id
     LEFT JOIN disputes d ON d.order_id = o.id
     WHERE ${SALE} AND o.paid_at >= ${w.from} AND o.paid_at < ${w.to}
     GROUP BY o.owner_id, u.brand_name, u.display_name, u.name, u.username
-    HAVING count(*) FILTER (WHERE o.refunded_cents > 0) > 0 OR count(DISTINCT d.id) > 0`);
+    HAVING count(DISTINCT o.id) FILTER (WHERE o.refunded_cents > 0) > 0 OR count(DISTINCT d.id) > 0`);
   return result
     .map((r) => {
       const orders = n(r.orders), refundedOrders = n(r.refunded), chargebacks = n(r.chargebacks);

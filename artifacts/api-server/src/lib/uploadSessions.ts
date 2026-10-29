@@ -229,6 +229,13 @@ export async function sweepOwnerSessions(
       live += 1;
       continue;
     }
+    // The meta object is listed but could not be read (readMeta swallows
+    // transient storage errors): this is not an orphan, so never delete a
+    // possibly live session on a failed read. Count it as live.
+    if (!meta && paths.includes(sessionMetaPath(owner, id))) {
+      live += 1;
+      continue;
+    }
     // Expired, or parts left behind without a meta object (an abandoned
     // discard): remove exactly what is listed.
     await Promise.all(paths.map((p) => storage.deleteObjectEntity(p).catch(() => {})));

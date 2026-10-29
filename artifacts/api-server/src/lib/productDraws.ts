@@ -379,6 +379,13 @@ async function chargeWinner(stripe: Pick<Stripe, "paymentIntents">, entry: Entry
     await stripe.paymentIntents.capture(intentId, {}, { idempotencyKey: `draw-capture/${entry.id}` });
     return { ok: true };
   } catch (err: any) {
+    // A timeout / 5xx can hide a capture that went through: never release a
+    // charged winner's unit and checkout row (the webhook needs the row).
+    const current = await stripe.paymentIntents.retrieve(intentId).catch(() => null);
+    if (current?.status === "succeeded") {
+      logger.warn({ err, entryId: entry.id, paymentIntentId: intentId }, "Draw capture errored but the payment was captured");
+      return { ok: true };
+    }
     logger.warn({ err, entryId: entry.id, paymentIntentId: intentId }, "Draw capture failed");
     await db.transaction(async (tx) => {
       await releaseStockReservation(tx, sessionId);

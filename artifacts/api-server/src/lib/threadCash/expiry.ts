@@ -7,7 +7,7 @@
  * thread_cash_entries(idempotency_key) allows exactly once, so the job, the
  * lazy check at redemption, and a crashed/retried run can overlap freely.
  */
-import { and, eq, gt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, lte, ne, sql, type SQL } from "drizzle-orm";
 import { db, threadCashEntries, threadCashExpiryWarnings } from "@workspace/db";
 import { logger } from "../logger";
 import {
@@ -99,19 +99,33 @@ export async function getExpirySummary(buyerId: string, now = new Date()): Promi
 const DAY_MS = 86_400_000;
 const BATCH = 500;
 
-async function candidateBuyers(from: Date | null, to: Date): Promise<string[]> {
-  const conditions = [
-    gt(threadCashEntries.amountCents, 0),
-    // Paid funds never expire; every promo credit (incl. a promo Live gift) does.
-    ne(threadCashEntries.funding, "paid"),
-    lte(threadCashEntries.createdAt, to),
-    ...(from ? [gt(threadCashEntries.createdAt, from)] : []),
-  ];
-  const rows = await db.selectDistinct({ buyerId: threadCashEntries.buyerId })
-    .from(threadCashEntries)
-    .where(and(...conditions))
-    .limit(BATCH);
-  return rows.map((r) => r.buyerId);
+/**
+ * Every buyer holding a non-paid credit earned in (from, to], read in pages
+ * of BATCH by buyer id. A buyer whose old credit is already spent or expired
+ * still matches, so a single LIMIT without paging would return the same
+ * first BATCH buyers on every run and never reach anyone after them.
+ */
+export async function candidateBuyers(from: Date | null, to: Date, batch = BATCH): Promise<string[]> {
+  const out: string[] = [];
+  let after: string | null = null;
+  for (;;) {
+    const conditions: SQL[] = [
+      gt(threadCashEntries.amountCents, 0),
+      // Paid funds never expire; every promo credit (incl. a promo Live gift) does.
+      ne(threadCashEntries.funding, "paid"),
+      lte(threadCashEntries.createdAt, to),
+      ...(from ? [gt(threadCashEntries.createdAt, from)] : []),
+      ...(after !== null ? [gt(threadCashEntries.buyerId, after)] : []),
+    ];
+    const rows: Array<{ buyerId: string }> = await db.selectDistinct({ buyerId: threadCashEntries.buyerId })
+      .from(threadCashEntries)
+      .where(and(...conditions))
+      .orderBy(asc(threadCashEntries.buyerId))
+      .limit(batch);
+    out.push(...rows.map((r) => r.buyerId));
+    if (rows.length < batch) return out;
+    after = rows[rows.length - 1].buyerId;
+  }
 }
 
 export type ThreadCashExpiryRun = { buyersExpired: number; expiredCents: number; warned: number };

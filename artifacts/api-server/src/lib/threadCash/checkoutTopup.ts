@@ -125,7 +125,7 @@ export async function sweepThreadCashSellerTopups(
     AND ${orders.status} NOT IN ('cancelled', 'refunded', 'refund_pending')
     AND ${orders.paidAt} >= ${since}
     AND (${orders.chargeModel} = 'destination'
-      OR (${orders.chargeModel} = 'transfer' AND ${orders.fundsState} = 'released'))
+      OR (${orders.chargeModel} IN ('transfer', 'held') AND ${orders.fundsState} = 'released'))
   `).limit(options.limit ?? 100);
   for (const { id } of due) await applyThreadCashSellerTopup(stripeClient, id);
   return due.length;

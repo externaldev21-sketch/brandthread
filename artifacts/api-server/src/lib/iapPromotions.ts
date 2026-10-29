@@ -113,6 +113,8 @@ export interface PromoStore {
   claimCredit(appUserId: string, kind: PromoKind, amountCents: number, targetId: string, at: Date): Promise<string | null>;
   /** Returns a reserved or granted purchase to the unspent pool (target never ran). */
   releaseCredit(transactionId: string): Promise<void>;
+  /** Transaction id of a purchase already granted to (funding) this target, or null. */
+  grantedPurchaseFor?(kind: PromoKind, targetId: string): Promise<string | null>;
 }
 
 export type GrantResult =
@@ -163,6 +165,14 @@ export async function grantPromotionPurchase(
 
   const result = await store.activate(parsed.kind, target.id, now);
   if (result === "ineligible") return { status: "ineligible", kind: parsed.kind, targetId: target.id };
+  if (result === "already_active" && store.grantedPurchaseFor) {
+    // Another store purchase already paid for this target: this charge must stay
+    // unspent credit, not be marked as delivered to a promotion it never funded.
+    const holder = await store.grantedPurchaseFor(parsed.kind, target.id);
+    if (holder && holder !== input.transactionId) {
+      return { status: "ineligible", kind: parsed.kind, targetId: target.id };
+    }
+  }
   await store.markGranted(input.transactionId, target.id, now);
   return { status: "granted", kind: parsed.kind, targetId: target.id };
 }

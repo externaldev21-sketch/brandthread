@@ -1,7 +1,10 @@
 /**
  * Write-side helpers that turn product actions (likes, saves, comments, hides,
- * purchases) into taste-profile updates. All are fire-and-forget safe: they
- * never throw, so a ranking failure cannot fail the user's action.
+ * purchases) into taste-profile updates. recordPostSignal and
+ * recordPurchaseSignals are fire-and-forget safe: they never throw, so a
+ * ranking failure cannot fail the user's action. hidePostFromForYou and
+ * unhidePostFromForYou DO throw on a database error (the hide is the user's
+ * action itself), so callers must await and handle them.
  */
 import {
   db, posts, feedNotInterested, forYouFeedCache, interactions, postTaggedProducts, productVariants,

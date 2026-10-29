@@ -322,8 +322,9 @@ export async function acceptOffer(
       continue;
     }
     const intent = await stripe.paymentIntents.retrieve(prior.stripePaymentIntentId);
-    if (intent.status === "canceled" || intent.status === "requires_payment_method") {
-      if (intent.status === "requires_payment_method") await stripe.paymentIntents.cancel(intent.id).catch(() => undefined);
+    // requires_confirmation: an attempt that stopped between create and confirm.
+    if (intent.status === "canceled" || intent.status === "requires_payment_method" || intent.status === "requires_confirmation") {
+      if (intent.status !== "canceled") await stripe.paymentIntents.cancel(intent.id).catch(() => undefined);
       await clearAttempt(prior.id);
       continue;
     }
@@ -410,6 +411,10 @@ export async function acceptOffer(
 
   const undo = () => clearAttempt(row.id);
 
+  // Created unconfirmed, linked to the checkout row, THEN confirmed: a
+  // confirm-on-create could succeed and fire payment_intent.succeeded before
+  // the row carried the intent id, and the webhook (which finds the row by
+  // stripePaymentIntentId) would drop a paid charge without making the order.
   let intent: Stripe.PaymentIntent;
   try {
     intent = await stripe.paymentIntents.create({
@@ -418,9 +423,6 @@ export async function acceptOffer(
       customer: check.stripeCustomerId,
       payment_method: check.paymentMethod.id,
       payment_method_types: ["card"],
-      confirm: true,
-      // The buyer is here and tapped "Add to order"; the app finishes 3DS if asked.
-      use_stripe_sdk: true,
       shipping: {
         name: shipping.name || "Customer",
         address: {
@@ -436,25 +438,50 @@ export async function acceptOffer(
       },
     }, { idempotencyKey: `post-purchase-pi/${input.buyerId}/${key}` });
   } catch (error: any) {
-    // A declined card throws, leaving an unpaid intent behind: close it.
-    const failedIntent = error?.raw?.payment_intent ?? error?.payment_intent;
-    if (failedIntent?.id) await stripe.paymentIntents.cancel(failedIntent.id).catch(() => undefined);
     await undo().catch((err) => logger.error({ err }, "Could not undo a post-purchase offer whose payment failed"));
-    if (error?.type === "StripeCardError") {
-      throw new PostPurchaseError(402, error.decline_code ?? error.code ?? "card_declined", error.message ?? "Your card was declined.");
-    }
     logger.error({ err: error }, "Post-purchase PaymentIntent failed");
     throw new PostPurchaseError(502, "PAYMENT_START_FAILED", "We couldn't add this to your order. You haven't been charged.");
   }
 
-  await db.transaction(async (tx) => {
-    await tx.update(checkoutSessions).set({
-      stripePaymentIntentId: intent.id,
-      stripeSessionId: `${intent.id}:${row.id}`,
-    }).where(eq(checkoutSessions.id, row.id));
-    await tx.update(stockReservations).set({ stripePaymentIntentId: intent.id })
-      .where(inArray(stockReservations.checkoutSessionId, [row.id]));
-  });
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(checkoutSessions).set({
+        stripePaymentIntentId: intent.id,
+        stripeSessionId: `${intent.id}:${row.id}`,
+      }).where(eq(checkoutSessions.id, row.id));
+      await tx.update(stockReservations).set({ stripePaymentIntentId: intent.id })
+        .where(inArray(stockReservations.checkoutSessionId, [row.id]));
+    });
+  } catch (error) {
+    // Nothing was charged yet: close the unconfirmed intent and give the unit back.
+    await stripe.paymentIntents.cancel(intent.id).catch(() => undefined);
+    await undo().catch((err) => logger.error({ err }, "Could not undo a post-purchase offer that could not be linked"));
+    logger.error({ err: error }, "Post-purchase checkout could not be linked to its PaymentIntent");
+    throw new PostPurchaseError(502, "PAYMENT_START_FAILED", "We couldn't add this to your order. You haven't been charged.");
+  }
+
+  try {
+    intent = await stripe.paymentIntents.confirm(intent.id, {
+      payment_method: check.paymentMethod.id,
+      // The buyer is here and tapped "Add to order"; the app finishes 3DS if asked.
+      use_stripe_sdk: true,
+    }, { idempotencyKey: `post-purchase-confirm/${input.buyerId}/${key}` });
+  } catch (error: any) {
+    // A declined card throws, leaving an unpaid intent behind: close it. Only
+    // a cancelled intent is undone; one that can't be cancelled may have been
+    // charged, so its linked row stays for the webhook / the next tap.
+    const cancelled = await stripe.paymentIntents.cancel(intent.id).then(() => true, () => false);
+    if (cancelled) {
+      await undo().catch((err) => logger.error({ err }, "Could not undo a post-purchase offer whose payment failed"));
+    }
+    if (error?.type === "StripeCardError") {
+      throw new PostPurchaseError(402, error.decline_code ?? error.code ?? "card_declined", error.message ?? "Your card was declined.");
+    }
+    logger.error({ err: error, paymentIntentId: intent.id, cancelled }, "Post-purchase PaymentIntent confirmation failed");
+    throw new PostPurchaseError(502, "PAYMENT_START_FAILED", cancelled
+      ? "We couldn't add this to your order. You haven't been charged."
+      : "We couldn't confirm this payment. Check your order before trying again.");
+  }
 
   return {
     paymentIntentId: intent.id,

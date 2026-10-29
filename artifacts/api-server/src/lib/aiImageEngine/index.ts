@@ -29,7 +29,7 @@ import {
   type ImageOperation,
 } from "@workspace/integrations-openai-ai-server/image";
 import { isOpenAiConfigured } from "@workspace/integrations-openai-ai-server/config";
-import type { AiTool } from "../aiImageProviders/config";
+import { isProviderId, type AiTool } from "../aiImageProviders/config";
 import { resolveToolGenerator } from "../aiImageProviders/routing";
 import { generateWithGemini, resolveGeminiConfig, type GeminiPart } from "./gemini";
 import {
@@ -63,7 +63,9 @@ const TASK_TOOL: Record<EngineTask, AiTool> = { mockup_to_model: "mockup-to-mode
 
 export function activeImageProvider(task: EngineTask, env: Record<string, string | undefined> = process.env): EngineProvider | null {
   const override = env[`AI_IMAGE_${TASK_TOOL[task].toUpperCase().replace(/-/g, "_")}_PROVIDER`];
-  if (override && override !== "openai") return "env-override";
+  // Only a provider id config.ts recognises: an unknown value (a typo) is ignored there too, and
+  // treating it as an override would leave generateShot with no generator to call.
+  if (isProviderId(override) && override !== "openai") return "env-override";
   if (resolveGeminiConfig(env)) return "gemini";
   if (isOpenAiConfigured(env)) return "openai";
   return null;

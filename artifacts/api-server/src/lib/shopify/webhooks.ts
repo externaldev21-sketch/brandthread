@@ -5,7 +5,7 @@
  *
  * Idempotent: lists the shop's existing subscriptions and only creates the
  * missing ones. Webhooks created this way are signed with the app's
- * SHOPIFY_API_SECRET, which is what verifyWebhookHmac checks — so this only
+ * SHOPIFY_APP_API_SECRET, which is what verifyWebhookHmac checks — so this only
  * applies to OAuth connections. A merchant custom-app token signs with that
  * custom app's own secret, which the server does not hold.
  */

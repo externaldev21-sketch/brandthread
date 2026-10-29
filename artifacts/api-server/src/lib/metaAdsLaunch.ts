@@ -10,9 +10,11 @@
  * Meta. The DB row's unique `idempotencyKey` plus this resume behavior are
  * what make a retried "Launch" tap safe, since metaGraph.ts itself
  * deliberately does not retry create calls (see its withRetry usage note).
+ * Concurrent launches of one campaign are refused by a conditional
+ * status='launching' claim (LAUNCH_LEASE_MS) taken before the first call.
  */
 import { db, metaAdAccounts, metaCampaigns } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, lt, ne, or } from "drizzle-orm";
 import {
   MetaGraphError,
   createAd,
@@ -77,12 +79,34 @@ async function patchCampaign(campaignId: string, values: Partial<MetaCampaignRow
     .where(eq(metaCampaigns.id, campaignId));
 }
 
+/**
+ * How long a launch holds the campaign. Each step bumps updatedAt, so only a
+ * launch that died mid-chain (crash, deploy) goes stale and can be resumed.
+ */
+export const LAUNCH_LEASE_MS = 10 * 60 * 1000;
+
 export async function launchCampaign(
   campaignId: string,
 ): Promise<{ status: "in_review" | "failed"; metaAdId?: string; rejectionReason?: string }> {
   const [campaign] = await db.select().from(metaCampaigns).where(eq(metaCampaigns.id, campaignId)).limit(1);
   if (!campaign) {
     throw new LaunchError("Campaign not found.");
+  }
+
+  // Resume-by-id only protects sequential retries. Two launches running at
+  // once (a double tap, or a client retry while the first is still talking
+  // to Meta) would both see no metaCampaignId and each build — and switch on
+  // — a full campaign that spends the budget. Claim the row first.
+  const claimed = await db
+    .update(metaCampaigns)
+    .set({ status: "launching", updatedAt: new Date() })
+    .where(and(
+      eq(metaCampaigns.id, campaignId),
+      or(ne(metaCampaigns.status, "launching"), lt(metaCampaigns.updatedAt, new Date(Date.now() - LAUNCH_LEASE_MS))),
+    ))
+    .returning({ id: metaCampaigns.id });
+  if (claimed.length === 0) {
+    throw new LaunchError("This campaign is already launching. Give it a minute, then check its status.");
   }
 
   const [account] = await db

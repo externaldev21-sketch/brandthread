@@ -94,6 +94,26 @@ export function parsePreview(html: string, pageUrl: URL): LinkPreview | null {
 
 type Hop = { status: number; location?: string; contentType: string; body: string };
 
+type LookupCallback = (
+  err: Error | null,
+  address: string | Array<{ address: string; family: number }>,
+  family?: number,
+) => void;
+
+/**
+ * A `lookup` for http(s).request that always answers with the pre-checked
+ * address. Node's net layer (autoSelectFamily, on by default since Node 20)
+ * calls lookup with `{ all: true }` and then expects an array of records;
+ * answering with a bare address there fails every request with
+ * "Invalid IP address: undefined".
+ */
+export function pinnedLookup(pinned: { address: string; family: number }) {
+  return (_host: string, options: unknown, cb: LookupCallback): void => {
+    if ((options as { all?: boolean } | null)?.all) cb(null, [{ address: pinned.address, family: pinned.family }]);
+    else cb(null, pinned.address, pinned.family);
+  };
+}
+
 async function fetchPinned(url: URL): Promise<Hop> {
   const host = url.hostname.replace(/^\[|\]$/g, "");
   const records = net.isIP(host) ? [{ address: host, family: net.isIP(host) }] : await dns.lookup(host, { all: true });
@@ -108,8 +128,7 @@ async function fetchPinned(url: URL): Promise<Hop> {
         "User-Agent": "Mozilla/5.0 (compatible; BrandthreadLinkPreview/1.0)",
       },
       timeout: TIMEOUT_MS,
-      lookup: (_h: string, _o: unknown, cb: (err: Error | null, address: string, family: number) => void) =>
-        cb(null, pinned.address, pinned.family),
+      lookup: pinnedLookup(pinned),
     } as https.RequestOptions, (res) => {
       const status = res.statusCode ?? 0;
       const contentType = String(res.headers["content-type"] ?? "");

@@ -378,18 +378,21 @@ export async function refundDebit(entryId: string, opts: { units?: number } = {}
     // A partial refund goes back in reverse spend order: purchased, monthly, rollover.
     let left = amount;
     const purchased = Math.min(-debit.purchased_delta, left); left -= purchased;
-    const monthly = Math.min(-debit.monthly_delta, left); left -= monthly;
-    const rollover = Math.min(-debit.rollover_delta, left);
+    let monthly = Math.min(-debit.monthly_delta, left); left -= monthly;
+    let rollover = Math.min(-debit.rollover_delta, left);
 
-    const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key, rollover_delta, monthly_delta, purchased_delta, meta)
-      VALUES (${debit.clerk_user_id}, 'refund', ${amount}, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`}, ${rollover}, ${monthly}, ${purchased}, ${JSON.stringify({ units: refundUnits })}::jsonb)
-      ON CONFLICT DO NOTHING RETURNING id`);
-    if (inserted.rows.length === 0) return false;
     // Monthly / rollover credits from a past period have expired; only same-period refunds go back to them.
+    // The refund row records what was actually credited, so the ledger keeps adding up to the balance.
     const acct = await tx.execute(sql`SELECT monthly_period FROM ai_credit_accounts WHERE clerk_user_id = ${debit.clerk_user_id} FOR UPDATE`);
     const samePeriod = (acct.rows[0] as { monthly_period: string } | undefined)?.monthly_period === day.slice(0, 7);
-    await tx.execute(sql`UPDATE ai_credit_accounts SET rollover_balance = rollover_balance + ${samePeriod ? rollover : 0},
-      monthly_balance = monthly_balance + ${samePeriod ? monthly : 0}, purchased_balance = purchased_balance + ${purchased},
+    if (!samePeriod) { monthly = 0; rollover = 0; }
+
+    const inserted = await tx.execute(sql`INSERT INTO ai_credit_ledger (clerk_user_id, kind, delta, tool_key, reference, idempotency_key, rollover_delta, monthly_delta, purchased_delta, meta)
+      VALUES (${debit.clerk_user_id}, 'refund', ${purchased + monthly + rollover}, ${debit.tool_key}, ${entryId}, ${`refund:${entryId}`}, ${rollover}, ${monthly}, ${purchased}, ${JSON.stringify({ units: refundUnits, amount })}::jsonb)
+      ON CONFLICT DO NOTHING RETURNING id`);
+    if (inserted.rows.length === 0) return false;
+    await tx.execute(sql`UPDATE ai_credit_accounts SET rollover_balance = rollover_balance + ${rollover},
+      monthly_balance = monthly_balance + ${monthly}, purchased_balance = purchased_balance + ${purchased},
       updated_at = NOW() WHERE clerk_user_id = ${debit.clerk_user_id}`);
     await tx.execute(sql`UPDATE ai_spend_daily SET spent = GREATEST(0, spent - ${refundUnits})
       WHERE day = ${day} AND clerk_user_id = ${generationCounterKey(debit.clerk_user_id)}`);
@@ -436,20 +439,33 @@ export type LedgerEntry = {
   id: string; kind: string; delta: number; toolKey: string | null; balanceAfter: number; createdAt: string;
 };
 
-/** Newest first. A 'rollover' row reports the credits carried over (its net effect on the total is zero). Usage and metered rows are never listed. */
+const CURSOR_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z)\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
+ * Newest first. A 'rollover' row reports the credits carried over (its net effect on the total is zero). Usage and metered rows are never listed.
+ * The cursor is "<created_at to the microsecond>|<id>", matching the (created_at, id) sort: rows written in one
+ * transaction share created_at, so a timestamp-only cursor skipped the rest of such a group. A plain ISO timestamp
+ * (cursor from an older build) is still accepted.
+ */
 export async function listHistory(clerkUserId: string, opts: { limit?: number; before?: string } = {}): Promise<{ entries: LedgerEntry[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
-  const before = opts.before && !Number.isNaN(Date.parse(opts.before)) ? opts.before : null;
-  const res = await db.execute(sql`SELECT id, kind, CASE WHEN kind = 'rollover' THEN rollover_delta ELSE delta END AS delta, tool_key, balance_after, created_at FROM ai_credit_ledger
-    WHERE clerk_user_id = ${clerkUserId} AND kind NOT IN ('usage', 'usage_refund', 'metered', 'metered_refund') ${before ? sql`AND created_at < ${before}` : sql``}
+  const keyset = opts.before ? CURSOR_RE.exec(opts.before) : null;
+  const before = !keyset && opts.before && !Number.isNaN(Date.parse(opts.before)) ? opts.before : null;
+  const cursorFilter = keyset
+    ? sql`AND (created_at, id) < (${keyset[1]}::timestamptz, ${keyset[2]}::uuid)`
+    : before ? sql`AND created_at < ${before}` : sql``;
+  const res = await db.execute(sql`SELECT id, kind, CASE WHEN kind = 'rollover' THEN rollover_delta ELSE delta END AS delta, tool_key, balance_after, created_at,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at FROM ai_credit_ledger
+    WHERE clerk_user_id = ${clerkUserId} AND kind NOT IN ('usage', 'usage_refund', 'metered', 'metered_refund') ${cursorFilter}
     ORDER BY created_at DESC, id DESC LIMIT ${limit + 1}`);
-  const rows = res.rows as Array<{ id: string; kind: string; delta: number; tool_key: string | null; balance_after: number; created_at: Date }>;
+  const rows = res.rows as Array<{ id: string; kind: string; delta: number; tool_key: string | null; balance_after: number; created_at: Date; cursor_at: string }>;
   const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
   return {
     entries: page.map((r) => ({
       id: r.id, kind: r.kind, delta: r.delta, toolKey: r.tool_key, balanceAfter: r.balance_after,
       createdAt: new Date(r.created_at).toISOString(),
     })),
-    nextCursor: rows.length > limit ? new Date(page[page.length - 1]!.created_at).toISOString() : null,
+    nextCursor: rows.length > limit && last ? `${last.cursor_at}|${last.id}` : null,
   };
 }

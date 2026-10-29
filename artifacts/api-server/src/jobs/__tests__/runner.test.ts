@@ -78,9 +78,9 @@ describe("background job runner", () => {
     expect(backgroundJobsEnabled({ BACKGROUND_JOBS: "on" })).toBe(true);
   });
 
-  it("covers all 44 integrated background jobs without duplicate names", () => {
-    expect(SINGLETON_JOBS.length + PER_INSTANCE_JOBS.length).toBe(44);
+  it("covers all 45 integrated background jobs without duplicate names", () => {
+    expect(SINGLETON_JOBS.length + PER_INSTANCE_JOBS.length).toBe(45);
     const names = [...SINGLETON_JOBS, ...PER_INSTANCE_JOBS].map(([n]) => n);
-    expect(new Set(names).size).toBe(44);
+    expect(new Set(names).size).toBe(45);
   });
 });

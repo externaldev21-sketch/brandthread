@@ -31,7 +31,7 @@ describe("plan access catalogue", () => {
     });
   });
 
-  it("returns Growth's three team seats and unlimited products", async () => {
+  it("returns Growth's three team seats and 25-product cap", async () => {
     state.planId = "growth";
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
       planId: "growth",

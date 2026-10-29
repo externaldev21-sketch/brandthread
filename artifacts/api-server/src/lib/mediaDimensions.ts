@@ -11,10 +11,13 @@
  * signed URL for videos. The backfill job uses the same probe.
  */
 import { execFile } from "node:child_process";
+import dns from "node:dns/promises";
+import net from "node:net";
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { logger } from "./logger";
 import { ObjectStorageService } from "./objectStorage";
+import { isPrivateAddress } from "./shopifyImport";
 
 const exec = promisify(execFile);
 const storage = new ObjectStorageService();
@@ -75,6 +78,27 @@ export function objectPathFor(urlOrPath: string | null | undefined): string | nu
   return `/objects/${m[1]}`;
 }
 
+/**
+ * External media URLs come from the client (POST /posts mediaUrls), so this
+ * server only fetches / ffprobes them when the host resolves to public
+ * addresses — never the metadata service, the storage sidecar or other
+ * internal hosts.
+ */
+export async function isPublicMediaUrl(raw: string): Promise<boolean> {
+  let url: URL;
+  try { url = new URL(raw); } catch { return false; }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (url.username || url.password) return false;
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  if (!host) return false;
+  try {
+    const records = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
+    return records.length > 0 && !records.some((record) => isPrivateAddress(record.address));
+  } catch {
+    return false;
+  }
+}
+
 function looksLikeVideo(contentType: string, urlOrPath: string): boolean {
   return contentType.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(urlOrPath);
 }
@@ -101,8 +125,10 @@ export async function measureMedia(urlOrPath: string | null | undefined): Promis
       return await imageBufferDims(bytes);
     }
     if (!/^https?:\/\//i.test(urlOrPath)) return null;
+    if (!(await isPublicMediaUrl(urlOrPath))) return null;
     if (looksLikeVideo("", urlOrPath)) return await videoDims(urlOrPath);
-    const res = await fetch(urlOrPath, { signal: AbortSignal.timeout(20_000) });
+    // No redirects: a public URL could otherwise bounce the fetch inward.
+    const res = await fetch(urlOrPath, { redirect: "error", signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return null;
     if (looksLikeVideo(String(res.headers.get("content-type") ?? ""), urlOrPath)) {
       await res.body?.cancel();

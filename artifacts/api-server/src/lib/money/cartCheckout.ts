@@ -411,17 +411,18 @@ export async function priceCartGroup(input: {
 }
 
 /**
- * What one seller group charges: subtotal + shipping − discount + sales tax
- * + DDP duties (intl #109; 0 for every other checkout, so the total is
- * exactly what it was before duties existed).
+ * What one seller group charges: subtotal − bundle savings + shipping −
+ * discount + sales tax + DDP duties (intl #109; 0 for every other checkout,
+ * so the total is exactly what it was before duties existed). subtotalCents
+ * is the full line price (PricedGroup), so bundle savings come off here.
  */
 export function groupChargeTotalCents(group: {
-  subtotalCents: number; shippingCents: number; discountCents: number; taxCents: number; dutiesCents?: number;
+  subtotalCents: number; bundleDiscountCents?: number; shippingCents: number; discountCents: number; taxCents: number; dutiesCents?: number;
 }): number {
-  return group.subtotalCents + group.shippingCents - group.discountCents + group.taxCents + (group.dutiesCents ?? 0);
+  return group.subtotalCents - (group.bundleDiscountCents ?? 0) + group.shippingCents - group.discountCents
+    + group.taxCents + (group.dutiesCents ?? 0);
 }
 
-/** Spreads a discount across line amounts in proportion, exact to the cent (the last line takes the remainder). */
 /**
  * Stripe Tax for one seller group, on the seller's connected account (their
  * registrations, their liability). Throws CartCheckoutError TAX_UNAVAILABLE

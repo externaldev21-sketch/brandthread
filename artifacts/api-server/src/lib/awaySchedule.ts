@@ -107,7 +107,7 @@ function dayIsOpen(mask: number, weekday: number): boolean {
 interface Interval { start: number; end: number }
 
 /** Business-hour intervals (UTC ms) that start on the local days surrounding
- *  `now` (two days back through one day ahead covers overnight spill). */
+ *  `now` (three days back through one day ahead covers overnight spill). */
 function businessIntervals(s: AwaySettings, now: Date): Interval[] {
   const today = localParts(now, s.timezone);
   const out: Interval[] = [];
