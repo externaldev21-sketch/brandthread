@@ -209,7 +209,7 @@ await shot('12-checkout');
 console.log(await labels());
 
 // ── Back out, one Back control at a time, to the seller dashboard ──
-const backs = [/^Close checkout$/, /^Close bag$/, /^Back to previous screen$/, /^Back$/];
+const backs = [/^Close (checkout|order review)$/, /^Close bag$/, /^Back to previous screen$/, /^Back$/];
 for (const label of backs) {
   const el = page.getByLabel(label).filter({ visible: true }).first();
   if (!(await el.count())) { console.log('  no visible control', label); continue; }
