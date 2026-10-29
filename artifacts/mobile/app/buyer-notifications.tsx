@@ -239,7 +239,7 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     case 'new_order_message':
     case 'new_seller_reply':
       if (notif.targetId) {
-        router.push(('/buyer-conversation?id=' + notif.targetId) as any);
+        router.push(('/buyer-conversation?id=' + encodeURIComponent(notif.targetId)) as any);
       } else {
         router.navigate('/(buyer)/inbox' as any);
       }
@@ -385,7 +385,6 @@ export default function BuyerNotifications() {
     if (!isBuyerDevPreview()) void markNotificationRead(notif.id).catch(() => {});
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);
-    await markNotificationRead(notif.id).catch(() => {});
   };
 
   const handleLongPress = (notif: Notification) => {
@@ -541,6 +540,7 @@ export default function BuyerNotifications() {
           tone: 'destructive',
           onPress: async () => {
             setNotifs(prev => prev.filter(n => n.id !== notif.id));
+            if (isBuyerDevPreview()) return;
             try {
               await deleteNotification(notif.id);
             } catch (err) {

@@ -18,6 +18,7 @@ import type { InsightRange } from '@/services/sellerInsightsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState, DateRangeKey } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
@@ -68,6 +69,8 @@ export default function AnalyticsSalesScreen() {
   const [activeChart, setActiveChart] = useState<'sales' | 'orders' | 'units' | 'aov' | 'refunds'>('sales');
   const [range, setRange] = useState<InsightRange>('month');
   const requestUser = useRef<string | null>(null);
+  // Range taps can overlap; only the latest request may write state.
+  const requestSeq = useRef(0);
 
   const load = useCallback(async (isRefresh = false) => {
     // The signed-out web preview has no Clerk user; the service serves its fixtures.
@@ -75,18 +78,19 @@ export default function AnalyticsSalesScreen() {
     if (!preview && (!authLoaded || !userId)) return;
     const requestedUser = userId ?? 'preview';
     requestUser.current = requestedUser;
+    const seq = ++requestSeq.current;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
       const next = await getSalesAnalytics(withRange(f, range));
-      if (requestUser.current !== requestedUser) return;
+      if (requestUser.current !== requestedUser || requestSeq.current !== seq) return;
       setData(next);
       setLoadError(false);
     } catch (err) {
-      if (requestUser.current !== requestedUser) return;
+      if (requestUser.current !== requestedUser || requestSeq.current !== seq) return;
       setLoadError(true);
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally { if (requestSeq.current === seq) { setLoading(false); setRefreshing(false); } }
   }, [filter, authLoaded, userId, range]);
 
   useEffect(() => {
@@ -186,7 +190,7 @@ export default function AnalyticsSalesScreen() {
             <View style={s.breakRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.breakLabel} numberOfLines={1}>{row.label}</Text>
-                <Text style={s.breakSub}>{row.orders} orders · {row.units} units</Text>
+                <Text style={s.breakSub}>{plural(row.orders, 'order')} · {plural(row.units, 'unit')}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={s.breakRevenue}>{formatCents(row.revenue)}</Text>

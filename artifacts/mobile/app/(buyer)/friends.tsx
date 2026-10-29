@@ -447,12 +447,19 @@ export default function FriendsScreen() {
       accentColor: post.authorColor,
     }, {
       onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
-    });
-    // The app-wide saved bar (thumbnail + "Manage" → Save to…), same as Home.
-    emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
-      id: post.id, caption: post.caption, creator: post.authorName, accentColor: post.authorColor,
-      contentType: post.type, mediaUris: post.mediaUrl ? [post.mediaUrl] : [],
-    }) });
+    })
+      .then(() => {
+        // The app-wide saved bar (thumbnail + "Manage" → Save to…), same as Home.
+        emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
+          id: post.id, caption: post.caption, creator: post.authorName, accentColor: post.authorColor,
+          contentType: post.type, mediaUris: post.mediaUrl ? [post.mediaUrl] : [],
+        }) });
+      })
+      .catch(() => {
+        // A real account's failed save throws (socialService.saveItem) — roll back.
+        setSavedIds(prev => { const next = new Set(prev); next.delete(post.id); return next; });
+        showSnackbar('Could not save. Try again.');
+      });
   }
 
   function handleNotInterested(post: BuyerPost) {
@@ -545,7 +552,8 @@ export default function FriendsScreen() {
 
         {/* Friend stories */}
         {stories.map(story => {
-          const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
+          // Server rows carry the real viewer id; MY_USER_ID covers local-only stories.
+          const viewed = story.viewers.some(v => v.userId === MY_USER_ID || (!!userId && v.userId === userId));
           return (
             <PressableScale
               key={story.id}
@@ -643,7 +651,7 @@ export default function FriendsScreen() {
       )}
     </>
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, compactEmpty, allStoryIds.join(',')]);
+  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, compactEmpty, allStoryIds.join(','), userId]);
 
   const ListFooter = useMemo(() => (
     friends.length > 0 ? (

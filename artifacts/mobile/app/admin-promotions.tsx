@@ -6,7 +6,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  * the payment in full. Backed by /api/admin/promotions (users.role = 'admin');
  * anyone else sees an access notice. Same pattern as app/admin-reports.tsx.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -76,8 +76,15 @@ export default function AdminPromotionsScreen() {
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  // One decision in flight at a time, set synchronously so a double tap
+  // can't send a second approve/reject (and refund) for the same item.
+  const decidingRef = useRef(false);
+  // Only the latest load may write: switching tabs mid-request must not
+  // show the previous tab's queue.
+  const loadId = useRef(0);
 
   const load = useCallback(async (isRefresh = false) => {
+    const id = ++loadId.current;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     if (!isSignedIn) {
@@ -87,14 +94,18 @@ export default function AdminPromotionsScreen() {
     }
     try {
       const me = await api.moderation.me();
+      if (id !== loadId.current) return;
       if (!me.isModerator) { setAccess('denied'); return; }
       setAccess('granted');
-      setQueue(await api.adminPromotions.queue({ status: tab }));
+      const next = await api.adminPromotions.queue({ status: tab });
+      if (id === loadId.current) setQueue(next);
     } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t load promotions.'));
+      if (id === loadId.current) setError(apiErrorMessage(err, 'We couldn’t load promotions.'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (id === loadId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [api, tab, isSignedIn, demo]);
 
@@ -102,6 +113,8 @@ export default function AdminPromotionsScreen() {
 
   async function decide(item: AdminPromotionItem, action: 'approve' | 'reject') {
     if (demo) { setQueue((q) => q && { ...q, items: q.items.filter((i) => i.id !== item.id) }); setRejecting(null); return; }
+    if (decidingRef.current) return;
+    decidingRef.current = true;
     setBusyId(item.id);
     setError(null);
     try {
@@ -113,6 +126,7 @@ export default function AdminPromotionsScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, action === 'approve' ? 'Could not approve.' : 'Could not reject.'));
     } finally {
+      decidingRef.current = false;
       setBusyId(null);
     }
   }
@@ -141,7 +155,7 @@ export default function AdminPromotionsScreen() {
         ))}
       </View>
       {!!error && <Text style={s.error}>{error}</Text>}
-      {loading || access === 'checking' ? (
+      {loading || (access === 'checking' && !error) ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : (
         <FlatList
@@ -160,7 +174,7 @@ export default function AdminPromotionsScreen() {
                   <Text style={s.kind}>{item.kind === 'boost' ? 'Boost' : 'Featured slot'}</Text>
                   <Text style={s.seller} numberOfLines={1}>{item.seller?.name ?? 'Seller'}</Text>
                   <Text style={s.meta}>
-                    {formatCents(item.amountCents)} · {item.durationDays} days{item.window ? ` · ${day(item.window.startsAt)} – ${day(item.window.endsAt)}` : ''}
+                    {formatCents(item.amountCents)} · {item.durationDays} {item.durationDays === 1 ? 'day' : 'days'}{item.window ? ` · ${day(item.window.startsAt)} – ${day(item.window.endsAt)}` : ''}
                   </Text>
                   {!!item.post?.caption && <Text style={s.caption} numberOfLines={2}>{item.post.caption}</Text>}
                 </View>

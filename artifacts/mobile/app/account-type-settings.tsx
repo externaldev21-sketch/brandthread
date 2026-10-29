@@ -91,7 +91,7 @@ export default function AccountProfilesScreen() {
       showAlert(roleExistsMessage(wanted), undefined, [
         { text: 'Cancel', style: 'cancel' },
         ...(outcome.profileClerkId
-          ? [{ text: 'Switch to it', onPress: () => { void switchTo(outcome.profileClerkId!); } }]
+          ? [{ text: 'Switch to it', onPress: () => { void handleSwitch(outcome.profileClerkId!); } }]
           : []),
       ]);
     } else if (outcome.kind === 'finish-setup') {

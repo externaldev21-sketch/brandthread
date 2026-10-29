@@ -90,6 +90,8 @@ type BoostTarget = {
 
 type Boost = {
   id: string;
+  /** The boosted post (server serializes the full row). */
+  targetId?: string;
   status: string;
   budgetCents: number;
   spentCents: number;
@@ -520,6 +522,8 @@ export default function BoostScreen() {
 
   // Prevent double-handling the paymentReturn redirect
   const paymentReturnConsumed = useRef(false);
+  // Synchronous guard: a fast double tap lands before `disabled` re-renders.
+  const submittingRef = useRef(false);
 
   const reach = useMemo(() => estimateBoostReach(budgetCents), [budgetCents]);
 
@@ -723,6 +727,16 @@ export default function BoostScreen() {
   // ── Payment flow ──────────────────────────────────────────────────────────
 
   async function handleBoostPost() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await runBoostPost();
+    } finally {
+      submittingRef.current = false;
+    }
+  }
+
+  async function runBoostPost() {
     if (!selectedTarget) {
       Alert.alert('Choose a post', 'Select the post you want to boost first.');
       return;
@@ -749,9 +763,16 @@ export default function BoostScreen() {
     }
     const chargeCents = nativeRail ? nearestPromoTierCents(budgetCents) : budgetCents;
 
-    // Step 1: Create pending boost (no charge yet)
+    // Step 1: Create pending boost (no charge yet). Reuse the pending one only
+    // if it's for the same post, budget and duration — otherwise checkout
+    // would charge the old amount for the old post.
     let boostRecord = pendingBoost;
-    if (!boostRecord || boostRecord.status === 'failed') {
+    const reusable = !!boostRecord
+      && boostRecord.status !== 'failed'
+      && boostRecord.targetId === selectedTarget.id
+      && boostRecord.budgetCents === chargeCents
+      && boostRecord.durationDays === durationDays;
+    if (!reusable) {
       setCreating(true);
       try {
         const created = await boostsRef.current.create({
@@ -1254,7 +1275,7 @@ export default function BoostScreen() {
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm }}>
                 <Text style={s.sliderCardLabel}>Duration</Text>
-                <Text style={s.sliderCardValue}>{b.durationDays} days</Text>
+                <Text style={s.sliderCardValue}>{b.durationDays} day{b.durationDays !== 1 ? 's' : ''}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={s.sliderCardLabel}>Estimated reach</Text>

@@ -91,8 +91,12 @@ export default function ReviewQueueScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ModerationQueueItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Only the latest load may write: switching Open/Resolved or a type filter
+  // mid-request must not show the previous filter's queue.
+  const loadId = useRef(0);
 
   const load = useCallback(async (isRefresh = false) => {
+    const id = ++loadId.current;
     // The signed-out preview is never a moderator and must not call the
     // protected moderation API (its auth token never resolves there).
     if (isSellerDevPreview() || isBuyerDevPreview()) { setAccess('denied'); setLoading(false); return; }
@@ -100,18 +104,21 @@ export default function ReviewQueueScreen() {
     setError(null);
     try {
       const me = await api.moderation.me();
+      if (id !== loadId.current) return;
       if (!me.isModerator) { setAccess('denied'); return; }
       setAccess('granted');
       const data = await api.moderation.queue({
         status,
         ...(typeFilter !== 'all' ? { type: typeFilter } : {}),
       });
-      setQueue(data);
+      if (id === loadId.current) setQueue(data);
     } catch (err) {
-      setError(apiErrorMessage(err, 'We couldn’t load the review queue. Try again.'));
+      if (id === loadId.current) setError(apiErrorMessage(err, 'We couldn’t load the review queue. Try again.'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (id === loadId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [api, status, typeFilter]);
 
@@ -207,7 +214,7 @@ export default function ReviewQueueScreen() {
             })}
           </ChipRow>
 
-          {loading || access === 'checking' ? (
+          {loading || (access === 'checking' && !error) ? (
             <View style={s.center}><ActivityIndicator color={theme.text} /></View>
           ) : error ? (
             <EmptyState
@@ -339,7 +346,9 @@ function ReviewSheet({
   if (itemProp) lastItem.current = itemProp;
   const item = itemProp ?? lastItem.current;
 
-  React.useEffect(() => { setNote(''); setBusy(null); setConfirmSuspend(false); setError(null); }, [item?.id]);
+  // Set synchronously so a double tap can't send the same action twice.
+  const busyRef = useRef(false);
+  React.useEffect(() => { setNote(''); setBusy(null); busyRef.current = false; setConfirmSuspend(false); setError(null); }, [item?.id]);
 
   if (!item) return null;
   const type = normalizeReportTarget(item.targetType);
@@ -347,24 +356,28 @@ function ReviewSheet({
   const open = item.status === 'pending';
 
   async function run(action: ModerationAction) {
-    if (!item) return;
+    if (!item || busyRef.current) return;
+    busyRef.current = true;
     setBusy(action);
     setError(null);
     try {
       await onResolve(item, action, note.trim());
     } catch (err) {
       setError(apiErrorMessage(err, 'That action didn’t go through. Try again.'));
+      busyRef.current = false;
       setBusy(null);
     }
   }
 
   async function reinstateOwner() {
-    if (!item?.owner) return;
+    if (!item?.owner || busyRef.current) return;
+    busyRef.current = true;
     setBusy('reinstate');
     try {
       await onReinstate(item.owner);
     } catch (err) {
       setError(apiErrorMessage(err, 'Couldn’t reinstate this account. Try again.'));
+      busyRef.current = false;
       setBusy(null);
     }
   }

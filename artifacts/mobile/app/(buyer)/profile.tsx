@@ -1289,7 +1289,7 @@ export default function ProfileScreen() {
             : null,
         }).concat([
           { key: 'orders', label: 'Orders', icon: 'package', separatorBefore: true, onPress: () => router.navigate('/(buyer)/orders' as never) },
-          { key: 'closet', label: 'Closet', icon: 'layers', onPress: () => router.push('/closet' as never) },
+          { key: 'closet', label: 'Closet', icon: 'layers', onPress: () => handleTabPress('Closet') },
           { key: 'tagged', label: 'Tagged posts', icon: 'tag', onPress: () => handleTabPress('Tagged') },
         ])}
       />

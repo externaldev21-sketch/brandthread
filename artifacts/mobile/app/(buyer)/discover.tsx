@@ -370,7 +370,7 @@ export default function DiscoverScreen() {
         searchBarRef={searchBarRef}
         searchBarHidden={!!search}
         beforeSearch={<DiscoverFilterRow active={filter} onChange={setFilter} />}
-        onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
+        onBellPress={isSignedIn ? () => router.navigate('/(buyer)/activity' as never) : undefined}
       />
       {filter === 'forYou' && firstWeek.visible && firstWeek.state && (
         <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
@@ -388,7 +388,7 @@ export default function DiscoverScreen() {
         title="Discover"
         onSearchPress={() => router.push('/buyer-search' as never)}
         beforeSearch={<DiscoverFilterRow active={filter} onChange={setFilter} />}
-        onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
+        onBellPress={isSignedIn ? () => router.navigate('/(buyer)/activity' as never) : undefined}
       />
     </>
   );
@@ -528,7 +528,8 @@ export default function DiscoverScreen() {
             <EmptyState
               title={dropsError ? "Couldn't load drops" : 'No drops yet'}
               message={dropsError ? 'Check your connection and try again.' : 'Upcoming drops from sellers will show up here.'}
-              action={dropsError ? { label: 'Try again', onPress: () => { void fetchDrops(); } } : undefined}
+              actionLabel={dropsError ? 'Try again' : undefined}
+              onAction={dropsError ? () => { void fetchDrops(); } : undefined}
             />
           )}
         />

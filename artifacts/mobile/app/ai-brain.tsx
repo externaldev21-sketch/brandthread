@@ -26,7 +26,6 @@ import {
   StyleSheet,
   Platform,
   Pressable,
-  Alert,
   Animated,
   ScrollView,
   useWindowDimensions,
@@ -783,7 +782,7 @@ export default function AiBrainScreen() {
   // ─── Clear session ──────────────────────────────────────────────────────────
 
   const handleClear = useCallback(() => {
-    Alert.alert(
+    showAlert(
       'Clear conversation',
       'This will erase all messages in this session.',
       [

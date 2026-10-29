@@ -166,13 +166,21 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
 
   async function handleArchive() {
     closeSheet();
-    await archiveProduct(p.id);
+    try {
+      await archiveProduct(p.id);
+    } catch {
+      Alert.alert('Could not archive product', 'Your product was not archived. Please try again.');
+    }
     onRefresh();
   }
 
   async function handleUnarchive() {
     closeSheet();
-    await unarchiveProduct(p.id);
+    try {
+      await unarchiveProduct(p.id);
+    } catch {
+      Alert.alert('Could not unarchive product', 'Your product was not unarchived. Please try again.');
+    }
     onRefresh();
   }
 
@@ -183,7 +191,14 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
 
   async function handleDuplicate() {
     closeSheet();
-    await duplicateProduct(p.id);
+    let copy: Product | undefined;
+    try {
+      copy = await duplicateProduct(p.id);
+    } catch { /* falls through to the error below */ }
+    if (!copy) {
+      Alert.alert('Could not duplicate product', 'Your product was not duplicated. Please try again.');
+      return;
+    }
     Alert.alert('Duplicated', `"${p.name}" was duplicated as a draft.`);
     onRefresh();
   }
@@ -582,6 +597,9 @@ export default function ProductsScreen() {
   // this tab re-fetches that same list silently: no skeleton, and a failed
   // background refresh keeps what's already shown (less-AI pass, item 89).
   const loadedKeyRef = React.useRef<string | null>(null);
+  // Only the newest request may write: a slow answer for an older filter/
+  // search/sort must not overwrite the list the seller switched to since.
+  const loadRequestRef = React.useRef(0);
 
   const loadProducts = useCallback(async () => {
     if (previewDemo) {
@@ -610,9 +628,11 @@ export default function ProductsScreen() {
     }
     const key = `${filter}|${debouncedQuery}|${sort}`;
     const silent = loadedKeyRef.current === key;
+    const requestId = ++loadRequestRef.current;
     if (!silent) setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined, ...productSortQuery(sort) });
+      if (requestId !== loadRequestRef.current) return;
       if (previewOnlyRef.current && Platform.OS !== 'web') {
         setProducts([]);
         setStats(EMPTY_STATS);
@@ -625,12 +645,12 @@ export default function ProductsScreen() {
       if (filter === 'all' && !debouncedQuery && !previewOnlyRef.current) setCachedTabData('seller-products', list);
       await loadStats();
     } catch (error) {
-      if (!silent) {
+      if (!silent && requestId === loadRequestRef.current) {
         setProducts([]);
         Alert.alert("Couldn't load your products", apiErrorMessage(error, 'Check your connection and pull down to try again.'));
       }
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [filter, debouncedQuery, sort, loadStats, previewDemo, previewOnly]);
 
@@ -724,7 +744,8 @@ export default function ProductsScreen() {
       return;
     }
     const wasArchived = product.status === 'archived';
-    setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'active' : 'archived' } : p)));
+    // unarchiveProduct restores to draft (services/productService.ts), so show that.
+    setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'draft' : 'archived' } : p)));
     try {
       if (wasArchived) await unarchiveProduct(product.id);
       else await archiveProduct(product.id);

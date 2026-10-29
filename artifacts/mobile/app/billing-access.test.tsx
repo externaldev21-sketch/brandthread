@@ -224,6 +224,9 @@ vi.mock('@/components/RoleLockedView', () => ({
     React.createElement('RoleLockedView', { screenTitle }, React.createElement('Text', null, 'Owner access required')),
 }));
 
+// Payouts mounts a first-run explainer that needs FirstRunTipsProvider.
+vi.mock('@/components/first-run-tips/ScreenExplainer', () => ({ ScreenExplainer: () => null }));
+
 vi.mock('@/components/StripeConnectWarning', () => ({
   default: () => null,
   normalizeConnectStatus: (value: unknown) => value,

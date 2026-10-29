@@ -127,7 +127,10 @@ export default function BundleDetailScreen() {
             {bundle.description?.trim() ? <Text style={st.description}>{bundle.description.trim()}</Text> : null}
 
             <Text style={st.sectionLabel}>
-              {`In this bundle · ${bundle.items.reduce((n, i) => n + i.quantity, 0)} items`}
+              {(() => {
+                const count = bundle.items.reduce((n, i) => n + i.quantity, 0);
+                return `In this bundle · ${count} ${count === 1 ? 'item' : 'items'}`;
+              })()}
             </Text>
             {bundle.items.map((item, index) => {
               const chosen = resolveBundleVariant(item, selections);

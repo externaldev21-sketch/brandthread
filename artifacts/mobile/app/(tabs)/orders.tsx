@@ -1121,21 +1121,29 @@ export default function OrdersScreen() {
 
   // Runs one existing per-order endpoint over the selection and reports
   // exactly which orders failed (and why) instead of a blanket error.
+  // One bulk run at a time: a second tap mid-run would resend every update.
+  const bulkRunningRef = useRef(false);
   const runBulkAction = useCallback(async (actionLabel: string, fn: (id: string) => Promise<unknown>) => {
     if (isPreviewMode) {
       Alert.alert('Sign in to continue', 'Bulk actions need a signed-in seller account.');
       return;
     }
-    haptic('select');
-    const byId = new Map(orders.map(o => [o.id, o]));
-    const result = await runBulk(selectedIds, fn, {
-      label: id => byId.get(id)?.orderNumber ?? id.slice(0, 8),
-      errorMessage: e => apiErrorMessage(e, 'Request failed'),
-    });
-    // Keep the failed orders selected so the seller can retry or inspect them.
-    setSelectedIds(result.failed.map(f => f.id));
-    const summary = summarizeBulk(result, actionLabel);
-    if (summary) Alert.alert(summary.title, summary.message);
+    if (bulkRunningRef.current) return;
+    bulkRunningRef.current = true;
+    try {
+      haptic('select');
+      const byId = new Map(orders.map(o => [o.id, o]));
+      const result = await runBulk(selectedIds, fn, {
+        label: id => byId.get(id)?.orderNumber ?? id.slice(0, 8),
+        errorMessage: e => apiErrorMessage(e, 'Request failed'),
+      });
+      // Keep the failed orders selected so the seller can retry or inspect them.
+      setSelectedIds(result.failed.map(f => f.id));
+      const summary = summarizeBulk(result, actionLabel);
+      if (summary) Alert.alert(summary.title, summary.message);
+    } finally {
+      bulkRunningRef.current = false;
+    }
     await loadData(generationRef.current);
   }, [isPreviewMode, orders, selectedIds, loadData]);
 
@@ -1419,7 +1427,7 @@ export default function OrdersScreen() {
       {/* Filter Sheet */}
       <FilterSheet
         visible={filterSheetVisible}
-        current={FILTERS.some(filter => filter.key === activeFilter) ? 'all' : activeFilter as OrderFilterKey}
+        current={ALL_FILTERS.some(filter => filter.key === activeFilter) ? activeFilter as OrderFilterKey : 'all'}
         onSelect={k => setActiveFilter(k)}
         currentSort={sort}
         onSelectSort={k => setSort(k)}

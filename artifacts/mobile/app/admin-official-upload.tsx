@@ -7,7 +7,7 @@
  * composer (lib/createPost/publish.ts) with `postAs: 'brandthread'`.
  * Non-admins see an access notice; the server enforces the role regardless.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -90,6 +90,8 @@ export default function AdminOfficialUploadScreen() {
     : []));
   const [plan, setPlan] = useState<PublishPlan>({ kind: 'now' });
   const [running, setRunning] = useState(false);
+  // Set synchronously: a double tap on Publish must not post every Thread twice.
+  const runningRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [seedPreview, setSeedPreview] = useState(isOfficialSeedPreview());
 
@@ -152,7 +154,7 @@ export default function AdminOfficialUploadScreen() {
   const pending = items.filter((it) => it.status.phase !== 'done');
 
   async function publishAll() {
-    if (running || pending.length === 0) return;
+    if (running || runningRef.current || pending.length === 0) return;
     if (invalid) { setNotice('A credit handle can only use letters, numbers, dots and underscores.'); return; }
     if (preview) { setNotice('Publishing is off in the preview. Sign in as an admin to publish.'); return; }
     let times: Array<string | null>;
@@ -163,6 +165,7 @@ export default function AdminOfficialUploadScreen() {
       return;
     }
     setNotice(null);
+    runningRef.current = true;
     setRunning(true);
     let failed = 0;
     for (let i = 0; i < pending.length; i += 1) {
@@ -199,6 +202,7 @@ export default function AdminOfficialUploadScreen() {
         update(item.id, { status: { phase: 'error', message: errorText(error) } });
       }
     }
+    runningRef.current = false;
     setRunning(false);
     Haptics.notificationAsync(failed ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success).catch(() => {});
     setNotice(failed
@@ -245,7 +249,7 @@ export default function AdminOfficialUploadScreen() {
         {items.map((item, index) => (
           <View key={item.id} style={s.card} testID={`bulk-item-${index}`}>
             <View style={s.cardHead}>
-              <Text style={s.cardTitle}>{`${index + 1}. ${item.kind === 'video' ? 'Video' : `Slideshow · ${item.assets.length} photos`}`}</Text>
+              <Text style={s.cardTitle}>{`${index + 1}. ${item.kind === 'video' ? 'Video' : `Slideshow · ${item.assets.length} ${item.assets.length === 1 ? 'photo' : 'photos'}`}`}</Text>
               <StatusPill status={item.status} />
               {!running && item.status.phase !== 'done' ? (
                 <Pressable onPress={() => setItems((l) => l.filter((x) => x.id !== item.id))} hitSlop={10} accessibilityLabel="Remove" testID={`bulk-remove-${index}`}>

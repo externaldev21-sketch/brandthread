@@ -177,6 +177,8 @@ export default function BuyerEditProfileScreen() {
   const preview = isBuyerDevPreview();
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
+  // Style badge edits count toward unsaved changes too (Save stayed disabled otherwise).
+  const [initialBadge, setInitialBadge] = useState<StyleBadgeState>(badge);
   const [extra, setExtra] = useState<Pick<BuyerProfileFields, 'pronouns' | 'gender' | 'aiCreator'>>({
     pronouns: '', gender: '', aiCreator: false,
   });
@@ -388,7 +390,9 @@ export default function BuyerEditProfileScreen() {
     Promise.all([loadStyleBadge(), loadBuyerProfile(), getMyProfile(), remoteSettings, preview ? Promise.resolve(null) : api.auth.me().catch(() => null)])
       .then(([badgeState, rawProfileState, socialProfile, remote, me]) => {
         const profileState = { ...rawProfileState, ...profileExtrasFromSettings(remote) };
-        setBadge(styleBadgeFromServer(me?.styleBadge) ?? badgeState ?? { ...DEFAULT_STYLE_BADGE, enabled: false });
+        const loadedBadge = styleBadgeFromServer(me?.styleBadge) ?? badgeState ?? { ...DEFAULT_STYLE_BADGE, enabled: false };
+        setBadge(loadedBadge);
+        setInitialBadge(loadedBadge);
         // Nothing saved on this device yet: fall back to the account itself
         // (server profile, then Clerk) — and, in the preview's demo=1 only,
         // to the demo identity the profile tab shows. Fresh stays empty.
@@ -440,8 +444,9 @@ export default function BuyerEditProfileScreen() {
   const isDirty = useMemo(
     () => fields.name !== initial.name || fields.username !== initial.username
       || fields.bio !== initial.bio || fields.link !== initial.link
-      || extra.gender.trim() !== initialExtra.gender.trim() || extra.aiCreator !== initialExtra.aiCreator,
-    [fields, initial, extra, initialExtra],
+      || extra.gender.trim() !== initialExtra.gender.trim() || extra.aiCreator !== initialExtra.aiCreator
+      || badge.enabled !== initialBadge.enabled || badge.emoji !== initialBadge.emoji || badge.label !== initialBadge.label,
+    [fields, initial, extra, initialExtra, badge, initialBadge],
   );
 
   // Warn on back navigation (header button, swipe, or hardware back) if there are unsaved text-field edits.
@@ -547,6 +552,8 @@ export default function BuyerEditProfileScreen() {
 
       setInitial(fields);
       setInitialExtra({ ...extra, gender: cleanedFields.gender });
+      setBadge(cleanedBadge);
+      setInitialBadge(cleanedBadge);
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
       setTimeout(() => goBackOr(router), 500);

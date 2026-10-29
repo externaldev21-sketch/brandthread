@@ -16,6 +16,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductAnalytics, getFilterState } from '@/services/analyticsService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { ProductAnalytics, ProductAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -59,7 +60,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
       style={s.prodRow}
       activeOpacity={0.8}
       accessibilityRole="button"
-      accessibilityLabel={`${p.name}, ${formatCents(p.revenueCents)}, ${p.unitsSold} units sold`}
+      accessibilityLabel={`${p.name}, ${formatCents(p.revenueCents)}, ${plural(p.unitsSold, 'unit')} sold`}
     >
       <View style={s.rankBadge}><Text style={s.rankText}>{rank}</Text></View>
       <View style={s.prodThumb}>
@@ -72,7 +73,7 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
         <View style={s.prodMeta}>
           <Text style={s.prodStat}>{formatCents(p.revenueCents)}</Text>
           <Text style={s.dotSep}>·</Text>
-          <Text style={s.prodStat}>{p.unitsSold.toLocaleString()} units</Text>
+          <Text style={s.prodStat}>{plural(p.unitsSold, 'unit')}</Text>
           {typeof p.conversionRate === 'number' && (
             <>
               <Text style={s.dotSep}>·</Text>

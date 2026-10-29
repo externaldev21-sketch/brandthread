@@ -449,7 +449,7 @@ export default function BuyerDropDetail() {
 
   function handleProductPress(product: DropProduct) {
     if (showRecap) {
-      router.push((`/buyer-product-detail?productId=${product.id}&productName=${encodeURIComponent(product.name)}`) as never);
+      router.push((`/buyer-product-detail?productId=${encodeURIComponent(product.id)}&productName=${encodeURIComponent(product.name)}`) as never);
       return;
     }
     if (!isLive) {

@@ -232,19 +232,34 @@ export default function BuyerHighlightsManager() {
     setCoverColor(h.coverColor);
   }
 
+  // Save / Select stories stay tappable until the sheet closes; a second tap
+  // must not create a duplicate highlight.
+  const createInFlight = useRef(false);
+
   async function handleSaveCreate() {
-    if (!label.trim()) return;
-    const h = await createHighlight({ emoji, label, coverColor });
-    setHighlights(prev => [...prev, h]);
-    setCreating(false);
+    if (!label.trim() || createInFlight.current) return;
+    createInFlight.current = true;
+    try {
+      const h = await createHighlight({ emoji, label, coverColor });
+      setHighlights(prev => [...prev, h]);
+      setCreating(false);
+    } finally {
+      createInFlight.current = false;
+    }
   }
 
   // Stories are saved server-side, so the step needs a signed-in account (or the demo preview).
   const canSelectStories = canSyncSocialServer() || isPreviewDemoMode();
 
   async function handleSelectStoriesCreate() {
-    if (!label.trim()) return;
-    const h = await createHighlight({ emoji, label, coverColor });
+    if (!label.trim() || createInFlight.current) return;
+    createInFlight.current = true;
+    let h: Highlight;
+    try {
+      h = await createHighlight({ emoji, label, coverColor });
+    } finally {
+      createInFlight.current = false;
+    }
     setHighlights(prev => [...prev, h]);
     setCreating(false);
     router.push(`/buyer-highlight-stories?highlightId=${encodeURIComponent(h.id)}` as any);

@@ -83,6 +83,7 @@ export default function BuyerCloseFriends() {
     // The server list is the source of truth when reachable; refresh the local cache from it.
     const ids = remote ? remote.friendIds : localIds;
     setCloseFriends(new Set(ids));
+    setSavedIds(new Set(ids));
     if (remote) void saveCloseFriendIds(ids).catch(() => {});
   }, [api]);
   const pull = usePullToRefresh(loadFriends);
