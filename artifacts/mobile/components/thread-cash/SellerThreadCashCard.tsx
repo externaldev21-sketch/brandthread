@@ -7,8 +7,10 @@ import { hapticLight } from '@/lib/haptics';
  * subtitle showing its live cash-out value (fee-aware, in case Dev ever
  * turns one on), and Cash out / History actions.
  *
- * Purely presentational — balance comes from useSellerThreadCashBalance()
- * so the dashboard row, the Studio/More tile and this card never drift.
+ * The balance comes in as props (from useSellerThreadCashBalance()) so the
+ * dashboard row, the Studio/More tile and this card never drift; the card's
+ * only own request is the cash-out quote (GET /thread-cash/quote) for the
+ * "Cash out for $X" line.
  */
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

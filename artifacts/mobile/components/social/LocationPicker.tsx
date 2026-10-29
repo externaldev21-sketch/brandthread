@@ -78,13 +78,15 @@ export function LocationPicker({ value, onSelect, onClear, coords, placeholder =
 
   useEffect(() => {
     setError(null);
+    // Any search still in flight is now stale: bump the sequence so its late
+    // answer can't repopulate results for a query the user already cleared.
+    const id = ++seq.current;
     if (!trimmed) { setResults([]); setSearching(false); return; }
     if (preview) {
       const q = trimmed.toLowerCase();
       setResults(demo ? DEMO_RESULTS.filter((r) => r.name.toLowerCase().includes(q)) : []);
       return;
     }
-    const id = ++seq.current;
     setSearching(true);
     const timer = setTimeout(async () => {
       try {

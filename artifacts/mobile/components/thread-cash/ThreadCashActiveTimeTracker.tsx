@@ -66,6 +66,12 @@ export function ThreadCashActiveTimeTracker() {
   useEffect(() => {
     if (!threadCashEnabled || !userId) return;
     let active = true;
+    // Per-account state: never let the previous account's day (or tick
+    // count) carry into this one — e.g. a tick that runs before this
+    // account's stored day has loaded would otherwise add to, and persist
+    // under this account's key, the previous account's seconds.
+    dayStateRef.current = null;
+    tickCountRef.current = 0;
     const storageKey = `${STATE_KEY_PREFIX}:${userId}`;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -138,6 +144,7 @@ export function ThreadCashActiveTimeTracker() {
           let state = dayStateRef.current;
           if (!state || state.localDate !== today) {
             state = await loadDayState();
+            if (!active) return;
           }
           if (!state.claimed) {
             state.activeSeconds += TICK_MS / 1000;
@@ -147,16 +154,20 @@ export function ThreadCashActiveTimeTracker() {
 
           if (tickCountRef.current % PERSIST_EVERY_TICKS === 0) {
             await persist(state);
+            if (!active) return;
           }
           await sendHeartbeatIfDue(state);
+          if (!active) return;
           await tryClaim(state);
         })();
       }, TICK_MS);
     }
 
     void (async () => {
-      dayStateRef.current = await loadDayState();
+      const loaded = await loadDayState();
       if (!active) return;
+      // A tick may have loaded today's state first; keep the one in use.
+      if (!dayStateRef.current) dayStateRef.current = loaded;
       if (AppState.currentState === 'active') startInterval();
     })();
 

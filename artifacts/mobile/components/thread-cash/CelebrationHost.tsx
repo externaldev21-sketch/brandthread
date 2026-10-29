@@ -7,7 +7,7 @@
  *
  * Small and notification-shaped, anchored under the notch — never a
  * full-screen takeover: a compact pill (bill icon + amount + sender) fades
- * in, holds, then slides back up, with a success haptic. Item 148: the bill
+ * in, holds, then slides back up (no haptic is played here). Item 148: the bill
  * + confetti burst that used to play with it is gone; the toast is the
  * signal, and the seller swipe glow stays the app's only "wow" effect.
  */
@@ -144,7 +144,16 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
   return (
     <CelebrationContext.Provider value={value}>
       {children}
-      {toast && <BurstToast event={toast} onDone={() => setToast(null)} />}
+      {/* Keyed by event id: a payment that lands while another toast is up
+          gets a fresh toast with its own full hold, and an earlier toast's
+          finishing fade can only clear itself, never the newer one. */}
+      {toast && (
+        <BurstToast
+          key={toast.id}
+          event={toast}
+          onDone={() => setToast((current) => (current?.id === toast.id ? null : current))}
+        />
+      )}
     </CelebrationContext.Provider>
   );
 }
