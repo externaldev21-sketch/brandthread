@@ -183,7 +183,7 @@ describe("Stripe redirect targets", () => {
   it("/onboard/return deep links back into the app", async () => {
     const res = await fetch(`${baseUrl}/api/seller/connect/onboard/return`, { redirect: "manual" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("brandthread://payout-setup?returned=1");
+    expect(res.headers.get("location")).toBe("brandthread://payouts?returned=1");
   });
 
   it("/onboard/refresh with a valid state mints a fresh Stripe link", async () => {
@@ -199,7 +199,7 @@ describe("Stripe redirect targets", () => {
   it("/onboard/refresh without a valid state falls back to the app deep link", async () => {
     const res = await fetch(`${baseUrl}/api/seller/connect/onboard/refresh?state=forged.token`, { redirect: "manual" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("brandthread://payout-setup?refresh=1");
+    expect(res.headers.get("location")).toBe("brandthread://payouts?refresh=1");
     expect(state.links).toHaveLength(0);
   });
 });

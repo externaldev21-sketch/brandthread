@@ -224,11 +224,11 @@ describe('StripeConnectWarning screen placement', () => {
     expect(dashboard).toMatch(/<StripeConnectWarning\s*\/>/);
   });
 
-  it('remains mounted on Payouts', () => {
+  it('is replaced on Payouts by the full setup journey (Payouts is the setup screen itself)', () => {
     const payouts = source('payouts.tsx');
 
-    expect(payouts).toContain("import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';");
-    expect(payouts).toMatch(/<StripeConnectWarning[\s\S]*connectStatus=\{connectStatus\}/);
+    expect(payouts).not.toContain('<StripeConnectWarning');
+    expect(payouts).toContain('<PayoutSetupJourney');
   });
 
   it('remains mounted on the seller Settings hub', () => {

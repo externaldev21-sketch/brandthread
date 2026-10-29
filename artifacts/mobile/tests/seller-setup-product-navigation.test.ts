@@ -77,7 +77,7 @@ describe('seller setup destination navigation', () => {
   it('routes every completion signal through the behavioral completion boundary', () => {
     const completionSignals = [
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
-      ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
+      ['app/payouts.tsx', "normalized?.state === 'active'", "'connect_payments'"],
       ['lib/listing/publishListing.ts', '() => api.products.create(serverCreatePayload)', "'first_product'"],
       ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],

@@ -372,6 +372,12 @@ describe('seller financial role boundaries', () => {
       amountCents: 2900, cancelAtPeriodEnd: false, effectiveProvider: 'stripe',
     });
 
+    // Payouts opens its manage page only for a live Stripe account.
+    apiMock.seller.connect.status.mockResolvedValue({
+      connected: true, chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active',
+      verified: true, bankLast4: '6789', providerConfigured: true, payoutState: 'active', actionItems: [],
+    });
+
     const billing = await renderScreen(BillingScreen);
     const subscription = await renderScreen(SubscriptionScreen);
     const finance = await renderScreen(FinanceScreen);

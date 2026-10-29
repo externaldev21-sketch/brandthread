@@ -57,7 +57,10 @@ describe('seller screens make no protected API call when signed out / Clerk not 
     expect(s).toContain('(!authLoaded || !isSignedIn)');
     before(s, 'const refreshConnectStatus = useCallback', 'if (isPreview)', 'api.');
     before(s, 'const load = useCallback', 'if (isPreview)', 'api.');
-    before(s, 'const openConnectOnboarding = useCallback', 'if (isPreview) return;', 'api.');
+    before(s, 'const openConnectOnboarding = useCallback', 'if (isPreview) return;', 'requestOnboardingLink(onWeb)');
+    // The only place the onboarding link is requested is behind that guard.
+    expect(s.split('requestOnboardingLink(').length - 1).toBe(1);
+
   });
 
   it('payout-detail.tsx / payout-schedule.tsx: any seller preview skips the API, signed in or not', () => {

@@ -24,13 +24,16 @@ import { applyNewAccountPayoutDelay } from "../lib/admin/payoutControls";
 import {
   APP_REFRESH_DEEP_LINK,
   APP_RETURN_DEEP_LINK,
+  actionItems,
   allowListedRedirect,
   buildConnectSteps,
   deadlineIso,
+  derivePayoutState,
   deriveSetupState,
   selectHostedLink,
   signConnectState,
   verifyConnectState,
+  type PayoutState,
 } from "../lib/connectOnboarding";
 
 const router = Router();
@@ -216,8 +219,12 @@ router.post("/resume", resumeHandler);
 function setupFields(account: Stripe.Account | null, hasBankAccount: boolean) {
   const steps = buildConnectSteps(account, { hasBankAccount });
   const req = account?.requirements;
+  const payoutState = derivePayoutState(account, steps);
   return {
     setupState: deriveSetupState(account, steps),
+    payoutState: payoutState as PayoutState | null,
+    // What Stripe is asking for — only meaningful once it is asking.
+    actionItems: payoutState === "action_needed" ? actionItems(steps) : [],
     steps,
     deadline: deadlineIso(account),
     disabledReason: req?.disabled_reason ?? null,
@@ -290,6 +297,10 @@ router.get("/status", async (req, res) => {
         requirementsDue: [],
         taxInfoStatus: "unknown" as const,
         ...setupFields(null, false),
+        // Nothing to derive a journey state from: the account exists but this
+        // environment can't read it. Null (never a guessed state) — the app
+        // shows "couldn't check" with a retry.
+        payoutState: null,
       });
       return;
     }

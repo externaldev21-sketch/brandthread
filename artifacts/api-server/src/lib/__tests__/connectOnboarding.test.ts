@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  actionItems,
   allowListedRedirect,
   buildConnectSteps,
   deadlineIso,
+  derivePayoutState,
   deriveSetupState,
   requirementShortLabel,
   selectHostedLink,
@@ -181,5 +183,63 @@ describe("shouldNotifyRestricted", () => {
   it("stays quiet for healthy transitions", () => {
     expect(shouldNotifyRestricted("pending", "active", [])).toBe(false);
     expect(shouldNotifyRestricted(null, "pending", [])).toBe(false);
+  });
+});
+
+describe("derivePayoutState", () => {
+  const state = (account: Parameters<typeof buildConnectSteps>[0], hasBankAccount = true) =>
+    derivePayoutState(account, buildConnectSteps(account, { hasBankAccount }));
+  const live = { details_submitted: true, charges_enabled: true, payouts_enabled: true };
+
+  it("is not_started with no Connect account", () => {
+    expect(state(null, false)).toBe("not_started");
+  });
+
+  it("is onboarding_incomplete while Stripe's form is unfinished, even with charges already on", () => {
+    expect(state({ details_submitted: false })).toBe("onboarding_incomplete");
+    expect(state({ details_submitted: false, charges_enabled: true, payouts_enabled: true })).toBe("onboarding_incomplete");
+  });
+
+  it("is pending_verification when submitted and Stripe is still checking", () => {
+    expect(state({ details_submitted: true, requirements: { pending_verification: ["individual.verification.document"] } })).toBe("pending_verification");
+    expect(state({ details_submitted: true, requirements: { disabled_reason: "requirements.pending_verification" } })).toBe("pending_verification");
+    expect(state({ details_submitted: true, requirements: { disabled_reason: "under_review" } })).toBe("pending_verification");
+    // Nothing due, nothing under review, but payouts not switched on yet.
+    expect(state({ details_submitted: true, charges_enabled: true, payouts_enabled: false })).toBe("pending_verification");
+  });
+
+  it("is action_needed when Stripe asks for more after submission", () => {
+    expect(state({ details_submitted: true, requirements: { currently_due: ["individual.verification.document"] } })).toBe("action_needed");
+    expect(state({ details_submitted: true, requirements: { past_due: ["external_account"] } })).toBe("action_needed");
+    expect(state({ details_submitted: true, requirements: { errors: [{ requirement: "individual.dob.day" }] } })).toBe("action_needed");
+    expect(state({ details_submitted: true, requirements: { disabled_reason: "rejected.other" } })).toBe("action_needed");
+    expect(state({ details_submitted: true, requirements: { disabled_reason: "listed" } })).toBe("action_needed");
+  });
+
+  it("is action_needed for a live account that still owes something (payouts keep flowing until the deadline)", () => {
+    expect(state({ ...live, requirements: { currently_due: ["individual.id_number"], current_deadline: 1_900_000_000 } })).toBe("action_needed");
+  });
+
+  it("is action_needed when submitted with no bank account attached", () => {
+    expect(state(live, false)).toBe("action_needed");
+  });
+
+  it("is active only when charges and payouts are on and nothing is due", () => {
+    expect(state(live)).toBe("active");
+    // future_requirements alone don't block today.
+    expect(state({ ...live, future_requirements: { eventually_due: ["individual.id_number"] } })).toBe("active");
+  });
+});
+
+describe("actionItems", () => {
+  it("lists only the needed steps, with what Stripe wants", () => {
+    const steps = buildConnectSteps(
+      { details_submitted: true, requirements: { currently_due: ["individual.verification.document"], past_due: ["external_account"] } },
+      { hasBankAccount: true },
+    );
+    expect(actionItems(steps)).toEqual([
+      { step: "identity", label: "Identity", detail: "Photo ID", pastDue: false },
+      { step: "bank_account", label: "Bank account", detail: "Bank account details", pastDue: true },
+    ]);
   });
 });
