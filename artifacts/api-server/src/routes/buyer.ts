@@ -75,6 +75,7 @@ import { giftColumns, giftResponse, giftSchema, moderateGift } from "../lib/gift
 import { recordLiveCheckout } from "../lib/livePurchases";
 
 import { liveStreamIdFromItems, resolveLiveAttribution } from "../lib/liveAttribution";
+import { sellerNameSql } from "../lib/sellerName";
 const router = Router();
 router.use(requireAuth);
 
@@ -1636,7 +1637,7 @@ router.get("/orders", async (req, res) => {
         id:                      orders.id,
         orderNumber:             orders.orderNumber,
         ownerId:                 orders.ownerId,
-        sellerDisplayName:       users.displayName,
+        sellerDisplayName:       sellerNameSql,
         status:                  orders.status,
         totalCents:              orders.totalCents,
         subtotalCents:           orders.subtotalCents,
@@ -1695,7 +1696,7 @@ router.get("/orders/:id", async (req, res) => {
         id:                      orders.id,
         orderNumber:             orders.orderNumber,
         ownerId:                 orders.ownerId,
-        sellerDisplayName:       users.displayName,
+        sellerDisplayName:       sellerNameSql,
         status:                  orders.status,
         totalCents:              orders.totalCents,
         subtotalCents:           orders.subtotalCents,

@@ -4,6 +4,8 @@
  * list whose rows carry a solid circle that becomes a check, and a "Select a
  * plan" block under it while the seller has no plan. Shared: the seller
  * dashboard shows it until the first sale, and onboarding routes here too.
+ * Each part retires on its own server condition (readyToSellVisibility); with
+ * both retired the component renders nothing.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -14,7 +16,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE } from '@/constants/typography';
 import {
-  READY_TO_SELL_STEPS, READY_TO_SELL_SUBTITLE, READY_TO_SELL_TITLE, completedLabel,
+  READY_TO_SELL_STEPS, READY_TO_SELL_SUBTITLE, READY_TO_SELL_TITLE, completedLabel, readyToSellVisibility,
   type ReadyToSellResponse,
 } from '@/lib/readyToSell';
 import { SELLER_PLANS, SELLER_TRIAL_DAYS } from '@/lib/sellerPlans';
@@ -28,9 +30,10 @@ interface Props {
    * The server launch checklist's count (lib/launchChecklist.ts
    * `launchProgress`). When given, the pill and bar show it — the same number
    * as Continue setup, More and the Launch screen — and a last row opens the
-   * full checklist. Without it they count these six rows.
+   * full checklist. Without it they count these six rows. Its `complete`
+   * retires the checklist (lib/readyToSell.ts readyToSellVisibility).
    */
-  progress?: { done: number; total: number } | null;
+  progress?: { done: number; total: number; complete?: boolean } | null;
   testID?: string;
 }
 
@@ -42,57 +45,68 @@ export function ReadyToSellChecklist({ data, hasPlan, onOpen, progress, testID =
   const done = progress ? progress.done : data.steps.filter(step => step.done).length;
   const total = progress ? progress.total : data.steps.length;
 
+  const visible = readyToSellVisibility({
+    data,
+    progress: progress ? { complete: progress.complete ?? (total > 0 && done === total) } : null,
+    hasPlan,
+  });
+  if (!visible.any) return null;
+
   return (
     <View testID={testID}>
-      <Text style={[styles.title, { color: theme.text }]}>{READY_TO_SELL_TITLE}</Text>
-      <Text style={[styles.subtitle, { color: theme.muted }]}>{READY_TO_SELL_SUBTITLE}</Text>
-      <View style={[styles.pill, { borderColor: theme.border }]} testID={`${testID}-count`}>
-        <Text style={[styles.pillText, { color: theme.muted }]}>{progress ? completedLabel({ doneCount: done, total }) : completedLabel(data)}</Text>
-      </View>
-      <View style={[styles.progressTrack, { backgroundColor: theme.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: total, now: done }} testID={`${testID}-progress`}>
-        <View style={{ height: '100%', backgroundColor: theme.text, width: `${total ? done / total * 100 : 0}%` }} />
-      </View>
+      {visible.checklist ? (
+        <>
+          <Text style={[styles.title, { color: theme.text }]}>{READY_TO_SELL_TITLE}</Text>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>{READY_TO_SELL_SUBTITLE}</Text>
+          <View style={[styles.pill, { borderColor: theme.border }]} testID={`${testID}-count`}>
+            <Text style={[styles.pillText, { color: theme.muted }]}>{progress ? completedLabel({ doneCount: done, total }) : completedLabel(data)}</Text>
+          </View>
+          <View style={[styles.progressTrack, { backgroundColor: theme.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: total, now: done }} testID={`${testID}-progress`}>
+            <View style={{ height: '100%', backgroundColor: theme.text, width: `${total ? done / total * 100 : 0}%` }} />
+          </View>
 
-      <View style={[styles.group, { backgroundColor: theme.surface }]}>
-        {data.steps.map((step, i) => {
-          const meta = READY_TO_SELL_STEPS[step.id];
-          return (
-            <PressableScale
-              key={step.id}
-              onPress={() => onOpen(meta.route)}
-              style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${meta.title}${step.done ? ', done' : ''}`}
-              testID={`${testID}-${step.id}`}
-            >
-              {step.done ? (
-                <View style={[styles.check, { backgroundColor: theme.text }]}>
-                  <Feather name="check" size={13} color={theme.background} />
-                </View>
-              ) : (
-                <View style={[styles.incomplete, { borderColor: theme.muted }]} />
-              )}
-              <Text style={[styles.rowTitle, { color: theme.text }]} numberOfLines={1}>{meta.title}</Text>
-              <Feather name="chevron-right" size={18} color={theme.subtle} />
-            </PressableScale>
-          );
-        })}
-        {progress ? (
-          <PressableScale
-            onPress={() => onOpen('/launch-checklist')}
-            style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}
-            accessibilityRole="button"
-            accessibilityLabel={`See all ${total} steps`}
-            testID={`${testID}-all-steps`}
-          >
-            <Text style={[styles.allSteps, { color: theme.muted }]} numberOfLines={1}>{`See all ${total} steps`}</Text>
-            <Feather name="chevron-right" size={18} color={theme.subtle} />
-          </PressableScale>
-        ) : null}
-      </View>
+          <View style={[styles.group, { backgroundColor: theme.surface }]}>
+            {data.steps.map((step, i) => {
+              const meta = READY_TO_SELL_STEPS[step.id];
+              return (
+                <PressableScale
+                  key={step.id}
+                  onPress={() => onOpen(meta.route)}
+                  style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${meta.title}${step.done ? ', done' : ''}`}
+                  testID={`${testID}-${step.id}`}
+                >
+                  {step.done ? (
+                    <View style={[styles.check, { backgroundColor: theme.text }]}>
+                      <Feather name="check" size={13} color={theme.background} />
+                    </View>
+                  ) : (
+                    <View style={[styles.incomplete, { borderColor: theme.muted }]} />
+                  )}
+                  <Text style={[styles.rowTitle, { color: theme.text }]} numberOfLines={1}>{meta.title}</Text>
+                  <Feather name="chevron-right" size={18} color={theme.subtle} />
+                </PressableScale>
+              );
+            })}
+            {progress ? (
+              <PressableScale
+                onPress={() => onOpen('/launch-checklist')}
+                style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle }]}
+                accessibilityRole="button"
+                accessibilityLabel={`See all ${total} steps`}
+                testID={`${testID}-all-steps`}
+              >
+                <Text style={[styles.allSteps, { color: theme.muted }]} numberOfLines={1}>{`See all ${total} steps`}</Text>
+                <Feather name="chevron-right" size={18} color={theme.subtle} />
+              </PressableScale>
+            ) : null}
+          </View>
+        </>
+      ) : null}
 
-      {hasPlan === false ? (
-        <View style={[styles.plan, { backgroundColor: theme.surface }]} testID={`${testID}-plan`}>
+      {visible.plan ? (
+        <View style={[styles.plan, !visible.checklist && styles.planAlone, { backgroundColor: theme.surface }]} testID={`${testID}-plan`}>
           <Text style={[styles.planTitle, { color: theme.text }]}>{`Start your ${SELLER_TRIAL_DAYS}-day free trial`}</Text>
           <Text style={[styles.planBody, { color: theme.muted }]}>
             {`Plans start at $${STARTING_PRICE / 100}/month.`}
@@ -130,4 +144,6 @@ const styles = StyleSheet.create({
   planTitle: { ...TYPE_SCALE.headline },
   planBody: { ...TYPE_SCALE.footnote, marginTop: 4 },
   planButton: { marginTop: 14 },
+  // Checklist retired: the plan block is the section's first child, so no gap above it.
+  planAlone: { marginTop: 0 },
 });

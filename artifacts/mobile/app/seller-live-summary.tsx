@@ -12,6 +12,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi } from '@/lib/api';
 import { FONT, FS, MEDIA, SP } from '@/lib/theme';
@@ -24,6 +25,8 @@ export default function SellerLiveSummaryScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
+  const myAvatar = identity?.avatarUrl ?? user?.imageUrl ?? null;
   const insets = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
   const [summary, setSummary] = useState<LiveShowSummary | null>(null);
@@ -60,9 +63,9 @@ export default function SellerLiveSummaryScreen() {
           <Text style={styles.bigLabel}>PEAK VIEWERS</Text>
         </View>
         <View style={styles.avatar}>
-          {user?.imageUrl
-            ? <CachedImage source={{ uri: user.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            : <Text style={styles.avatarText}>{(user?.username ?? 'Y').slice(0, 1).toUpperCase()}</Text>}
+          {myAvatar
+            ? <CachedImage source={{ uri: myAvatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            : <Text style={styles.avatarText}>{(identity?.username ?? user?.username ?? 'Y').slice(0, 1).toUpperCase()}</Text>}
         </View>
         <View style={styles.bigCol}>
           <Text style={[styles.bigNum, TABULAR_NUMS]} testID="summary-total">{n(summary?.totalViewers)}</Text>

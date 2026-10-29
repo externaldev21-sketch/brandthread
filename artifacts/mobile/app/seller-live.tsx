@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 import { API_BASE_URL, useApi } from '@/lib/api';
 import { showAlert } from '@/lib/actionSheet';
 import { friendlyError } from '@/lib/friendlyError';
@@ -87,6 +88,8 @@ export default function SellerLiveScreen() {
   const topInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
+  const myUsername = identity?.username ?? user?.username ?? null;
   const preview = isLivePreviewDemo();
 
   const [viewerCount, setViewerCount] = useState(0);
@@ -318,12 +321,12 @@ export default function SellerLiveScreen() {
   // ─── Actions ───────────────────────────────────────────────────────────────
   async function sendComment(message: string) {
     if (preview) {
-      setComments(prev => [...prev, { id: `you-${Date.now()}`, userId: user?.id, username: user?.username ?? 'You', text: message, at: Date.now(), kind: 'host' as const }].slice(-80));
+      setComments(prev => [...prev, { id: `you-${Date.now()}`, userId: user?.id, username: myUsername ?? 'You', text: message, at: Date.now(), kind: 'host' as const }].slice(-80));
       return;
     }
     await (api as any).live.comment(params.streamId, {
       message,
-      displayName: user?.username ?? user?.firstName ?? 'Host',
+      displayName: myUsername ?? identity?.displayName ?? user?.firstName ?? 'Host',
     });
   }
 
@@ -430,9 +433,9 @@ export default function SellerLiveScreen() {
 
   // ─── Derived ───────────────────────────────────────────────────────────────
   const host: LiveHost = useMemo(() => {
-    const name = user?.username ?? user?.firstName ?? 'You';
-    return { id: user?.id ?? 'me', name, handle: user?.username ? `@${user.username}` : '', initials: name.slice(0, 2).toUpperCase(), avatarColor: MEDIA.chip, avatarUri: user?.imageUrl ?? null, verified: false };
-  }, [user?.id, user?.username, user?.firstName, user?.imageUrl]);
+    const name = myUsername ?? user?.firstName ?? 'You';
+    return { id: user?.id ?? 'me', name, handle: myUsername ? `@${myUsername}` : '', initials: name.slice(0, 2).toUpperCase(), avatarColor: MEDIA.chip, avatarUri: identity?.avatarUrl ?? user?.imageUrl ?? null, verified: false };
+  }, [user?.id, myUsername, user?.firstName, identity?.avatarUrl, user?.imageUrl]);
 
   const { products: showProducts } = productsFromTags(productTags);
   const withImages: LiveProduct[] = showProducts.map(p => ({ ...p, imageUri: productTags.find(t => t.productId === p.productId)?.imageUri ?? null }));

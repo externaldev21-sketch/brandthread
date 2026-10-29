@@ -21,7 +21,9 @@ it('records first-week sharing only for the authenticated, non-preview seller', 
 describe('Dashboard: store URL + copy icon row next to the title', () => {
   it('uses the one store link (brandthread.app/@username via hooks/useStoreLink), not a new builder', () => {
     expect(dashboard).toContain("import { useStoreLink } from '@/hooks/useStoreLink';");
-    expect(dashboard).toContain('const storeUrl = storeLink.url;');
+    // The onboarding @username through the same builder useStoreLink uses
+    // (lib/storeShare sellerStoreLink), falling back to the hook's own link.
+    expect(dashboard).toContain('const storeUrl = (sellerPreview ? null : sellerStoreLink(myIdentity?.username)) ?? storeLink.url;');
     expect(dashboard).not.toContain('buildCanonicalProfileUrl');
   });
 

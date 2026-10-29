@@ -46,6 +46,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'e
 import { useSignInGate } from '@/hooks/useSignInGate';
 
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 
 import { SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUBTLE_WASH, FONT, FS, SP, RADIUS } from '@/lib/theme';
 
@@ -875,9 +876,11 @@ function CommentsThread({ input, embedded = false, onClose }: { input: CommentsT
     () => { void api.posts.recordWatchedVideo(postId).catch(() => {}); },
   );
 
-  const myName = user?.fullName || user?.firstName || user?.username || 'You';
+  // Canonical onboarding identity (seller: business name); Clerk only until it loads.
+  const { identity } = useMyIdentity();
+  const myName = identity?.displayName || user?.fullName || user?.firstName || user?.username || 'You';
   const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
-  const myAvatar = user?.hasImage ? user.imageUrl : null;
+  const myAvatar = identity?.avatarUrl ?? (user?.hasImage ? user.imageUrl : null);
 
   const [comments, setComments] = useState<Row[]>([]);
   /** Top / Newest chips under the header, YouTube's comments sheet (#142). */

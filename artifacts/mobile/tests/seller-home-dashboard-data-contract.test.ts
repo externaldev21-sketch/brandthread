@@ -89,7 +89,8 @@ describe('seller home dashboard data contract', () => {
 
   it('shows the setup card (not action-needed) and empty top-products/recent-orders for a brand-new seller', () => {
     expect(source).toContain('const newSeller = everSoldCount !== null && isNewSeller(everSoldCount)');
-    expect(source).toContain('newSeller ? (');
+    // Waits for the server's first-product flag so the card never flashes in.
+    expect(source).toContain('newSeller && hasLiveProduct !== null ? (');
     expect(source).toContain('<SellerDashboardSetupCard');
     // Polish #90/#91: a brand-new seller still sees the real (zero) stat
     // tiles and the Recent orders / Top products sections with an honest

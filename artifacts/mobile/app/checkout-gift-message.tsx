@@ -10,6 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CheckoutField } from '@/components/checkout/CheckoutPrimitives';
@@ -28,8 +29,10 @@ export default function CheckoutGiftMessageScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
   const saved = getGiftOption();
-  const buyerName = (user?.fullName ?? [user?.firstName, user?.lastName].filter(Boolean).join(' ')).trim();
+  // The name the buyer gave in onboarding; Clerk's only until it loads.
+  const buyerName = (identity?.personName ?? user?.fullName ?? [user?.firstName, user?.lastName].filter(Boolean).join(' ')).trim();
 
   const [to, setTo] = useState(saved?.to ?? '');
   const [from, setFrom] = useState(saved ? saved.from : buyerName.slice(0, GIFT_NAME_MAX));

@@ -55,3 +55,22 @@ export function buildFreshReadyToSell(): ReadyToSellResponse {
 export function buildDemoReadyToSell(): ReadyToSellResponse {
   return build(['first_product', 'name_store', 'payouts']);
 }
+
+/**
+ * Which parts of the dashboard's "Get ready to sell" block are still earning
+ * their space — each retires on server state alone, never a local dismiss:
+ * - checklist: until every launch step is done (the server's 9-step count when
+ *   it has loaded; its six rows are a subset of those steps, so a finished
+ *   seller never sees it flash in first).
+ * - plan ("Start your free trial" / "Select a plan"): only while the
+ *   subscription status says there is no plan (false), never while unknown.
+ */
+export function readyToSellVisibility({ data, progress, hasPlan }: {
+  data: Pick<ReadyToSellResponse, 'complete'>;
+  progress?: { complete: boolean } | null;
+  hasPlan: boolean | null;
+}): { checklist: boolean; plan: boolean; any: boolean } {
+  const checklist = progress ? !progress.complete : !data.complete;
+  const plan = hasPlan === false;
+  return { checklist, plan, any: checklist || plan };
+}

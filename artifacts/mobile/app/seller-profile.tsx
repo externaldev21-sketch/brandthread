@@ -99,6 +99,7 @@ import { resolveProfileBanner, type ProfileBanner } from '@/components/profile/p
 import { useProfileBannerState } from '@/components/profile/useProfileBanner';
 import { useProfileNote } from '@/components/profile/useProfileNote';
 import { useProfileBanner } from '@/components/profile/ProfileBannerEditor';
+import { sellerDisplayName } from '@/lib/identity';
 
 type ContentTab = 'Posts' | 'Shop' | 'Tagged';
 // Internal key stays 'Shop'; the label (and accessibility name) is "Products".
@@ -156,7 +157,8 @@ function httpOrNull(value: unknown): string | null {
 const PROFILE_LOAD_FALLBACK = 'Something went wrong on our end. Try again in a moment.';
 
 function toSellerView(profile: any, fallbackId: string): SellerView {
-  const brandName = profile?.brandName ?? profile?.displayName ?? 'Seller';
+  // Business name, then the person's name, then @username (lib/identity.ts).
+  const brandName = sellerDisplayName(profile ?? {}) ?? 'Seller';
   return {
     sellerId: profile?.clerkId ?? profile?.id ?? fallbackId,
     brandName,

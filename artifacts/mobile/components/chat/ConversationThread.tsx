@@ -57,7 +57,7 @@ import {
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
   sendQueuedMessage, getCachedConversation, getCachedMessages,
-  MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
+  MY_USER_ID, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import { clientIdFromOutboxMessageId, discardOutboxMessage, enqueueOutboxMessage, isOutboxMessageId, mergeOutboxIntoThread, outboxEntryToMessage, retryOutboxMessage, subscribeOutboxEvents, type OutboxEntry } from '@/lib/messageOutbox';
 import { useMessageOutbox } from '@/hooks/useMessageOutbox';
@@ -87,6 +87,8 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth, useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
+import { initialsOf } from '@/lib/initials';
 import { apiErrorCode, apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, REMOVED_MESSAGE_TEXT, type DmMessagingState } from '@/components/safety/DmSafety';
 import {
@@ -362,11 +364,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   const myId = userId ?? MY_USER_ID;
   // Seeded preview thread ids for this side (never real network calls).
   const isPreviewId = (id: string) => (isSeller ? isSellerPreviewConversationId(id) : isPreviewConversationId(id));
-  // The seller's own name for calls (the buyer side keeps its MY_NAME).
+  // Your own name for calls, reactions and pending messages: the canonical
+  // onboarding identity (seller: business name; buyer: their name), never the
+  // old "Jordan" placeholder. Clerk's name only until it loads.
   const { user } = useUser();
-  const sellerName = user?.fullName || user?.username || 'You';
-  const myCallName = isSeller ? sellerName : MY_NAME;
-  const myCallInitials = isSeller ? (sellerName[0] ?? '?').toUpperCase() : MY_INITIALS;
+  const { identity: myIdentity } = useMyIdentity();
+  const myCallName = myIdentity?.displayName || user?.fullName || user?.username || 'You';
+  const myCallInitials = initialsOf(myCallName, 1) || MY_INITIALS;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   // Seeded preview threads have no signed-in owner; they get their own scope.
@@ -1360,11 +1364,11 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     if (!conv || requestLocked) return;
     hapticSelection();
     const prevMessages = messages;
-    const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
+    const { next } = applyOptimisticReaction(msg.reactions, myId, myCallName, type);
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
     try {
       if (isPreviewId(conv.id)) {
-        reactToPreviewMessage(conv.id, msg.id, type, myId, MY_NAME);
+        reactToPreviewMessage(conv.id, msg.id, type, myId, myCallName);
         return;
       }
       await addReaction(conv.id, msg.id, type);
@@ -1716,7 +1720,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         conversationId: conv.id,
         fromId: myId,
         fromName: 'You',
-        fromInitials: MY_INITIALS,
+        fromInitials: myCallInitials,
         fromColor: theme.accent,
         text: t,
         attachment: att ?? undefined,
@@ -1770,7 +1774,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       ticket.messageId = localId;
       setMessages(prev => [...prev, {
         id: localId, conversationId: threadId, fromId: myId, fromName: 'You',
-        fromInitials: MY_INITIALS, fromColor: theme.accent, text: t,
+        fromInitials: myCallInitials, fromColor: theme.accent, text: t,
         attachment: { ...att, meta: { ...att.meta, uploadProgress: String(ticket.fraction) } },
         reactions: [], status: 'sending', ts: Date.now(), deletedForMe: false,
       }]);
@@ -2523,7 +2527,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
 
   // ── Main render ─────────────────────────────────────────────────────────────
 
-  const visibleMessages = mergeOutboxIntoThread(messages.filter(m => !m.deletedForMe), outboxEntries.map(entry => outboxEntryToMessage(entry, { fromId: myId, fromName: myCallName, fromInitials: MY_INITIALS, fromColor: MY_COLOR })));
+  const visibleMessages = mergeOutboxIntoThread(messages.filter(m => !m.deletedForMe), outboxEntries.map(entry => outboxEntryToMessage(entry, { fromId: myId, fromName: myCallName, fromInitials: myCallInitials, fromColor: MY_COLOR })));
   const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
   const listDataRef = useRef(listData);
   listDataRef.current = listData;

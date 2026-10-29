@@ -34,6 +34,7 @@ import {
 import {
   TRENDING_WINDOW_DAYS, rankByScore, scoreBrandSignals, scoreProductSignals, windowStart,
 } from "../lib/trendingScoring";
+import { sellerNameSql } from "../lib/sellerName";
 
 const router = Router();
 
@@ -69,7 +70,7 @@ async function attachVariantsAndSeller<T extends { id: string; ownerId: string }
     db.select().from(productVariants).where(inArray(productVariants.productId, ids)),
     db.select({
       clerkId: users.clerkId,
-      displayName: users.displayName,
+      displayName: sellerNameSql,
       verified: users.verified,
       verificationStatus: users.verificationStatus,
       activeStanding: users.activeStanding,

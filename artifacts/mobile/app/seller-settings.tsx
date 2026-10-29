@@ -29,6 +29,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 
 import { useAuth, useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 
 import { useColors } from '@/hooks/useColors';
 
@@ -74,6 +75,7 @@ export default function SellerSettingsScreen() {
   const api = useApi();
   const { signOut } = useAuth();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
 
   const [query, setQuery] = useState('');
@@ -99,7 +101,8 @@ export default function SellerSettingsScreen() {
     return () => { active = false; };
   }, [api]);
 
-  const profileName = previewSellerBrandName() ?? (user?.fullName || user?.username || 'Your Brandthread store');
+  // The business name onboarding saved (Clerk's name only until it loads).
+  const profileName = previewSellerBrandName() ?? (identity?.displayName || user?.fullName || user?.username || '');
   // Initials are derived from the exact same `profileName` string shown next
   // to the avatar (not a separate first/last-name pair that may be blank),
   // so the avatar and the name text can never disagree.
