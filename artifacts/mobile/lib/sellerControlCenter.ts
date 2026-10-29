@@ -110,8 +110,8 @@ export const SECTIONS: ControlCenterSection[] = [
     items: [
       // Dev: the Studio menu opens on this — the seller's own way into the
       // real buyer Threads feed (swipe, comment, buy) without leaving their
-      // seller account. See app/watch-threads.tsx.
-      { id: 'watch-threads', label: 'Watch Threads', icon: 'play-circle', route: '/watch-threads', description: 'Browse and shop the Threads feed' },
+      // seller account. See app/(tabs)/watch-threads.tsx.
+      { id: 'watch-threads', label: 'Watch Threads', icon: 'play-circle', route: '/(tabs)/watch-threads', description: 'Browse and shop the Threads feed' },
       { id: 'add-product', label: 'Add product', icon: 'plus-square', route: '/add-product', description: 'List a new item' },
       { id: 'post-video',  label: 'Create post',  icon: 'video',       route: '/create-post', description: 'Share a shoppable post' },
       { id: 'go-live',     label: 'Go Live',      icon: 'radio',       route: '/seller-go-live', description: 'Start a live shopping stream' },

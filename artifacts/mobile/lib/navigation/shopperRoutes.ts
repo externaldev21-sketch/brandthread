@@ -2,7 +2,7 @@
  * Where a purchase flow's Bag / Continue shopping links go, by account.
  *
  * Buyers get their tab-shell screens. A seller shopping from Watch Threads
- * (app/watch-threads.tsx) must stay on the seller side and never be switched
+ * (app/(tabs)/watch-threads.tsx) must stay on the seller side and never be switched
  * into the buyer tab shell, so they get the same Bag screen pushed on the
  * root stack (app/bag.tsx), and Continue shopping pops back to the Watch
  * Threads feed they came from.
@@ -26,7 +26,7 @@ export function shopperRoutesFor(role: string | null | undefined): ShopperRoutes
   return {
     isSeller,
     bag: isSeller ? '/bag' : '/(buyer)/cart',
-    shopping: isSeller ? '/watch-threads' : '/(buyer)/discover',
+    shopping: isSeller ? '/(tabs)/watch-threads' : '/(buyer)/discover',
     purchases: isSeller ? '/purchases' : '/(buyer)/orders',
   };
 }
