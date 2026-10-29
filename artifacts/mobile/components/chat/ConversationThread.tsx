@@ -721,9 +721,10 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       }
     } catch (e) {
       const status = (e as { status?: number } | null)?.status;
+      // 404/403 is "Conversation not found" (no retry); anything else is a
+      // load failure with "Try again".
       setLoadFailed(status !== 404 && status !== 403);
       console.error('Failed to load conversation', e);
-      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -736,7 +737,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   useEffect(() => {
     const unsub = subscribeSocial(() => {
       if (conv?.id && !isPreviewId(conv.id)) {
-        getMessages(conv.id).then(setMessages);
+        getMessages(conv.id).then(setMessages).catch(() => {});
       }
     });
     return unsub;
@@ -1300,12 +1301,18 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     setIsSending(true);
     try {
       await sendMessage(conv.id, '', attachment);
+    } catch (e) {
+      Alert.alert('Voice message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
+      setIsSending(false);
+      return;
+    }
+    // Sent. A failed refresh must not read as "not sent" (the buyer would
+    // record and send it again); the next poll / realtime event catches up.
+    try {
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       listScroll.requestScrollToEnd();
-    } catch (e) {
-      Alert.alert('Voice message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
-    } finally {
+    } catch { /* refreshed later */ } finally {
       setIsSending(false);
     }
   }
@@ -1802,7 +1809,17 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       return;
     }
     if (userId) {
-      await enqueueOutboxMessage(userId, conv.id, { text: t, attachment: att ?? undefined, replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined, replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName });
+      const threadId = conv.id;
+      try {
+        await enqueueOutboxMessage(userId, threadId, { text: t, attachment: att ?? undefined, replyToId: replyingTo && !isOutboxMessageId(replyingTo.id) ? replyingTo.id : undefined, replyPreview: replyingTo?.text, replyToAuthorName: replyingTo?.fromName });
+      } catch {
+        // The composer was already cleared: hand the draft back instead of
+        // silently losing it (same as the media-upload branch above).
+        if (currentUserRef.current !== userId || currentThreadIdRef.current !== threadId) return;
+        setText(t); setSelectedAttachment(att); setReplyTo(replyingTo);
+        Alert.alert('Message not saved', 'Your message was not sent. Try again.');
+        return;
+      }
       listScroll.requestScrollToEnd();
       void flushOutboxNow();
       return;
@@ -2013,9 +2030,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: true } : m)));
       return;
     }
-    deleteMessageForMe(conv.id, msg.id)
-      .then(() => getMessages(conv.id).then(setMessages))
-      .catch((e) => Alert.alert('Couldn’t delete message', apiErrorMessage(e, 'Please try again.')));
+    const threadId = conv.id;
+    deleteMessageForMe(threadId, msg.id)
+      .then(() => {
+        // Deleted: hide it now; a failed refresh must not report the delete as failed.
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: true } : m)));
+        return getMessages(threadId).then(setMessages).catch(() => {});
+      }, (e) => Alert.alert('Couldn’t delete message', apiErrorMessage(e, 'Please try again.')));
   }
 
   function sheetReport() {
@@ -2544,13 +2565,13 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
   }, [conv?.id, messages.length]));
   useEffect(() => {
     focusHoldRef.current = null; focusScrollIdRef.current = null; setFocusedMessageId(null);
+    searchFocusHoldRef.current = false;
   }, [userId, params.id]);
 
   // New focusMessageId (first open, or another search result) → queue it.
   useEffect(() => {
     if (!params.focusMessageId) return;
     focusPendingRef.current = params.focusMessageId;
-    focusHoldRef.current = true;
     hasScrolledToUnreadRef.current = true;
   }, [params.focusMessageId]);
 
@@ -2560,6 +2581,9 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     const idx = listData.findIndex(r => r.type === 'message' && r.msg.id === target);
     if (idx < 0) return;
     focusPendingRef.current = null;
+    // Hold the stick-to-bottom scrolls on the found message until a new
+    // message arrives (released in the messages.length effect above).
+    searchFocusHoldRef.current = true;
     focusHoldLenRef.current = messages.length;
     const scrollTimer = setTimeout(() => {
       flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
@@ -2928,6 +2952,7 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         onContentSizeChange={() => {
+          if (searchFocusHoldRef.current) return;
           if (focusHoldRef.current === messages.length) return;
           focusHoldRef.current = null;
           listScroll.onContentSizeChange();
@@ -3503,7 +3528,10 @@ function statusLineFor(participant: ConversationParticipant | null): string | nu
   if (participant.isOnline) return 'online';
   if (participant.lastSeenAt) {
     const ts = new Date(participant.lastSeenAt).getTime();
-    if (!Number.isNaN(ts)) return `last seen ${timeAgo(ts)} ago`;
+    if (!Number.isNaN(ts)) {
+      const ago = timeAgo(ts);
+      return ago === 'now' ? 'last seen just now' : `last seen ${ago} ago`;
+    }
   }
   return null;
 }

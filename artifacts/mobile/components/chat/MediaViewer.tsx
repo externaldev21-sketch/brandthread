@@ -39,6 +39,21 @@ export default function MediaViewer({
     return Math.sqrt(dx * dx + dy * dy);
   };
 
+  // The responder below is created once, so it reads the latest onClose
+  // through a ref instead of the first render's closure.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Every way out (X, back, swipe down) resets the transform, or the next
+  // photo opens still dragged down / dimmed.
+  const handleClose = () => {
+    currentScale.current = 1;
+    scale.setValue(1);
+    translateY.setValue(0);
+    backdropOpacity.setValue(1);
+    onCloseRef.current();
+  };
+
   const resetTransform = () => {
     currentScale.current = 1;
     Animated.parallel([
@@ -78,21 +93,13 @@ export default function MediaViewer({
         return;
       }
       if (gesture.dy > 120) {
-        onClose();
+        handleClose();
         return;
       }
       resetTransform();
     },
     onPanResponderTerminate: () => resetTransform(),
   })).current;
-
-  const handleClose = () => {
-    currentScale.current = 1;
-    scale.setValue(1);
-    translateY.setValue(0);
-    backdropOpacity.setValue(1);
-    onClose();
-  };
 
   async function handleSave() {
     if (!uri) return;

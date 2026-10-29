@@ -239,6 +239,9 @@ export function OrderConfirmation({
       + '&participantColor=' + encodeURIComponent(theme.accent)
       + '&participantAccountType=seller'
       + '&type=buyer_to_seller_order'
+      // The server keys an order thread by contextOrderId; without it every
+      // order reuses one thread labelled with the first order's number.
+      + (firstVerified?.id ? '&contextOrderId=' + encodeURIComponent(firstVerified.id) : '')
       + '&contextOrderNumber=' + encodeURIComponent(firstVerified?.number ?? '')
     ) as never);
   }
