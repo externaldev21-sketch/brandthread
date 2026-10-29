@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Icon } from '@/components/ui/Icon';
@@ -45,6 +46,11 @@ type Props = {
  * and a failed request rolls back AND says so (`onError`, else an alert).
  * Unfollowing confirms first (the Following list's two-option sheet,
  * app/connections.tsx), so no screen using this button unfollows on one tap.
+ *
+ * Instagram's in-place morph: the label swaps the instant it's tapped (no
+ * spinner — the write is optimistic), the new label fades in over the old
+ * one and the pill's width eases to the new label's width, so neighbours
+ * slide rather than jump. The resting look of each state is unchanged.
  */
 export default function FollowButton({ userId, initial, onChange, disabled, size = 'default', style, onError, guard, name }: Props) {
   const { theme } = useAppTheme();
@@ -128,10 +134,30 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
     }
   };
 
+  const contentWidth = useSharedValue(-1);
+  // The new label gets its full natural width at once, so it never wraps or
+  // ellipsizes while the clip around it is still easing open.
+  const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
+  const onMeasure = (e: LayoutChangeEvent) => {
+    const w = Math.ceil(e.nativeEvent.layout.width);
+    if (w <= 0) return;
+    setNaturalWidth(w);
+    // First measure sizes it outright; every later change eases.
+    contentWidth.value = contentWidth.value < 0 ? w : withTiming(w, { duration: 220, easing: Easing.out(Easing.cubic) });
+  };
+  const widthStyle = useAnimatedStyle(() => (contentWidth.value < 0 ? {} : { width: contentWidth.value }));
+
   const label = state.isFollowing
     ? (state.isMutual ? 'Friends' : 'Following')
     : (state.isFollowedBy ? 'Follow back' : 'Follow');
   const isPrimary = !state.isFollowing;
+  const fg = disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text;
+  const content = (
+    <>
+      {state.isFollowing && <Icon name="check" size={14} color={fg} style={styles.icon} />}
+      <Text style={[styles.label, { color: fg }]} numberOfLines={1}>{label}</Text>
+    </>
+  );
 
   return (
     <Pressable
@@ -154,19 +180,22 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
         style,
       ]}
     >
-      {busy ? (
-        <ActivityIndicator size="small" color={isPrimary ? theme.onAccent : theme.text} />
-      ) : (
-        <>
-          {state.isFollowing && (
-            <Icon name="check" size={14} color={disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text} style={styles.icon} />
-          )}
-          <Text style={[styles.label, { color: disabled ? TEXT_DISABLED : isPrimary ? theme.onAccent : theme.text }]}>{label}</Text>
-        </>
-      )}
+      <Animated.View style={[styles.morph, widthStyle]}>
+        <Animated.View key={label} entering={FadeIn.duration(160)} style={[styles.row, styles.label0, naturalWidth != null && { width: naturalWidth }]}>
+          {content}
+        </Animated.View>
+        {/* Invisible copy at natural width: drives the width ease above. */}
+        <View style={[styles.measureBox, { width: MEASURE_ROOM }]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View style={styles.row} onLayout={onMeasure}>{content}</View>
+        </View>
+      </Animated.View>
     </Pressable>
   );
 }
+
+/** Room for the invisible measuring copy to lay out at natural width (it is
+ *  clipped by the morph box, never seen, never scrollable). */
+const MEASURE_ROOM = 1000;
 
 const makeStyles = (theme: AppThemePreset, size: 'default' | 'compact') => StyleSheet.create({
   base: {
@@ -179,5 +208,9 @@ const makeStyles = (theme: AppThemePreset, size: 'default' | 'compact') => Style
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   icon: { marginRight: 4 },
+  morph: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  label0: { justifyContent: 'center', flexShrink: 0 },
+  measureBox: { position: 'absolute', left: 0, top: 0, flexDirection: 'row', alignItems: 'flex-start', opacity: 0 },
   label: { fontFamily: FONT.semibold, fontSize: size === 'compact' ? FS.meta : FS.sm },
 });

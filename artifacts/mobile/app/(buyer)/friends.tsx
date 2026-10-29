@@ -5,7 +5,17 @@ import { relativeTime } from '@/lib/activity';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import { View, Text, ScrollView, FlatList, Alert, StyleSheet, Dimensions, Share, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, FlatList, Alert, StyleSheet, Dimensions, Share, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { TapHeartBurst } from '@/components/buyer-feed/TapHeartBurst';
+import { PinchToZoom } from '@/components/media/PinchToZoom';
+import { ParentScrollGestureScope } from '@/components/media/ParentScrollGesture';
+import { PopOnActive } from '@/components/motion/PopOnActive';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { emitSaveHeartEvent } from '@/lib/saved/saveHeartBus';
+import { savedPostToast } from '@/lib/saved/savedPostToast';
+
+/** Two taps on a post's photo inside this window (ms) like it. */
+const DOUBLE_TAP_MS = 280;
 
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -97,6 +107,35 @@ function PostCard({
   const { openReport } = useReportSheet();
   const { theme } = useAppTheme();
   const palette = useColors();
+  const reduceMotion = useReduceMotion();
+  const [burstPoint, setBurstPoint] = useState<{ x: number; y: number } | null>(null);
+  const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomingRef = useRef(false);
+  const zoomEndedAt = useRef(0);
+  useEffect(() => () => { if (singleTapTimer.current) clearTimeout(singleTapTimer.current); }, []);
+  const onMediaPress = (event: GestureResponderEvent) => {
+    // A pinch that just ended is not a tap.
+    if (zoomingRef.current || Date.now() - zoomEndedAt.current < 300) { lastTap.current = null; return; }
+    const { locationX: x, locationY: y } = event.nativeEvent;
+    const now = Date.now();
+    const prev = lastTap.current;
+    if (prev && now - prev.at < DOUBLE_TAP_MS && Math.hypot(prev.x - x, prev.y - y) < 40) {
+      lastTap.current = null;
+      if (singleTapTimer.current) { clearTimeout(singleTapTimer.current); singleTapTimer.current = null; }
+      // Double tap only ever likes — never un-likes (Instagram).
+      if (!post.likedByMe) onLike(post);
+      setBurstPoint({ x, y });
+      return;
+    }
+    lastTap.current = { at: now, x, y };
+    if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+    singleTapTimer.current = setTimeout(() => {
+      singleTapTimer.current = null;
+      lastTap.current = null;
+      onOpenComments(post);
+    }, DOUBLE_TAP_MS);
+  };
 
   return (
     <View style={[s.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
@@ -139,27 +178,34 @@ function PostCard({
         />
       </View>
 
-      {/* Media */}
-      <PressableScale accessibilityLabel="Open comments" onPress={() => onOpenComments(post)} style={s.mediaPress}>
-        {post.mediaUrl ? (
-          <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
-        ) : (
-          <View style={[s.media, { backgroundColor: palette.elevated }]}>
-            <Icon
-              name={post.type === 'video' ? 'video' : 'image'}
-              size={44}
-              color={palette.mutedForeground}
-            />
-          </View>
-        )}
+      {/* Media — Instagram: double-tap likes (heart where you tapped), one
+          tap still opens comments once the double-tap window has passed,
+          two fingers zoom the photo in place above the feed. */}
+      <PressableScale accessibilityLabel="Open comments" onPress={onMediaPress} style={s.mediaPress} testID={`friends-post-media-${post.id}`}>
+        <PinchToZoom uri={post.mediaUrl} onZoomChange={(z) => { zoomingRef.current = z; if (!z) zoomEndedAt.current = Date.now(); }} testID={`friends-post-zoom-${post.id}`}>
+          {post.mediaUrl ? (
+            <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
+          ) : (
+            <View style={[s.media, { backgroundColor: palette.elevated }]}>
+              <Icon
+                name={post.type === 'video' ? 'video' : 'image'}
+                size={44}
+                color={palette.mutedForeground}
+              />
+            </View>
+          )}
+        </PinchToZoom>
+        <TapHeartBurst point={burstPoint} reduceMotion={reduceMotion} />
       </PressableScale>
 
       {/* Actions */}
       <View style={s.actionRow}>
         <PressableScale style={s.actionItem} onPress={() => onLike(post)}>
-          {post.likedByMe
-            ? <FontAwesome name="heart" size={ICON.lg} color={palette.destructive} />
-            : <Icon name="heart" size={ICON.lg} color={palette.mutedForeground} />}
+          <PopOnActive active={post.likedByMe} testID={`friends-like-icon-${post.id}`}>
+            {post.likedByMe
+              ? <FontAwesome name="heart" size={ICON.lg} color={palette.destructive} />
+              : <Icon name="heart" size={ICON.lg} color={palette.mutedForeground} />}
+          </PopOnActive>
           <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }, post.likedByMe && { color: palette.destructive }]}>{post.likesCount}</Text>
         </PressableScale>
         <PressableScale style={s.actionItem} onPress={() => onOpenComments(post)}>
@@ -180,9 +226,11 @@ function PostCard({
           onPress={() => onSave(post)}
           accessibilityLabel={saved ? 'Remove from saved' : 'Save post'}
         >
-          {saved
-            ? <FontAwesome name="bookmark" size={ICON.lg} color={theme.accent} />
-            : <Icon name="bookmark" size={ICON.lg} color={palette.mutedForeground} />}
+          <PopOnActive active={saved} kind="bounce">
+            {saved
+              ? <FontAwesome name="bookmark" size={ICON.lg} color={theme.accent} />
+              : <Icon name="bookmark" size={ICON.lg} color={palette.mutedForeground} />}
+          </PopOnActive>
         </PressableScale>
         <PressableScale
           style={s.actionIcon}
@@ -393,7 +441,11 @@ export default function FriendsScreen() {
     }, {
       onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
     });
-    showSnackbar('Saved');
+    // The app-wide saved bar (thumbnail + "Manage" → Save to…), same as Home.
+    emitSaveHeartEvent({ type: 'toast', toast: savedPostToast({
+      id: post.id, caption: post.caption, creator: post.authorName, accentColor: post.authorColor,
+      contentType: post.type, mediaUris: post.mediaUrl ? [post.mediaUrl] : [],
+    }) });
   }
 
   function handleNotInterested(post: BuyerPost) {
@@ -638,6 +690,7 @@ export default function FriendsScreen() {
       {loadError && feedPosts.length === 0 && !loading ? (
         <ErrorState message="Couldn't load activity. Pull to refresh." onRetry={loadData} />
       ) : (
+        <ParentScrollGestureScope>
         <FlatList
           ref={scrollResetRef}
           data={feedPosts}
@@ -661,6 +714,7 @@ export default function FriendsScreen() {
             />
           )}
         />
+        </ParentScrollGestureScope>
       )}
 
       <Snackbar visible={snackbar.visible} message={snackbar.message} onDismiss={() => setSnackbar(prev => ({ ...prev, visible: false }))} />

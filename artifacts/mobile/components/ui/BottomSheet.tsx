@@ -41,7 +41,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useKeyboardHeight } from '@/components/ui/useKeyboardHeight';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -49,7 +49,7 @@ import { radius } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { SHEET_BACKDROP_OPACITY } from '@/constants/motion';
-import { useSheetTransition } from '@/components/ui/useSheetTransition';
+import { useSheetTransition, type SheetDetent } from '@/components/ui/useSheetTransition';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 import { sheetSurfaceColor } from '@/lib/sheetSurface';
 
@@ -125,6 +125,13 @@ export interface SheetProps {
   showGrabber?: boolean;
   /** Preserve the filter sheet's half/full snap points on the shared engine. */
   detents?: boolean;
+  /** Detents: the body height the half detent shows (grabber + bottom inset are added
+   *  on top), so a sheet keeps its old resting size. Default: SHEET_HALF_FRACTION of the window. */
+  halfContentHeight?: number;
+  /** Detents: open the keyboard at half and the sheet springs to full, so the composer stays in view. */
+  expandOnKeyboard?: boolean;
+  /** Detents: which detent the sheet settled at (after a drag or snap). */
+  onDetentChange?: (detent: SheetDetent) => void;
 }
 
 export function SheetButton({ label, onPress, disabled, loading, variant = 'primary', accessibilityLabel, testID }: SheetAction) {
@@ -171,6 +178,11 @@ export function SheetCloseButton({ onPress, label = 'Close' }: { onPress: () => 
   );
 }
 
+/** The grabber row's height: 6 + 5 + 4 (styles.grabberWrap / grabber). */
+const GRABBER_BLOCK_H = 15;
+/** styles.bodyEnd's bottom padding (body without a footer). */
+const BODY_END_PAD = 8;
+
 export function SheetGrabber() {
   const { theme } = useAppTheme();
   return (
@@ -184,6 +196,7 @@ export function Sheet({
   visible, onClose, onDismissed, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
   children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
   testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false, fullHeight: fillHeight = false, surfaceStyle, showGrabber = true,
+  halfContentHeight, expandOnKeyboard = false, onDetentChange,
 }: SheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -194,8 +207,22 @@ export function Sheet({
   const fullHeight = sheetFullHeight(insets.top);
   const {
     modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout, scrollOffset, bodyOverflows,
-    contentScrollEnabled, footerStyle,
-  } = useSheetTransition(visible, onClose, { reduceMotion, detents: detents ? { fullHeight } : undefined });
+    contentScrollEnabled, footerStyle, detent, snapTo,
+  } = useSheetTransition(visible, onClose, {
+    reduceMotion,
+    detents: detents
+      ? {
+        fullHeight,
+        halfHeight: halfContentHeight != null
+          ? Math.min(fullHeight, halfContentHeight + (showGrabber ? GRABBER_BLOCK_H : 0)
+            + (footer || primaryAction || secondaryAction ? 0 : BODY_END_PAD) + Math.max(insets.bottom, 16))
+          : undefined,
+      }
+      : undefined,
+  });
+  const onDetentChangeRef = useRef(onDetentChange);
+  onDetentChangeRef.current = onDetentChange;
+  useEffect(() => { if (detents) onDetentChangeRef.current?.(detent); }, [detents, detent]);
   const wasModalVisible = useRef(false);
   useEffect(() => {
     if (modalVisible) {
@@ -218,6 +245,12 @@ export function Sheet({
   const syncOverflow = () => bodyOverflows.set(contentH.current > viewportH.current + 1);
 
   const keyboard = useKeyboardHeight();
+  // Keyboard up while at half: go full (Instagram comments), never back down on its own.
+  useAnimatedReaction(
+    () => keyboard.value < -1,
+    (up, wasUp) => { if (detents && expandOnKeyboard && up && !wasUp) runOnJS(snapTo)('full'); },
+    [detents, expandOnKeyboard, snapTo],
+  );
   const restingBottom = Math.max(insets.bottom, 16);
   // Pinned content sits on the keyboard (8pt gap) while it's up, and above
   // the home indicator when it's down — tracked per frame, no jump.
@@ -400,7 +433,7 @@ const styles = StyleSheet.create({
     maxWidth: WEB_SHELL_MAX_WIDTH,
     alignSelf: 'center',
   },
-  grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 4 },
+  grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 4 }, // GRABBER_BLOCK_H tall
   grabber: { width: 36, height: 5, borderRadius: 2.5 },
   header: {
     flexDirection: 'row',

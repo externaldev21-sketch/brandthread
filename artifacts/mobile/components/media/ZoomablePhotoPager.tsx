@@ -59,6 +59,9 @@ export type ZoomablePhotoPagerProps = {
   onFirstImagePainted?: () => void;
   onZoomChange?: (zoomed: boolean) => void;
   testID?: string;
+  /** Filled with a stepper the parent can call (edge taps): moves one slide
+   *  by `delta`, returning false at either end. */
+  stepRef?: React.MutableRefObject<((delta: number) => boolean) | null>;
   /** Extra chrome inside the frame (e.g. web prev/next arrows). */
   renderOverlay?: (api: { index: number; count: number; zoomed: boolean; goTo: (i: number) => void }) => React.ReactNode;
 };
@@ -66,7 +69,7 @@ export type ZoomablePhotoPagerProps = {
 export function ZoomablePhotoPager({
   postId, uris, width: W, height: H, aspects, mode, renderPage, showCounter = true, counterTop = 12,
   dotsPlacement = 'overlay', dotsBottom = 12, dotColor = MEDIA.white, dotDim = `${MEDIA.white}66`,
-  isActive = true, onIndexChange, onFirstImagePainted, onZoomChange, testID, renderOverlay,
+  isActive = true, onIndexChange, onFirstImagePainted, onZoomChange, testID, renderOverlay, stepRef,
 }: ZoomablePhotoPagerProps) {
   const pages = useMemo(() => (uris.length > 0 ? uris : ['']), [uris]);
   const count = pages.length;
@@ -166,6 +169,17 @@ export function ZoomablePhotoPager({
     offset.value = withSpring(-c * W, { ...SPRING, overshootClamping: true });
     commit(c);
   }, [W, commit, count, idx, offset, resetZoomAnimated, zoomedSV]);
+
+  useEffect(() => {
+    if (!stepRef) return undefined;
+    stepRef.current = (delta: number) => {
+      const next = indexRef.current + delta;
+      if (next < 0 || next > count - 1) return false;
+      goTo(next);
+      return true;
+    };
+    return () => { stepRef.current = null; };
+  }, [stepRef, goTo, count]);
 
   // Retained screens follow the shared per-post index (viewer <-> feed <-> profile).
   useEffect(() => {

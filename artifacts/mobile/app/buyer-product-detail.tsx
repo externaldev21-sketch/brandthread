@@ -147,6 +147,7 @@ import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { getProduct as getLocalSellerProduct } from '@/services/productService';
 
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+import { TickingCount } from '@/components/motion/TickingCount';
 
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 
@@ -2191,7 +2192,7 @@ export default function BuyerProductDetailScreen() {
             />
             {cartCount > 0 ? (
               <View style={s.cartBadge} pointerEvents="none" testID="product-cart-badge">
-                <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+                <TickingCount value={cartCount} style={s.cartBadgeText} />
               </View>
             ) : null}
           </Animated.View>

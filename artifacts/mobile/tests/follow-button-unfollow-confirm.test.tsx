@@ -18,6 +18,7 @@ vi.mock('react-native', () => {
   return {
     Pressable: nativeComponent('Pressable'),
     Text: nativeComponent('Text'),
+    View: nativeComponent('View'),
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     StyleSheet: { create: (styles: unknown) => styles },
     Platform: { OS: 'ios' },

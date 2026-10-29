@@ -32,10 +32,12 @@ export type PhotoCarouselProps = {
   autoAdvance?: boolean;
   /** Press-and-hold pauses auto-advance. */
   holding?: boolean;
+  /** Edge taps (Instagram): the feed page steps slides through this. */
+  stepRef?: React.MutableRefObject<((delta: number) => boolean) | null>;
 };
 
 export function PhotoCarousel({
-  postId, uris, pageWidth, pageHeight, counterTop, indicatorBottom, onIndexChange, onFirstImagePainted, isActive = true, aspects, onZoomChange, autoAdvance = false, holding = false,
+  postId, uris, pageWidth, pageHeight, counterTop, indicatorBottom, onIndexChange, onFirstImagePainted, isActive = true, aspects, onZoomChange, autoAdvance = false, holding = false, stepRef,
 }: PhotoCarouselProps) {
   return (
     <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]} testID={`photo-carousel-${postId}`}>
@@ -54,6 +56,7 @@ export function PhotoCarousel({
         onIndexChange={onIndexChange}
         onFirstImagePainted={onFirstImagePainted}
         onZoomChange={onZoomChange}
+        stepRef={stepRef}
         renderOverlay={({ index, count, zoomed, goTo }) => (
           <PhotoAutoAdvance index={index} count={count} zoomed={zoomed} goTo={goTo} enabled={autoAdvance} active={isActive} holding={holding} />
         )}

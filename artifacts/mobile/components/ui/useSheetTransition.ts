@@ -49,6 +49,9 @@ export interface SheetTransition {
    *  upward drag scrolls the body instead of rubber-banding the sheet. */
   bodyOverflows: SharedValue<boolean>;
   detent: SheetDetent;
+  /** Detent sheets: spring to a detent programmatically (e.g. expand to
+   *  full when the keyboard opens). No-op without detents. */
+  snapTo: (detent: SheetDetent) => void;
   contentScrollEnabled: boolean;
   footerStyle: AnimatedStyle<{ transform?: { translateY: number }[] }>;
 }
@@ -228,9 +231,18 @@ export function useSheetTransition(
       }
     });
 
+  const snapTo = useCallback((next: SheetDetent) => {
+    if (!detents || !openRef.current) return;
+    const target = next === 'full' ? 0 : halfOffset;
+    setDetent(next);
+    translateY.set(reduceMotion
+      ? withTiming(target, { duration: 150, easing: SHEET_EASING })
+      : withSpring(target, SHEET_SPRING));
+  }, [detents, halfOffset, reduceMotion, translateY]);
+
   return {
     modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout, scrollOffset, bodyOverflows,
-    detent, contentScrollEnabled: !detents || detent === 'full', footerStyle,
+    detent, snapTo, contentScrollEnabled: !detents || detent === 'full', footerStyle,
   };
 }
 

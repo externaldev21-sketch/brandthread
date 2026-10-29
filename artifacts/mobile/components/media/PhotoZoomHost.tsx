@@ -17,6 +17,10 @@ export type ZoomLift = {
   ty: SharedValue<number>;
   /** Set true once the lifted copy is on screen so the original can hide. */
   lifted: SharedValue<boolean>;
+  /** How the copy fills `rect` — match the original (default 'contain'). */
+  contentFit?: 'contain' | 'cover';
+  /** Corner radius of the original frame, so the lift starts identical. */
+  borderRadius?: number;
 };
 
 let current: ZoomLift | null = null;
@@ -39,12 +43,12 @@ function LiftLayer({ lift }: { lift: ZoomLift }) {
   }));
   return (
     <Animated.View
-      style={[{ position: 'absolute', left: lift.rect.x, top: lift.rect.y, width: lift.rect.width, height: lift.rect.height }, style]}
+      style={[{ position: 'absolute', left: lift.rect.x, top: lift.rect.y, width: lift.rect.width, height: lift.rect.height, borderRadius: lift.borderRadius ?? 0, overflow: 'hidden' }, style]}
       testID="photo-zoom-lift"
     >
       {/* The original hides only once this copy has actually painted. */}
       <CachedImage
-        source={{ uri: lift.uri }} style={StyleSheet.absoluteFill} contentFit="contain" transition={0}
+        source={{ uri: lift.uri }} style={StyleSheet.absoluteFill} contentFit={lift.contentFit ?? 'contain'} transition={0}
         onLoad={() => { lifted.value = true; }}
         onDisplay={() => { lifted.value = true; }}
         testID="photo-zoom-lift-image"

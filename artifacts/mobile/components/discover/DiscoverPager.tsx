@@ -384,6 +384,7 @@ export function DiscoverPager() {
                 accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
                 onPress={openCart}
                 badge={cartCount}
+                tickBadge
                 style={styles.glassBtn}
               />
             </RNAnimated.View>

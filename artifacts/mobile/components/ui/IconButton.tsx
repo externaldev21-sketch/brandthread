@@ -4,6 +4,7 @@
  * A 44x44pt minimum hit-area icon button. Thin wrapper over the existing
  * PressableScale press-feel with design-system tokens (RADII.chip, SPACING).
  */
+import { TickingCount } from '@/components/motion/TickingCount';
 import React from 'react';
 import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle, type GestureResponderEvent } from 'react-native';
 
@@ -47,6 +48,8 @@ export interface IconButtonProps {
    */
   variant?: 'plain' | 'filled' | 'glass';
   badge?: number;
+  /** Roll the badge number up on an increase (bag counts — components/motion/TickingCount). */
+  tickBadge?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -59,7 +62,7 @@ export interface IconButtonProps {
 
 export function IconButton({
   name, onPress, accessibilityLabel, accessibilityHint, color, size = 20,
-  variant = 'filled', badge, disabled = false, style, testID, rippleEnabled = true,
+  variant = 'filled', badge, tickBadge = false, disabled = false, style, testID, rippleEnabled = true,
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -98,9 +101,13 @@ export function IconButton({
         <Icon name={name} size={size} color={resolvedColor} />
         {typeof badge === 'number' && badge > 0 && (
           <View style={[styles.badge, { backgroundColor: palette.primary, borderColor: variant === 'glass' ? '#0A0A0B' : palette.background }]}>
-            <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
-              {badge > 99 ? '99+' : badge}
-            </Animated.Text>
+            {tickBadge ? (
+              <TickingCount value={badge} maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]} />
+            ) : (
+              <Animated.Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[styles.badgeText, { color: palette.primaryForeground }]}>
+                {badge > 99 ? '99+' : badge}
+              </Animated.Text>
+            )}
           </View>
         )}
       </Animated.View>

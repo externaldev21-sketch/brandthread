@@ -8,8 +8,8 @@
  *
  *  - Pinch to zoom (1x–4x) around the pinch point; drag to look around
  *    while zoomed; double-tap zooms in to 2.5x / back out.
- *  - Swipe down (unzoomed) to close: the photo follows the finger and the
- *    black backdrop thins out with it, so the gesture shows what it will do;
+ *  - Swipe down (unzoomed) to close: the photo follows the finger, shrinks
+ *    and rounds its corners (Instagram), and the black backdrop thins out with it, so the gesture shows what it will do;
  *    let go past the threshold and it closes, otherwise it settles back.
  *  - Motion only reports a gesture — no decorative animation.
  */
@@ -27,7 +27,7 @@ import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { CREATE_CANVAS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { backdropOpacityFor, shouldDismiss } from '@/lib/mediaDismiss';
+import { backdropOpacityFor, dragRadiusFor, dragScaleFor, shouldDismiss } from '@/lib/mediaDismiss';
 
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
@@ -167,6 +167,7 @@ function ZoomablePhoto({
   const savedTx = useSharedValue(0);
   const savedTy = useSharedValue(0);
   const dragY = useSharedValue(0);
+  const dragX = useSharedValue(0);
   // Leaving a photo resets its zoom, so coming back shows it whole.
   useEffect(() => {
     if (active) return;
@@ -227,6 +228,7 @@ function ZoomablePhoto({
     .onUpdate((e) => {
       if (savedScale.value > 1.01) return;
       dragY.value = e.translationY;
+      dragX.value = e.translationX;
       backdrop.value = backdropOpacityFor(e.translationY);
     })
     .onEnd((e) => {
@@ -236,6 +238,7 @@ function ZoomablePhoto({
         return;
       }
       dragY.value = withTiming(0, SETTLE);
+      dragX.value = withTiming(0, SETTLE);
       backdrop.value = withTiming(1, SETTLE);
     });
 
@@ -256,11 +259,19 @@ function ZoomablePhoto({
 
   const photoStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: tx.value },
+      { translateX: tx.value + dragX.value },
       { translateY: ty.value + dragY.value },
-      { scale: scale.value },
+      { scale: scale.value * dragScaleFor(dragY.value) },
     ],
   }));
+  // Rounds the photo's own frame: the clip is sized to the photo's contain
+  // rect (once its aspect is known), so the rounded corners are the image's,
+  // not the empty letterbox's.
+  const frameStyle = useAnimatedStyle(() => ({ borderRadius: dragRadiusFor(dragY.value) }));
+  const [aspect, setAspect] = useState<number | null>(null);
+  const frame = aspect
+    ? (width / height > aspect ? { width: height * aspect, height } : { width, height: width / aspect })
+    : { width, height };
 
   // Web: the mouse wheel zooms (no pinch on a trackpad-less mouse).
   const webWheel = Platform.OS === 'web' ? {
@@ -276,12 +287,15 @@ function ZoomablePhoto({
     <GestureDetector gesture={gesture}>
       <View style={{ width, height }} collapsable={false} {...webWheel}>
         <Animated.View style={[styles.page, { width, height }, photoStyle]}>
-          <CachedImage
-            source={{ uri }}
-            style={{ width, height }}
-            contentFit="contain"
-            accessibilityLabel="Product photo. Pinch to zoom, swipe down to close."
-          />
+          <Animated.View style={[{ ...frame, overflow: 'hidden' }, frameStyle]}>
+            <CachedImage
+              source={{ uri }}
+              style={frame}
+              contentFit="contain"
+              onLoad={(e) => { const { width: w, height: h } = e.source; if (w > 0 && h > 0) setAspect(w / h); }}
+              accessibilityLabel="Product photo. Pinch to zoom, swipe down to close."
+            />
+          </Animated.View>
         </Animated.View>
       </View>
     </GestureDetector>

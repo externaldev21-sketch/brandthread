@@ -22,7 +22,7 @@ import { FontAwesome } from '@expo/vector-icons';
 
 import { Icon } from '@/components/ui/Icon';
 
-import { useRouter, useIsFocused, useScrollToTop, useLocalSearchParams } from 'expo-router';
+import { useRouter, useIsFocused, useScrollToTop, useLocalSearchParams, useNavigation } from 'expo-router';
 
 import { useReportSheet } from '@/components/safety/ReportSheet';
 
@@ -127,6 +127,10 @@ import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { ThreadCommentsSheet } from '@/app/buyer-post-comments';
 
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+import { TickingCount } from '@/components/motion/TickingCount';
+import { NewPostsPill, useNewPostsCheck } from '@/components/buyer-feed/NewPostsPill';
+import { NEW_POSTS_CHECK_LIMIT } from '@/lib/feed/newPostsPill';
+import { edgeTapDirection } from '@/lib/feed/edgeTap';
 
 import { useBuyerTabBarInset, useBuyerTabBarMetrics, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 
@@ -1916,6 +1920,10 @@ function SpotlightPageImpl({
   const lastPressPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
+  /** Steps the photo carousel one slide (edge taps); null for videos. */
+  const photoStepRef = useRef<((delta: number) => boolean) | null>(null);
+  /** Finger is down on the page: holds photo auto-advance (press-and-hold). */
+  const [pressHolding, setPressHolding] = useState(false);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // No entrance animation on the overlay chrome (rail + bottom-info block):
   // it must move 1:1 with its own page as part of the same cell, exactly
@@ -1972,8 +1980,15 @@ function SpotlightPageImpl({
       if (railViewerId) burstHeart(lastPressPoint.current);
     } else {
       lastTap.current = now;
+      // Decided at the first tap's point, acted on only once it's clearly a
+      // single tap: outer quarters of a multi-photo post step photos.
+      const edge = item.contentType === 'video' ? 0 : edgeTapDirection(lastPressPoint.current.x, pageWidth, item.mediaUris?.length ?? 0);
       pauseTimer.current = setTimeout(() => {
         pauseTimer.current = null;
+        if (edge !== 0) {
+          if (photoStepRef.current?.(edge)) haptic('select');
+          return;
+        }
         setPaused(p => !p);
       }, 290);
     }
@@ -2001,9 +2016,11 @@ function SpotlightPageImpl({
   }, [speedActive, speedPillOpacity]);
   function handlePressIn(evt: { nativeEvent: { locationX: number; locationY: number } }) {
     longPressHandled.current = false;
+    if (item.contentType !== 'video') setPressHolding(true);
     lastPressPoint.current = { x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY };
   }
   function handlePressOut() {
+    setPressHolding(false);
     if (longPressHandled.current) longPressHandled.current = false;
   }
 
@@ -2076,7 +2093,8 @@ function SpotlightPageImpl({
                 indicatorBottom={bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8}
                 onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined}
                 autoAdvance={photoAutoAdvance && isActive && !menuOpen}
-                holding={paused}
+                holding={paused || pressHolding}
+                stepRef={photoStepRef}
               />
             )}
           <TapHeartBurst point={heartBurstPoint} reduceMotion={reduceMotion} />
@@ -3080,6 +3098,44 @@ function FeedScreenContent({
   }, [feedRefreshing, loadFeed]);
   const { refreshControl: threadRefresh, indicator: threadRefreshIndicator } = useThreadRefresh(feedRefreshing, handleRefresh);
 
+  // "New posts" pill (lib/feed/newPostsPill.ts): scrolled into Threads /
+  // Following, a quiet check of the feed's top posts; fresh ones float a pill
+  // under the header instead of swapping the list under the viewer.
+  const currentPostIds = useMemo(() => sellerFeedPosts.map(post => post.id), [sellerFeedPosts]);
+  const fetchTopPostIds = useCallback(async () => {
+    const page = await getThreadPostsPage(createThreadFeedCursor(), NEW_POSTS_CHECK_LIMIT, feedTab);
+    return (Array.isArray(page.posts) ? page.posts : [])
+      .map(mapSellerPost)
+      .filter((p): p is SpotlightItem => p !== null)
+      .map(p => p.id);
+  }, [feedTab]);
+  const newPosts = useNewPostsCheck({
+    focused: screenFocused && !isCreatorFeed,
+    activeIndex,
+    loading: feedLoading || feedRefreshing,
+    currentIds: currentPostIds,
+    fetchTopIds: fetchTopPostIds,
+  });
+  const jumpToTopAndRefresh = useCallback(() => {
+    newPosts.dismiss();
+    haptic('refresh');
+    feedListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    handleRefresh();
+  }, [newPosts.dismiss, handleRefresh]);
+  // Re-tapping the Home tab (already on it): useScrollToTop above takes the
+  // list back to the first post; this also refreshes it (Instagram / X).
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (isCreatorFeed) return undefined;
+    const nav = navigation as unknown as { addListener?: (type: string, cb: () => void) => () => void; isFocused?: () => boolean };
+    if (!nav.addListener) return undefined;
+    return nav.addListener('tabPress', () => {
+      if (!nav.isFocused?.()) return;
+      newPosts.dismiss();
+      handleRefresh();
+    });
+  }, [navigation, isCreatorFeed, newPosts.dismiss, handleRefresh]);
+
 
   // "Just dropped from brands you follow" — real drops only: fetch the
   // buyer's follow graph and the platform's currently-live drops, then
@@ -4011,6 +4067,9 @@ function FeedScreenContent({
       /></ParentScrollGestureScope>}
       </Animated.View>
       {threadRefreshIndicator}
+      {!isCreatorFeed && (
+        <NewPostsPill visible={newPosts.available} top={Math.max(topBarHeight, insets.top + 44) + 8} onPress={jumpToTopAndRefresh} />
+      )}
 
       {/* LIVE tab body — covers the paused post feed (kept mounted underneath
           so Following/Threads come back exactly where they were). */}
@@ -4144,9 +4203,7 @@ function FeedScreenContent({
                 <Icon name="shopping-cart" size={22} color={ON_DARK} />
                 {cartCount > 0 && (
                   <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
-                    <Text style={styles.cartCountText}>
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </Text>
+                    <TickingCount value={cartCount} style={styles.cartCountText} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -4216,9 +4273,7 @@ function FeedScreenContent({
                   <Icon name="shopping-cart" size={24} color={ON_DARK} />
                   {cartCount > 0 && (
                     <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
-                      <Text style={styles.cartCountText}>
-                        {cartCount > 99 ? '99+' : cartCount}
-                      </Text>
+                      <TickingCount value={cartCount} style={styles.cartCountText} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -4325,9 +4380,7 @@ function FeedScreenContent({
               <Icon name="shopping-cart" size={20} color={ON_DARK} />
               {cartCount > 0 && (
                 <View style={styles.cartCountBadge}>
-                  <Text style={styles.cartCountText}>
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </Text>
+                  <TickingCount value={cartCount} style={styles.cartCountText} />
                 </View>
               )}
             </TouchableOpacity>

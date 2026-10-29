@@ -117,7 +117,7 @@ vi.mock('react-native-reanimated', () => {
 
   // createAnimatedComponent: components/ui's SuccessCheck (draw variant) wraps
   // svg Circle/Path at module load.
-  const AnimatedDefault = { View: el('AnimatedView'), FlatList, createAnimatedComponent: (Component: unknown) => Component };
+  const AnimatedDefault = { View: el('AnimatedView'), Text: el('AnimatedText'), FlatList, createAnimatedComponent: (Component: unknown) => Component };
   return {
     default: AnimatedDefault,
     FlatList,
