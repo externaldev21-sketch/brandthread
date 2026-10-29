@@ -523,6 +523,22 @@ export default function SellerHomeCommerceDashboard({
     void loadSecondaryData();
   }, [loadSecondaryData, retryTick, storeContextTick]);
 
+  // Live order (pack 2, item 15, kept subtle): the moment a new order lands
+  // on the seller socket, refetch right away so the numbers update in place
+  // (plain, no roll/pop) and the new row slides into Recent orders, with one
+  // light selection tick. Same refetch path pull-to-refresh uses; haptics
+  // no-op on web.
+  const lastPingSeqRef = useRef<number | null>(null);
+  useEffect(() => {
+    const seq = liveMap.ping?.seq ?? null;
+    if (seq === null || seq === lastPingSeqRef.current) return;
+    lastPingSeqRef.current = seq;
+    haptic('select');
+    secondaryCoveredRef.current = `${ticksRef.current.retryTick + 1}:${ticksRef.current.storeContextTick}`;
+    setRetryTick((n) => n + 1);
+    void loadSecondaryData();
+  }, [liveMap.ping?.seq, loadSecondaryData]);
+
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
     // Owner-only. The signed-out preview has no team role; its source answers

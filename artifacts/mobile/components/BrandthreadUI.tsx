@@ -8,7 +8,7 @@ import { radius as ControlRadius, radius } from '@/constants/radii';
  */
 
 import React, { useRef, useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Animated, Platform, ViewStyle, TextStyle, StyleProp, Pressable, SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps, AccessibilityRole, AccessibilityState } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Animated, Easing, Platform, ViewStyle, TextStyle, StyleProp, Pressable, SwitchProps, PressableProps, LayoutChangeEvent, TextInputProps, AccessibilityRole, AccessibilityState } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -30,7 +30,8 @@ import { undoExpiresAt } from '@/lib/undoRecovery';
 
 import { displayPriceInput, finishPriceInput, sanitizePriceInput } from '@/lib/priceInput';
 
-import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
+import { PRESS_SCALE, PRESS_DURATION_MS, pressScaleAnim } from '@/constants/motion';
+import { isMotionReduced } from '@/lib/reduceMotion';
 
 import { useSettled } from '@/lib/animationUtils';
 
@@ -100,17 +101,56 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <UndoToastContext.Provider value={{ showUndo, dismissUndo }}>
       {children}
-      {action && (
-        <View accessibilityLiveRegion="polite" testID={action.testID} style={[undoS.root, { backgroundColor: colors.elevated, borderColor: colors.border }, action.bottom != null && { bottom: action.bottom }]}>
-          <Text style={[undoS.message, { color: colors.foreground }]}>{action.message}</Text>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Undo: ${action.message}`} onPress={undo} disabled={undoing} style={undoS.button}>
-            <Text style={[undoS.buttonText, { color: action.tone === 'monochrome' ? colors.foreground : colors.success }]}>{undoing ? 'Restoring…' : 'Undo'}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <UndoToastCard action={action} undoing={undoing} onUndo={undo} />
     </UndoToastContext.Provider>
   );
 }
+/**
+ * The undo toast's own motion (pack 2, item 20): slides up from below and
+ * fades in on show, slides back down on expiry/undo — the iOS/Instagram
+ * "Removed — Undo" snackbar. The last action stays rendered while it slides
+ * out so the exit is visible. Reduce Motion: appears/disappears in place.
+ */
+const UNDO_SLIDE_PX = 28;
+function UndoToastCard({ action, undoing, onUndo }: { action: UndoAction | null; undoing: boolean; onUndo: () => void }) {
+  const colors = useColors();
+  const progress = useRef(new Animated.Value(0)).current;
+  const [shown, setShown] = useState<UndoAction | null>(action);
+  useEffect(() => {
+    const reduce = isMotionReduced();
+    if (action) {
+      setShown(action);
+      progress.stopAnimation();
+      if (reduce) { progress.setValue(1); return; }
+      progress.setValue(0);
+      Animated.spring(progress, { toValue: 1, damping: 22, stiffness: 260, mass: 0.9, overshootClamping: true, useNativeDriver: NATIVE_DRIVER }).start();
+      return;
+    }
+    if (reduce) { setShown(null); progress.setValue(0); return; }
+    Animated.timing(progress, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: NATIVE_DRIVER })
+      .start(({ finished }) => { if (finished) setShown(null); });
+  }, [action, progress]);
+  if (!shown) return null;
+  return (
+    <Animated.View
+      accessibilityLiveRegion="polite"
+      testID={shown.testID}
+      pointerEvents={action ? 'auto' : 'none'}
+      style={[
+        undoS.root,
+        { backgroundColor: colors.elevated, borderColor: colors.border },
+        shown.bottom != null && { bottom: shown.bottom },
+        { opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [UNDO_SLIDE_PX, 0] }) }] },
+      ]}
+    >
+      <Text style={[undoS.message, { color: colors.foreground }]}>{shown.message}</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Undo: ${shown.message}`} onPress={onUndo} disabled={undoing || !action} style={undoS.button}>
+        <Text style={[undoS.buttonText, { color: shown.tone === 'monochrome' ? colors.foreground : colors.success }]}>{undoing ? 'Restoring…' : 'Undo'}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 const undoS = StyleSheet.create({
   root: { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.xl, minHeight: 52, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, zIndex: 1000, elevation: 1000 },
   message: { flex: 1, color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
@@ -152,9 +192,10 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
   noMinHeight?: boolean;
 }
 
-// Press feel shared by every button and card: a quick, firm squish on touch
-// and a plain (non-spring) release back to rest, ~PRESS_DURATION_MS — no
-// overshoot/bounce, per the app-wide press-feedback standard. `bounce: true`
+// Press feel shared by every button and card: a quick, firm squish to
+// PRESS_SCALE (0.97) on the shared critically-damped PRESS_SPRING
+// (pressScaleAnim) — no overshoot/bounce, per the app-wide press-feedback
+// standard. `bounce: true`
 // opts a call site back into the old springy rebound below.
 const NATIVE_DRIVER = Platform.OS !== 'web';
 const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
@@ -218,7 +259,10 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
         Animated.parallel([
           bounce
             ? Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING })
-            : Animated.timing(scale, { toValue: activeScale, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+            // The one shared press spring (critically damped, no rebound;
+            // Reduce Motion: no scale) — pack 2, item 22: every tappable on
+            // PressableScale now presses exactly like Button/IconButton/Card.
+            : pressScaleAnim(scale, activeScale),
           Animated.timing(opacity, { toValue: activeOpacity, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressIn?.(e);
@@ -231,7 +275,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
           Animated.parallel([
             bounce
               ? Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING })
-              : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+              : pressScaleAnim(scale, 1),
             Animated.timing(opacity, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
           ]),
         );

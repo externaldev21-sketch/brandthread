@@ -9,6 +9,8 @@ import { radius as ControlRadius } from '@/constants/radii';
  * components/layout/ScreenChrome.tsx), so adding it here again left a
  * second bar-height gap under every report.
  */
+import { GlideThumbView, useGlideThumb } from '@/components/motion/GlideThumb';
+import { PressableScale } from '@/components/BrandthreadUI';
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 
@@ -93,25 +95,31 @@ export function SegmentedPills<T extends string>({ options, value, onChange, tes
   options: { key: T; label: string }[]; value: T; onChange: (k: T) => void; testID?: string;
 }) {
   const colors = useColors();
+  // The selected fill glides between segments (pack 2, item 18).
+  const glide = useGlideThumb(options.findIndex(o => o.key === value));
   return (
     <View style={{ flexDirection: 'row', gap: SP.xs, marginBottom: SP.md }} testID={testID}>
-      {options.map(o => {
+      <GlideThumbView thumbStyle={glide.thumbStyle} ready={glide.ready} style={{ borderRadius: ControlRadius.md, backgroundColor: colors.primary }} />
+      {options.map((o, i) => {
         const active = o.key === value;
         return (
-          <TouchableOpacity
-            key={o.key}
+          <View key={o.key} style={{ flex: 1 }} onLayout={glide.onItemLayout(i)}>
+          <PressableScale
+            noMinHeight
+            rippleEnabled={false}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={o.label}
             onPress={() => { haptic('select'); onChange(o.key); }}
             style={{
-              flex: 1, minHeight: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
+              minHeight: 40, borderRadius: ControlRadius.md, alignItems: 'center', justifyContent: 'center',
               paddingHorizontal: SP.xs, borderWidth: 1,
-              backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border,
+              backgroundColor: 'transparent', borderColor: active ? colors.primary : colors.border,
             }}
           >
             <Text numberOfLines={1} style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: active ? colors.primaryForeground : colors.mutedForeground }}>{o.label}</Text>
-          </TouchableOpacity>
+          </PressableScale>
+          </View>
         );
       })}
     </View>

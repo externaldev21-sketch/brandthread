@@ -42,6 +42,11 @@ export interface ChipRowProps extends Omit<ScrollViewProps, 'horizontal' | 'chil
   children: React.ReactNode;
   /** Index (among the rendered children) of the selected chip, if any. */
   selectedIndex?: number;
+  /** Additive: drawn first inside the scrolling content, under the chips
+   *  (e.g. a gliding selection thumb) — not counted as a chip. */
+  underlay?: React.ReactNode;
+  /** Additive: each chip's frame in the scrolling content's coordinates. */
+  onChipLayout?: (index: number, frame: { x: number; y: number; width: number; height: number }) => void;
   /** Leading/trailing content inset. Defaults to the 16pt screen gutter. */
   inset?: number;
   /** Space between chips. Defaults to 8. */
@@ -57,6 +62,8 @@ export interface ChipRowProps extends Omit<ScrollViewProps, 'horizontal' | 'chil
 export function ChipRow({
   children,
   selectedIndex,
+  underlay,
+  onChipLayout,
   inset = 16,
   gap = 8,
   bleed = 0,
@@ -129,12 +136,14 @@ export function ChipRow({
       style={[styles.row, bleed ? { marginHorizontal: -bleed } : null, style]}
       contentContainerStyle={[styles.content, { paddingHorizontal: inset, gap }, contentContainerStyle]}
     >
+      {underlay}
       {items.map((child, index) => (
         <View
           key={(child as React.ReactElement).key ?? index}
           onLayout={(e) => {
-            const { x, width } = e.nativeEvent.layout;
+            const { x, y, width, height } = e.nativeEvent.layout;
             frames.current[index] = { x, width };
+            onChipLayout?.(index, { x, y, width, height });
             if (index === selectedIndex) tryInitialScroll();
           }}
         >
