@@ -11,12 +11,13 @@
  * Fails if "unavailable" shows anywhere, or if a state lands on the wrong screen.
  *
  *   node scripts/store-screenshots/payouts-journey-verify.mjs [--skip-build]
+ *   (cloud containers: PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome)
  *
  * Output: docs/screenshots/payouts-journey/ (repo root)
  */
 import path from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
-import { BUYER_USER } from './demo-data.mjs';
+import { BUYER_USER, respond } from './demo-data.mjs';
 import { clerkStubScript } from './clerk-stub.mjs';
 import {
   DEFAULT_BUILD_DIR, MOBILE_ROOT, buildPreviewWeb, launchBrowser, openContext, serveBuild, waitForQuietNetwork,
@@ -69,11 +70,20 @@ async function sellerRoutes(context, origin, statusBody, onboardBodies) {
   // seller preview; hide it so this seller reaches the (fake) API.
   await context.addInitScript(() => {
     const get = Storage.prototype.getItem;
-    Storage.prototype.getItem = function getItem(key) { return key === 'user_role' ? null : get.call(this, key); };
+    // …and pin the saved preview role to guest: with none saved, this export
+    // defaults to the offline seller preview (lib/devPreview.ts).
+    Storage.prototype.getItem = function getItem(key) {
+      if (key === 'user_role') return null;
+      if (key === 'bt:previewRole:seller-review-v2') return 'guest';
+      return get.call(this, key);
+    };
   });
   const json = (route, body) => route.fulfill({ status: 200, headers: CORS(origin), contentType: 'application/json', body: JSON.stringify(body) });
   await context.route(/\/api\/(v1\/)?seller\/connect\/status$/, (route) =>
     route.request().method() === 'OPTIONS' ? route.fulfill({ status: 204, headers: CORS(origin) }) : json(route, statusBody));
+  // An adult account, so the age gate in front of Payouts stays out of the way.
+  await context.route(/\/api\/(v1\/)?auth\/me$/, (route) =>
+    route.request().method() === 'OPTIONS' ? route.fulfill({ status: 204, headers: CORS(origin) }) : json(route, { ...respond({ method: 'GET', path: '/auth/me', query: new URLSearchParams(), role: 'seller' }), ageBand: '18_plus' }));
   await context.route(/\/api\/(v1\/)?team\/context$/, (route) =>
     route.request().method() === 'OPTIONS' ? route.fulfill({ status: 204, headers: CORS(origin) }) : json(route, { role: 'owner', storeOwnerId: 'seller', teamMembershipId: null }));
   await context.route(/\/api\/(v1\/)?seller\/connect\/onboard$/, (route) => {
