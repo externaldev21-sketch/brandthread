@@ -136,6 +136,12 @@ export interface LeaderLock {
   tryAcquire(): Promise<boolean>;
   /** Resolves false when the lock holder connection is gone. */
   stillHeld(): Promise<boolean>;
+  /**
+   * Gives the lock up (stop/shutdown). The Postgres lock holds a pool
+   * connection checked out for as long as this process leads; without
+   * releasing it, `pool.end()` at shutdown waits on it forever.
+   */
+  release?(): void;
 }
 
 /** Session-level advisory lock held on one dedicated pool connection. */
@@ -173,6 +179,10 @@ export function postgresLeaderLock(key = JOBS_LEADER_LOCK_KEY): LeaderLock {
         drop();
         return false;
       }
+    },
+    release() {
+      // Discarding the session connection ends it, which frees the advisory lock.
+      drop();
     },
   };
 }
@@ -212,10 +222,13 @@ export function startSingletonJobsWithLeadership(opts: RunnerOptions = {}): () =
 
   const heartbeat = async () => {
     if (stopped) return;
-    if (await lock.stillHeld()) return schedule(() => void heartbeat(), heartbeatMs);
+    const held = (await lock.stillHeld()) || (await lock.tryAcquire());
     // Try to take the lock straight back (e.g. a dropped connection); only one
     // process can, so keep running if we win.
-    if (await lock.tryAcquire()) return schedule(() => void heartbeat(), heartbeatMs);
+    if (held) {
+      if (stopped) { lock.release?.(); return; }
+      return schedule(() => void heartbeat(), heartbeatMs);
+    }
     if (!stopped) onLost();
   };
 
@@ -225,7 +238,7 @@ export function startSingletonJobsWithLeadership(opts: RunnerOptions = {}): () =
       logger.info({ retryMs }, "Background jobs: another process is the leader; standing by");
       return schedule(() => void attempt(), retryMs);
     }
-    if (stopped) return;
+    if (stopped) { lock.release?.(); return; }
     logger.info({ jobs: jobs.length }, "Background jobs: this process is the leader; starting jobs");
     for (const [name, start] of jobs) {
       try {
@@ -241,6 +254,7 @@ export function startSingletonJobsWithLeadership(opts: RunnerOptions = {}): () =
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    lock.release?.();
   };
 }
 

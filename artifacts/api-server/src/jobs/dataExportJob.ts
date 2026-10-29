@@ -70,18 +70,26 @@ export async function processDataExportJob(job: ClaimedJob, deps: ProcessDeps): 
     };
     await deps.saveReady(job.id, patch);
 
-    if (deps.mailerConfigured()) {
-      const to = await deps.getEmail(job.clerkId);
-      if (to) {
-        const sent = await deps.sendEmail({ to, downloadUrl: downloadUrlFor(deps.origin(), token), expiresAt });
-        if (sent) {
-          await deps.saveReady(job.id, { ...patch, emailedAt: deps.now() });
-        } else {
-          logger.warn({ job: "dataExport", jobId: job.id }, "Data export ready but email failed; available in-app");
+    // The job is ready from here on. A failure in the email step (e.g. a DB
+    // error looking up the address) must not fall through to saveFailure,
+    // which would flip a finished export back to queued/failed — and a
+    // `failed` job's stored file is never expired or deleted.
+    try {
+      if (deps.mailerConfigured()) {
+        const to = await deps.getEmail(job.clerkId);
+        if (to) {
+          const sent = await deps.sendEmail({ to, downloadUrl: downloadUrlFor(deps.origin(), token), expiresAt });
+          if (sent) {
+            await deps.saveReady(job.id, { ...patch, emailedAt: deps.now() });
+          } else {
+            logger.warn({ job: "dataExport", jobId: job.id }, "Data export ready but email failed; available in-app");
+          }
         }
+      } else {
+        logger.warn({ job: "dataExport", jobId: job.id }, "Data export ready; mailer not configured, available in-app only");
       }
-    } else {
-      logger.warn({ job: "dataExport", jobId: job.id }, "Data export ready; mailer not configured, available in-app only");
+    } catch (err) {
+      logger.warn({ err, job: "dataExport", jobId: job.id }, "Data export ready but email step failed; available in-app");
     }
     return "ready";
   } catch (err) {
