@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
-import { Icon } from '@/components/ui/Icon';
+import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { crispPx } from '@/lib/crispPixel';
 import { haptics } from '@/lib/haptics';
 import { useSellerUnreadThreads } from '@/hooks/useSellerUnreadThreads';
@@ -46,7 +46,8 @@ export default function SellerMessagesButton({
       accessibilityLabel={unread > 0 ? `Messages, ${unread} unread` : 'Messages'}
     >
       <View>
-        <Icon name="message-circle" size={size} color={color ?? theme.text} />
+        {/* The tab bar's own line-icon family (the buyer Messages tab glyph). */}
+        <BuyerNavIcon name="inbox" size={size} color={color ?? theme.text} />
         {unread > 0 && (
           <View
             testID={`${testID}-badge`}

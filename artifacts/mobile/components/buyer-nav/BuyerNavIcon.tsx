@@ -7,7 +7,9 @@ export type BuyerNavIconName =
   | 'home' | 'discover' | 'inbox' | 'search' | 'profile' | 'activity'
   | 'close' | 'friends' | 'filters'
   // Seller bar
-  | 'dashboard' | 'products' | 'orders' | 'studio';
+  | 'dashboard' | 'products' | 'orders' | 'studio'
+  // Seller dashboard top bar (pairs with 'inbox' for Messages)
+  | 'share';
 
 /**
  * Line icons for the buyer and seller navigation. One consistent 24pt grid, rounded
@@ -149,6 +151,19 @@ export function BuyerNavIcon({
           <Rect x={13.2} y={3.8} width={7} height={5} rx={2} fill="none" {...common} />
           <Rect x={3.8} y={14.6} width={7} height={5.6} rx={2} fill="none" {...common} />
           <Rect x={13.2} y={11.2} width={7} height={9} rx={2} fill={focused ? color : 'none'} {...common} />
+        </Svg>
+      );
+    case 'share':
+      // Rounded tray with an up arrow, drawn to sit beside 'inbox' as a pair.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M8.6 9.4H7.4A2.6 2.6 0 0 0 4.8 12v5.8a2.6 2.6 0 0 0 2.6 2.6h9.2a2.6 2.6 0 0 0 2.6-2.6V12a2.6 2.6 0 0 0-2.6-2.6h-1.2"
+            fill="none"
+            {...common}
+          />
+          <Line x1={12} y1={3.8} x2={12} y2={14.2} {...common} />
+          <Path d="M8.7 7 12 3.8 15.3 7" fill="none" {...common} />
         </Svg>
       );
     case 'close':
