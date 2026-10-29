@@ -83,6 +83,14 @@ export function createFakeOnboardingApi() {
       dbUser.ageBand = '18_plus';
       return { status: 200, body: { ageBand: dbUser.ageBand } };
     }
+    // Record the agreement like the real server, so a reload after sign-up
+    // doesn't bring LegalAcceptanceGate back.
+    if (p === '/auth/legal-acceptance' && method === 'POST') {
+      const user = ensureUser();
+      user.termsVersion = body?.version ?? null;
+      user.termsAcceptedAt = new Date().toISOString();
+      return { status: 200, body: { termsVersion: user.termsVersion, termsAcceptedAt: user.termsAcceptedAt } };
+    }
     if (p === '/auth/me' && get) {
       if (!dbUser) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'No account yet' } } };
       return { status: 200, body: dbUser };

@@ -55,10 +55,14 @@ describe("launch onboarding: requirements", () => {
     expect(profile).toContain("footer={web ? (");
     expect(profile).toContain('<PillButton testID="onboarding-notifications-continue" label="Continue" onPress={onSkip} />');
     expect(profile).toContain("Alerts aren’t available in the browser.");
+    // The web title must not promise alerts are being turned on.
+    expect(profile).toContain("{web ? 'Get alerts in the app' : 'Turn on notifications'}");
   });
 
-  it("asks before leaving the code step and disables edge-swipe back there", () => {
-    expect(onboarding).toContain("title: 'Abandon verification?'");
+  it("code step: back does what \"Wrong email? Edit\" does, and edge-swipe stays off mid-verification", () => {
+    expect(onboarding).toContain("onBack={editEmail} onEditEmail={editEmail}");
+    expect(onboarding).toContain("if (step === 'CODE') editEmail();");
+    expect(onboarding).not.toContain("Abandon verification?");
     expect(onboarding).toContain("onBack={step === 'CODE' ? undefined : onBack}");
   });
 

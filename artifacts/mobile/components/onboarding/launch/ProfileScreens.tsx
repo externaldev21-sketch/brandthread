@@ -558,7 +558,7 @@ export function NotificationsScreen({
       <View style={[s.bell, { backgroundColor: theme.text }]}>
         <Feather name="bell" size={26} color={theme.background} />
       </View>
-      <Title style={s.bellTitle}>Turn on notifications</Title>
+      <Title style={s.bellTitle}>{web ? 'Get alerts in the app' : 'Turn on notifications'}</Title>
       <Sub>
         {web
           ? 'Alerts aren’t available in the browser. Turn them on anytime in the Brandthread mobile app.'

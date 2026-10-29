@@ -193,6 +193,7 @@ vi.mock('@/lib/onboardingSurvey', () => ({
 vi.mock('../app/_layout', () => ({ ONBOARDING_KEY: 'onboarding_complete', ONBOARDING_OWNER_KEY: 'onboarding_owner_id' }));
 
 import OnboardingScreen from '../app/onboarding';
+import { setPendingDob } from '../lib/ageGate';
 
 let tree: ReactTestRenderer;
 const flush = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); };
@@ -245,6 +246,7 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     h.router.push.mockClear();
     for (const k of Object.keys(h.params)) delete h.params[k];
     h.confirmAlert.mockImplementation(async () => true);
+    setPendingDob(null);
   });
   afterEach(() => { act(() => tree?.unmount()); vi.restoreAllMocks(); });
 
@@ -394,7 +396,7 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     expect(h.storage.get('onboarding_complete')).not.toBe('true');
   });
 
-  it('asks before abandoning the code step, and offers a direct "Wrong email? Edit"', async () => {
+  it('back on the code step returns to the editable email, exactly like "Wrong email? Edit"', async () => {
     await render();
     await press('onboarding-use-email');
     await type('onboarding-dob', '01152000');
@@ -403,21 +405,159 @@ describe('launch onboarding (real screen, mocked Clerk + API)', () => {
     await press('onboarding-email-continue');
     expect(has('onboarding-code')).toBe(true);
 
-    h.confirmAlert.mockImplementationOnce(async () => false);
     await press('onboarding-back');
-    expect(h.confirmAlert).toHaveBeenCalledWith(expect.objectContaining({ title: 'Abandon verification?' }));
-    expect(has('onboarding-code')).toBe(true);
-
-    await press('onboarding-back');
-    expect(has('onboarding-email')).toBe(true);
-    expect(byId('onboarding-email-input').props.value).toBe('sam@exmaple.com');
-
-    await press('onboarding-email-continue');
-    h.confirmAlert.mockClear();
-    await press('onboarding-code-edit-email');
     expect(h.confirmAlert).not.toHaveBeenCalled();
     expect(has('onboarding-email')).toBe(true);
     expect(byId('onboarding-email-input').props.value).toBe('sam@exmaple.com');
+
+    await type('onboarding-email-input', 'sam@example.com');
+    await press('onboarding-email-continue');
+    await press('onboarding-code-edit-email');
+    expect(h.confirmAlert).not.toHaveBeenCalled();
+    expect(has('onboarding-email')).toBe(true);
+    expect(byId('onboarding-email-input').props.value).toBe('sam@example.com');
+    expect(h.calls.filter((c) => c.startsWith('clerk.signUp.create'))).toEqual([
+      'clerk.signUp.create:sam@exmaple.com', 'clerk.signUp.create:sam@example.com',
+    ]);
+  });
+
+  it('a reload before verification keeps the birthday and email (nothing asked twice)', async () => {
+    await render();
+    await press('onboarding-use-email');
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    await type('onboarding-email-input', 'sam@example.com');
+    await press('onboarding-email-continue');
+    expect(has('onboarding-code')).toBe(true);
+    await wait(350); // draft save is debounced
+    const saved = JSON.parse(h.storage.get('onboarding_pending_draft')!);
+    expect(saved).toMatchObject({ stepId: 'CODE', email: 'sam@example.com', dobInput: '01/15/2000', codeMode: 'signup' });
+    expect(JSON.stringify(saved)).not.toContain('000000');
+
+    // Reload: in-memory state is gone; Clerk no longer holds the attempt here.
+    act(() => tree.unmount());
+    setPendingDob(null);
+    await render();
+    expect(has('onboarding-email')).toBe(true);
+    expect(byId('onboarding-email-input').props.value).toBe('sam@example.com');
+    await press('onboarding-back');
+    expect(byId('onboarding-dob').props.value).toBe('01/15/2000');
+    await press('onboarding-dob-continue');
+    await press('onboarding-email-continue');
+    await enterCode('000000');
+    await pickUsername();
+    await press('onboarding-photo-skip');
+    await press('onboarding-interest-skip');
+    await press('onboarding-brands-skip');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(h.api.ageGate.submit).toHaveBeenCalledWith('2000-01-15');
+    expect(h.storage.has('onboarding_pending_draft')).toBe(false);
+  });
+
+  it('a day-old signed-out draft is not shown to whoever opens the app next', async () => {
+    h.storage.set('onboarding_pending_draft', JSON.stringify({
+      version: 10, stepId: 'EMAIL', authMethod: 'email', email: 'old@example.com', codeMode: 'signup',
+      firstName: '', lastName: '', dobInput: '01/15/2000', savedAt: Date.now() - 25 * 60 * 60 * 1000,
+    }));
+    await render();
+    expect(has('onboarding-welcome')).toBe(true);
+    await press('onboarding-use-email');
+    expect(byId('onboarding-dob').props.value).toBe('');
+  });
+
+  it('a reload on the code step resumes the code step while Clerk still holds the sign-up', async () => {
+    h.storage.set('onboarding_pending_draft', JSON.stringify({
+      version: 10, stepId: 'CODE', authMethod: 'email', email: 'sam@example.com', codeMode: 'signup',
+      firstName: '', lastName: '', dobInput: '01/15/2000', savedAt: Date.now(),
+    }));
+    (h.signUp as { emailAddress?: string }).emailAddress = 'sam@example.com';
+    try {
+      await render();
+      expect(has('onboarding-code')).toBe(true);
+      await enterCode('000000');
+      expect(h.calls).toEqual(['clerk.signUp.verifyEmailCode', 'clerk.signUp.finalize']);
+      expect(has('onboarding-username')).toBe(true);
+    } finally {
+      delete (h.signUp as { emailAddress?: string }).emailAddress;
+    }
+  });
+
+  it('a reload after verification still sends the birthday, but only for the account it was typed for', async () => {
+    h.clerk.signedIn = true;
+    const draft = { version: 10, stepId: 'CODE', authMethod: 'email', codeMode: 'signup', firstName: '', lastName: '', dobInput: '01/15/2000', savedAt: Date.now() };
+    h.storage.set('onboarding_pending_draft', JSON.stringify({ ...draft, email: 'someone.else@example.com' }));
+    await render();
+    await pickUsername();
+    await press('onboarding-photo-skip');
+    await press('onboarding-interest-skip');
+    await press('onboarding-brands-skip');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(h.api.ageGate.submit).not.toHaveBeenCalled();
+
+    act(() => tree.unmount());
+    h.storage.clear();
+    h.storage.set('onboarding_pending_draft', JSON.stringify({ ...draft, email: 'sam@example.com' }));
+    await render();
+    expect(has('onboarding-username')).toBe(true);
+    await pickUsername();
+    await press('onboarding-photo-skip');
+    await press('onboarding-interest-skip');
+    await press('onboarding-brands-skip');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-buyer');
+    await press('onboarding-role-continue');
+    expect(h.api.ageGate.submit).toHaveBeenCalledWith('2000-01-15');
+  });
+
+  it('a teen birthday typed before a reload still blocks selling', async () => {
+    const teen = new Date();
+    const dobInput = `01/01/${teen.getUTCFullYear() - 15}`;
+    h.clerk.signedIn = true;
+    h.storage.set('onboarding_pending_draft', JSON.stringify({
+      version: 10, stepId: 'CODE', authMethod: 'email', email: 'sam@example.com', codeMode: 'signup',
+      firstName: '', lastName: '', dobInput, savedAt: Date.now(),
+    }));
+    await render();
+    await pickUsername();
+    await press('onboarding-photo-skip');
+    await press('onboarding-interest-skip');
+    await press('onboarding-brands-skip');
+    await press('onboarding-sizes-skip');
+    await press('onboarding-notifications-skip');
+    await press('account-type-seller');
+    await press('onboarding-role-continue');
+    expect(byId('onboarding-role-error').props.children).toBe('You must be 18 or older to sell.');
+  });
+
+  it('Log in from Welcome carries an email typed earlier to sign-in', async () => {
+    await render();
+    await press('onboarding-use-email');
+    await type('onboarding-dob', '01152000');
+    await press('onboarding-dob-continue');
+    await type('onboarding-email-input', 'Back@Example.com');
+    await press('onboarding-back');
+    await press('onboarding-back');
+    await press('onboarding-toggle-mode');
+    await press('onboarding-use-email');
+    expect(h.router.push).toHaveBeenLastCalledWith('/sign-in?email=back%40example.com');
+  });
+
+  it('a two-step account handed to sign-in arrives with its email prefilled', async () => {
+    h.clerk.existingEmails.add('back@example.com');
+    vi.spyOn(h.signIn.emailCode, 'verifyCode').mockImplementationOnce(async () => {
+      h.signIn.status = 'needs_second_factor';
+      return { error: null };
+    });
+    await render();
+    await signUpWithEmail('back@example.com');
+    expect(h.router.replace).toHaveBeenLastCalledWith('/sign-in?email=back%40example.com');
   });
 
   it('shows "Invite applied" on Welcome only when an invite code came with the link', async () => {

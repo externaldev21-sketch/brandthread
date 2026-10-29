@@ -1,7 +1,9 @@
 /**
- * Client side of the age gate. The date of birth lives only in memory here,
- * between the birthday screen and the authenticated POST /api/auth/age call,
- * and is never written to storage. The server derives and stores just the band.
+ * Client side of the age gate. The date of birth lives in memory here,
+ * between the birthday screen and the authenticated POST /api/auth/age call.
+ * Onboarding's signed-out draft (lib/onboardingDraft.ts) also keeps it on the
+ * device so a web reload doesn't ask again, and drops it once that call
+ * succeeds or the person signs out. The server derives and stores just the band.
  */
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/expo';
