@@ -135,8 +135,12 @@ export default function HashtagScreen() {
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore || loading || preview) return;
     setLoadingMore(true);
+    // A Top/Recent switch (or retry) while this page is in flight starts a new
+    // load; drop this page then, or the old sort's posts and cursor leak in.
+    const id = requestId.current;
     try {
       const page = await api.hashtags.posts(tag, sort, cursor);
+      if (id !== requestId.current) return;
       setItems((current) => {
         const seen = new Set(current.map((i) => i.id));
         return [...current, ...page.items.filter((p) => !seen.has(p.id)).map(toGridItem)];

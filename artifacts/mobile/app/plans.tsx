@@ -117,8 +117,8 @@ const BENEFIT_BULLETS = [
 //     in this app today (only the server-driven "Trial reminders" toggle in
 //     Notification Settings) — see the PR description. ────────────────────
 // Web checkout (Stripe) uses the server's trial (routes/subscription.ts
-// trial_period_days). Native reads each store product's own intro offer.
-const WEB_TRIAL_DAYS = 5;
+// trial_period_days = planCatalogue TRIAL_DAYS), which the shared plan config
+// (`trialDays`) carries. Native reads each store product's own intro offer.
 
 function trialSteps(days: number): TrialTimelineStep[] {
   return [
@@ -254,6 +254,9 @@ export default function PlansScreen() {
                 router.replace('/(tabs)/' as never);
               } else {
                 setCurrentPlanId(status.plan ?? null);
+                setCurrentPlanStatus(status.status ?? null);
+                setCurrentInterval(status.interval ?? 'month');
+                setLoadingId(null);
                 setAwaitingReturn(false);
                 showToast(
                   'Plan updated',
@@ -486,7 +489,7 @@ export default function PlansScreen() {
   // intro offer must not make this one promise a trial, and the length comes
   // from the store product rather than a hard-coded "5-day".
   const selectedTrialDays = Platform.OS === 'web'
-    ? WEB_TRIAL_DAYS
+    ? trialDays
     : freeTrialDays(packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[selectedPlan.id])?.product.introPrice as any);
   const hasRealTrialOffer = selectedTrialDays != null;
   const selectedCtaDisabled = loadingId !== null

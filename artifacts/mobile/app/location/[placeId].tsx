@@ -137,9 +137,12 @@ export default function LocationScreen() {
 
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore || loading || preview) return;
+    const id = requestId.current;
     setLoadingMore(true);
     try {
       const page = await api.places.posts(placeId, sort, cursor);
+      // The tab switched (or a reload started) while this page was in flight.
+      if (id !== requestId.current) return;
       setItems((current) => {
         const seen = new Set(current.map((i) => i.id));
         return [...current, ...page.items.filter((p) => !seen.has(p.id)).map(toGridItem)];

@@ -137,8 +137,9 @@ export default function LiveModerationScreen() {
     if (!live) { allowLeaveRef.current = true; goBackOr(router); return; }
     setSaving(true);
     try {
+      // A word typed but not yet added with "Add" is part of the draft too.
       await api.liveMod.saveSettings(streamId, {
-        bannedWords: state.bannedWords, slowModeSeconds: state.slowModeSeconds, saveAsDefault,
+        bannedWords: addBannedWord(state.bannedWords, wordDraft), slowModeSeconds: state.slowModeSeconds, saveAsDefault,
       });
       allowLeaveRef.current = true;
       goBackOr(router);

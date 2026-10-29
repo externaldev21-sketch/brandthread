@@ -113,6 +113,14 @@ function BuyForm({ info, signedIn, preview, previewDone }: { info: GiftCardStore
     phone: '+14155552671', textedTo: previewDone === 'texted' ? '2671' : null,
   } : null));
 
+  // The server reuses the PaymentIntent (and the pending card, with its old
+  // recipient) for a repeated key, and Stripe rejects a reused key with a new
+  // amount. So a retry after a cancelled 3DS / closed sheet only shares the key
+  // when nothing about the purchase changed.
+  useEffect(() => {
+    keyRef.current = `gc_${randomUUID()}`;
+  }, [amountCents, channel, email, phone, name, message]);
+
   const texting = channel === 'text';
   const issue = giftCardPurchaseIssue({ amountCents, info, email, phone: texting ? phone : null });
   const cardReady = preview || cardComplete;

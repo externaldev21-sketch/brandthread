@@ -4,12 +4,12 @@ import { CachedImage as Image } from '@/components/CachedImage';
  * preview text, headline, text, image, up to 3 product cards, button, live preview,
  * test send, send now or schedule. Route: /email-campaign-compose?id=
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { SP } from '@/lib/theme';
 import { RetryRow } from '@/components/ui/RetryRow';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { promptUpgradeOnPlanGate } from '@/lib/planUpgradePrompt';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { friendlyError } from '@/lib/friendlyError';
@@ -108,6 +108,22 @@ export default function EmailCampaignComposeScreen() {
     return () => { off = true; };
   }, [api, routeId, mode, reloadToken]);
 
+  // "Open sender details" pushes /email-settings; re-read the sender settings on
+  // return so a newly added mailing address unblocks sending. Only the settings
+  // are refetched, so the form being edited is never overwritten.
+  const focusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!focusedOnce.current) { focusedOnce.current = true; return; }
+    if (mode !== 'live') return;
+    let off = false;
+    api.emailMarketing.settings().then((settings) => {
+      if (off) return;
+      setMissingAddress(!settings.postalAddress.trim());
+      setStoreName(settings.fromName?.trim() || settings.defaultFromName || 'Your store');
+    }).catch(() => {});
+    return () => { off = true; };
+  }, [api, mode]));
+
   const fullBody = useMemo<EmailCampaignBody>(() => ({
     ...body,
     imageUrl: body.imageUrl?.trim() ? body.imageUrl.trim() : null,
@@ -143,9 +159,14 @@ export default function EmailCampaignComposeScreen() {
     }
   };
 
+  // One action at a time: buttons only disable after a re-render, and two
+  // overlapping saves of a new campaign would each create a campaign.
+  const busyRef = useRef(false);
   const run = async (kind: 'save' | 'test' | 'schedule' | 'send', fn: (cid: string) => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(kind);
-    try { const cid = await save(); if (cid) await fn(cid); } finally { setBusy(null); }
+    try { const cid = await save(); if (cid) await fn(cid); } finally { busyRef.current = false; setBusy(null); }
   };
 
   const saveDraft = () => run('save', async () => { setLeaveTo('back'); });

@@ -926,7 +926,9 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
       // Auto-dismiss the banner after 6 seconds
       setTimeout(() => setCancelConfirmed(false), 6000);
     } catch (e: any) {
-      Alert.alert('Couldn’t cancel this order', 'Check your connection and try again.');
+      // The server's own words when it refused (shipped order, refund failed, …).
+      Alert.alert('Couldn’t cancel this order', sellerOrderConflictMessage(e?.code)
+        ?? (e instanceof ApiError && e.status > 0 && e.message ? e.message : 'Check your connection and try again.'));
     } finally {
       setCancelling(false);
     }
@@ -1345,7 +1347,7 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
               multiline
             />
             <Text style={s.warningText}>
-              This will cancel the order. Any refund must be issued separately through your payment provider. This cannot be undone.
+              This will cancel the order. If the buyer paid, what's left of their payment is refunded automatically. This cannot be undone.
 
             </Text>
             <View style={s.modalActions}>

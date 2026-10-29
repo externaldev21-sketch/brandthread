@@ -176,8 +176,6 @@ export default function IntegrationsScreen() {
                     accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
                     accessibilityHint={connected ? (item.route ? `Opens ${item.label} settings` : undefined) : `Connect ${item.label}`}
                     activeOpacity={connected && !item.route ? 1 : 0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${item.label}, ${connected ? 'connected' : 'not connected'}`}
                     accessibilityState={{ busy: isToggling }}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >

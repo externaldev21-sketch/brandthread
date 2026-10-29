@@ -82,6 +82,9 @@ export default function PayoutDetailScreen() {
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
+    // Clerk still restoring the session: stay on the skeleton instead of
+    // flashing "Payout not found" before the real fetch runs.
+    if (!isPreviewMode && !authLoaded) return;
     if (isPreview) {
       // Signed-out preview never calls the API; fake data only with &demo=1.
       setDetail(isPreviewDemoMode() && payoutId ? demoDetail(payoutId) : null);
@@ -99,7 +102,7 @@ export default function PayoutDetailScreen() {
       else setLoadError(true);
     }
     setLoading(false);
-  }, [api, isPreview, payoutId]);
+  }, [api, authLoaded, isPreview, isPreviewMode, payoutId]);
 
   useEffect(() => { void load(); }, [load]);
 

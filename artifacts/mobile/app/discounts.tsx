@@ -785,7 +785,7 @@ function DiscountRow({ d, first, onPress, onViewUses }: {
       <Text style={s.metaText} numberOfLines={2}>{discountSummaryLine(d)}</Text>
       <Text style={s.metaText} numberOfLines={1}>{discountUsageLine(d)}</Text>
     </TouchableOpacity>
-<TouchableOpacity onPress={onViewUses} accessibilityLabel={`View redemptions for ${d.code}`}><Text style={s.metaText}>View redemptions · {d.usesCount} uses</Text></TouchableOpacity></View>
+<TouchableOpacity onPress={onViewUses} accessibilityLabel={`View redemptions for ${d.code}`}><Text style={s.metaText}>View redemptions · {d.usesCount} {d.usesCount === 1 ? 'use' : 'uses'}</Text></TouchableOpacity></View>
   );
 }
 

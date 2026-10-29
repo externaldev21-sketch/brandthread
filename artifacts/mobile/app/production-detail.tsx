@@ -111,10 +111,14 @@ export default function ProductionDetailScreen() {
 
   const openThread = async () => {
     if (!data?.manufacturer) return;
-    const target = threadId ?? (await getOrCreateConversation(data.manufacturer.id, {
-      productionId: data.order.id, contextLabel: `${orderTypeLabel(data.order.orderType)}: ${data.order.title}`,
-    })).id;
-    router.push({ pathname: '/manufacturer-messages', params: { threadId: target } } as never);
+    try {
+      const target = threadId ?? (await getOrCreateConversation(data.manufacturer.id, {
+        productionId: data.order.id, contextLabel: `${orderTypeLabel(data.order.orderType)}: ${data.order.title}`,
+      })).id;
+      router.push({ pathname: '/manufacturer-messages', params: { threadId: target } } as never);
+    } catch {
+      setActionError("Couldn't open the conversation. Try again.");
+    }
   };
 
   const decline = () => {

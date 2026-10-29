@@ -386,7 +386,8 @@ export default function PaymentsScreen() {
           releaseAt:      d.releaseAt ?? undefined,
           scheduledBroadcastAt: d.scheduledBroadcastAt ?? undefined,
           releaseDate:    d.releaseAt ? fmtDate(d.releaseAt) : undefined,
-          mfgProgress:    d.mfgProgress ?? undefined,
+          // The API stores 0–100 (drops.mfg_progress); the card renders a 0–1 fraction.
+          mfgProgress:    typeof d.mfgProgress === 'number' ? Math.min(1, Math.max(0, d.mfgProgress / 100)) : undefined,
         }));
         setDrops(mapped);
         setBroadcastStates(mapped.reduce<Record<string, BroadcastState>>((states, drop) => {
@@ -455,9 +456,11 @@ export default function PaymentsScreen() {
   const preOrderDrops = drops.filter((d) => d.type === 'pre-order');
   const preMadeDrops  = drops.filter((d) => d.type === 'pre-made');
 
+  // Only drops with a real date can be "next" (payoutDate is '—' without one,
+  // and the formatted label doesn't parse reliably on Hermes) — sort on the ISO value.
   const nextPayout = [...drops]
-    .filter((d) => d.status !== 'paid')
-    .sort((a, b) => new Date(a.payoutDate).getTime() - new Date(b.payoutDate).getTime())[0];
+    .filter((d) => d.status !== 'paid' && d.releaseAt && !Number.isNaN(new Date(d.releaseAt).getTime()))
+    .sort((a, b) => new Date(a.releaseAt!).getTime() - new Date(b.releaseAt!).getTime())[0];
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -492,7 +495,7 @@ export default function PaymentsScreen() {
             <View style={styles.payoutInfo}>
               <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Payout account</Text>
               <Text style={[styles.payoutAccount, { color: colors.foreground }]}>
-                No payout account on file
+                Set up and managed in Payouts
               </Text>
             </View>
           </View>

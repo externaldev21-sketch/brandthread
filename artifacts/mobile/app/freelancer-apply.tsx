@@ -34,7 +34,7 @@ import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, RED, FILL_EL
 
 import { useColors } from '@/hooks/useColors';
 
-import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { parseDecimalToCents } from '@/lib/money';
 
 const STEPS = ['Service', 'Rate & Bio', 'Portfolio'];
 
@@ -66,7 +66,9 @@ export default function FreelancerApplyScreen() {
           setIsEdit(true);
           setServiceType(freelancer.serviceType);
           setTagsText((freelancer.skillTags ?? []).join(', '));
-          setRateText(formatCents(freelancer.hourlyRateCents).slice(1));
+          // Plain "1234.50" — the input only accepts digits/dot, so a locale-formatted
+          // "$1,234.50" (or "65,00 $") would fail parseDecimalToCents and block Continue.
+          setRateText(Number.isSafeInteger(freelancer.hourlyRateCents) ? (freelancer.hourlyRateCents / 100).toFixed(2) : '');
           setBio(freelancer.bio ?? '');
           const u = [...(freelancer.portfolioUrls ?? [])];
           while (u.length < 4) u.push('');

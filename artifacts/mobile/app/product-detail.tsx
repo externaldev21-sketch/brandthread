@@ -388,7 +388,7 @@ function OverviewTab({ product, pricing, coverImage }: {
               {pricing.compareAtPriceCents && (
                 <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
               )}
-              {pricing.discountPercent && (
+              {!!pricing.discountPercent && (
                 <StatusBadge label={`-${pricing.discountPercent}%`} variant="error" small />
               )}
             </View>
@@ -1014,7 +1014,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             Est. completion: {fmtDate(mfg.productionDeadline)}
           </Text>
         )}
-        {mfg.unitsInProduction && (
+        {!!mfg.unitsInProduction && (
           <Text style={pt.unitsText}>{mfg.unitsInProduction} units in production</Text>
         )}
       </GradientCard>
@@ -1131,7 +1131,16 @@ function AnalyticsTab({
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const an = React.useMemo(() => makeAnStyles(theme), [theme]);
-  if (error) return null;
+  if (error) {
+    return (
+      <EmptyState
+        icon="alert-circle"
+        title="Couldn't load analytics"
+        description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: onRetry, icon: 'refresh-cw' }}
+      />
+    );
+  }
   if (loading || !analytics) {
     return (
       <View style={{ padding: SP.md, gap: SP.md }}>
@@ -1299,7 +1308,7 @@ function StoreTab({
               {pricing.compareAtPriceCents && (
                 <Text style={st.comparePrice}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
               )}
-              {pricing.discountPercent && (
+              {!!pricing.discountPercent && (
                 <StatusBadge label={`Save ${pricing.discountPercent}%`} variant="error" small />
               )}
             </View>

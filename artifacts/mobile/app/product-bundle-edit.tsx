@@ -159,8 +159,10 @@ export default function ProductBundleEditScreen() {
 
   async function removeItem(itemId: string) {
     if (!bundleId) return;
-    await (api as any).bundles.removeItem(bundleId, itemId);
-    setItems(prev => prev.filter(i => i.id !== itemId));
+    try {
+      await (api as any).bundles.removeItem(bundleId, itemId);
+      setItems(prev => prev.filter(i => i.id !== itemId));
+    } catch { Alert.alert("Couldn't remove from bundle", 'Try again.'); }
   }
 
   // ── Save bundle ─────────────────────────────────────────────────────────────
@@ -187,7 +189,8 @@ export default function ProductBundleEditScreen() {
       } else {
         await (api as any).bundles.update(bundleId!, {
           name:             trimName,
-          description:      description.trim() || undefined,
+          // '' (not undefined) so clearing the field clears it on the server.
+          description:      description.trim(),
           bundlePriceCents:     parsedBundlePriceCents,
           compareAtCents,
           status:           isActive ? 'active' : 'draft',

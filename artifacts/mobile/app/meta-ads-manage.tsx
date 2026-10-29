@@ -347,10 +347,10 @@ function CampaignCard({
           <Stat label="Spend" value={money(i.spendCents)} colors={colors} />
           <Stat label="Reach" value={i.reach.toLocaleString()} colors={colors} />
           <Stat label="Clicks" value={i.clicks.toLocaleString()} colors={colors} />
-          <Stat label="CTR" value={`${(i.ctr * 100).toFixed(2)}%`} colors={colors} />
+          <Stat label="CTR" value={`${(Number(i.ctr ?? 0) * 100).toFixed(2)}%`} colors={colors} />
           <Stat label="CPC" value={money(i.cpcCents)} colors={colors} />
           <Stat label="Purchases" value={i.purchases.toLocaleString()} colors={colors} />
-          <Stat label="ROAS" value={`${i.roas.toFixed(2)}x`} colors={colors} />
+          <Stat label="ROAS" value={i.roas == null ? '—' : `${Number(i.roas).toFixed(2)}x`} colors={colors} />
         </View>
       )}
 
