@@ -7,7 +7,7 @@
  * thread_cash_entries(idempotency_key) allows exactly once, so the job, the
  * lazy check at redemption, and a crashed/retried run can overlap freely.
  */
-import { and, asc, eq, gt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, lte, ne, sql, type SQL } from "drizzle-orm";
 import { db, threadCashEntries, threadCashExpiryWarnings } from "@workspace/db";
 import { logger } from "../logger";
 import {
@@ -109,7 +109,7 @@ export async function candidateBuyers(from: Date | null, to: Date, batch = BATCH
   const out: string[] = [];
   let after: string | null = null;
   for (;;) {
-    const conditions = [
+    const conditions: SQL[] = [
       gt(threadCashEntries.amountCents, 0),
       // Paid funds never expire; every promo credit (incl. a promo Live gift) does.
       ne(threadCashEntries.funding, "paid"),
@@ -117,7 +117,7 @@ export async function candidateBuyers(from: Date | null, to: Date, batch = BATCH
       ...(from ? [gt(threadCashEntries.createdAt, from)] : []),
       ...(after !== null ? [gt(threadCashEntries.buyerId, after)] : []),
     ];
-    const rows = await db.selectDistinct({ buyerId: threadCashEntries.buyerId })
+    const rows: Array<{ buyerId: string }> = await db.selectDistinct({ buyerId: threadCashEntries.buyerId })
       .from(threadCashEntries)
       .where(and(...conditions))
       .orderBy(asc(threadCashEntries.buyerId))
