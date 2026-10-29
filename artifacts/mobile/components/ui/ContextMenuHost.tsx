@@ -122,7 +122,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
   const cardWidth = Math.min(width - 48, 420);
   const listHeight = req.items.length * 48;
   const hasHeader = !!(preview.title || preview.avatarUri);
-  const chrome = (hasHeader ? 52 : 0) + 12 + listHeight;
+  const chrome = (hasHeader ? 52 : 0) + 12 + listHeight + (preview.footer ? 80 : 0);
   const maxMedia = Math.max(160, height - insets.top - insets.bottom - 48 - chrome);
   const ratio = previewAspectRatio(preview.aspectRatio);
   const mediaHeight = preview.imageUri ? Math.min(maxMedia, cardWidth / ratio) : 0;
@@ -163,6 +163,9 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
               <Text style={[styles.previewBody, { color: theme.text }]} numberOfLines={8}>{preview.body}</Text>
             ) : null}
           </Pressable>
+          {preview.footer ? (
+            <View style={[styles.previewFooter, { backgroundColor: surface }]} testID="context-menu-preview-footer">{preview.footer}</View>
+          ) : null}
           <ScrollView style={[styles.previewList, { backgroundColor: surface }]} scrollEnabled={listHeight > 360} bounces={false}>
             <MenuRows items={req.items} onPick={(item) => close(item.onPress)} />
           </ScrollView>
@@ -227,6 +230,7 @@ const styles = StyleSheet.create({
   previewSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 1 },
   previewBody: { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular, padding: 14 },
   previewList: { marginTop: 12, borderRadius: 14, maxHeight: 360 },
+  previewFooter: { marginTop: 8, borderRadius: 14, padding: 12 },
   row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
   rowCompact: { minHeight: ROW_HEIGHT },
   rowSeparator: { borderTopWidth: StyleSheet.hairlineWidth },

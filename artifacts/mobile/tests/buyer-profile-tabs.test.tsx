@@ -130,6 +130,9 @@ vi.mock('react-native', () => {
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    // The content swipe between tabs (components/profile/useProfileTabSwipe).
+    PanResponder: { create: () => ({ panHandlers: {} }) },
+    Easing: { out: (f: unknown) => f, cubic: (t: number) => t },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     StatusBar: () => null,
     AccessibilityInfo: {

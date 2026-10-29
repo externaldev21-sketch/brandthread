@@ -20,7 +20,7 @@
  * from the local preview provider instead of the API.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { KeyboardAvoidingView } from '@/components/KeyboardProviderCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,7 +43,8 @@ import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
 import { LiveCommentActionsSheet, type CommentAction, type CommentActionTarget } from '@/components/live/LiveCommentActionsSheet';
 import {
-  LiveChatInput, LiveChatList, LiveHostRow, LiveProductCard, LiveRail, LiveTopRight,
+  LiveChatInput, LiveChatList, LiveHeartLayer, LiveHostRow, LiveProductCard, LiveRail, LiveTopRight,
+  type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { showActionSheet } from '@/components/ui/ActionSheet';
@@ -93,6 +94,14 @@ export default function SellerLiveScreen() {
   const preview = isLivePreviewDemo();
 
   const [viewerCount, setViewerCount] = useState(0);
+  // Viewers' likes float up on the host's screen too (pack 2, item 32) —
+  // a few hearts per like event, capped at 3 so a flood stays calm.
+  const heartsRef = useRef<LiveHeartLayerHandle>(null);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const floatHearts = useCallback((count: number) => {
+    heartsRef.current?.burst(screenWidth - 36, screenHeight - Math.max(insets.bottom, 10) - 150, Math.max(1, Math.min(3, count)));
+  }, [insets.bottom, screenHeight, screenWidth]);
+  const lastPreviewLikesRef = useRef<number | null>(null);
   const [comments, setComments] = useState<LiveChatMessage[]>([]);
   const [duration, setDuration] = useState(0);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
@@ -234,6 +243,11 @@ export default function SellerLiveScreen() {
       }).catch(() => {});
       const off = provider.subscribe(params.streamId, event => {
         if (event.type === 'viewers') setViewerCount(event.viewerCount);
+        if (event.type === 'likes') {
+          const prev = lastPreviewLikesRef.current;
+          lastPreviewLikesRef.current = event.likeCount;
+          if (prev != null && event.likeCount > prev) floatHearts(event.likeCount - prev);
+        }
         if (event.type === 'chat') setComments(prev => [...prev, ...event.messages].slice(-80));
       });
       return () => { alive = false; off(); };
@@ -283,13 +297,15 @@ export default function SellerLiveScreen() {
       setProductTags(event.productTags as ProductTag[]);
     } else if (event.type === 'viewerCount') {
       setViewerCount(event.count);
+    } else if (event.type === 'likes') {
+      floatHearts(event.added ?? 1);
     } else if (event.type === 'comment_removed') {
       setComments(prev => prev.filter(c => c.id !== event.commentId));
       mod.handleEvent(event);
     } else {
       mod.handleEvent(event);
     }
-  }, [mod.handleEvent, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [floatHearts, mod.handleEvent, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pollComments = useCallback(async () => {
     try {
@@ -519,6 +535,9 @@ export default function SellerLiveScreen() {
         )}
         {notice ? <Text style={styles.notice} onPress={() => setNotice('')}>{notice}</Text> : null}
       </KeyboardAvoidingView>
+
+      {/* Sibling of the stage so a rising heart is never clipped. */}
+      <LiveHeartLayer ref={heartsRef} />
 
       {showShop && (
         <LiveProductsSheet

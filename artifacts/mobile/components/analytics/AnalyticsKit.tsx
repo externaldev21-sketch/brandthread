@@ -31,6 +31,9 @@ import { svgTextFont } from '@/lib/systemFont';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { radius } from '@/constants/radii';
+import { ChartScrubArea, ChartScrubLens, useChartScrub } from '@/components/analytics/ChartScrub';
+import { GlideThumbView, useGlideThumb } from '@/components/motion/GlideThumb';
+import { PressScale } from '@/components/motion/PressScale';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -146,30 +149,39 @@ export function PillTabs<T extends string>({
 }) {
   const colors = useColors();
   const s = useMemo(() => pillTabStyles(colors), [colors]);
-  const pills = options.map(opt => {
+  const activeIndex = options.findIndex(opt => opt.key === value);
+  // The filled thumb glides under the labels (pack 2, item 18) instead of
+  // the fill jump-cutting between pills.
+  const glide = useGlideThumb(activeIndex);
+  const pills = options.map((opt, i) => {
         const active = opt.key === value;
         return (
-          <TouchableOpacity
-            key={opt.key}
+          <View key={opt.key} onLayout={scroll ? undefined : glide.onItemLayout(i)}>
+          <PressScale
             onPress={() => { haptic('select'); onChange(opt.key); }}
-            style={[s.pill, active && s.pillActive]}
+            style={[s.pill, active && s.pillActiveBorder]}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
           >
             <Text style={[s.pillText, active && s.pillTextActive]}>{opt.label}</Text>
-          </TouchableOpacity>
+          </PressScale>
+          </View>
         );
       });
-  if (!scroll) return <View style={{ marginBottom: SP.md }}><View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: 'wrap' }}>{pills}</View></View>;
+  const thumb = <GlideThumbView thumbStyle={glide.thumbStyle} ready={glide.ready} style={s.thumb} testID="pill-tabs-thumb" />;
+  if (!scroll) return <View style={{ marginBottom: SP.md }}><View style={{ flexDirection: 'row', gap: SP.xs, flexWrap: 'wrap' }}>{thumb}{pills}</View></View>;
   return (
-    <ChipRow selectedIndex={options.findIndex(opt => opt.key === value)} hapticOnSelect={false} bleed={SP.md} inset={SP.md} gap={SP.xs} style={{ marginBottom: SP.md }}>
+    <ChipRow selectedIndex={activeIndex} hapticOnSelect={false} bleed={SP.md} inset={SP.md} gap={SP.xs} style={{ marginBottom: SP.md }} underlay={thumb} onChipLayout={glide.setRect}>
       {pills}
     </ChipRow>
   );
 }
 const pillTabStyles = (colors: Colors) => StyleSheet.create({
-  pill:       { minHeight: 36, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.primary },
+  // Pills are transparent over a card-coloured track; the active fill is the
+  // gliding thumb drawn underneath them.
+  pill:       { minHeight: 36, paddingHorizontal: SP.sm + 2, paddingVertical: SP.xs, borderRadius: radius.md, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  pillActiveBorder: { borderColor: colors.primary },
+  thumb:      { borderRadius: radius.md, backgroundColor: colors.accent },
   pillText:     { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground },
   pillTextActive: { color: colors.accentForeground },
 });
@@ -333,8 +345,12 @@ export function AnalyticsBarChart({
     return gridHeight - Math.max(0, Math.min(1, frac)) * (gridHeight - 4);
   };
 
+  const scrub = useChartScrub({ count: n, plotLeft: yLabelW, plotWidth: plotW, centred: true, enabled: !allZero });
+  const scrubbed = scrub.index !== null ? points[scrub.index] : undefined;
+
   return (
-    <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+    <ChartScrubArea gesture={scrub.gesture} accessibilityLabel="Bar chart, drag across to read each bar">
+    <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)} testID="analytics-bar-chart">
       <Svg width={chartWidth} height={height}>
         {levels.map((v, i) => {
           const y = levels.length === 1 ? gridHeight : gridHeight - (i / (levels.length - 1)) * (gridHeight - 4);
@@ -351,7 +367,9 @@ export function AnalyticsBarChart({
           const x = barX(i);
           const y = barY(p.value);
           const h = gridHeight - y;
-          return <Rect key={i} x={x} y={y} width={barW} height={Math.max(2, h)} rx={3} ry={3} fill={barColor} opacity={0.88} />;
+          // The scrubbed bar lifts to full opacity; the rest dim back.
+          const opacity = scrub.index === null ? 0.88 : scrub.index === i ? 1 : 0.4;
+          return <Rect key={i} x={x} y={y} width={barW} height={Math.max(2, h)} rx={3} ry={3} fill={barColor} opacity={opacity} />;
         })}
         {points.length > 0 && (() => {
           const indices = points.length <= 7 ? points.map((_, i) => i) : [0, Math.floor((points.length - 1) / 2), points.length - 1];
@@ -368,7 +386,19 @@ export function AnalyticsBarChart({
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.subtle }}>{emptyLabel}</Text>
         </View>
       )}
+      {!allZero && (
+        <ChartScrubLens
+          fingerX={scrub.fingerX}
+          active={scrub.active}
+          chartWidth={chartWidth}
+          plotTop={0}
+          plotHeight={gridHeight}
+          value={scrubbed ? fmt(scrubbed.value) : null}
+          label={scrubbed?.label ?? null}
+        />
+      )}
     </View>
+    </ChartScrubArea>
   );
 }
 

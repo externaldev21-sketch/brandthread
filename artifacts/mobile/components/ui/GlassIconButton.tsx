@@ -7,13 +7,14 @@
  * glass where available and a real blur elsewhere. Never use it for a bar,
  * a card, or anything over the tab bar.
  */
-import React from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Glass } from '@/components/ui/Glass';
 import { Icon, ICON_SIZE, type IconName } from '@/components/ui/Icon';
 import { iconAccessibilityLabel } from '@/lib/a11y/iconLabels';
 import { RADII } from '@/constants/radii';
 import { MEDIA } from '@/lib/theme';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface GlassIconButtonProps {
   name: IconName;
@@ -28,19 +29,23 @@ export interface GlassIconButtonProps {
 
 export function GlassIconButton({ name, onPress, accessibilityLabel, size = 40, style, testID }: GlassIconButtonProps) {
   const slop = Math.max(0, (44 - size) / 2);
+  // The shared press squish (pack 2, item 22), on top of the existing dim.
+  const scale = useRef(new Animated.Value(1)).current;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={iconAccessibilityLabel(name, accessibilityLabel)}
       onPress={() => onPress()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       hitSlop={{ top: slop, bottom: slop, left: slop, right: slop }}
       testID={testID}
       style={({ pressed }) => [{ width: size, height: size, opacity: pressed ? 0.7 : 1 }, style]}
     >
-      <View style={[styles.circle, { borderRadius: size / 2 }]}>
+      <Animated.View style={[styles.circle, { borderRadius: size / 2, transform: [{ scale }] }]}>
         <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
         <Icon name={name} size={size >= 44 ? ICON_SIZE.lg : ICON_SIZE.sm} color={MEDIA.foreground} />
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }

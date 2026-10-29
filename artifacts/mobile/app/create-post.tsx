@@ -7,6 +7,7 @@
 // never post to Threads (the server rejects it too).
 // Caps, modes and defaults live in constants/postLimits.ts. Every in-flow header is the
 // shared ScreenHeader (via components/create-post/ui.tsx CreateHeader) — no divider, no subtitle.
+import { completePostUpload, failPostUpload, startPostUpload, updatePostUploadProgress } from '@/lib/postUploadProgress';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -288,7 +289,34 @@ export default function CreatePostScreen() {
           onProgress: (fraction, phaseStep) => setPublishState({ phase: 'running', fraction, step: phaseStep, draft: asDraft }),
           signal: abort.current,
         }).then((post) => attachThreadPoll(post, postMode === 'thread' ? details.poll : null));
-        if (asDraft) await run(); else await completeSetupTaskAfter('first_post', run);
+        if (asDraft) {
+          await run();
+        } else {
+          // Publish in the background (pack 2, item 27): the composer closes
+          // straight away and the upload's real progress drives the hairline
+          // at the top of the feed (lib/postUploadProgress). A failure keeps
+          // the entry up with Retry, re-running the same publish.
+          const uploadId = `post-${Date.now()}`;
+          const thumb = media.kind === 'slides' ? media.slides[media.coverIndex] : undefined;
+          startPostUpload({ id: uploadId, kind: 'thread', thumbnailUri: thumb?.kind === 'photo' ? thumb.uri : undefined });
+          const background = () => {
+            void completeSetupTaskAfter('first_post', () => publishCreatePost({
+              api,
+              input: { mode: postMode, media, details, isDraft: false },
+              onProgress: (fraction) => updatePostUploadProgress(uploadId, fraction),
+              signal: { aborted: false },
+            }).then((post) => attachThreadPoll(post, postMode === 'thread' ? details.poll : null)))
+              .then(() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                completePostUpload(uploadId);
+              })
+              .catch(() => failPostUpload(uploadId, () => { startPostUpload({ id: uploadId, kind: 'thread', thumbnailUri: thumb?.kind === 'photo' ? thumb.uri : undefined }); background(); }));
+          };
+          background();
+          setPublishState({ phase: 'idle' });
+          leave();
+          return;
+        }
       } else {
         return;
       }

@@ -129,13 +129,34 @@ export default function SwipeRow({
       return true;
   };
 
+  // The latest actions, read at release time — so callers can pass inline
+  // `leading`/`trailing` arrays without the PanResponder being rebuilt (and
+  // its in-flight gesture state lost) on every parent render mid-drag.
+  const actionsRef = useRef({ leading, trailing });
+  actionsRef.current = { leading, trailing };
+
+  // Whether this touch has become a horizontal swipe. A row whose content is
+  // not itself pressable (e.g. a Bag line) has no deeper responder, so the
+  // touch would otherwise go to an ancestor (the app root's keyboard-dismiss
+  // Pressable) — and React Native only re-negotiates moves among the current
+  // responder's ancestors, so the row could never claim the drag. Taking the
+  // touch at start (deeper Pressables still win, they're asked first) and
+  // engaging only on a clearly horizontal move fixes that; until engaged the
+  // responder yields to a scroll view that asks for it.
+  const engaged = useRef(false);
+
   const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => { engaged.current = false; return !disabled; },
     // Capture phase: a clearly horizontal drag is taken from the row's own
     // Pressable (which claimed the touch on press-in), as UITableView does.
-    onMoveShouldSetPanResponderCapture: shouldClaim,
-    onMoveShouldSetPanResponder: shouldClaim,
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderMove: (_, g) => {
+    onMoveShouldSetPanResponderCapture: (evt, g) => { const claim = shouldClaim(evt, g); if (claim) engaged.current = true; return claim; },
+    onMoveShouldSetPanResponder: (evt, g) => { const claim = shouldClaim(evt, g); if (claim) engaged.current = true; return claim; },
+    onPanResponderTerminationRequest: () => !engaged.current,
+    onPanResponderMove: (evt, g) => {
+      if (!engaged.current) {
+        if (!shouldClaim(evt, g)) return;
+        engaged.current = true;
+      }
       let x = offset.current + g.dx;
       if (leadingWidth === 0) x = Math.min(0, x);
       if (trailingWidth === 0) x = Math.max(0, x);
@@ -147,13 +168,18 @@ export default function SwipeRow({
         : fullSwipe && x >= full && leadingWidth > 0 ? 'leading' : null);
     },
     onPanResponderRelease: (_, g) => {
+      // Taken at touch-start but never became a swipe (a tap or a vertical
+      // drag on non-pressable row content): nothing to settle.
+      if (!engaged.current) return;
+      engaged.current = false;
       const x = offset.current + g.dx;
       const result = resolveSwipeRelease(x, g.vx, {
         width: width.current, leadingWidth, trailingWidth, fullSwipe,
       });
       setArmed(null);
       if (result.kind === 'full') {
-        const action = result.side === 'trailing' ? trailing[trailing.length - 1] : leading[0];
+        const { leading: lead, trailing: trail } = actionsRef.current;
+        const action = result.side === 'trailing' ? trail[trail.length - 1] : lead[0];
         const to = result.side === 'trailing' ? -width.current : width.current;
         // Mail: the row slides off with the action, then the list updates.
         offset.current = 0;
@@ -166,9 +192,9 @@ export default function SwipeRow({
       if (result.kind === 'open') settle(result.side === 'trailing' ? -trailingWidth : leadingWidth);
       else close();
     },
-    onPanResponderTerminate: () => { setArmed(null); close(); },
+    onPanResponderTerminate: () => { engaged.current = false; setArmed(null); close(); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [disabled, leadingWidth, trailingWidth, fullSwipe, leading, trailing]);
+  }), [disabled, leadingWidth, trailingWidth, fullSwipe]);
 
   const renderButton = (action: SwipeRowAction, style?: object) => {
     const tone = toneColors(theme, action.tone ?? 'neutral');
@@ -231,7 +257,11 @@ const styles = StyleSheet.create({
   panel: { position: 'absolute', top: 0, bottom: 0, flexDirection: 'row', zIndex: 0, elevation: 0 },
   leadingPanel: { left: 0 },
   trailingPanel: { right: 0 },
-  foreground: { zIndex: 1, elevation: 1 },
+  // Web: vertical panning stays native, horizontal drags reach the
+  // PanResponder — with the default `touch-action: auto` the browser claims
+  // the horizontal pan and fires pointercancel, so a touch swipe never opened
+  // the row on mobile web.
+  foreground: { zIndex: 1, elevation: 1, ...(Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as object) : null) },
   action: { alignItems: 'center', justifyContent: 'center', gap: 4, height: '100%' },
   // Armed full swipe: the outermost action fills the row, its symbol riding
   // the inner edge next to the row (Mail).

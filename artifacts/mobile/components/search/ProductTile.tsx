@@ -1,5 +1,5 @@
 import { savedProducts, toggleSavedProduct } from '@/lib/saved/savedProducts';
-import { openContextMenu } from '@/lib/contextMenu';
+import { openProductPeek } from '@/components/peek/QuickPeek';
 import { buildProductUrl } from '@/lib/shareLinks';
 import { hapticPrimaryAction, haptics } from '@/lib/haptics';
 import { copyLink, shareLink } from '@/lib/shareActions';
@@ -77,15 +77,16 @@ export function ProductTile({ item, accent: _accent, onPress, width, sharedPhoto
   const openMenu = () => {
     if (!url) return;
     const saved = savedProducts.has(productId);
-    const price = typeof item.priceCents === 'number' ? formatMoney(item.priceCents) : null;
-    openContextMenu({
-      preview: {
-        imageUri: item.imageUri,
-        aspectRatio: GRID_CARD_ASPECT,
-        title: item.name,
-        subtitle: [item.brand, price].filter(Boolean).join(' · '),
-      },
-      onPreviewPress: onPress,
+    // Quick-peek with price + Add to bag (pack 2, item 29) over the same
+    // Save / Share / Copy link rows.
+    openProductPeek({
+      productId,
+      name: item.name,
+      brand: item.brand,
+      imageUri: item.imageUri,
+      aspectRatio: GRID_CARD_ASPECT,
+      priceCents: item.priceCents,
+      onOpen: onPress,
       items: [
         {
           key: 'save', label: saved ? 'Remove from saved' : 'Save', icon: 'bookmark',

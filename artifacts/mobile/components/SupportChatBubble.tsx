@@ -256,6 +256,8 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
         <FlatList
           ref={flatRef}
           data={msgs}
+          // Drag the thread down to pull the keyboard away with it (pack 2, item 33).
+          keyboardDismissMode="interactive"
           keyExtractor={m => m.id}
           renderItem={({ item }) => <MessageBubble msg={item} accent={accent} accentDim={accentDim} accentBorder={accentBorder} />}
           contentContainerStyle={s.msgList}

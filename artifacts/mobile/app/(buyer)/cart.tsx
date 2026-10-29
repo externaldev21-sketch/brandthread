@@ -31,6 +31,7 @@ import { keepShopping } from '@/lib/navigation/shopperRoutes';
 import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { applyCartQuantity } from '@/lib/cartOptimistic';
+import SwipeRow from '@/components/ui/SwipeRow';
 
 import * as Haptics from 'expo-haptics';
 
@@ -215,6 +216,8 @@ export default function CartScreen() {
   // (lib/checkoutLive.ts); never on web, where the sheet needs checkout's own tap.
   const checkoutLive = useCheckoutLive();
   const walletAllowed = Platform.OS === 'ios' ? checkoutLive.applePay : Platform.OS === 'android' ? checkoutLive.googlePay : false;
+  // Undo toasts sit just above the sticky checkout bar, never over it.
+  const undoBottom = BAG_BAR_HEIGHT + (walletAllowed ? 56 : 0) + insets.bottom + SP.sm;
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   // Rewards (app/loyalty.tsx) hands over the points the buyer chose there;
@@ -395,8 +398,11 @@ export default function CartScreen() {
     setCart(optimistic);
     if (target <= 0) {
       showUndo({
-        message: `"${item.productName}" removed`,
+        message: 'Removed from bag',
         undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+        bottom: undoBottom,
+        tone: 'monochrome',
+        testID: 'bag-undo-toast',
       });
     }
     try {
@@ -415,6 +421,34 @@ export default function CartScreen() {
     void changeQuantity(itemId, 1);
   }
 
+  // Swipe-to-delete (pack 2, item 19): optimistic, like stepping the
+  // quantity to 0 — the row leaves the instant the swipe lands, the undo
+  // toast slides up, and a failed server write puts the line back.
+  async function handleSwipeRemove(itemId: string) {
+    if (pendingByItemId[itemId]) return;
+    const snapshot = cartRef.current;
+    if (!snapshot.items.some(i => i.id === itemId)) return;
+    haptic('select');
+    const optimistic = applyCartQuantity(snapshot, itemId, 0);
+    cartRef.current = optimistic;
+    setCart(optimistic);
+    showUndo({
+      message: 'Removed from bag',
+      undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+      bottom: undoBottom,
+      tone: 'monochrome',
+      testID: 'bag-undo-toast',
+    });
+    try {
+      const next = await removeCartItem(itemId);
+      // Only adopt the server cart if nothing else changed it meanwhile.
+      if (cartRef.current === optimistic) { cartRef.current = next; setCart(next); }
+    } catch {
+      cartRef.current = snapshot;
+      setCart(snapshot);
+    }
+  }
+
   async function handleRemove(itemId: string) {
     if (pendingByItemId[itemId]) return;
     const removed = cart.items.find(item => item.id === itemId);
@@ -425,8 +459,11 @@ export default function CartScreen() {
       setCart(newCart);
       if (removed) {
         showUndo({
-          message: `"${removed.productName}" removed`,
+          message: 'Removed from bag',
           undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+          bottom: undoBottom,
+          tone: 'monochrome',
+          testID: 'bag-undo-toast',
         });
       }
     } finally {
@@ -709,6 +746,15 @@ export default function CartScreen() {
                   {editMode && <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: selectedIds.has(item.id) }} accessibilityLabel={`Select ${item.productName}`} onPress={() => setSelectedIds(ids => { const next = new Set(ids); next.has(item.id) ? next.delete(item.id) : next.add(item.id); return next; })}>
                     <Text style={{ color: theme.text }}>{selectedIds.has(item.id) ? 'Selected' : 'Select'}</Text>
                   </TouchableOpacity>}
+                  <SwipeRow
+                    rowId={item.id}
+                    testIDPrefix="bag-swipe"
+                    disabled={editMode || !!pendingByItemId[item.id]}
+                    trailing={[
+                      { key: 'save', label: 'Save', icon: 'bookmark', tone: 'muted', onPress: () => handleMoveToSaves(item.id), accessibilityLabel: `Move ${item.productName} to saves` },
+                      { key: 'remove', label: 'Remove', icon: 'trash-2', tone: 'destructive', onPress: () => handleSwipeRemove(item.id), accessibilityLabel: `Remove ${item.productName} from bag` },
+                    ]}
+                  >
                   <BagItemRow
                     key={item.id}
                     item={item}
@@ -721,6 +767,7 @@ export default function CartScreen() {
                     onMoveToSaves={() => handleMoveToSaves(item.id)}
                     onRemove={() => handleRemove(item.id)}
                   />
+                  </SwipeRow>
                   </View>
                 ))}
                   </View>

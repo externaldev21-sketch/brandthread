@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,7 @@ import Animated, {
   withSpring,
   withTiming,
   Extrapolation,
+  runOnJS,
   type SharedValue,
 } from 'react-native-reanimated';
 
@@ -144,14 +145,24 @@ export function TabBarBadge({ count, theme }: { count: number; theme: AppThemePr
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(count > 0 ? 1 : 0);
   const previous = useRef(count);
+  const [shown, setShown] = useState(count > 0 ? count : 0);
 
   useEffect(() => {
     const was = previous.current;
     previous.current = count;
     if (count <= 0) {
-      scale.set(withTiming(0, { duration: 140 }));
+      // Pack 2, item 26: the exit used to be cut off (the badge unmounted
+      // the same render the shrink started); keep the last label up until
+      // the shrink finishes.
+      if (was > 0 && !reduceMotion) {
+        scale.set(withTiming(0, { duration: 140 }, (finished) => { if (finished) runOnJS(setShown)(0); }));
+      } else {
+        scale.set(0);
+        setShown(0);
+      }
       return;
     }
+    setShown(count);
     if (reduceMotion) {
       scale.set(1);
       return;
@@ -170,8 +181,8 @@ export function TabBarBadge({ count, theme }: { count: number; theme: AppThemePr
   // would otherwise blur this fine-print number for as long as it's shown.
   const style = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
 
-  if (count <= 0) return null;
-  const label = count > 99 ? '99+' : String(count);
+  if (shown <= 0) return null;
+  const label = shown > 99 ? '99+' : String(shown);
   return (
     <Animated.View
       style={[

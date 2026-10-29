@@ -40,6 +40,10 @@ export interface ContextMenuPreview {
   avatarUri?: string | null;
   /** Text-only preview (a message, a conversation's last message). */
   body?: string | null;
+  /** Additive (pack 2, items 28/29): live content under the card — a
+   *  quick-peek's Follow / Add to bag row. Rendered outside the card's own
+   *  pressable so its buttons never nest inside another button. */
+  footer?: import('react').ReactNode;
 }
 
 export interface ContextMenuRequest {

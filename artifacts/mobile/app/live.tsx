@@ -253,6 +253,12 @@ export default function LiveScreen() {
   const pageHeight = viewport.height;
   const listRef = useRef<FlatList<LiveStream>>(null);
   const heartsRef = useRef<LiveHeartLayerHandle>(null);
+  // Other viewers' likes float up too (pack 2, item 32): when the active
+  // stream's like count rises by more than this viewer's own taps, the
+  // difference rises from the like button as a few hearts (capped at 3 per
+  // update so a burst of likes stays calm). Own taps already burst at the
+  // finger, so they're subtracted out here.
+  const ownLikesRef = useRef(0);
   const [muted, setMuted] = useState(true);
   const [bagFor, setBagFor] = useState<LiveStream | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
@@ -436,6 +442,20 @@ export default function LiveScreen() {
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
 
   const bottomInset = Math.max(insets.bottom, 10);
+  const activeStreamId = streams[activeIndex]?.id;
+  const activeLikeCount = activeStreamId ? pager.runtime[activeStreamId]?.likeCount : undefined;
+  const lastLikesRef = useRef<{ id: string | undefined; count: number | undefined }>({ id: undefined, count: undefined });
+  useEffect(() => {
+    const last = lastLikesRef.current;
+    lastLikesRef.current = { id: activeStreamId, count: activeLikeCount };
+    if (last.id !== activeStreamId) { ownLikesRef.current = 0; return; }
+    if (activeLikeCount == null || last.count == null || activeLikeCount <= last.count) return;
+    const delta = activeLikeCount - last.count;
+    const remote = Math.max(0, delta - ownLikesRef.current);
+    ownLikesRef.current = Math.max(0, ownLikesRef.current - delta);
+    if (remote <= 0 || pageWidth <= 0) return;
+    heartsRef.current?.burst(pageWidth - 36, pageHeight - bottomInset - 150, Math.min(3, remote));
+  }, [activeLikeCount, activeStreamId, bottomInset, pageHeight, pageWidth]);
   // Outside a real device the browser never fills in a non-zero
   // `env(safe-area-inset-top)`, so insets.top reads 0 on web — same
   // fallback TabPageHeader uses for every tab page.
@@ -516,7 +536,7 @@ export default function LiveScreen() {
                 onOpenShop={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
                 onMore={() => openStreamOptions(item)}
-                onLike={(x, y, count) => { if (!requireSignIn()) return; heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
+                onLike={(x, y, count) => { if (!requireSignIn()) return; heartsRef.current?.burst(x, y, count); ownLikesRef.current += 1; pager.like(item.id); }}
                 onSend={async text => {
                   if (!requireSignIn()) return;
                   try { await pager.sendChat(text); } catch (e: any) {

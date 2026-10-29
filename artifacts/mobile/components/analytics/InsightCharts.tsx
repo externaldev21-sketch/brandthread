@@ -17,6 +17,7 @@ import { TrendChip } from '@/components/analytics/AnalyticsKit';
 import { bucketLabel, selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import type { InsightRange } from '@/services/sellerInsightsService';
 import { formatDollarsCompact } from '@/lib/compactFormat';
+import { ChartScrubArea, ChartScrubLens, useChartScrub } from '@/components/analytics/ChartScrub';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -98,8 +99,11 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
   const y = (v: number) => top + plotH - (v / topVal) * plotH;
   const linePath = n > 0 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ') : '';
   const labelIdx = selectEvenlySpacedIndices(n, AXIS_LABEL_COUNT[range]);
+  const scrub = useChartScrub({ count: n, plotLeft: yLabelW, plotWidth: plotW, enabled: !allZero && n > 1 });
+  const scrubbed = scrub.index !== null ? points[scrub.index] : undefined;
   return (
-    <View onLayout={e => setWidth(e.nativeEvent.layout.width)}>
+    <ChartScrubArea gesture={scrub.gesture} accessibilityLabel="Chart, drag across to read each point">
+    <View onLayout={e => setWidth(e.nativeEvent.layout.width)} testID="insight-line-chart">
       <Svg width={chartWidth} height={height}>
         {levels.map((v, i) => {
           const ly = y(allZero ? (i / 2) * topVal : v);
@@ -124,7 +128,20 @@ export function InsightLineChart({ points, range, formatValue, height = 160, emp
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground }}>{emptyLabel}</Text>
         </View>
       )}
+      {!allZero && n > 1 && (
+        <ChartScrubLens
+          fingerX={scrub.fingerX}
+          active={scrub.active}
+          chartWidth={chartWidth}
+          plotTop={top}
+          plotHeight={plotH}
+          value={scrubbed ? fmt(scrubbed.value) : null}
+          label={scrubbed ? bucketLabel(scrubbed.bucket, range) : null}
+          dotY={scrubbed ? y(scrubbed.value) : null}
+        />
+      )}
     </View>
+    </ChartScrubArea>
   );
 }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/BrandthreadUI';
@@ -12,6 +12,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, SP } from '@/lib/theme';
 import type { RecentOrderSummary } from '@/lib/sellerDashboardStats';
 import { formatMoney } from '@/lib/format';
+import { LiveRowEnter } from '@/components/motion/LiveRowEnter';
 
 export function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -57,6 +58,20 @@ export function SellerDashboardRecentOrders({
   emptyMessage?: string;
 }) {
   const { theme } = useAppTheme();
+  // Live order pop (pack 2, item 15): each order id's entrance is decided
+  // once, the first time it's rendered — the first list shown is taken
+  // as-is, and an id that appears after that (a live order landing) slides
+  // in from above while the rows below glide down. Sticky per id so a later
+  // re-render (the 30s poll) never flips a row's entrance mid-run.
+  const entranceRef = useRef<Map<string, boolean> | null>(null);
+  const shown = orders.slice(0, 5);
+  if (shown.length > 0) {
+    const first = entranceRef.current === null;
+    const map = entranceRef.current ?? new Map<string, boolean>();
+    for (const o of shown) if (!map.has(o.id)) map.set(o.id, !first);
+    entranceRef.current = map;
+  }
+  const isNew = (id: string) => entranceRef.current?.get(id) === true;
   if (orders.length === 0) {
     if (!emptyMessage) return null;
     return (
@@ -71,9 +86,9 @@ export function SellerDashboardRecentOrders({
     <View testID="seller-dashboard-recent-orders">
       <SellerDashboardSectionHeader title="Recent orders" action="See all" onAction={onSeeAll} />
       <SellerDashboardListGroup>
-        {orders.slice(0, 5).map((order, index, arr) => (
+        {shown.map((order, index, arr) => (
+          <LiveRowEnter key={order.id} animate={isNew(order.id)} testID={isNew(order.id) ? 'seller-dashboard-recent-order-new' : undefined}>
           <SellerDashboardListItem
-            key={order.id}
             icon="shopping-bag"
             title={order.buyerName}
             subtitle={`${order.orderNumber} · ${order.itemCount} ${order.itemCount === 1 ? 'item' : 'items'}`}
@@ -82,6 +97,7 @@ export function SellerDashboardRecentOrders({
             onPress={() => onOpenOrder(order.id)}
             isLast={index === arr.length - 1}
           />
+          </LiveRowEnter>
         ))}
       </SellerDashboardListGroup>
     </View>

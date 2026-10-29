@@ -4,6 +4,7 @@
  * that brand ("Day 1"). Renders nothing when there's nothing to show, and
  * scrolls sideways past a phone width. Tapping opens the brand.
  */
+import { openProfilePeek } from '@/components/peek/QuickPeek';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -29,6 +30,14 @@ export function ProfileBrandsRow({ items, testID = 'profile-brands' }: { items: 
         <Pressable
           key={b.sellerId}
           onPress={() => router.push(`/seller-profile?id=${encodeURIComponent(b.sellerId)}` as never)}
+          // Long-press peeks the brand with Follow (pack 2, item 28).
+          onLongPress={() => openProfilePeek({
+            userId: b.sellerId,
+            name: b.name,
+            avatarUri: b.avatarUrl,
+            onOpen: () => router.push(`/seller-profile?id=${encodeURIComponent(b.sellerId)}` as never),
+          })}
+          delayLongPress={350}
           style={[s.chip, { borderColor: theme.border }]}
           accessibilityRole="button"
           accessibilityLabel={[b.name, ...b.tags].join(', ')}

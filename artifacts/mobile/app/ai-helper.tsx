@@ -169,7 +169,7 @@ export default function AiHelperScreen() {
         <View style={s.center}><Text style={s.body}>Sign in to use AI helpers.</Text></View>
       ) : (
         <>
-          <ScrollView style={s.flex} contentContainerStyle={[s.scroll, { paddingBottom: SP.lg }]} keyboardShouldPersistTaps="handled">
+          <ScrollView style={s.flex} contentContainerStyle={[s.scroll, { paddingBottom: SP.lg }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
             {demo && <Text style={s.demo}>Demo output</Text>}
             {mode !== 'size-chart' && (
               <>

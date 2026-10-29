@@ -161,6 +161,8 @@ export default function AIMockupChatScreen() {
       <FlatList
         ref={flatRef}
         data={messages}
+        // Drag the thread down to pull the keyboard away with it (pack 2, item 33).
+        keyboardDismissMode="interactive"
         inverted
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}

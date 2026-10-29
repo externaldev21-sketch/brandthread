@@ -15,6 +15,7 @@
  * Shared by the buyer viewer (app/live.tsx) and the host's own controls
  * (app/seller-live.tsx), so both sides look the same.
  */
+import { activeMentionQuery, insertMentionHandle } from '@/lib/commentMentions';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Animated, Easing, Platform, Pressable, StyleSheet, Text, TextInput, View,
@@ -203,6 +204,15 @@ export function LiveChatList({ messages, onLongPressMessage }: {
 
 // ─── "Add a comment…" ───────────────────────────────────────────────────────
 
+/** The shared @mention strip, loaded only once the viewer types "@" — the
+ *  overlay module stays light (MentionPickerSheet pulls in the full people
+ *  sheet, its API client and keyboard handling). */
+function LiveMentionBar(props: React.ComponentProps<typeof import('@/components/MentionPickerSheet').MentionSuggestionsBar>) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { MentionSuggestionsBar } = require('@/components/MentionPickerSheet') as typeof import('@/components/MentionPickerSheet');
+  return <MentionSuggestionsBar {...props} />;
+}
+
 export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => Promise<void> | void; disabled?: boolean }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -214,8 +224,21 @@ export function LiveChatInput({ onSend, disabled }: { onSend: (text: string) => 
     try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
   };
   const canSend = text.trim().length > 0 && !busy;
+  // @mention autocomplete with avatars (pack 2, item 34): floats just above
+  // the pill (absolute, so the chat column never shifts) while typing "@…".
+  const mentionQuery = activeMentionQuery(text);
   return (
     <View style={styles.inputPill} testID="live-comment">
+      {mentionQuery !== null && (
+        <View style={styles.mentionFloat} pointerEvents="box-none">
+          <LiveMentionBar
+            query={mentionQuery}
+            active
+            enabled={!disabled}
+            onPick={(person) => setText((t) => insertMentionHandle(t, person.username ?? person.handle))}
+          />
+        </View>
+      )}
       <TextInput
         value={text}
         onChangeText={setText}
@@ -388,6 +411,7 @@ const styles = StyleSheet.create({
   chatText: { color: MEDIA.fg, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18, ...SHADOW },
   chatEvent: { color: MEDIA.fgMuted, fontFamily: FONT.medium, fontSize: FS.meta, marginLeft: 34, ...SHADOW },
 
+  mentionFloat: { position: 'absolute', left: 0, right: 0, bottom: '100%', marginBottom: 8, borderRadius: 12, overflow: 'hidden', backgroundColor: MEDIA.scrim },
   inputPill: {
     flexDirection: 'row', alignItems: 'center', height: 40, borderRadius: 20, paddingLeft: 14, paddingRight: 5,
     backgroundColor: MEDIA.chip, borderWidth: 1, borderColor: MEDIA.hairline,
