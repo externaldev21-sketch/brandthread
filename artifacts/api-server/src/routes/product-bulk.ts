@@ -504,6 +504,15 @@ router.post("/duplicate", requireRole("manager"), validateInput({ body: duplicat
   try {
     const created = await db.transaction(async (tx) => {
       const owned = await loadOwned(tx, ownerId, parsed.ids, true);
+      // A copy carries no removal_kind, so duplicating a listing a moderator
+      // took down would hand the seller an unlocked twin it could publish.
+      const lockedIds = owned.filter((p) => isModerationLocked(p.removalKind)).map((p) => p.id);
+      if (lockedIds.length > 0) {
+        throw new BulkRefusal(409, {
+          error: "Some listings are locked by a platform moderation action",
+          code: "PRODUCT_MODERATION_LOCKED", lockedIds,
+        });
+      }
       // Copies are saved as drafts, which the plan cap never counts.
       const sources = await tx.select().from(products).where(inArray(products.id, parsed.ids));
       const variants = await tx.select().from(productVariants).where(inArray(productVariants.productId, parsed.ids));

@@ -37,11 +37,20 @@ async function getOrCreateTaxConfig(sellerId: string) {
 
   if (existing) return existing;
 
+  // Two first visits at once (e.g. status + calculate) must not 500 on the
+  // unique seller_id: the loser re-reads the winner's row.
   const [created] = await db
     .insert(sellerTaxConfig)
     .values({ sellerId })
+    .onConflictDoNothing({ target: sellerTaxConfig.sellerId })
     .returning();
-  return created;
+  if (created) return created;
+  const [winner] = await db
+    .select()
+    .from(sellerTaxConfig)
+    .where(eq(sellerTaxConfig.sellerId, sellerId))
+    .limit(1);
+  return winner;
 }
 
 // ─── GET /api/taxes/status ────────────────────────────────────────────────────
@@ -277,8 +286,12 @@ router.post("/calculate", async (req, res) => {
     }
 
     const config = await getOrCreateTaxConfig(sellerId);
+    // Same switches as /status and every checkout path (lib/sellerTaxSwitches.ts):
+    // on unless the seller explicitly opted out. The legacy stripe_tax_enabled /
+    // charge_shipping_tax columns default to false and are not authoritative.
+    const switches = effectiveTaxSwitches(config);
 
-    if (!stripe || !config.stripeTaxEnabled) {
+    if (!stripe || !switches.automaticTax) {
       // Return zero tax if Stripe Tax not enabled
       res.json({ taxAmountCents: 0, taxBreakdown: [], currency, estimated: true });
       return;
@@ -314,7 +327,7 @@ router.post("/calculate", async (req, res) => {
             },
             address_source: "shipping",
           },
-          ...(config.chargeShippingTax ? { shipping_cost: { amount: req.body.shippingCents ?? 0 } } : {}),
+          ...(switches.shippingTax ? { shipping_cost: { amount: req.body.shippingCents ?? 0 } } : {}),
         },
         { stripeAccount: user.stripeAccountId },
       );

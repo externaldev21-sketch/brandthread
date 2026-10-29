@@ -12,6 +12,7 @@ import { clearSalesCache } from "../lib/pricing/salesRuntime";
 import { z } from "@workspace/api-zod";
 import { bodyObject, idParams, numLike, validateInput } from "../lib/commerceValidation";
 import { parseTimeZone } from "../lib/scheduleWindow";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -81,6 +82,8 @@ function validate(b: Body, full: boolean): string | null {
 
 async function ownsAll(sellerId: string, productIds: string[]): Promise<boolean> {
   if (productIds.length === 0) return true;
+  // products.id is a uuid: a malformed id can't be one of this store's products.
+  if (!productIds.every(isUuid)) return false;
   const owned = await db.select({ id: products.id }).from(products)
     .where(and(eq(products.ownerId, sellerId), inArray(products.id, productIds), isNull(products.deletedAt)));
   return owned.length === new Set(productIds).size;
@@ -157,6 +160,7 @@ router.patch("/:id", requirePermission("marketing"), validateInput({ params: sal
   try {
     const sellerId = (req as any).clerkUserId as string;
     const b = req.body as Body;
+    if (!isUuid(req.params.id)) { res.status(404).json({ error: "Sale not found" }); return; }
     const [existing] = await db.select().from(sales)
       .where(and(eq(sales.id, req.params.id), eq(sales.sellerId, sellerId))).limit(1);
     if (!existing) { res.status(404).json({ error: "Sale not found" }); return; }
@@ -206,6 +210,7 @@ router.patch("/:id", requirePermission("marketing"), validateInput({ params: sal
 router.delete("/:id", requirePermission("marketing"), validateInput({ params: saleIdParams }), async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
+    if (!isUuid(req.params.id)) { res.status(404).json({ error: "Sale not found" }); return; }
     const deleted = await db.delete(sales)
       .where(and(eq(sales.id, req.params.id), eq(sales.sellerId, sellerId))).returning({ id: sales.id });
     if (deleted.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }

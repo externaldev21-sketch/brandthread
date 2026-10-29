@@ -92,7 +92,7 @@ router.post("/onboard", async (req, res) => {
     const {
       refreshUrl = `${baseUrl}/manufacturers/payment`,
       returnUrl  = `${baseUrl}/manufacturers/payment`,
-    } = req.body;
+    } = (req.body ?? {}) as { refreshUrl?: unknown; returnUrl?: unknown };
     if (!isAllowedOnboardingUrl(refreshUrl) || !isAllowedOnboardingUrl(returnUrl)) {
       res.status(400).json({ error: "refreshUrl and returnUrl must be allowed Brandthread app or web URLs" });
       return;

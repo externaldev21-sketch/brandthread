@@ -20,6 +20,9 @@ const router = Router();
 router.use(requireAuth);
 
 const me = (req: unknown) => (req as { clerkUserId: string }).clerkUserId;
+// Piece ids (order item ids) and outfit ids are uuids; a looser shape (e.g.
+// 36 dashes) used to reach the uuid cast and answer 500.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get("/pieces", async (req, res) => {
   try {
@@ -62,7 +65,7 @@ router.post("/outfits", async (req, res) => {
   if (pieceIds.length > MAX_OUTFIT_PIECES) {
     return res.status(400).json({ error: `An outfit holds up to ${MAX_OUTFIT_PIECES} pieces` });
   }
-  if (pieceIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) {
+  if (pieceIds.some((id) => !UUID_RE.test(id))) {
     return res.status(400).json({ error: "Unknown piece" });
   }
   try {
@@ -80,7 +83,7 @@ router.post("/outfits", async (req, res) => {
 });
 
 router.delete("/outfits/:id", async (req, res) => {
-  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: "Outfit not found" });
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Outfit not found" });
   try {
     const deleted = await db.delete(closetOutfits)
       .where(and(eq(closetOutfits.id, req.params.id), eq(closetOutfits.buyerId, me(req))))

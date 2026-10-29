@@ -731,7 +731,8 @@ router.get("/notifications", async (req, res) => {
 // Returns topCustomers list and aggregate stats (totalCustomers, repeatRate).
 router.get("/customers", featureGate("advanced_analytics"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const limit   = Math.min(parseInt((req.query.limit as string) ?? "10", 10) || 10, 50);
+  // 1–50; a negative ?limit= used to reach Postgres as LIMIT -n (500).
+  const limit   = Math.max(1, Math.min(parseInt((req.query.limit as string) ?? "10", 10) || 10, 50));
 
   try {
     // Top customers — group orders by buyer; join users for display name and
@@ -766,7 +767,9 @@ router.get("/customers", featureGate("advanced_analytics"), async (req, res) => 
       FROM (
         SELECT buyer_id, COUNT(*) AS order_count
         FROM orders
-        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL
+        -- Guest orders (no buyer_id) would otherwise collapse into one NULL
+        -- "customer" counted as a repeat buyer that total_customers excludes.
+        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL AND buyer_id IS NOT NULL
         GROUP BY buyer_id
       ) sub
     `);
@@ -780,7 +783,8 @@ router.get("/customers", featureGate("advanced_analytics"), async (req, res) => 
 
 // GET /api/analytics/advanced  (advanced analytics: Growth+ by default, planCatalogue.ts)
 // Customer cohorts by first-order month, lifetime value and average order
-// value by month, from real non-cancelled orders. Existing analytics stay
+// value by month, from counted orders (paid, not cancelled, net of refunds —
+// the same definition as the rest of this file). Existing analytics stay
 // free; only this additional module is plan-gated.
 router.get("/advanced", featureGate("advanced_analytics"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
@@ -789,9 +793,9 @@ router.get("/advanced", featureGate("advanced_analytics"), async (req, res) => {
     const cohorts = await db.execute(sql`
       WITH b AS (
         SELECT buyer_id, MIN(created_at) AS first_at, COUNT(*)::int AS order_count,
-               COALESCE(SUM(total_cents), 0)::bigint AS total_cents
+               COALESCE(SUM(total_cents - COALESCE(refunded_cents, 0)), 0)::bigint AS total_cents
         FROM orders
-        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND buyer_id IS NOT NULL
+        WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL AND buyer_id IS NOT NULL
         GROUP BY buyer_id
       )
       SELECT to_char(date_trunc('month', first_at), 'YYYY-MM') AS cohort,
@@ -805,16 +809,16 @@ router.get("/advanced", featureGate("advanced_analytics"), async (req, res) => {
     const monthly = await db.execute(sql`
       SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
              COUNT(*)::int AS orders,
-             COALESCE(SUM(total_cents), 0)::bigint AS revenue_cents
+             COALESCE(SUM(total_cents - COALESCE(refunded_cents, 0)), 0)::bigint AS revenue_cents
       FROM orders
-      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND created_at >= ${since}
+      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL AND created_at >= ${since}
       GROUP BY 1
     `);
     const lifetime = await db.execute(sql`
       SELECT COUNT(DISTINCT buyer_id)::int AS customers,
-             COALESCE(SUM(total_cents), 0)::bigint AS revenue_cents
+             COALESCE(SUM(total_cents - COALESCE(refunded_cents, 0)), 0)::bigint AS revenue_cents
       FROM orders
-      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND buyer_id IS NOT NULL
+      WHERE owner_id = ${ownerId} AND status != 'cancelled' AND paid_at IS NOT NULL AND buyer_id IS NOT NULL
     `);
     res.json(buildAdvancedAnalyticsResponse(cohorts.rows, monthly.rows, lifetime.rows));
   } catch (err) {

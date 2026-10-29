@@ -116,6 +116,9 @@ const MESSAGE_ATTACHMENT_TYPES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Message / product / order / post ids are uuids (anything else fails the uuid cast with a 500). */
+const MESSAGE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function getAttachmentPreview(attachment: unknown): string | undefined {
   if (!attachment || typeof attachment !== "object") return undefined;
   const title = (attachment as { title?: unknown }).title;
@@ -481,7 +484,14 @@ router.post("/", rateLimit("messaging"), validateBody(createConversationBody), a
   if (Array.isArray(participants) && participants.length >= 2) {
     if (participants.length > 20) return res.status(400).json({ error: "A group chat can have at most 20 other members." });
     for (const p of participants) {
-      if (!p?.userId) return res.status(400).json({ error: "Every participant needs a userId." });
+      if (!p?.userId || typeof p.userId !== "string") return res.status(400).json({ error: "Every participant needs a userId." });
+    }
+    // One row per member (the participant primary key): a repeated invitee or
+    // the creator listed among the invitees used to fail the insert with a
+    // 500 after the empty group row was already created.
+    const invitees = [...new Map(participants.filter((p) => p.userId !== myUserId).map((p) => [p.userId, p])).values()];
+    if (invitees.length < 2) return res.status(400).json({ error: "A group chat needs at least 2 other members." });
+    for (const p of invitees) {
       const relation = await blockRelation(myUserId, p.userId);
       if (relation !== "none") {
         return res.status(403).json({ error: `Unable to add ${p.name || "that person"} to the group.`, code: "BLOCKED" });
@@ -489,8 +499,8 @@ router.post("/", rateLimit("messaging"), validateBody(createConversationBody), a
     }
     // "Who can add you to groups" (Settings → Who can message and see me):
     // 'friends' only lets people the invitee follows add them.
-    const inviteeSettings = await getUserAppSettingsMany(participants.map((p) => p.userId));
-    for (const p of participants) {
+    const inviteeSettings = await getUserAppSettingsMany(invitees.map((p) => p.userId));
+    for (const p of invitees) {
       if (inviteeSettings.get(p.userId)?.groupAdds !== "friends") continue;
       if (!(await isFollowedBy(p.userId, myUserId))) {
         return res.status(403).json({
@@ -499,24 +509,30 @@ router.post("/", rateLimit("messaging"), validateBody(createConversationBody), a
         });
       }
     }
-    const [conv] = await db.insert(conversations).values({ type: "group" }).returning();
-    await db.insert(conversationParticipants).values([
-      {
-        conversationId: conv.id, userId: myUserId,
-        name: myInfo?.name ?? "", handle: myInfo?.handle ?? "",
-        initials: myInfo?.initials ?? "", color: myInfo?.color ?? "#8B5CF6",
-        accountType: myInfo?.accountType ?? "buyer",
-      },
-      ...participants.map((p) => ({
-        conversationId: conv.id, userId: p.userId, name: p.name, handle: p.handle,
-        initials: p.initials, color: p.color, accountType: p.accountType,
-      })),
-    ]);
+    const conv = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(conversations).values({ type: "group" }).returning();
+      await tx.insert(conversationParticipants).values([
+        {
+          conversationId: created.id, userId: myUserId,
+          name: myInfo?.name ?? "", handle: myInfo?.handle ?? "",
+          initials: myInfo?.initials ?? "", color: myInfo?.color ?? "#8B5CF6",
+          accountType: myInfo?.accountType ?? "buyer",
+        },
+        ...invitees.map((p) => ({
+          conversationId: created.id, userId: p.userId, name: p.name, handle: p.handle,
+          initials: p.initials, color: p.color, accountType: p.accountType,
+        })),
+      ]);
+      return created;
+    });
     const parts = await db.select().from(conversationParticipants).where(eq(conversationParticipants.conversationId, conv.id));
     return res.status(201).json(buildConversationView(conv, parts, myUserId));
   }
 
-  if (!participant?.userId) return res.status(400).json({ error: "participant.userId required" });
+  if (!participant?.userId || typeof participant.userId !== "string") return res.status(400).json({ error: "participant.userId required" });
+  // A 1:1 with yourself can't exist (one participant row per person); it used
+  // to insert the conversation and then 500 on the duplicate participant.
+  if (participant.userId === myUserId) return res.status(400).json({ error: "You can't start a conversation with yourself." });
 
   // ── Block check (both directions) ─────────────────────────────────────────
   const relation = await blockRelation(myUserId, participant.userId);
@@ -695,8 +711,14 @@ function sweepExpiredMessages(conversationId: string): void {
 router.get("/:id/messages", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
-  const limit = Math.min(parseInt(String(req.query.limit ?? 50), 10), 100);
-  const before = req.query.before as string | undefined;
+  // A missing, non-numeric or out-of-range limit used to reach SQL as
+  // LIMIT NaN / a negative LIMIT (500); it is clamped to 1..100 instead.
+  const parsedLimit = parseInt(String(req.query.limit ?? 50), 10);
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+  const before = typeof req.query.before === "string" && req.query.before ? req.query.before : undefined;
+  if (before !== undefined && Number.isNaN(new Date(before).getTime())) {
+    return res.status(400).json({ error: "before must be a date", code: "VALIDATION_ERROR" });
+  }
   // Search-in-chat (chat details > Search): when `q` is present this becomes
   // a search over this conversation's own message history only, not global
   // search — newest-first like the normal timeline, `before`/pagination
@@ -934,6 +956,7 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
       // (buyer attaching the seller's product they are asking about).
       const pid = att.meta?.productId;
       if (!pid) return res.status(400).json({ error: "Attachment product requires meta.productId." });
+      if (typeof pid !== "string" || !MESSAGE_ID_RE.test(pid)) return res.status(400).json({ error: "Attached product not found." });
       const [product] = await db
         .select({ id: products.id, ownerId: products.ownerId, status: products.status })
         .from(products)
@@ -955,6 +978,7 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
         .limit(1);
       const orderId = att.meta?.orderId ?? conv?.contextOrderId ?? null;
       if (!orderId) return res.status(400).json({ error: "No order linked to this conversation." });
+      if (typeof orderId !== "string" || !MESSAGE_ID_RE.test(orderId)) return res.status(400).json({ error: "Attached order not found." });
       const [order] = await db
         .select({ id: orders.id, ownerId: orders.ownerId, buyerId: orders.buyerId })
         .from(orders)
@@ -970,6 +994,7 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
     if (att.type === "post") {
       const postId = att.meta?.postId;
       if (!postId) return res.status(400).json({ error: "Attachment post requires meta.postId." });
+      if (typeof postId !== "string" || !MESSAGE_ID_RE.test(postId)) return res.status(400).json({ error: "Attached post not found." });
       const [post] = await db
         .select({
           id: posts.id, userId: posts.userId, postStatus: posts.postStatus,
@@ -1012,7 +1037,8 @@ router.post("/:id/messages", rateLimit("messaging"), validateBody(sendMessageBod
   // spoofed) rather than surfacing a confusing quote or a 400 for a client
   // race (e.g. the quoted message got deleted between swipe and send).
   let validReplyToId: string | null = null;
-  if (replyToId) {
+  // Not a uuid → it can't name a message (and would fail the uuid cast).
+  if (typeof replyToId === "string" && MESSAGE_ID_RE.test(replyToId)) {
     const [original] = await db.select({ id: messages.id })
       .from(messages)
       .where(and(eq(messages.id, replyToId), eq(messages.conversationId, id)))
@@ -1153,6 +1179,7 @@ router.put("/:id/messages/:messageId/reactions", validateBody(reactionBody), asy
   if (!reactionType || !REACTION_TYPES.includes(reactionType as ReactionType)) {
     return res.status(400).json({ error: `reactionType must be one of: ${REACTION_TYPES.join(", ")}` });
   }
+  if (!MESSAGE_ID_RE.test(messageId)) return res.status(404).json({ error: "Message not found" });
 
   const [membership] = await db.select().from(conversationParticipants)
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
@@ -1213,6 +1240,7 @@ router.delete("/:id/messages/:messageId/reactions", async (req, res) => {
     .limit(1);
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
 
+  if (!MESSAGE_ID_RE.test(messageId)) return res.status(404).json({ error: "Message not found" });
   const [message] = await db.select({ id: messages.id }).from(messages)
     .where(and(eq(messages.id, messageId), eq(messages.conversationId, id)))
     .limit(1);
@@ -1493,7 +1521,6 @@ router.delete("/:id/for-me", async (req, res) => {
 // ─── DELETE /api/conversations/:id/messages/:messageId/for-me ────────────────
 // Message long-press > "Delete for me". Hides one message from my copy of
 // the thread only; it stays for everyone else. Idempotent.
-const MESSAGE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 router.delete("/:id/messages/:messageId/for-me", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id, messageId } = req.params;

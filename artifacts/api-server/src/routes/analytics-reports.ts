@@ -15,9 +15,13 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requirePermission } from "../middlewares/requireRole";
 
 const router = Router();
 router.use(requireAuth);
+// Mounted with team context: same gate as /api/analytics/insights, so a team
+// member without analytics access (staff, orders) can't read profit/fees.
+router.use(requirePermission("analytics"));
 
 export const REPORT_RANGES = [
   "today", "yesterday", "7d", "30d", "90d", "this_month", "last_month", "this_year", "all",

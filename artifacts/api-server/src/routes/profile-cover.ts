@@ -254,7 +254,7 @@ export function createProfileCoverRouter({
       // so flagged ones are refused; a screening outage never blocks the upload.
       const screened = await screenVideo({ buffer: rendered });
       if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
-        void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_video", verdict: { ...screened, verdict: "reject" } }));
+        void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_video", verdict: { ...screened, verdict: "reject" } })).catch(() => {});
         return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
       }
 
@@ -433,7 +433,7 @@ export function createProfileCoverRouter({
 
         const screened = await screenVideo({ buffer: converted ? await fs.readFile(output) : bytes });
         if ((screened.verdict === "hold" && !screened.unverified) || screened.verdict === "reject") {
-          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_gif", verdict: { ...screened, verdict: "reject" } }));
+          void import("../lib/mediaModerationStore").then((m) => m.recordRejectedUpload({ ownerId: clerkId, surface: "cover_gif", verdict: { ...screened, verdict: "reject" } })).catch(() => {});
           return res.status(422).json({ error: MEDIA_REJECTED_MESSAGE, code: "IMAGE_REJECTED" });
         }
 

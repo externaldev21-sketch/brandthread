@@ -8,9 +8,10 @@
  */
 import { Router } from "express";
 import { db, recentlyViewedProducts, products, productVariants, users } from "@workspace/db";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 
@@ -24,6 +25,8 @@ router.post("/", validateBody(recentlyViewedBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { productId } = req.body as { productId?: string };
   if (!productId) return res.status(400).json({ error: "productId required" });
+  // products.id is a uuid: any other value would make Postgres throw (a 500).
+  if (!isUuid(productId)) return res.status(404).json({ error: "Product not found" });
 
   const [product] = await db.select({ id: products.id }).from(products)
     .where(eq(products.id, productId)).limit(1);
@@ -65,7 +68,8 @@ router.get("/", async (req, res) => {
     status: products.status,
   }).from(recentlyViewedProducts)
     .innerJoin(products, eq(products.id, recentlyViewedProducts.productId))
-    .where(and(eq(recentlyViewedProducts.userId, userId), eq(products.status, "active")))
+    // A deleted listing keeps its status, so deletedAt is checked too.
+    .where(and(eq(recentlyViewedProducts.userId, userId), eq(products.status, "active"), isNull(products.deletedAt)))
     .orderBy(desc(recentlyViewedProducts.viewedAt))
     .limit(limit);
 

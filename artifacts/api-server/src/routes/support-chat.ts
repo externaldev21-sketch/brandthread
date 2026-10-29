@@ -64,7 +64,10 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
         name:       products.name,
         status:     products.status,
         category:   products.category,
-        priceCents: (products as any).priceCents,
+        // Products have no price column (prices live on variants): the
+        // lowest variant price. Selecting a missing column threw and blanked
+        // every user's account context.
+        priceCents: sql<number | null>`(SELECT MIN(pv.price_cents) FROM product_variants pv WHERE pv.product_id = "products"."id")::int`,
       })
         .from(products)
         .where(eq(products.ownerId, clerkId))
@@ -105,8 +108,14 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
     if (isSeller) {
       // Drop wallet balances
       const walletRows = await db.execute(sql`
-        SELECT dw.drop_id, dw.balance_cents, dw.held_cents, dw.released_cents,
-               d.title as drop_title, d.release_at
+        SELECT dw.drop_id, dw.balance_cents,
+               -- drop_wallets has no held column: what is still held is what
+               -- was deposited and not yet released. drops has no title: name.
+               (dw.balance_cents - dw.released_cents) AS held_cents,
+               dw.released_cents,
+               -- Same "available" as GET /api/drop-wallet (routes/drop-wallet.ts).
+               (dw.balance_cents - dw.released_cents - dw.reserved_cents) AS available_cents,
+               d.name as drop_title, d.release_at
         FROM   drop_wallets dw
         JOIN   drops d ON d.id = dw.drop_id
         WHERE  d.owner_id = ${clerkId}
@@ -116,17 +125,17 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
 
       const wallets = walletRows.rows as Array<{
         drop_id: string; balance_cents: number; held_cents: number;
-        released_cents: number; drop_title: string;
+        released_cents: number; available_cents: number; drop_title: string;
       }>;
 
       const totalHeld     = wallets.reduce((s, w) => s + Number(w.held_cents ?? 0), 0);
-      const totalBalance  = wallets.reduce((s, w) => s + Number(w.balance_cents ?? 0), 0);
+      const totalBalance  = wallets.reduce((s, w) => s + Number(w.available_cents ?? 0), 0);
       const totalReleased = wallets.reduce((s, w) => s + Number(w.released_cents ?? 0), 0);
 
       // Recent transactions
       const txRows = await db.execute(sql`
         SELECT dwt.type, dwt.amount_cents, dwt.description, dwt.created_at,
-               d.title as drop_title
+               d.name as drop_title
         FROM   drop_wallet_transactions dwt
         JOIN   drop_wallets dw ON dw.id = dwt.wallet_id
         JOIN   drops d ON d.id = dw.drop_id
@@ -165,7 +174,7 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
           `Total available balance: ${cents(totalBalance)}`,
           `Total released to date: ${cents(totalReleased)}`,
           wallets.map(w =>
-            `- Drop "${w.drop_title}": held=${cents(Number(w.held_cents))}, balance=${cents(Number(w.balance_cents))}, released=${cents(Number(w.released_cents))}`
+            `- Drop "${w.drop_title}": held=${cents(Number(w.held_cents))}, available=${cents(Number(w.available_cents))}, released=${cents(Number(w.released_cents))}`
           ).join("\n"),
         ].join("\n") : "No drop wallets yet.",
         ``,

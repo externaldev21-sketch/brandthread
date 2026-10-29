@@ -50,14 +50,19 @@ vi.mock("../../middlewares/requireRole", () => ({
 }));
 vi.mock("../../routes/notifications-feed", () => ({ publishNotification: async () => undefined }));
 vi.mock("../../lib/brandthreadEmail", () => ({ sendManufacturerSignupEmail: async () => undefined }));
+const objectOwners = vi.hoisted(() => new Map<string, string>());
 vi.mock("../../lib/objectStorage", () => ({
   ObjectStorageService: class {
     async getObjectEntityDownloadURL(path: string) { return `https://objects.test${path}`; }
     async createObjectEntityFromBuffer(_bytes: Buffer, _contentType: string) {
       return `/objects/uploads/${crypto.randomBytes(8).toString("hex")}`;
     }
-    async trySetObjectEntityAclPolicy() { return undefined; }
+    async trySetObjectEntityAclPolicy(path: string, policy: { owner: string }) { objectOwners.set(path, policy.owner); return undefined; }
     async deleteObjectEntity() { return undefined; }
+    async getObjectEntityFile(path: string) { return { path }; }
+    async canAccessObjectEntity({ userId, objectFile }: { userId?: string; objectFile: { path: string } }) {
+      return !!userId && objectOwners.get(objectFile.path) === userId;
+    }
   },
 }));
 vi.mock("../../lib/stripe", () => ({
@@ -310,6 +315,15 @@ describe("manufacturer order card → payment → tracker", () => {
     // Neither a note nor a photo is a no-op, not a silent success.
     const empty = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", {}, factory.clerkId!);
     expect(empty.status).toBe(422);
+
+    // wave1-s06: an object path the manufacturer did not upload is refused,
+    // never signed into a download URL.
+    objectOwners.set("/objects/uploads/someone-elses-private-file", seller);
+    const forged = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", {
+      note: "look", imageObjectPaths: ["/objects/uploads/someone-elses-private-file"],
+    }, factory.clerkId!);
+    expect(forged.status).toBe(422);
+    expect(JSON.stringify(forged.body)).not.toContain("objects.test");
 
     const posted = await call(`/api/manufacturers/orders/${orderId}/updates`, "POST", {
       note: "Cutting complete, moving to sewing.", imageObjectPaths: [upload.objectPath],

@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { db, posts, users } from "@workspace/db";
 import { eq, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { redirectToPublicMedia } from "../lib/mediaDelivery";
 import { ObjectPermission } from "../lib/objectAcl";
 import { cappedUnknown, jsonList, jsonValue, looseBody, validateBody } from "../middlewares/bodySchemas";
@@ -630,6 +630,11 @@ router.post("/compose-video", requireAuth, validateBody(composeVideoBody), async
   } catch (err) {
     if (outputObject) await storage.deleteObjectEntity(outputObject).catch(() => {});
     if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
+    // A clip upload that no longer exists (expired, already composed, or a
+    // made-up path) is the client's stale state, not a server failure.
+    if (err instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "A clip upload was not found. Please re-upload and try again.", code: "UPLOAD_NOT_FOUND" });
+    }
     req.log.error({ err, clerkId }, "Could not compose post video");
     return res.status(500).json({ error: "Video could not be composed" });
   } finally {
@@ -697,6 +702,9 @@ router.post("/compose-video/thumbnail", requireAuth, validateBody(videoThumbnail
     });
   } catch (err) {
     if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
+    if (err instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "That video was not found.", code: "UPLOAD_NOT_FOUND" });
+    }
     req.log.error({ err, clerkId }, "Could not extract cover frame");
     return res.status(500).json({ error: "Could not extract a cover frame at that point" });
   } finally {

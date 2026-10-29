@@ -17,13 +17,25 @@
  * `shopify_webhook_events`, keyed by Shopify's own `X-Shopify-Webhook-Id`.
  */
 import { Router } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, orders, shopifyConnections, shopifyOrderLinks, shopifyWebhookEvents } from "@workspace/db";
 import { verifyWebhookHmac } from "../lib/shopify/oauth";
 import { requestOrderRelease, executeOrderRelease } from "../lib/money/escrow";
 import { publishNotification } from "./notifications-feed";
 import { logger } from "../lib/logger";
 import { notifyBuyerOrderShipped } from "../lib/orderNotifications";
+import { orderStatusMachine } from "../lib/money/stateMachines";
+
+/**
+ * Orders a Shopify fulfillment may mark shipped: the same pre-shipment states
+ * PATCH /api/orders/:id/tracking allows, plus an already-shipped order whose
+ * tracking number changed. Never a cancelled, refunding, delivered or
+ * label-purchasing order.
+ */
+const FULFILLABLE_STATUSES = [
+  ...orderStatusMachine.sourcesOf("shipped").filter((status) => status !== "label_purchasing"),
+  "shipped" as const,
+];
 
 const router = Router();
 
@@ -132,6 +144,7 @@ async function handleFulfillmentWebhook(shopDomain: string, payload: any): Promi
     updatedAt: new Date(),
   }).where(and(
     eq(orders.id, link.brandthreadOrderId),
+    inArray(orders.status, FULFILLABLE_STATUSES),
     sql`${orders.trackingNumber} IS DISTINCT FROM ${trackingNumber}`,
   )).returning();
   if (!updated) return;

@@ -24,12 +24,12 @@ import { publishNotification } from "./notifications-feed";
 import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
-import { ownerAllows, ownersAllowing, resolveAccountPrivacy } from "../lib/privacySettings";
+import { ownerAllows, ownersAllowing, resolveAccountPrivacy, storyReplyDenial } from "../lib/privacySettings";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { storyListedFor } from "../lib/storyVisibility";
 import { storyHiddenFrom } from "../lib/interactionSettings";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
-import { audienceAllows, viewerRelations } from "../lib/storyAccess";
+import { audienceAllows, viewerMayOpenAudience, viewerRelations } from "../lib/storyAccess";
 import { withStickerState } from "../lib/storyStickers";
 
 /** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
@@ -79,14 +79,18 @@ function thumbnailFor(media: unknown, slide: number): string | null {
   return pick(items[slide]) ?? items.map(pick).find((u) => !!u) ?? null;
 }
 
-const isLive = (row: { expiresAt: Date; moderationStatus: string }) =>
-  new Date(row.expiresAt).getTime() > Date.now() && row.moderationStatus !== "removed";
+// A story held by media screening is visible to its author only (same rule
+// as lib/storyVisibility.storyListedFor).
+const isLive = (row: { expiresAt: Date; moderationStatus: string; authorId: string }, viewerId: string) =>
+  new Date(row.expiresAt).getTime() > Date.now() && row.moderationStatus !== "removed"
+  && (row.moderationStatus !== "held" || row.authorId === viewerId);
 
 // ─── People picker ────────────────────────────────────────────────────────────
 router.get("/mention-search", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const q = normalizeSearchTerm(((req.query.q as string) || "").trim().replace(/^@/, ""));
-  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+  // A repeated ?q= arrives as an array; a negative ?limit= would reach LIMIT.
+  const q = normalizeSearchTerm((typeof req.query.q === "string" ? req.query.q : "").trim().replace(/^@/, ""));
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 50);
 
   const blocked = [...(await blockedUserIds(myId))];
   const followingRows = await db.select({ id: follows.followingId }).from(follows)
@@ -217,7 +221,7 @@ router.get("/stories/:id", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const [row] = await db.select().from(stories).where(eq(stories.id, String(req.params.id))).limit(1);
   const gone = () => res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" });
-  if (!row || !isLive(row)) { gone(); return; }
+  if (!row || !isLive(row, myId)) { gone(); return; }
 
   if (row.authorId !== myId) {
     if ((await blockRelation(myId, row.authorId)) !== "none") { gone(); return; }
@@ -276,7 +280,7 @@ router.post("/stories/:id/mention-reply", rateLimit("messaging"), async (req, re
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }
 
   const [story] = await db.select().from(stories).where(eq(stories.id, String(req.params.id))).limit(1);
-  if (!story || !isLive(story)) { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
+  if (!story || !isLive(story, myId)) { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
   const [tagged] = await db.select({ storyId: storyMentions.storyId }).from(storyMentions)
     .where(and(eq(storyMentions.storyId, story.id), eq(storyMentions.mentionedUserId, myId))).limit(1);
   if (!tagged) { res.status(403).json({ error: "Only people tagged in a story can reply this way", code: "NOT_TAGGED" }); return; }
@@ -325,12 +329,16 @@ router.post("/stories/:id/reply", rateLimit("messaging"), async (req, res) => {
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }
 
   const [story] = await db.select().from(stories).where(eq(stories.id, String(req.params.id))).limit(1);
-  if (!story || !isLive(story)) { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
+  if (!story || !isLive(story, myId)) { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
   if (story.authorId === myId) { res.status(400).json({ error: "You can't reply to your own story" }); return; }
 
   const relation = await blockRelation(myId, story.authorId);
   if (relation === "blocked_by_me") { res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" }); return; }
   if (relation !== "none") { res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return; }
+  // Same audience rule as like / view: a story I can't open, I can't reply to.
+  if (await storyHiddenFrom(story.authorId, myId) || !(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
+    res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return;
+  }
 
   // The author's reply settings, enforced here (not just a UI label).
   const perm = (story.privacyReplyPerm ?? "everyone").toLowerCase();
@@ -343,6 +351,13 @@ router.post("/stories/:id/reply", rateLimit("messaging"), async (req, res) => {
     if (!authorFollowsMe) {
       res.status(403).json({ error: "Only people this account follows can reply.", code: "REPLIES_LIMITED" }); return;
     }
+  }
+  // The stored permissions are "everyone" | "friends" | "off" (POST /stories);
+  // "friends" and a missing value (account "Who can reply to stories") are
+  // resolved by the same check the messages endpoint runs on story replies.
+  const replyDenial = await storyReplyDenial(myId, [{ type: "story_reply", meta: { storyId: story.id } }]);
+  if (replyDenial) {
+    res.status(403).json({ error: replyDenial, code: "STORY_REPLIES_RESTRICTED" }); return;
   }
 
   const result = await ensureStoryReplyConversation(myId, story.authorId);

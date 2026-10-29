@@ -423,7 +423,8 @@ export async function redeemLoyaltyPoints(
 
 router.post("/redeem", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { points: rawPoints } = req.body as { points?: number };
+  // Express 5 leaves req.body undefined when no JSON body was sent.
+  const { points: rawPoints } = (req.body ?? {}) as { points?: number };
   const points = Math.floor(Number(rawPoints));
 
   if (!points || points < 100) {

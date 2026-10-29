@@ -30,8 +30,16 @@ import {
   featuredPriceCents, hasCapacity, occupiesCapacity, slotDisplayState, type Window,
 } from "../lib/promotions/featured";
 import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
+
+// featured_slots.id is a uuid column: a malformed id would make Postgres throw
+// (a 500). It cannot name any slot, so it is a plain 404.
+router.param("id", (_req, res, next, id) => {
+  if (!isUuid(id)) { res.status(404).json({ error: "Slot not found" }); return; }
+  next();
+});
 
 type SlotRow = typeof featuredSlots.$inferSelect;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

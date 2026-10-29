@@ -17,6 +17,9 @@ const suffix = crypto.randomBytes(6).toString("hex");
 const sellerId = `reports-seller-${suffix}`;
 const otherSeller = `reports-other-${suffix}`;
 
+// requirePermission("analytics") reads Clerk's getAuth(); the seller is the store owner.
+vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: sellerId }) }));
+
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: unknown, next: () => void) => {
     req.clerkUserId = sellerId;

@@ -11,6 +11,7 @@ import type { NextFunction, Request, Response } from "express";
 import { featureLabel, featureMinPlans, hasPlan, type PlanFeature } from "../lib/planFeatures";
 import { getVerifiedPlanAccess, sendPlanLookupUnavailable } from "../lib/planAccess";
 import type { SellerPlanId } from "../lib/planCatalogue";
+import { normalizeGatePath } from "../lib/gatePath";
 
 const ALLOW_TEST_SUBSCRIPTION_BYPASS =
   process.env.NODE_ENV === "development" && process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS === "true";
@@ -18,10 +19,12 @@ const ALLOW_TEST_SUBSCRIPTION_BYPASS =
 /** `when` narrows a match by the request body (e.g. only bulk orders, not samples). */
 export type GateMatch = { method: string; path: string | RegExp; when?: (req: Request) => boolean };
 
+/** Paths compare in canonical form: Express also routes `/RFQS` and `/rfqs/` to `/rfqs`. */
 function matches(req: Request, only: GateMatch[] | undefined): boolean {
   if (!only) return true;
+  const path = normalizeGatePath(req.path);
   return only.some((m) => m.method === req.method
-    && (typeof m.path === "string" ? req.path === m.path : m.path.test(req.path))
+    && (typeof m.path === "string" ? path === m.path : m.path.test(path))
     && (!m.when || m.when(req)));
 }
 

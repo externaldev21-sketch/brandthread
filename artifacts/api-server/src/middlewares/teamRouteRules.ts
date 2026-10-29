@@ -13,6 +13,7 @@
  *  ownerWrites — writes are owner-only.
  */
 import type { Permission } from "./requireRole";
+import { normalizeGatePath } from "../lib/gatePath";
 
 export type TeamRouteRule = {
   self?: boolean;
@@ -49,6 +50,11 @@ const RULES: Record<string, TeamRouteRule> = {
   "/seller/metafields": { writes: "products" },
   "/seller/settings": { writes: "products" },
   "/seller/vacation": { writes: "products" },
+  // Mounted ahead of the /seller catch-all (routes/index.ts); these keep the
+  // "products" write gate they used to get from the catch-all's rule.
+  "/seller/payment-settings": { writes: "products" },
+  "/seller/quick-replies": { writes: "products" },
+  "/seller/away-message": { writes: "products" },
   // Orders and after-sale.
   "/returns": { writes: "orders" },
   "/disputes": { writes: "orders" },
@@ -63,9 +69,14 @@ const RULES: Record<string, TeamRouteRule> = {
   "/seller/verification": { ownerWrites: true },
 };
 
-/** The mount a request is running under, relative to /api (or /api/v1). */
+/**
+ * The mount a request is running under, relative to /api (or /api/v1).
+ * req.baseUrl keeps the caller's spelling, and Express mounts match any case
+ * and a trailing slash (`/api/STORE` runs the /store routers), so the lookup
+ * uses the canonical form; otherwise a variant spelling skipped the rule.
+ */
 export function mountPathOf(baseUrl: string | undefined): string {
-  return String(baseUrl ?? "").replace(/^\/api(\/v1)?(?=\/|$)/, "") || "/";
+  return normalizeGatePath(String(baseUrl ?? "")).replace(/^\/api(\/v1)?(?=\/|$)/, "") || "/";
 }
 
 export function teamRouteRuleFor(baseUrl: string | undefined): TeamRouteRule | null {
@@ -75,5 +86,6 @@ export function teamRouteRuleFor(baseUrl: string | undefined): TeamRouteRule | n
 export function actsAsSelf(rule: TeamRouteRule | null, subPath: string): boolean {
   if (!rule) return false;
   if (rule.self) return true;
-  return (rule.selfPaths ?? []).some((p) => (typeof p === "string" ? subPath === p : p.test(subPath)));
+  const path = normalizeGatePath(subPath);
+  return (rule.selfPaths ?? []).some((p) => (typeof p === "string" ? path === p : p.test(path)));
 }

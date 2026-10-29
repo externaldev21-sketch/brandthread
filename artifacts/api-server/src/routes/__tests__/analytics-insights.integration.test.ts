@@ -276,6 +276,9 @@ describe("GET /audience", () => {
     // 8 buyers today (7 + attributed order by buyer2 is the same person -> 7 distinct); buyer0 returning (<5, hidden)
     expect(body.buyers.returning).toBeNull();
     expect(body.buyers.suppressed).toBe(true);
+    // 6 new buyers are shown, so the total (7) must be hidden: 7 − 6 would reveal the 1 returning buyer.
+    expect(body.buyers.new).toBe(6);
+    expect(body.buyers.total).toBeNull();
     expect(body.topCountries).toEqual([{ country: "US", people: 6 }]); // DE (1 person) hidden
     expect(body.hiddenLocations).toBe(1);
     expect(JSON.stringify(body)).not.toContain("FR");

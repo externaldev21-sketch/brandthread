@@ -39,8 +39,10 @@ vi.mock("drizzle-orm", () => ({
   }),
 }));
 
-vi.mock("@workspace/db", () => ({
-  db: {
+vi.mock("@workspace/db", () => {
+  const db = {
+    // seller-locations runs its writes in a transaction; the mock tx is the db.
+    transaction: async <T>(fn: (tx: unknown) => Promise<T>) => fn(db),
     execute: async (query: { text: string; values: unknown[] }) => {
       captured.calls.push({ text: query.text, values: query.values });
       // A generic row that satisfies whichever shape the caller reads
@@ -57,8 +59,9 @@ vi.mock("@workspace/db", () => ({
         }],
       };
     },
-  },
-}));
+  };
+  return { db };
+});
 
 let server: Server;
 let base = "";

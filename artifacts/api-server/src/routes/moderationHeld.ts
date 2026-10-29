@@ -13,7 +13,7 @@
  * the pending reports on the same item so the two queues never disagree.
  */
 import { Router } from "express";
-import { and, asc, count, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { db, mediaModerationResults, postComments, posts, reports, stories } from "@workspace/db";
 import { releaseHeldContent, removeReportedContent } from "../lib/reportTargets";
 import { profilesById } from "../lib/safety";
@@ -61,15 +61,28 @@ function storyMediaUrls(media: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Keyset over (created_at truncated to ms, id). Postgres keeps microseconds
+ * but the cursor (a JS Date) only has milliseconds, so comparing the raw
+ * column re-served the last item of every page on the next one.
+ */
+function msCreatedAt(column: AnyColumn): SQL {
+  return sql`date_trunc('milliseconds', ${column})`;
+}
+function afterCursor(createdAt: AnyColumn, id: AnyColumn, cursor: { at: Date; id: string } | null, castType: "timestamp" | "timestamptz"): SQL | undefined {
+  if (!cursor) return undefined;
+  return sql`(${msCreatedAt(createdAt)}, ${id}) > (${cursor.at.toISOString()}::${sql.raw(castType)}, ${cursor.id}::uuid)`;
+}
+
 async function loadHeld(type: HeldType, limit: number, cursor: { at: Date; id: string } | null): Promise<HeldItem[]> {
   if (type === "post") {
-    const after = cursor ? or(gt(posts.createdAt, cursor.at), and(eq(posts.createdAt, cursor.at), gt(posts.id, cursor.id))) : undefined;
+    const after = afterCursor(posts.createdAt, posts.id, cursor, "timestamp");
     const rows = await db.select({
       id: posts.id, userId: posts.userId, caption: posts.caption, mediaType: posts.mediaType, mediaUrl: posts.mediaUrl,
       mediaUrls: posts.mediaUrls, thumbnailUrl: posts.thumbnailUrl, reason: posts.moderationReason, createdAt: posts.createdAt,
     }).from(posts)
       .where(and(eq(posts.moderationStatus, "held"), ne(posts.postStatus, "deleted"), after))
-      .orderBy(asc(posts.createdAt), asc(posts.id)).limit(limit);
+      .orderBy(asc(msCreatedAt(posts.createdAt)), asc(posts.id)).limit(limit);
     return rows.map((r) => ({
       type: "post", id: r.id, ownerId: r.userId, createdAt: r.createdAt, reason: r.reason, text: r.caption || null,
       mediaType: r.mediaType,
@@ -78,22 +91,22 @@ async function loadHeld(type: HeldType, limit: number, cursor: { at: Date; id: s
     }));
   }
   if (type === "story") {
-    const after = cursor ? or(gt(stories.createdAt, cursor.at), and(eq(stories.createdAt, cursor.at), gt(stories.id, cursor.id))) : undefined;
+    const after = afterCursor(stories.createdAt, stories.id, cursor, "timestamp");
     const rows = await db.select().from(stories)
       .where(and(eq(stories.moderationStatus, "held"), after))
-      .orderBy(asc(stories.createdAt), asc(stories.id)).limit(limit);
+      .orderBy(asc(msCreatedAt(stories.createdAt)), asc(stories.id)).limit(limit);
     return rows.map((r) => ({
       type: "story", id: r.id, ownerId: r.authorId, createdAt: r.createdAt, reason: r.moderationReason, text: null,
       mediaType: "story", mediaUrls: storyMediaUrls(r.media), parentId: null,
     }));
   }
-  const after = cursor ? or(gt(postComments.createdAt, cursor.at), and(eq(postComments.createdAt, cursor.at), gt(postComments.id, cursor.id))) : undefined;
+  const after = afterCursor(postComments.createdAt, postComments.id, cursor, "timestamptz");
   const rows = await db.select({
     id: postComments.id, authorId: postComments.authorId, body: postComments.body, postId: postComments.postId,
     reason: postComments.moderationReason, createdAt: postComments.createdAt,
   }).from(postComments)
     .where(and(eq(postComments.moderationStatus, "held"), after))
-    .orderBy(asc(postComments.createdAt), asc(postComments.id)).limit(limit);
+    .orderBy(asc(msCreatedAt(postComments.createdAt)), asc(postComments.id)).limit(limit);
   return rows.map((r) => ({
     type: "comment", id: r.id, ownerId: r.authorId, createdAt: r.createdAt, reason: r.reason, text: r.body,
     mediaType: null, mediaUrls: [], parentId: r.postId,

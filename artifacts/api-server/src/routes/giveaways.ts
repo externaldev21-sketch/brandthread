@@ -117,7 +117,11 @@ async function checkOwnedRefs(sellerId: string, productId: string | null, postId
 sellerGiveawaysRouter.get("/rules-template", async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
-    const q = req.query as Record<string, string | undefined>;
+    // A repeated query key arrives as an array; only plain strings are used.
+    const raw = req.query as Record<string, unknown>;
+    const q = Object.fromEntries(
+      Object.entries(raw).filter(([, value]) => typeof value === "string"),
+    ) as Record<string, string | undefined>;
     const profiles = await profileFor([sellerId]);
     const startsAt = new Date(q.startsAt ?? Date.now());
     const endsAt = new Date(q.endsAt ?? Date.now() + 7 * 86_400_000);
@@ -246,11 +250,30 @@ sellerGiveawaysRouter.patch("/:id", rateLimit("mutation"), async (req, res) => {
     }
     const refError = await checkOwnedRefs(sellerId, v.productId, v.postId);
     if (refError) { res.status(400).json({ error: refError, code: "INVALID_REFERENCE" }); return; }
-    const [row] = await db.update(giveaways).set({
-      title: v.title, prizeText: v.prizeText, productId: v.productId, postId: v.postId,
-      startsAt: v.startsAt, endsAt: v.endsAt, rulesText: stripRequiredFooter(v.rulesText), eligibility: v.eligibility,
-      region: v.region, winnerCount: v.winnerCount, updatedAt: new Date(),
-    }).where(and(eq(giveaways.id, g.id), eq(giveaways.status, "open"))).returning();
+    const result = await db.transaction(async (tx) => {
+      // Same lock and rule as POST /: moving the dates must not make two open
+      // giveaways run at the same time.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"giveaway_create:" + sellerId}))`);
+      const [overlap] = await tx.select({ id: giveaways.id }).from(giveaways).where(and(
+        eq(giveaways.sellerId, sellerId),
+        eq(giveaways.status, "open"),
+        ne(giveaways.id, g.id),
+        sql`${giveaways.startsAt} < ${v.endsAt.toISOString()}::timestamptz`,
+        sql`${giveaways.endsAt} > ${v.startsAt.toISOString()}::timestamptz`,
+      )).limit(1);
+      if (overlap) return { overlap: true as const };
+      const [row] = await tx.update(giveaways).set({
+        title: v.title, prizeText: v.prizeText, productId: v.productId, postId: v.postId,
+        startsAt: v.startsAt, endsAt: v.endsAt, rulesText: stripRequiredFooter(v.rulesText), eligibility: v.eligibility,
+        region: v.region, winnerCount: v.winnerCount, updatedAt: new Date(),
+      }).where(and(eq(giveaways.id, g.id), eq(giveaways.status, "open"))).returning();
+      return { overlap: false as const, row };
+    });
+    if (result.overlap) {
+      res.status(409).json({ error: "You already have a giveaway running in that period.", code: "GIVEAWAY_OVERLAP" });
+      return;
+    }
+    const row = result.row;
     if (!row) { res.status(409).json({ error: "This giveaway can no longer be edited.", code: "NOT_EDITABLE" }); return; }
     res.json(serialize(row));
   } catch (err) { sendError(res, req, err, "Failed to update giveaway"); }

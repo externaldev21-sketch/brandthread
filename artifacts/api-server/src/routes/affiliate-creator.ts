@@ -22,6 +22,7 @@ import { generateUniqueCode, getProgram, syncDiscountCode } from "../lib/affilia
 import { creatorAccountState, payoutsConfigured } from "../lib/affiliate/payouts";
 import { creatorBrandRows, creatorPayoutRows, sumStats } from "../lib/affiliate/queries";
 import { CREATOR_CONNECT_REFRESH_PATH, CREATOR_CONNECT_RETURN_PATH, creatorConnectLanding } from "../lib/affiliate/connectReturn";
+import { isUuid } from "../lib/uuid";
 
 /** Stripe Connect return/refresh for creators (BT-323), mounted at /api/affiliate/connect. */
 export const affiliateConnectRedirectRouter = Router();
@@ -197,6 +198,11 @@ router.post("/brands/:sellerId/apply", async (req, res) => {
 async function respondToInvite(req: any, res: any, accept: boolean) {
   try {
     const creatorId = me(req);
+    // affiliate_creators.id is a uuid: a malformed id is simply not an invite.
+    if (!isUuid(req.params.id)) {
+      res.status(404).json({ error: "Invite not found" });
+      return;
+    }
     const outcome = await db.transaction(async (tx) => {
       const [row] = await tx.select().from(affiliateCreators).where(and(
         eq(affiliateCreators.id, String(req.params.id)), eq(affiliateCreators.creatorId, creatorId),
@@ -293,9 +299,19 @@ router.post("/payout-account/onboard", async (req, res) => {
     let accountId = user.stripeAccountId;
     if (!accountId) {
       const account = await client.accounts.create({ type: "express", capabilities: { transfers: { requested: true } } });
-      accountId = account.id;
-      await db.update(users).set({ stripeAccountId: accountId, stripeAccountStatus: "pending", updatedAt: new Date() })
-        .where(and(eq(users.clerkId, creatorId), sql`${users.stripeAccountId} IS NULL`));
+      const [saved] = await db.update(users).set({ stripeAccountId: account.id, stripeAccountStatus: "pending", updatedAt: new Date() })
+        .where(and(eq(users.clerkId, creatorId), sql`${users.stripeAccountId} IS NULL`))
+        .returning({ stripeAccountId: users.stripeAccountId });
+      if (saved?.stripeAccountId) {
+        accountId = saved.stripeAccountId;
+      } else {
+        // A concurrent onboard (double tap) saved its account first: onboard
+        // that one, never an account that isn't linked to this user.
+        const [current] = await db.select({ stripeAccountId: users.stripeAccountId }).from(users)
+          .where(eq(users.clerkId, creatorId)).limit(1);
+        accountId = current?.stripeAccountId ?? null;
+        if (!accountId) throw new Error("Creator Stripe account could not be saved");
+      }
     }
     const urls = affiliatePayoutReturnUrls();
     const link = await client.accountLinks.create({

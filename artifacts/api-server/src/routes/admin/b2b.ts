@@ -52,7 +52,8 @@ router.post("/sample-orders/:id/refund", async (req, res) => {
 router.get("/b2b-disputes", async (req, res) => {
   const limit = Number(req.query.limit ?? 50);
   try {
-    const rows = await listB2bDisputes(Number.isFinite(limit) ? limit : 50);
+    // Whole number only: a fractional LIMIT is a Postgres error.
+    const rows = await listB2bDisputes(Number.isFinite(limit) ? Math.trunc(limit) : 50);
     return res.json({
       items: rows.map((d) => ({
         id: d.id,

@@ -16,6 +16,11 @@ import { ensureStripeCustomer } from "../lib/stripe";
 const router = Router();
 router.use(requireAuth);
 
+/** Stripe's answer for a payment method id that doesn't exist (a bad or stale id from the client). */
+function isMissingPaymentMethod(e: any): boolean {
+  return e?.code === "resource_missing" || e?.statusCode === 404;
+}
+
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY not set");
@@ -121,6 +126,7 @@ router.post("/:pmId/default", rateLimit("checkout"), async (req, res) => {
 
     return res.json({ ok: true, paymentMethodId: pmId });
   } catch (e: any) {
+    if (isMissingPaymentMethod(e)) return res.status(404).json({ error: "Payment method not found" });
     return res.status(500).json({ error: e.message });
   }
 });
@@ -149,6 +155,7 @@ router.delete("/:pmId", rateLimit("checkout"), async (req, res) => {
     await stripe.paymentMethods.detach(pmId);
     return res.json({ ok: true });
   } catch (e: any) {
+    if (isMissingPaymentMethod(e)) return res.status(404).json({ error: "Payment method not found" });
     return res.status(500).json({ error: e.message });
   }
 });

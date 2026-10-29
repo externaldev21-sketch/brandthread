@@ -43,6 +43,16 @@ import { phoneLast4 } from "../lib/sms/phone";
 
 const router = Router();
 
+// Card ids are uuids; anything else would reach Postgres as an invalid uuid
+// and 500, so it is simply "not found".
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function cardIdOr404(req: Request, res: Response): string | null {
+  const id = String(req.params.id);
+  if (UUID_RE.test(id)) return id;
+  res.status(404).json({ error: "Gift card not found.", code: "NOT_FOUND" });
+  return null;
+}
+
 function fail(res: Response, error: unknown): boolean {
   if (error instanceof GiftCardError) {
     res.status(error.status).json({ error: error.message, code: error.code });
@@ -98,10 +108,12 @@ router.post("/purchase", validateRequest({ body: purchaseSchema }), async (req, 
 
 router.post("/purchase/:id/confirm", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  const cardId = cardIdOr404(req, res);
+  if (!cardId) return;
   const stripe = stripeOr503(res);
   if (!stripe) return;
   try {
-    const result = await confirmGiftCardPurchase(stripe, buyerId, String(req.params.id));
+    const result = await confirmGiftCardPurchase(stripe, buyerId, cardId);
     res.json({
       status: result.status,
       card: presentCard(result.card, "purchaser"),
@@ -169,7 +181,9 @@ router.get("/mine", async (req, res) => {
 
 router.get("/mine/:id", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  const [card] = await db.select().from(giftCards).where(eq(giftCards.id, String(req.params.id))).limit(1);
+  const cardId = cardIdOr404(req, res);
+  if (!cardId) return;
+  const [card] = await db.select().from(giftCards).where(eq(giftCards.id, cardId)).limit(1);
   if (!card || (card.ownerId !== buyerId && card.purchaserId !== buyerId)) {
     res.status(404).json({ error: "Gift card not found.", code: "NOT_FOUND" });
     return;
@@ -250,8 +264,10 @@ router.post("/seller/issue", requirePermission("marketing"), validateRequest({ b
 
 router.post("/seller/cards/:id/void", requirePermission("marketing"), async (req: Request, res: Response) => {
   const sellerId = (req as any).clerkUserId as string;
+  const cardId = cardIdOr404(req, res);
+  if (!cardId) return;
   try {
-    const card = await db.transaction((tx) => voidCard(tx, String(req.params.id), sellerId, sellerId));
+    const card = await db.transaction((tx) => voidCard(tx, cardId, sellerId, sellerId));
     res.json({ card: presentCard(card, "seller") });
   } catch (error) {
     if (fail(res, error)) return;

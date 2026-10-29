@@ -16,6 +16,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "@workspace/api-zod";
 import { bodyObject, idParams, numLike, validateInput } from "../lib/commerceValidation";
 import { requireRole, teamContext } from "../middlewares/requireRole";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -33,10 +34,26 @@ const presetFields = {
 };
 const presetBody = bodyObject(presetFields);
 
+// length_in/width_in/height_in are numeric(6,2): anything that rounds past
+// 9999.99 overflows the column (a 500), and anything that rounds to 0.00
+// would store a zero dimension the positive-number rule is meant to refuse.
+const MAX_DIMENSION = 9999.99;
+
 function toDimension(value: unknown): string | null {
   const n = typeof value === "string" ? Number(value) : value;
   if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return null;
-  return n.toFixed(2);
+  const fixed = n.toFixed(2);
+  const rounded = Number(fixed);
+  if (rounded <= 0 || rounded > MAX_DIMENSION) return null;
+  return fixed;
+}
+
+// weight_oz is a whole number of ounces; a positive weight under half an
+// ounce must not round down to a stored 0.
+function toWeightOz(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) return null;
+  return Math.max(1, Math.round(n));
 }
 
 router.get("/", requireRole("staff"), async (req, res) => {
@@ -50,25 +67,26 @@ router.get("/", requireRole("staff"), async (req, res) => {
 router.post("/", requireRole("staff"), validateInput({ body: presetBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-  const weightOz = Number(req.body?.weightOz);
+  const weightOz = toWeightOz(req.body?.weightOz);
   const lengthIn = toDimension(req.body?.lengthIn);
   const widthIn = toDimension(req.body?.widthIn);
   const heightIn = toDimension(req.body?.heightIn);
   if (!name) return void res.status(400).json({ error: "name is required" });
-  if (!Number.isFinite(weightOz) || weightOz <= 0) {
+  if (weightOz === null) {
     return void res.status(400).json({ error: "weightOz must be a positive number" });
   }
   if (!lengthIn || !widthIn || !heightIn) {
-    return void res.status(400).json({ error: "lengthIn, widthIn, and heightIn must be positive numbers" });
+    return void res.status(400).json({ error: "lengthIn, widthIn, and heightIn must be positive numbers (at most 9999.99)" });
   }
   const [preset] = await db.insert(sellerPackagePresets).values({
-    ownerId, name, weightOz: Math.round(weightOz), lengthIn, widthIn, heightIn,
+    ownerId, name, weightOz, lengthIn, widthIn, heightIn,
   }).returning();
   res.status(201).json({ preset });
 });
 
 router.patch("/:id", requireRole("staff"), validateInput({ params: presetIdParams, body: presetBody }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  if (!isUuid(req.params.id)) return void res.status(404).json({ error: "Preset not found" });
   const update: Record<string, unknown> = { updatedAt: new Date() };
   if (req.body?.name !== undefined) {
     const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
@@ -76,16 +94,16 @@ router.patch("/:id", requireRole("staff"), validateInput({ params: presetIdParam
     update.name = name;
   }
   if (req.body?.weightOz !== undefined) {
-    const weightOz = Number(req.body.weightOz);
-    if (!Number.isFinite(weightOz) || weightOz <= 0) {
+    const weightOz = toWeightOz(req.body.weightOz);
+    if (weightOz === null) {
       return void res.status(400).json({ error: "weightOz must be a positive number" });
     }
-    update.weightOz = Math.round(weightOz);
+    update.weightOz = weightOz;
   }
   for (const [key, field] of [["lengthIn", "lengthIn"], ["widthIn", "widthIn"], ["heightIn", "heightIn"]] as const) {
     if (req.body?.[key] !== undefined) {
       const dim = toDimension(req.body[key]);
-      if (!dim) return void res.status(400).json({ error: `${key} must be a positive number` });
+      if (!dim) return void res.status(400).json({ error: `${key} must be a positive number (at most 9999.99)` });
       update[field] = dim;
     }
   }
@@ -98,6 +116,7 @@ router.patch("/:id", requireRole("staff"), validateInput({ params: presetIdParam
 
 router.delete("/:id", requireRole("staff"), validateInput({ params: presetIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  if (!isUuid(req.params.id)) return void res.status(404).json({ error: "Preset not found" });
   const [deleted] = await db.delete(sellerPackagePresets)
     .where(and(eq(sellerPackagePresets.id, req.params.id), eq(sellerPackagePresets.ownerId, ownerId)))
     .returning({ id: sellerPackagePresets.id });

@@ -11,7 +11,7 @@
  */
 import { Router } from "express";
 import { db, freelancers, freelancerReviews, users } from "@workspace/db";
-import { and, asc, eq, gte, lte, desc, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lte, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { parseFreelancerSort, type FreelancerSort } from "../lib/freelancerRatings";
 
@@ -101,12 +101,19 @@ router.get("/", async (req, res) => {
   try {
     const { serviceType, minRate, maxRate, available, sort } = req.query as Record<string, string | undefined>;
 
-    const conds = [eq(freelancers.isActive, true)];
-    if (serviceType && (FREELANCER_SERVICE_TYPES as readonly string[]).includes(serviceType)) {
+    // A suspended or deleted account's listing is not hireable.
+    const conds = [eq(freelancers.isActive, true), isNull(users.deletedAt), isNull(users.suspendedAt)];
+    if (typeof serviceType === "string" && (FREELANCER_SERVICE_TYPES as readonly string[]).includes(serviceType)) {
       conds.push(eq(freelancers.serviceType, serviceType));
     }
-    const min = minRate ? parseInt(minRate, 10) : NaN;
-    const max = maxRate ? parseInt(maxRate, 10) : NaN;
+    // hourly_rate_cents is an int4: a bound outside it would 500 in Postgres,
+    // so clamp to the column's range (rates themselves are 100..10,000,000).
+    const rateBound = (raw: unknown) => {
+      const n = typeof raw === "string" && raw ? parseInt(raw, 10) : NaN;
+      return Number.isFinite(n) ? Math.max(0, Math.min(n, 2_147_483_647)) : NaN;
+    };
+    const min = rateBound(minRate);
+    const max = rateBound(maxRate);
     if (Number.isFinite(min)) conds.push(gte(freelancers.hourlyRateCents, min));
     if (Number.isFinite(max)) conds.push(lte(freelancers.hourlyRateCents, max));
     if (available === "true") conds.push(sql`${freelancers.stripeAccountId} IS NOT NULL`);
@@ -114,7 +121,7 @@ router.get("/", async (req, res) => {
     const rows = await db
       .select({ freelancer: freelancers, user: USER_FIELDS })
       .from(freelancers)
-      .leftJoin(users, eq(users.clerkId, freelancers.userId))
+      .innerJoin(users, eq(users.clerkId, freelancers.userId))
       .where(and(...conds))
       .orderBy(...orderFor(parseFreelancerSort(sort)))
       .limit(100);

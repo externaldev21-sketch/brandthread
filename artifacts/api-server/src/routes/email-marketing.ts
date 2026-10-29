@@ -172,6 +172,34 @@ async function campaignStats(campaignId: string) {
   return r.rows[0] as Record<string, number>;
 }
 
+const EMPTY_STATS = { sent: 0, failed: 0, skipped: 0, queued: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0 };
+
+/** campaignStats for many campaigns in one grouped query (the list view). */
+async function campaignStatsMany(campaignIds: string[]): Promise<Map<string, Record<string, number>>> {
+  const out = new Map<string, Record<string, number>>();
+  if (campaignIds.length === 0) return out;
+  const r = await db.execute(sql`
+    SELECT
+      campaign_id,
+      count(*) FILTER (WHERE status = 'sent')::int AS sent,
+      count(*) FILTER (WHERE status = 'failed')::int AS failed,
+      count(*) FILTER (WHERE status = 'skipped')::int AS skipped,
+      count(*) FILTER (WHERE status IN ('queued','sending'))::int AS queued,
+      count(*) FILTER (WHERE delivered_at IS NOT NULL)::int AS delivered,
+      count(*) FILTER (WHERE opened_at IS NOT NULL)::int AS opened,
+      count(*) FILTER (WHERE clicked_at IS NOT NULL)::int AS clicked,
+      count(*) FILTER (WHERE bounced_at IS NOT NULL)::int AS bounced
+    FROM email_campaign_sends
+    WHERE campaign_id IN (${sql.join(campaignIds.map((id) => sql`${id}::uuid`), sql`, `)})
+    GROUP BY campaign_id
+  `);
+  for (const row of r.rows as Array<Record<string, unknown>>) {
+    const { campaign_id: campaignId, ...stats } = row;
+    out.set(String(campaignId), stats as Record<string, number>);
+  }
+  return out;
+}
+
 function serialize(c: typeof emailCampaigns.$inferSelect) {
   return {
     id: c.id, subject: c.subject, preheader: c.preheader, body: c.body, audience: c.audience,
@@ -199,8 +227,12 @@ router.get("/campaigns", async (req, res) => {
   const rows = await db.select().from(emailCampaigns)
     .where(eq(emailCampaigns.sellerId, sellerOf(req)))
     .orderBy(desc(emailCampaigns.createdAt)).limit(100);
-  const out = [];
-  for (const c of rows) out.push({ ...serialize(c), stats: c.status === "draft" ? null : await campaignStats(c.id) });
+  // One grouped stats query for the page instead of one query per campaign.
+  const stats = await campaignStatsMany(rows.filter((c) => c.status !== "draft").map((c) => c.id));
+  const out = rows.map((c) => ({
+    ...serialize(c),
+    stats: c.status === "draft" ? null : stats.get(c.id) ?? { ...EMPTY_STATS },
+  }));
   res.json({ campaigns: out });
 });
 

@@ -28,6 +28,7 @@ import { blockRelation, publishingRestriction } from "../lib/safety";
 import { evaluateContent } from "../lib/contentModerator";
 import { audienceAllows, normalizeAudience, viewerRelations } from "../lib/storyAccess";
 import { resolveToClerkId } from "./public";
+import { viewerCanSeeContent } from "../lib/privateAccount";
 import { cappedList, cappedUnknown, looseBody, optNumberish, validateBody } from "../middlewares/bodySchemas";
 
 export const MAX_HIGHLIGHTS = 50;
@@ -175,7 +176,7 @@ router.get("/highlights/me", async (req, res) => {
  */
 router.get("/highlights/stories", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const limit = Math.min(parseInt(String(req.query.limit ?? "60"), 10) || 60, 120);
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "60"), 10) || 60, 1), 120);
   const now = new Date();
   const [current, archived] = await Promise.all([
     db.select().from(stories)
@@ -201,6 +202,9 @@ async function visibleHighlightsOf(viewerId: string, ownerId: string) {
   const [owner] = await db.select({ deletedAt: users.deletedAt, suspendedAt: users.suspendedAt })
     .from(users).where(eq(users.clerkId, ownerId)).limit(1);
   if (!owner || owner.deletedAt || owner.suspendedAt) return null;
+  // Highlights are saved stories: a private account's are for approved
+  // followers only, like its posts, tagged tab and live stories.
+  if (ownerId !== viewerId && !(await viewerCanSeeContent(viewerId, ownerId))) return [];
   const rows = await db.select().from(storyHighlights)
     .where(eq(storyHighlights.userId, ownerId))
     .orderBy(asc(storyHighlights.position), desc(storyHighlights.createdAt));

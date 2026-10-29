@@ -7,6 +7,10 @@
  * GET    /api/social/close-friends                     — my close friends
  * PUT    /api/social/close-friends                     — full replace { friendIds: string[] } (max 500)
  *
+ * NOTE: routes/close-friends.ts is mounted on /social before this router
+ * (routes/index.ts) and answers GET/PUT /close-friends itself, so the two
+ * close-friends handlers below are not reached in the running app.
+ *
  * Requesting / cancelling a request lives on POST / DELETE /api/social/follow.
  */
 import { Router } from "express";

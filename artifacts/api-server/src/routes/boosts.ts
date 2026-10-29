@@ -43,6 +43,7 @@ import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls"
 import { promotionReviewRequired, refundPromotionPayment } from "../lib/promotions/refund";
 import { rejectNativeStripeCheckout } from "../middlewares/nativeStoreRail";
 import { releasePromotionCreditForTarget } from "../lib/iapPromotionsStore";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -139,6 +140,8 @@ export function isAllowedBoostReturnUrl(value: unknown): value is string {
 // ─── Internal: find owned boost ───────────────────────────────────────────────
 
 async function findOwnedBoost(id: string, sellerId: string) {
+  // boosts.id is a uuid column: comparing it to anything else throws (a 500).
+  if (!isUuid(id)) return null;
   const [row] = await db
     .select()
     .from(boosts)
@@ -374,6 +377,10 @@ router.post("/", express.json({ limit: "16kb" }), async (req, res) => {
   }
   if (!targetId || typeof targetId !== "string") {
     return res.status(400).json({ error: "targetId required" });
+  }
+  // posts.id is a uuid column; anything else can't be a post (and would 500).
+  if (!isUuid(targetId)) {
+    return res.status(404).json({ error: "Boost target not found or not yet published" });
   }
 
   // Persist objective='views' for schema compatibility; validate if provided
@@ -774,6 +781,7 @@ router.patch("/:id", express.json({ limit: "4kb" }), async (req, res) => {
   if (!status || !["paused", "cancelled"].includes(status)) {
     return res.status(400).json({ error: "status must be 'paused' or 'cancelled'" });
   }
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Boost not found" });
 
   const [existing] = await db
     .select({ id: boosts.id, status: boosts.status })
@@ -806,11 +814,14 @@ router.patch("/:id", express.json({ limit: "4kb" }), async (req, res) => {
     return res.json(serializeBoost(refunded));
   }
 
+  // Only from the status checked above: a concurrent change (expiry to
+  // completed, an admin action) must not be overwritten by this write.
   const [updated] = await db
     .update(boosts)
     .set({ status })
-    .where(eq(boosts.id, req.params.id))
+    .where(and(eq(boosts.id, existing.id), eq(boosts.status, existing.status)))
     .returning();
+  if (!updated) return res.status(409).json({ error: "Boost changed; refresh and try again" });
 
   return res.json(serializeBoost(updated));
 });

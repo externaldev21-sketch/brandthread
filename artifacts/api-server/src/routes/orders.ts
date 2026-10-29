@@ -23,7 +23,7 @@ import { reserveStockForOrder, restoreStockForOrder } from "../lib/stockReservat
 import { nextOrderNumber } from "../lib/orderNumber";
 import { notifyStockRestored } from "../lib/stockNotifications";
 import { recordDelivery, shipItems } from "../lib/delivery/deliveryState";
-import { buyerEmailOf, notifyBuyerOrderShipped } from "../lib/orderNotifications";
+import { buyerEmailOf, orderShippedCopy } from "../lib/orderNotifications";
 import { sellerMayMarkDelivered, validateTrackingNumber } from "../lib/shippingTracking";
 import { notifyBuyerPreparing } from "../lib/delivery/notifications";
 import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
@@ -34,12 +34,28 @@ import { notifyOrderLiveActivity } from "../lib/liveActivityPush";
 import { generateOrderNumberIn } from "../lib/orderNumber";
 import { giftResponse } from "../lib/giftOptions";
 import { carrierTrackingUrl } from "../lib/delivery/buyerView";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
 // Resolve team membership: managers/staff act on the owner's store while the
 // audit log keeps track of who actually performed each action.
 router.use(teamContext());
+
+// orders.id is a uuid column: comparing it to a non-uuid string makes
+// Postgres throw, which surfaced as a 500. A malformed id names no order, so
+// answer 404 before any handler queries. Oversized ids are left to the
+// route's validateInput (400), as before.
+router.param("id", (req, res, next, id) => {
+  if (typeof id === "string" && id.length <= 200 && !isUuid(id)) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  next();
+});
+
+// Largest value an int4 money column (total_cents etc.) can hold.
+const MAX_INT4 = 2_147_483_647;
 
 const TRACKING_STATUSES = [
   "label_created",
@@ -84,6 +100,32 @@ async function notifyOrderShipped(
   if (!sent) {
     logger.warn({ orderId: order.id }, "Shipping email delivery failed");
   }
+}
+
+/**
+ * Buyer "Your order has shipped" (in-app + push). One copy for every ship
+ * path (orderShippedCopy), opening the buyer's order screen, with the order's
+ * product thumbnail. Fire-and-forget: a notification failure never fails the
+ * seller's request.
+ */
+function publishBuyerShipped(input: {
+  buyerId: string;
+  orderId: string;
+  orderNumber: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+}): void {
+  withOrderImage(input.orderId, {
+    userId:       input.buyerId,
+    category:     "orders",
+    pushCategory: "order",
+    type:         "order_shipped",
+    ...orderShippedCopy(input),
+    targetId:     input.orderId,
+    targetType:   "buyer_order",
+  }).then(publishNotification).catch((err) => {
+    logger.warn({ err, orderId: input.orderId }, "Order shipped notification failed");
+  });
 }
 
 // ── Request schemas ──────────────────────────────────────────────────────────
@@ -237,6 +279,8 @@ router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }
 
       // The order stores these ids and the seller's order detail later reads
       // the customer row by id alone, so only accept the seller's own records.
+      if (customerId && !isUuid(customerId)) throw Object.assign(new Error("Customer not found"), { status: 404 });
+      if (dropId && !isUuid(dropId)) throw Object.assign(new Error("Drop not found"), { status: 404 });
       if (customerId) {
         const [ownCustomer] = await tx.select({ id: customers.id }).from(customers)
           .where(and(eq(customers.id, customerId), eq(customers.ownerId, ownerId))).limit(1);
@@ -259,6 +303,9 @@ router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }
 
         let priceCents: number;
 
+        if (item.variantId && !isUuid(item.variantId)) {
+          throw Object.assign(new Error(`Variant ${item.variantId} not found or access denied`), { status: 404 });
+        }
         if (item.variantId) {
           // Server-side price lookup — also verifies ownership through product join
           const [variant] = await tx
@@ -298,6 +345,11 @@ router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }
       }
 
       const totalCents = subtotalCents + shippingCents;
+      // Per-line caps still allow a sum past what the int4 columns hold,
+      // which would fail the insert with a 500.
+      if (totalCents > MAX_INT4) {
+        throw Object.assign(new Error("Order total is too large"), { status: 400 });
+      }
 
       // Short order number (BT-4821), unique across every store.
       const orderNumber = await generateOrderNumberIn(tx);
@@ -385,7 +437,7 @@ router.post("/", requireRole("manager"), validateInput({ body: createOrderBody }
 });
 
 // GET /api/orders/:id
-router.get("/:id", async (req, res) => {
+router.get("/:id", validateInput({ params: orderIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [order] = await db.select().from(orders)
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
@@ -711,8 +763,20 @@ router.patch("/:id/status", requireRole("staff"), validateInput({ params: orderI
       title:      notif.title,
       body:       notif.body,
       targetId:   transitioned.id,
-      targetType: "order",
+      // Buyer-facing: opens the buyer's order screen, not the seller's.
+      targetType: "buyer_order",
     }).then(publishNotification).catch(() => { /* non-critical */ });
+  }
+  // The buyer's in-app + push "shipped" notice — the same copy every ship
+  // path uses (lib/orderNotifications.ts orderShippedCopy).
+  if (status === "shipped" && !quietShip && transitioned.buyerId) {
+    publishBuyerShipped({
+      buyerId: transitioned.buyerId,
+      orderId: transitioned.id,
+      orderNumber: transitioned.orderNumber,
+      carrier: transitioned.carrier,
+      trackingNumber: transitioned.trackingNumber,
+    });
   }
   if (status === "shipped" && !quietShip) {
     void notifyOrderShipped(transitioned).catch((err) => {
@@ -734,7 +798,7 @@ function refundableCentsOf(order: { grossChargedCents: number; totalCents: numbe
 }
 
 // GET /api/orders/:id/refunds — refunds issued on this order (newest first)
-router.get("/:id/refunds", async (req, res) => {
+router.get("/:id/refunds", validateInput({ params: orderIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [order] = await db.select({ id: orders.id, refundedCents: orders.refundedCents, grossChargedCents: orders.grossChargedCents, totalCents: orders.totalCents })
     .from(orders)
@@ -760,7 +824,7 @@ router.get("/:id/refunds", async (req, res) => {
 
 // POST /api/orders/:id/refund — seller refunds part or all of what is left,
 // without cancelling the order (manager+). Body: { amountCents, reason, note?, requestId }
-router.post("/:id/refund", requireRole("manager"), async (req, res) => {
+router.post("/:id/refund", requireRole("manager"), validateInput({ params: orderIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const body = req.body ?? {};
   const method = body.method ?? "original";
@@ -1035,16 +1099,13 @@ async function handleTrackingUpdate(req: Request<{ id: string }>, res: Response)
 
   // Notify buyer only when status genuinely transitioned to shipped
   if (statusTransition?.buyerId && notifyCustomer) {
-    const carrierLabel = updated.carrier ?? carrier ?? "carrier";
-    withOrderImage(statusTransition.id, {
-      userId:     statusTransition.buyerId,
-      category:   "orders",
-      type:       "order_shipped",
-      title:      "Your order has shipped!",
-      body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
-      targetId:   statusTransition.id,
-      targetType: "order",
-    }).then(publishNotification).catch(() => { /* non-critical */ });
+    publishBuyerShipped({
+      buyerId: statusTransition.buyerId,
+      orderId: statusTransition.id,
+      orderNumber: statusTransition.orderNumber,
+      carrier: updated.carrier ?? carrier ?? null,
+      trackingNumber: updated.trackingNumber,
+    });
   }
   const trackingAlertMap: Partial<Record<typeof TRACKING_STATUSES[number], {
     type: string;
@@ -1121,13 +1182,13 @@ async function handleTrackingUpdate(req: Request<{ id: string }>, res: Response)
 
   res.json(updated);
 }
-router.patch("/:id/tracking", requireRole("staff"), handleTrackingUpdate);
+router.patch("/:id/tracking", requireRole("staff"), validateInput({ params: orderIdParams, body: orderTrackingBody }), handleTrackingUpdate);
 
 // POST /api/orders/:id/ship — seller "Mark as shipped" (staff+). Same effect
 // as adding tracking (ships the order, alerts the buyer, releases held
 // funds), but the carrier and tracking number are required and the number
 // must match the carrier's format.
-router.post("/:id/ship", requireRole("staff"), async (req, res) => {
+router.post("/:id/ship", requireRole("staff"), validateInput({ params: orderIdParams }), async (req, res) => {
   const check = validateTrackingNumber(req.body?.carrier, req.body?.trackingNumber);
   if (!check.ok) {
     res.status(400).json({ error: check.error, field: check.field, code: "INVALID_TRACKING" }); return;
@@ -1152,7 +1213,7 @@ router.post("/:id/ship", requireRole("staff"), async (req, res) => {
 // POST /api/orders/:id/mark-delivered — seller fallback (staff+). Only for
 // a shipment no carrier status can arrive for (see sellerMayMarkDelivered);
 // otherwise the carrier's scan or the buyer confirms delivery.
-router.post("/:id/mark-delivered", requireRole("staff"), async (req, res) => {
+router.post("/:id/mark-delivered", requireRole("staff"), validateInput({ params: orderIdParams }), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [order] = await db.select().from(orders)
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);

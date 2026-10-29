@@ -29,13 +29,14 @@ import { DUTIES_UNAVAILABLE_RESPONSE, DutiesUnavailableError, dutiesLineItem, ho
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import { recordCheckoutAttribution } from "../lib/growth/attribution";
-import { BundlePricingError } from "../lib/money/bundlePricing";
+import { BundlePricingError, linesAfterBundles } from "../lib/money/bundlePricing";
 import { priceGroupBundles } from "../lib/money/bundleLoader";
 import { DiscountValidationError, validateDiscountCode } from "../lib/discounts";
 import {
   buildGuestCheckoutSessionParams, guestCustomerParams, guestDiscountCents,
 } from "../lib/money/guestCheckoutSession";
 import { giftColumns, giftSchema, moderateGift } from "../lib/giftOptions";
+import { flatRateShipping } from "../lib/defaultShipping";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -334,8 +335,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       sellerHomeCountry = sellerRow?.country ?? "US";
     } else {
       const [rate] = await db.select().from(shippingRates).where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
-      shippingCents = !rate || (rate.freeAboveCents != null && afterBundlesCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
-      shippingLineName = rate?.name ?? "Shipping";
+      // No rate configured → the standard rate (lib/defaultShipping.ts), not
+      // free — same as the signed-in checkout, so a guest order never leaves
+      // the seller paying the label.
+      ({ cents: shippingCents, name: shippingLineName } = flatRateShipping(rate, afterBundlesCents));
     }
     // Taxes & duties switches: on unless the seller explicitly turned them off.
     const taxSwitches = await loadSellerTaxSwitches(sellerId);
@@ -346,7 +349,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       product_data: shippingProductData(shippingLineName, taxSwitches),
     }, quantity: 1 });
     // ── Discount code (BT-255): validated fresh, with the same rules and the
-    // same per-customer key ("guest:<email>") the order webhook records.
+    // same per-customer key ("guest:<email>") the order webhook records. Like
+    // the signed-in flow (routes/buyer.ts, lib/money/cartCheckout.ts) it sees
+    // the cart after bundle savings, so a code never discounts money the
+    // bundle already took off.
     let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
     if (typeof discountCode === "string" && discountCode.trim()) {
       try {
@@ -354,8 +360,8 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
           sellerId,
           code: discountCode,
           customerKey: `guest:${email}`,
-          cartSubtotalCents: subtotalCents,
-          lines: discountLines,
+          cartSubtotalCents: afterBundlesCents,
+          lines: linesAfterBundles(discountLines, bundlePricing.lineDiscountCents),
           liveStreamId: typeof liveStreamId === "string" ? liveStreamId : null,
         });
       } catch (err) {
@@ -369,7 +375,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       ? guestDiscountCents({
         appliedAmountCents: discountApplication.appliedAmountCents,
         freeShipping: discountApplication.freeShipping,
-        subtotalCents,
+        subtotalCents: afterBundlesCents,
         shippingCents,
       })
       : 0;

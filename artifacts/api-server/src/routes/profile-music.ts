@@ -32,7 +32,8 @@ router.get("/search", requireAuth, async (req, res) => {
 
 router.put("/me", requireAuth, async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { trackId } = req.body as { trackId?: unknown };
+  // No JSON body (no content-type) leaves req.body undefined in Express 5.
+  const { trackId } = (req.body ?? {}) as { trackId?: unknown };
   if (trackId === null) {
     await db.update(users).set({ profileSong: null, updatedAt: new Date() }).where(eq(users.clerkId, userId));
     return res.json({ song: null });

@@ -24,9 +24,20 @@ import {
 import { processEvidenceUpload, type UploadDeps } from "../lib/disputes/upload";
 import { buildTimelineSteps, sortTimelineEvents } from "../lib/disputes/timeline";
 import { acceptUploadSession } from "../lib/uploadSessions";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
+
+// disputes.id is a uuid column: a malformed id would make Postgres throw
+// (a 500). It cannot name any dispute, so it is a plain 404.
+router.param("id", (_req, res, next, id) => {
+  if (!isUuid(id)) { res.status(404).json({ error: "Dispute not found" }); return; }
+  next();
+});
+
+/** Stripe's limit for its free-text evidence fields. */
+const MAX_EVIDENCE_TEXT = 20_000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -205,9 +216,15 @@ router.post("/:id/evidence", async (req, res) => {
       res.status(409).json({ error: "Evidence was already submitted. Stripe allows one submission." }); return;
     }
 
-    const { type, description, trackingNumber } = req.body;
-    if (!type || !description?.trim()) {
+    const { type, description, trackingNumber } = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof type !== "string" || !type.trim() || typeof description !== "string" || !description.trim()) {
       res.status(400).json({ error: "type and description are required" }); return;
+    }
+    if (type.length > 40) {
+      res.status(400).json({ error: "type is not a valid evidence type" }); return;
+    }
+    if (description.length > MAX_EVIDENCE_TEXT) {
+      res.status(400).json({ error: `description can be at most ${MAX_EVIDENCE_TEXT} characters` }); return;
     }
 
     // Build the evidence item for our DB

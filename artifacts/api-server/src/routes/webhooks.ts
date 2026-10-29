@@ -1716,8 +1716,28 @@ async function handleSubscriptionUpdated(sub: any, previousAttributes: Record<st
     logger.warn({ subscriptionId: sub.id }, "Subscription update missing customer ID");
     return;
   }
-  const [before] = await db.select({ clerkId: users.clerkId, status: users.subscriptionStatus, planId: users.subscriptionPlanId })
-    .from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
+  const [before] = await db.select({
+    clerkId: users.clerkId, status: users.subscriptionStatus, planId: users.subscriptionPlanId, subscriptionId: users.subscriptionId,
+  }).from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
+
+  // Stripe does not guarantee delivery order. A canceled subscription never
+  // comes back, so (a) a late created/updated event for a subscription we
+  // already recorded as canceled, and (b) a terminal event for a subscription
+  // that is no longer the seller's current one, must not overwrite the row
+  // (either would re-grant a dead plan or point users.subscription_id back
+  // at a dead subscription).
+  const TERMINAL = ["canceled", "incomplete_expired"];
+  if (before?.subscriptionId) {
+    const sameSub = before.subscriptionId === sub.id;
+    if (sameSub && before.status === "canceled" && !TERMINAL.includes(sub.status)) {
+      logger.info({ subscriptionId: sub.id, subscriptionStatus: sub.status }, "Ignoring stale event for a canceled subscription");
+      return;
+    }
+    if (!sameSub && TERMINAL.includes(sub.status)) {
+      logger.info({ subscriptionId: sub.id, current: before.subscriptionId }, "Ignoring terminal event for a superseded subscription");
+      return;
+    }
+  }
 
   // Determine plan from the price lookup_key on the first subscription item
   const lookupKey: string | undefined = sub.items?.data?.[0]?.price?.lookup_key;
@@ -1955,8 +1975,16 @@ async function handleSubscriptionDeleted(sub: any) {
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customerId) return;
 
-  const [seller] = await db.select({ clerkId: users.clerkId, planId: users.subscriptionPlanId })
+  const [seller] = await db.select({ clerkId: users.clerkId, planId: users.subscriptionPlanId, subscriptionId: users.subscriptionId })
     .from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
+
+  // Same rule as handleInvoicePaymentFailed: only the seller's current
+  // platform subscription may end their plan. Deleting a superseded or
+  // duplicate subscription must not downgrade a seller whose newer one is live.
+  if (seller?.subscriptionId && sub.id && seller.subscriptionId !== sub.id) {
+    logger.info({ subscriptionId: sub.id, current: seller.subscriptionId, customerId }, "Ignoring deletion of a non-current subscription");
+    return;
+  }
 
   await db.update(users).set({
     subscriptionStatus: "canceled",

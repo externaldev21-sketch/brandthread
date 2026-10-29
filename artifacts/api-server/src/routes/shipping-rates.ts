@@ -204,8 +204,10 @@ router.patch("/:id", validateInput({ params: rateIdParams, body: updateRateBody 
     return;
   }
 
-  const updates: Record<string, unknown> = {};
-  if (name !== undefined) updates.name = name;
+  // Always stamps updatedAt, so an empty patch is a no-op rather than an
+  // empty SET (which drizzle rejects). `name` is NOT NULL: null keeps it.
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (name !== undefined && name !== null) updates.name = name;
   if (flatRateCents !== undefined) updates.flatRateCents = flatRateCents;
   if (freeAboveCents !== undefined) updates.freeAboveCents = freeAboveCents;
   if (active !== undefined) updates.active = active;

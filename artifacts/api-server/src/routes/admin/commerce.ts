@@ -18,7 +18,7 @@ import { computeRevenueBreakdown } from "../../lib/admin/revenue";
 
 const router = Router();
 
-const ORDER_STATUSES = ["pending", "processing", "fulfilled", "shipped", "cancelled"];
+const ORDER_STATUSES = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
 const CLOSED_DISPUTE = ["won", "lost", "warning_closed", "charge_refunded"];
 
 async function namesByClerkId(ids: (string | null)[]) {

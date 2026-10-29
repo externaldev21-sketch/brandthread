@@ -60,13 +60,21 @@ router.put("/", validateBody(vacationBody), async (req, res) => {
   if (typeof vacationMode !== "boolean") {
     return res.status(400).json({ error: "vacationMode (boolean) required" });
   }
+  // An unparseable date would otherwise reach the DB as Invalid Date and 500.
+  let until: Date | null = null;
+  if (vacationUntil !== undefined && vacationUntil !== null && vacationUntil !== "") {
+    until = typeof vacationUntil === "string" ? new Date(vacationUntil) : null;
+    if (!until || Number.isNaN(until.getTime())) {
+      return res.status(400).json({ error: "vacationUntil must be an ISO date or null" });
+    }
+  }
 
   const [updated] = await db
     .update(users)
     .set({
       vacationMode,
       vacationMessage: vacationMessage?.trim() || null,
-      vacationUntil:   vacationUntil ? new Date(vacationUntil) : null,
+      vacationUntil:   until,
       updatedAt:       new Date(),
     })
     .where(eq(users.clerkId, clerkId))

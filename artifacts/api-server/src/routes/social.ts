@@ -68,6 +68,7 @@ import { pinnedAtIso, pinnedAtSql, pinnedFirst as pinnedFirstOrder } from "../li
 import { publicPronouns, publicStyleBadge } from "../lib/profileExtras";
 import { postDimsPayload } from "../lib/mediaDimensions";
 import { postDimsColumns } from "../lib/postDimsColumns";
+import { isUuid } from "../lib/uuid";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -865,6 +866,8 @@ router.get("/me/liked-posts", async (req, res) => {
 router.get("/posts/:postId", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { postId } = req.params;
+  // posts.id is a uuid column: a malformed id would 500 in Postgres.
+  if (!isUuid(postId)) { res.status(404).json({ error: "Post not found" }); return; }
 
   const [row] = await db.select({ userId: posts.userId }).from(posts)
     .where(eq(posts.id, postId)).limit(1);
@@ -1304,8 +1307,9 @@ router.get("/followers", async (req, res) => {
 // with more followers are tie-broken ahead within each tier.
 router.get("/search", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
-  const q     = ((req.query.q as string) || "").trim();
-  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+  // A repeated ?q= arrives as an array; a negative ?limit= would reach LIMIT.
+  const q     = (typeof req.query.q === "string" ? req.query.q : "").trim();
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 50);
   if (q.length < 1) { res.json([]); return; }
 
   const term = normalizeSearchTerm(q);
@@ -1378,7 +1382,7 @@ const NEW_ON_BRANDTHREAD_DAYS = 14;
 
 router.get("/suggested", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
-  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 50);
 
   const [followingRows, dismissedRows, blockedRows] = await Promise.all([
     db.select({ followingId: follows.followingId }).from(follows).where(eq(follows.followerId, myId)),
@@ -1410,6 +1414,9 @@ router.get("/suggested", async (req, res) => {
       // A self-follow row must never count as a "mutual" — otherwise a
       // candidate can be shown as "Followed by <candidate's own name>".
       ne(follows.followerId, follows.followingId),
+      // Suspended / deleted candidates must not take the page's slots.
+      sql`EXISTS (SELECT 1 FROM users cu WHERE cu.clerk_id = ${follows.followingId}
+        AND cu.suspended_at IS NULL AND cu.deleted_at IS NULL AND cu.deletion_requested_at IS NULL)`,
     ))
     .groupBy(follows.followingId)
     .orderBy(desc(sql`count(*)`))
@@ -1435,7 +1442,14 @@ router.get("/suggested", async (req, res) => {
   const candidateIds = [...mutualIds, ...freshRows.map((r) => r.clerkId)].slice(0, limit);
   if (candidateIds.length === 0) { res.json([]); return; }
 
-  const userRows = await db.select().from(users).where(and(inArray(users.clerkId, candidateIds), userIsSearchable()));
+  // Mutual-follow candidates come straight from the follow graph, so the
+  // account-standing filter the fresh fill applies must be repeated here.
+  const userRows = await db.select().from(users).where(and(
+    inArray(users.clerkId, candidateIds),
+    userIsSearchable(),
+    isNull(users.suspendedAt),
+    isNull(users.deletedAt), isNull(users.deletionRequestedAt),
+  ));
   const byId = new Map(userRows.map((u) => [u.clerkId, u]));
   const mutualById = new Map(mutualRows.map((row) => [row.candidateId, row]));
   const freshById = new Map(freshRows.map((r) => [r.clerkId, r]));
@@ -1546,6 +1560,7 @@ async function isFollowing(followerId: string, followingId: string): Promise<boo
 
 /** Loads {id, moderationStatus, expiresAt} for an active (non-expired, visible) story. */
 async function loadActiveStory(storyId: string) {
+  if (!isUuid(storyId)) return null; // stories.id is a uuid column
   const [row] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
   if (!row) return null;
   if (row.moderationStatus === "removed" || row.moderationStatus === "held") return null;
@@ -1650,7 +1665,13 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
   const storyHeld = !!storyVerdict && isFlagged(storyVerdict);
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const accountStoryReplies = (repliesDisabled === undefined || privacy?.replyPermission === undefined)
+  // Only the three stored reply permissions are accepted; anything else
+  // (unknown strings, objects) falls back to the account default instead of
+  // being written to stories.privacy_reply_perm.
+  const rawReplyPerm = privacy?.replyPermission;
+  const explicitReplyPerm = rawReplyPerm === "everyone" || rawReplyPerm === "friends" || rawReplyPerm === "off"
+    ? rawReplyPerm : undefined;
+  const accountStoryReplies = (repliesDisabled === undefined || explicitReplyPerm === undefined)
     ? (await getUserAppSettings(myId)).settings.storyReplies
     : "everyone";
   // Close Friends wins over the coarser visibility: the mobile client sends
@@ -1660,7 +1681,7 @@ router.post("/stories", validateBody(createStoryBody), async (req, res) => {
     : privacy?.visibility === "friends" ? "friends" : "public";
 
   // An explicit per-story choice wins; otherwise use the account default.
-  const replyPerm = privacy?.replyPermission ?? accountStoryReplies;
+  const replyPerm = explicitReplyPerm ?? accountStoryReplies;
 
   const [row] = await db.insert(stories).values({
     authorId:           myId,
@@ -1884,6 +1905,7 @@ router.get("/stories/following", async (req, res) => {
 router.get("/stories/:id/viewers", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const storyId = req.params.id;
+  if (!isUuid(storyId)) { res.status(404).json({ error: "Story not found" }); return; }
 
   const [story] = await db.select({ authorId: stories.authorId }).from(stories)
     .where(eq(stories.id, storyId)).limit(1);
@@ -1914,6 +1936,7 @@ router.get("/stories/:id/viewers", async (req, res) => {
 router.delete("/stories/:id", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const storyId = req.params.id;
+  if (!isUuid(storyId)) { res.status(404).json({ error: "Story not found" }); return; }
   const [deleted] = await db.delete(stories)
     .where(and(eq(stories.id, storyId), eq(stories.authorId, myId)))
     .returning({ id: stories.id });

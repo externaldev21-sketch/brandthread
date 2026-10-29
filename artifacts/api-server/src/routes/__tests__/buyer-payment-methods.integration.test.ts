@@ -78,7 +78,12 @@ const fakeStripe = vi.hoisted(() => {
       list: async ({ customer }: { customer: string }) => ({
         data: [...methods.values()].filter((method) => method.customer === customer),
       }),
-      retrieve: async (id: string) => methods.get(id),
+      retrieve: async (id: string) => {
+        const method = methods.get(id);
+        // Like Stripe: an unknown id is a resource_missing error, not undefined.
+        if (!method) throw Object.assign(new Error(`No such PaymentMethod: '${id}'`), { code: "resource_missing", statusCode: 404 });
+        return method;
+      },
       detach: async (id: string) => {
         detached.push(id);
         return methods.get(id);
@@ -277,6 +282,15 @@ describe("buyer payment methods", () => {
     expect(result.status).toBe(403);
     expect(result.body.error).toBe("Not your payment method");
     expect(fakeStripe.detached).toEqual([]);
+  });
+
+  it("answers 404 (not 500) for a payment method id Stripe doesn't know", async () => {
+    const del = await request("/api/buyer/payment-methods/pm_missing", BUYER_ID, "DELETE");
+    expect(del).toEqual({ status: 404, body: { error: "Payment method not found" } });
+    const def = await request("/api/buyer/payment-methods/pm_missing/default", BUYER_ID, "POST");
+    expect(def).toEqual({ status: 404, body: { error: "Payment method not found" } });
+    expect(fakeStripe.detached).toEqual([]);
+    expect(fakeStripe.customerUpdates).toEqual([]);
   });
 
   it("starts a SetupIntent on the buyer's existing Stripe Customer", async () => {

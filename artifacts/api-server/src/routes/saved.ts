@@ -184,7 +184,7 @@ router.get("/:targetId/price-alert", async (req, res) => {
 
 router.put("/:targetId/price-alert", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { enabled } = req.body as { enabled?: unknown };
+  const { enabled } = (req.body ?? {}) as { enabled?: unknown };
   if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
   const [row] = await db.update(savedItems)
     .set({ notifyOnPriceDrop: enabled })

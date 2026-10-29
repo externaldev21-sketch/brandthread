@@ -12,8 +12,8 @@
  * (newest first). Split into a sitemap index when the catalogue gets there.
  */
 import { Router } from "express";
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
-import { db, drops, products, users } from "@workspace/db";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { db, drops, productLaunches, productSeo, products, users } from "@workspace/db";
 import { rateLimit } from "../middlewares/rateLimit";
 import { CANONICAL_WEB_ORIGIN } from "../lib/webOrigin";
 
@@ -42,10 +42,19 @@ export function renderSitemap(entries: Entry[], origin = CANONICAL_WEB_ORIGIN): 
 export async function sitemapEntries(): Promise<Entry[]> {
   const sellerOk = and(eq(users.accountType, "seller"), isNull(users.deletedAt), isNull(users.suspendedAt), isNull(users.deletionRequestedAt));
 
+  // Same product rules as routes/seo-public.ts: a scheduled product stays out
+  // until its launch, and the seller's "hide from search engines" (no_index)
+  // keeps it out of the sitemap.
   const productRows = await db.select({ id: products.id, updatedAt: products.updatedAt })
     .from(products)
     .innerJoin(users, eq(users.clerkId, products.ownerId))
-    .where(and(eq(products.status, "active"), isNull(products.deletedAt), sellerOk))
+    .leftJoin(productLaunches, eq(productLaunches.productId, products.id))
+    .leftJoin(productSeo, eq(productSeo.productId, products.id))
+    .where(and(
+      eq(products.status, "active"), isNull(products.deletedAt), sellerOk,
+      sql`(${productLaunches.productId} IS NULL OR ${productLaunches.launchedAt} IS NOT NULL OR ${productLaunches.launchAt} <= now())`,
+      sql`coalesce(${productSeo.noIndex}, false) = false`,
+    ))
     .orderBy(desc(products.updatedAt))
     .limit(SITEMAP_LIMITS.products);
 

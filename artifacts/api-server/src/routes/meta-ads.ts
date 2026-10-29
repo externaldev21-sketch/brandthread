@@ -490,7 +490,11 @@ export function dailySpendCentsFor(campaign: {
   return Math.round(campaign.budgetCents / days);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function findOwnedCampaign(id: string, owner: string) {
+  // ids are uuid columns: a malformed id is simply "not found", not a DB error.
+  if (!UUID_RE.test(id)) return null;
   const [row] = await db
     .select()
     .from(metaCampaigns)
@@ -680,6 +684,27 @@ router.patch("/campaigns/:id", express.json({ limit: "32kb" }), async (req, res)
     "primaryText", "headline", "ctaType", "destinationUrl", "mediaKind", "mediaObjectPaths",
     "budgetType", "budgetCents", "advantagePlus", "placements", "targetingSpec", "promoteRefId",
   ] as const;
+  // Same rules as POST /campaigns: a draft must stay launchable.
+  if (body.budgetCents !== undefined && (!Number.isInteger(body.budgetCents) || body.budgetCents <= 0)) {
+    res.status(400).json({ error: "budgetCents must be a positive whole number" });
+    return;
+  }
+  if (body.budgetType !== undefined && body.budgetType !== "daily" && body.budgetType !== "lifetime") {
+    res.status(400).json({ error: "budgetType must be daily or lifetime" });
+    return;
+  }
+  if (body.mediaKind !== undefined && body.mediaKind !== "video" && body.mediaKind !== "photos") {
+    res.status(400).json({ error: "mediaKind must be video or photos" });
+    return;
+  }
+  if (body.destinationUrl !== undefined && (typeof body.destinationUrl !== "string" || !body.destinationUrl)) {
+    res.status(400).json({ error: "destinationUrl is required" });
+    return;
+  }
+  if (body.mediaObjectPaths !== undefined && !Array.isArray(body.mediaObjectPaths)) {
+    res.status(400).json({ error: "mediaObjectPaths must be an array" });
+    return;
+  }
   const updates: Partial<typeof metaCampaigns.$inferInsert> = { updatedAt: new Date() };
   for (const key of editable) {
     if (body[key] !== undefined) (updates as any)[key] = body[key];

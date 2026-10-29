@@ -18,7 +18,7 @@ export function toCSV(rows: Record<string, unknown>[], fields: string[]): string
     if (v === null || v === undefined) return "";
     const raw = typeof v === "object" ? JSON.stringify(v) : String(v);
     const s = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
-    return s.includes(",") || s.includes('"') || s.includes("\n")
+    return s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")
       ? `"${s.replace(/"/g, '""')}"`
       : s;
   };
@@ -32,10 +32,10 @@ router.post("/", requireRole("owner"), async (req, res) => {
   const {
     format = "json",
     include = ["products", "orders", "customers"],
-  } = req.body as {
+  }: {
     format?: "json" | "csv";
     include?: ("products" | "orders" | "customers")[];
-  };
+  } = req.body ?? {};
   const allowed = new Set(["products", "orders", "customers"]);
   if (!["json", "csv"].includes(format) || !Array.isArray(include) || include.length === 0 || include.some((key) => !allowed.has(key))) {
     res.status(400).json({ error: "Choose a valid format and at least one export category" });

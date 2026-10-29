@@ -23,6 +23,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { broadcastToRoom, disconnectUserFromRoom } from "../ws/liveHub";
 import { clampSlowMode, normalizeBannedWords } from "../lib/liveModeration";
 import { loadEffectiveSettings } from "../lib/liveModerationState";
+import { logger } from "../lib/logger";
 import { cappedList, cappedUnknown, looseBody, validateBody } from "../middlewares/bodySchemas";
 
 const router = Router();
@@ -52,7 +53,11 @@ async function hostStream(req: Request, res: Response): Promise<{ id: string; se
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response) => {
-    fn(req, res).catch((e: any) => { if (!res.headersSent) res.status(500).json({ error: e?.message ?? "Server error" }); });
+    fn(req, res).catch((err: unknown) => {
+      // Never echo internal (e.g. database) error text to the client.
+      logger.error({ err }, "live moderation request failed");
+      if (!res.headersSent) res.status(500).json({ error: "Server error" });
+    });
   };
 }
 

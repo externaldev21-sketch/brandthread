@@ -42,9 +42,12 @@ export function accountsToKeep(callerId: string, signedInAccountIds: unknown): s
 // caller is kept — the previous hand-off behavior.
 router.post("/register", requireAuth, validateBody(registerPushBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { token, platform, accountIds, timezone } = req.body as { token: string; platform?: string; accountIds?: unknown; timezone?: unknown };
+  const { token, platform: rawPlatform, accountIds, timezone } = req.body as { token: unknown; platform?: unknown; accountIds?: unknown; timezone?: unknown };
 
-  if (!token) return res.status(400).json({ error: "token is required" });
+  // The schema only caps lengths: a non-string token (number, object) would
+  // reach the text column and make the insert throw (a 500).
+  if (typeof token !== "string" || !token) return res.status(400).json({ error: "token is required" });
+  const platform = typeof rawPlatform === "string" && rawPlatform ? rawPlatform : undefined;
 
   const keep = accountsToKeep(userId, accountIds);
   await db.delete(pushTokens).where(and(eq(pushTokens.token, token), notInArray(pushTokens.userId, keep)));
@@ -80,9 +83,9 @@ router.post("/register", requireAuth, validateBody(registerPushBody), async (req
 // Body: { token: string }
 router.delete("/deregister", requireAuth, validateBody(deregisterPushBody), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { token } = req.body as { token: string };
+  const { token } = req.body as { token: unknown };
 
-  if (!token) return res.status(400).json({ error: "token is required" });
+  if (typeof token !== "string" || !token) return res.status(400).json({ error: "token is required" });
 
   await db
     .delete(pushTokens)

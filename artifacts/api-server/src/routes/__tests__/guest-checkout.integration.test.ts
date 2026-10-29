@@ -221,8 +221,9 @@ describe("guest checkout", () => {
         .where(eq(checkoutSessions.stripeSessionId, result.body.sessionId)).limit(1);
       expect(stored.discountCodeId).toBe(`dc_${suffix}`);
       expect(stored.discountCodeAmountCents).toBe(500);
-      // 5% of the discounted $20, not of $25: the code lowers the fee basis.
-      expect(stored.platformFeeCents).toBe(100);
+      // 5% of the discounted $20 plus the $5.99 standard shipping (no rate
+      // configured → lib/defaultShipping.ts), not of $25: the code lowers the fee basis.
+      expect(stored.platformFeeCents).toBe(130);
 
       const bad = await post("/api/guest/checkout/session", {
         items: [{ productId, variantId, quantity: 1 }],

@@ -90,7 +90,9 @@ async function postsForPlace(placeId: string, sort: SortMode, cursorRaw: string 
   if (sort === "recent" && cursor) {
     const [ts, id] = cursor.split("|");
     const at = new Date(ts);
-    if (!Number.isNaN(at.getTime()) && id) {
+    // posts.id is a uuid column: a tampered cursor id must be ignored, not
+    // sent to Postgres (where it throws and the page 500s).
+    if (!Number.isNaN(at.getTime()) && isUuid(id)) {
       where.push(or(lt(posts.createdAt, at), and(eq(posts.createdAt, at), lt(posts.id, id)))!);
     }
   } else if (sort === "top" && cursor?.startsWith("o")) {

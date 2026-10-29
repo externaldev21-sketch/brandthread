@@ -8,8 +8,9 @@ import { Router } from "express";
 import { db, freelancers, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { getWebOrigin } from "../lib/webOrigin";
+import { allowedWebOrigins, getWebOrigin } from "../lib/webOrigin";
 import { requireStripe } from "../lib/stripe";
+import { allowListedRedirect } from "../lib/connectOnboarding";
 
 const router = Router();
 
@@ -37,7 +38,8 @@ router.use(requireAuth);
  * Initiates Stripe Connect Express onboarding for the authenticated freelancer.
  * Reuses the user's existing seller Connect account when one exists (one
  * Express account per person); otherwise creates a new account.
- * Body (optional): { refreshUrl, returnUrl }
+ * Body (optional): { refreshUrl, returnUrl } — only https URLs on
+ * Brandthread's own allow-listed origins (same rule as seller Connect).
  */
 router.post("/onboard", async (req, res) => {
   try {
@@ -48,10 +50,21 @@ router.post("/onboard", async (req, res) => {
     // Dev proxy forwards /api/* verbatim to this server (previewPath /api);
     // the domain root is the correct public base for building /api/... URLs.
     const baseUrl = getWebOrigin("https://localhost:3000");
-    const {
-      refreshUrl = `${baseUrl}/api/freelancers/connect/onboard/refresh`,
-      returnUrl = `${baseUrl}/api/freelancers/connect/onboard/return`,
-    } = req.body ?? {};
+    const urls = {
+      refreshUrl: `${baseUrl}/api/freelancers/connect/onboard/refresh`,
+      returnUrl: `${baseUrl}/api/freelancers/connect/onboard/return`,
+    };
+    const body = (req.body ?? {}) as { refreshUrl?: unknown; returnUrl?: unknown };
+    for (const key of ["refreshUrl", "returnUrl"] as const) {
+      if (body[key] === undefined) continue;
+      const safe = allowListedRedirect(body[key], allowedWebOrigins());
+      if (!safe) {
+        res.status(400).json({ error: `${key} must be an https URL on a Brandthread origin` });
+        return;
+      }
+      urls[key] = safe;
+    }
+    const { refreshUrl, returnUrl } = urls;
 
     const [freelancer] = await db
       .select({ id: freelancers.id, stripeAccountId: freelancers.stripeAccountId })
@@ -86,7 +99,12 @@ router.post("/onboard", async (req, res) => {
           })
           .where(eq(freelancers.userId, clerkUserId));
       } else {
-        const account = await stripe.accounts.create({ type: "express" });
+        // The idempotency key makes concurrent first taps resolve to one
+        // account instead of minting an orphan Express account per tap.
+        const account = await stripe.accounts.create(
+          { type: "express" },
+          { idempotencyKey: `freelancer-connect-express-${clerkUserId}` },
+        );
         stripeAccountId = account.id;
         await db
           .update(freelancers)

@@ -34,6 +34,9 @@ const CASE_TRANSITIONS: Record<string, readonly string[]> = {
   actioned: [],
 };
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// ip_cases.id and products.id are uuid columns; a malformed id must 400/404,
+// not reach Postgres and 500.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 const publicCase = (c: typeof ipCases.$inferSelect) => ({
   caseReference: c.publicReference, status: c.status, rightsType: c.rightsType,
@@ -97,6 +100,9 @@ router.post("/", rateLimit("report"), async (req, res) => {
   }
   if (listingUrl && (listingUrl.length > 2048 || !/^https?:\/\//i.test(listingUrl))) {
     return res.status(400).json({ error: "listingUrl must be an http(s) URL" });
+  }
+  if (listingProductId !== null && !UUID_RE.test(listingProductId)) {
+    return res.status(400).json({ error: "Invalid listing target" });
   }
   const notice = validateNotice(body);
   if (!notice.ok) return res.status(400).json({ error: notice.error });
@@ -204,6 +210,11 @@ router.post("/seller/:reference/counter-notice", requireAuth, rateLimit("report"
 });
 
 router.use(requireAuth, requireModerator);
+// Every remaining `:id` is an ip_cases uuid (runs after the moderator gate above).
+router.param("id", (req, res, next, id) => {
+  if (!UUID_RE.test(String(id))) { res.status(404).json({ error: "Case not found" }); return; }
+  next();
+});
 router.get("/access", (_req, res) => {
   return res.json({ moderator: true });
 });

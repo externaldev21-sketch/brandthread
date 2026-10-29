@@ -19,6 +19,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isBlockedEitherWay, optionalViewerId } from "../lib/safety";
 import { resolveToClerkId } from "./public";
@@ -108,8 +109,10 @@ router.get("/by-seller/:sellerId", async (req, res) => {
       // recorded, so an empty shelf means "replays not enabled", not "none yet".
       recordingEnabled: isReplayRecordingConfigured(),
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live replays request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -130,8 +133,10 @@ router.get("/:streamId", async (req, res) => {
     // co-host products), at today's price, only while the replay is current.
     const products = replay.expired ? [] : await replayProducts(row);
     return res.json({ replay: { ...replay, products } });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live replays request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -173,8 +178,10 @@ router.patch("/:streamId", requireAuth, validateBody(replayVisibilityBody), asyn
       `);
     }
     return res.json({ ok: true, visibility });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live replays request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -193,8 +200,10 @@ router.delete("/:streamId", requireAuth, async (req, res) => {
       WHERE id = ${row.replay_post_id}::uuid AND user_id = ${userId}
     `);
     return res.json({ ok: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live replays request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 

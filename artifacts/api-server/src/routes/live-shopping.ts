@@ -12,6 +12,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isBlockedEitherWay, optionalViewerId } from "../lib/safety";
 import { broadcastToRoom } from "../ws/liveHub";
@@ -33,8 +34,10 @@ router.get("/:id/bag", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
     return res.json({ products: bag.products });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live shopping request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -80,8 +83,10 @@ router.put("/:id/cohost/products", requireAuth, async (req, res) => {
     const bag = await loadLiveBag(id);
     broadcastToRoom(id, { type: "bag", products: bag?.products ?? [] });
     return res.json({ products: bag?.products ?? [] });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live shopping request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -102,8 +107,10 @@ router.get("/:id/activity", async (req, res) => {
       }
     }
     return res.json({ activity: await listLiveActivity(id, since) });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live shopping request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 

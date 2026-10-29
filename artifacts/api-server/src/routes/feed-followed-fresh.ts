@@ -31,6 +31,7 @@ import { matchesMutedWords } from "../lib/contentModerator";
 import { locationsByPlaceId } from "../lib/places";
 import { attachQuoteData } from "../lib/quotedPosts";
 import { interleaveByAuthor, parseFollowedFreshQuery } from "../lib/followedFresh";
+import { taggedProductVisibleTo } from "../lib/productVisibility";
 
 const router = Router();
 
@@ -121,7 +122,9 @@ router.get("/followed-fresh", requireAuth, async (req, res) => {
         })
         .from(postTaggedProducts)
         .leftJoin(products, eq(products.id, postTaggedProducts.productId))
-        .where(inArray(postTaggedProducts.postId, postIds))
+        // Same rule as /api/posts/feed: a deleted, draft or archived product is
+        // not shown as a shoppable tag (unless it is the viewer's own).
+        .where(and(inArray(postTaggedProducts.postId, postIds), taggedProductVisibleTo(viewerId)))
         .orderBy(postTaggedProducts.position),
       countBy("like"),
       countBy("repost"),

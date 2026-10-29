@@ -46,8 +46,9 @@ router.get("/", async (req, res) => {
       counts[row.owner_resource] = row.count;
     }
     return res.json({ counts });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    req.log?.error?.({ err: e }, "Metafield request failed");
+    return res.status(500).json({ error: "Something went wrong with custom fields. Try again." });
   }
 });
 
@@ -66,8 +67,9 @@ router.get("/:resource", async (req, res) => {
       ORDER BY pinned DESC, created_at ASC
     `);
     return res.json({ definitions: rows.rows });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    req.log?.error?.({ err: e }, "Metafield request failed");
+    return res.status(500).json({ error: "Something went wrong with custom fields. Try again." });
   }
 });
 
@@ -82,7 +84,7 @@ router.post("/", async (req, res) => {
     type = "single_line_text_field",
     description,
     pinned = false,
-  } = req.body;
+  } = (req.body ?? {}) as Record<string, any>;
 
   if (!ownerResource || typeof key !== "string" || typeof name !== "string" || !key.trim() || !name.trim()) {
     return res.status(400).json({ error: "ownerResource, key, and name are required" });
@@ -99,6 +101,12 @@ router.post("/", async (req, res) => {
   if (typeof namespace !== "string" || !KEY_RE.test(namespace)) {
     return res.status(400).json({ error: "Invalid namespace" });
   }
+  if (description !== undefined && description !== null && typeof description !== "string") {
+    return res.status(400).json({ error: "Invalid description" });
+  }
+  if (typeof pinned !== "boolean") {
+    return res.status(400).json({ error: "Invalid pinned" });
+  }
 
   try {
     const result = await db.execute(sql`
@@ -114,8 +122,9 @@ router.post("/", async (req, res) => {
       RETURNING *
     `);
     return res.status(201).json({ definition: result.rows[0] });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    req.log?.error?.({ err: e }, "Metafield request failed");
+    return res.status(500).json({ error: "Something went wrong with custom fields. Try again." });
   }
 });
 
@@ -149,8 +158,9 @@ router.patch("/:id", async (req, res) => {
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Not found" });
     return res.json({ definition: result.rows[0] });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    req.log?.error?.({ err: e }, "Metafield request failed");
+    return res.status(500).json({ error: "Something went wrong with custom fields. Try again." });
   }
 });
 
@@ -166,8 +176,9 @@ router.delete("/:id", async (req, res) => {
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Not found" });
     return res.json({ ok: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    req.log?.error?.({ err: e }, "Metafield request failed");
+    return res.status(500).json({ error: "Something went wrong with custom fields. Try again." });
   }
 });
 

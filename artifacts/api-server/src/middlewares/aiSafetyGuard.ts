@@ -45,10 +45,16 @@ const IMAGE_KEYS = new Set(["b64_json", "image_b64", "imageBase64", "imageB64"])
 const CHAT_TEXT_KEYS = new Set(["message", "content", "text", "prompt", "query", "question"]);
 const MAX_IMAGES = 8;
 
+/**
+ * A data URI, a bare URL or a long base64 blob: not something a person typed.
+ * Only whole-string URLs / data URIs count (a prompt that merely starts with a
+ * link is still text), and a long unbroken run counts only in the base64
+ * alphabet, so CJK prompts (no spaces) are still scanned.
+ */
 function looksBinary(s: string): boolean {
-  if (s.startsWith("data:")) return true;
-  if (/^https?:\/\//i.test(s)) return true;
-  return s.length > 600 && !/\s/.test(s.slice(0, 600));
+  const t = s.trim();
+  if ((t.startsWith("data:") || /^https?:\/\//i.test(t)) && !/\s/.test(t)) return true;
+  return t.length > 600 && /^[A-Za-z0-9+/=_-]+$/.test(t.slice(0, 600));
 }
 
 /** All human-written strings in a JSON body (media mode). */
