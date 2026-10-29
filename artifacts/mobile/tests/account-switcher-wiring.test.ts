@@ -37,4 +37,16 @@ describe('AccountSwitcherSheet wiring', () => {
   it('counts only this device\'s real, active Clerk sessions', () => {
     expect(screen).toContain("session.status === 'active' && session.user");
   });
+
+  it('never lists sample/demo accounts — preview included', () => {
+    expect(screen).not.toContain('isPreviewDemoMode');
+    expect(screen).not.toMatch(/@ava|atelier\.noire|preview-seller|preview-buyer/);
+    const provider = readFileSync(resolve(import.meta.dirname, '../contexts/QuickAccountSwitchContext.tsx'), 'utf8');
+    expect(provider).not.toMatch(/PREVIEW_ACCOUNTS|@ava|atelier\.noire|setDevWebPreviewRole/);
+  });
+
+  it('switches through the shared covered transition, not a bare setActive', () => {
+    expect(screen).toContain('switchAccount({');
+    expect(screen).not.toMatch(/await setActive\(\{ session: account\.id \}\);\n\s*onClose\(\)/);
+  });
 });

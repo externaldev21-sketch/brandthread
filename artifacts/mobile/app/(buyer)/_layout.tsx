@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, usePathname } from 'expo-router';
 import { RetainedScene } from '@/components/RetainedScene';
 import { TabScenePreloader } from '@/components/navigation/TabScenePreloader';
+import { useAccountSwitchKey } from '@/lib/accountScope';
 import { GuestRouteBoundary } from '@/components/GuestRouteBoundary';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -52,6 +53,7 @@ function BuyerTabLayout() {
   const inboxBadgeCount = dmBadgeCount + communityBadgeCount;
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  const accountSwitchKey = useAccountSwitchKey();
 
   // Blurry-text fix: drop the slide's `transform` once a tab switch has
   // settled, so the resting (focused) screen's full-screen wrapper carries
@@ -131,6 +133,11 @@ function BuyerTabLayout() {
 
   return (
     <Tabs
+      // A fresh navigator per signed-in account: an account switch mounts the
+      // new account's screens (each with its own loading state) behind the
+      // switch cover instead of re-rendering the old account's retained
+      // scenes with the new user — see lib/accountScope.ts.
+      key={accountSwitchKey}
       // Back retraces the tabs actually visited. The default ('firstRoute')
       // sent every back from a tab-level screen (Analytics, Edit profile,
       // Bag, Inbox…) to Home/Dashboard instead of the tab it was opened

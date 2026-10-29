@@ -194,14 +194,30 @@ export function useScreenInteractive(screen: string, ready: boolean = true): voi
   const doneRef = useRef(false);
   useEffect(() => {
     if (!ready || doneRef.current) return;
-    // Store builds only take the cold-start reading; later screens skip all work.
-    if (!PERF_MARKS && !canBeFirstScreen(mountedAt)) return;
+    // Store builds only take the cold-start reading; later screens skip all
+    // work unless an account switch is waiting for its home screen.
+    const measure = PERF_MARKS || canBeFirstScreen(mountedAt);
+    if (!measure && screenReadyListeners.size === 0) return;
     return afterContentFrameAndInteractions((at) => {
       if (doneRef.current) return;
       doneRef.current = true;
-      recordScreenInteractive(screen, mountedAt, at);
+      if (measure) recordScreenInteractive(screen, mountedAt, at);
+      screenReadyListeners.forEach((listener) => listener(screen));
     });
   }, [ready, screen, mountedAt]);
+}
+
+const screenReadyListeners = new Set<(screen: string) => void>();
+
+/**
+ * Called with a screen's `useScreenInteractive` name once it is on screen
+ * with its first content (or skeleton) painted. Used by the account switch
+ * (lib/accountSwitchTransition.ts) to reveal the new account's home only
+ * when it has painted, never a half-mounted frame.
+ */
+export function subscribeScreenInteractive(listener: (screen: string) => void): () => void {
+  screenReadyListeners.add(listener);
+  return () => { screenReadyListeners.delete(listener); };
 }
 
 /**

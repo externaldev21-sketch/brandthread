@@ -3,6 +3,7 @@ import { getIconFontBootReady, getIconFontServerReady, subscribeIconFonts } from
 import { AffiliateRefCapture } from '@/components/AffiliateRefCapture';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
+import { markAccountScope } from '@/lib/accountScope';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart, recordShellInteractive } from '@/lib/perf';
 import { focusedNavigationKey, markNavigationCommit, markNavigationDispatch, markNavigationInput } from '@/lib/navigation/navigationTrace';
@@ -1240,6 +1241,10 @@ function ServiceConfigurer() {
     initProductService(newUserId);
     initOrderService(newUserId);
     initAnalyticsService(newUserId);
+    // Last: every cache above now reads as this account. The tab shells
+    // re-key on it and the account-switch cover waits for it
+    // (lib/accountScope.ts, lib/accountSwitchTransition.ts).
+    markAccountScope(newUserId);
 
     if (!newUserId || !isSignedIn) return;
     return runAfterFirstPaint(() => {

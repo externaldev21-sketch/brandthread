@@ -10,15 +10,18 @@
  * instead.
  *
  * The switch itself is the same Clerk multi-session `setActive` the sheet
- * uses. Around it, the app content fades through the background colour
- * (so the buyer -> seller shell swap, or one account's data replacing
- * another's, never shows as a flash), the app lands on the new account's
- * home — the seller Dashboard for a seller account, Threads for a buyer —
- * and a small toast shows the new account's avatar and @handle.
+ * uses, and the sheet's own row taps run through `switchAccount` here too,
+ * so both get the same transition (lib/accountSwitchTransition.ts): the app
+ * content is covered by the background colour, which stays up until the new
+ * account's caches are scoped and its home — the seller Dashboard for a
+ * seller account, Threads for a buyer — has painted, so a half-mounted
+ * shell or the old account's screens with the new account's (still empty)
+ * data never show. A small toast then shows the new account's avatar and
+ * @handle.
  *
- * Preview mode (`?bt_preview=…`, no real Clerk session) mirrors the sheet's
- * own two demo accounts (@ava, buyer; @atelier.noire, seller) and switches by
- * flipping the preview role.
+ * Only accounts actually signed in on this device are ever switched to.
+ * Preview mode (`?bt_preview=…`) has no real Clerk session, so a hold there
+ * opens the sheet, which leads straight to Add account.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
@@ -37,16 +40,42 @@ import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { getHandle } from '@/lib/accountSwitcherHelpers';
-import { isBuyerDevPreview, isSellerDevPreview, setDevWebPreviewRole } from '@/lib/devPreview';
+import { getAccountScope, subscribeAccountScope } from '@/lib/accountScope';
+import {
+  SWITCH_COVER_IN_MS,
+  SWITCH_COVER_OUT_MS,
+  runAccountSwitch,
+  type AccountKind,
+  type AccountSwitchResult,
+} from '@/lib/accountSwitchTransition';
 import { pickNextAccount } from '@/lib/holdToSwitch';
+import { prefetchRouteCode } from '@/lib/navigation/routeWarmup';
+import { subscribeScreenInteractive } from '@/lib/perf';
 import { FONT, MEDIA } from '@/lib/theme';
+
+export type SwitchAccountRequest = {
+  /** Makes the account active (Clerk setActive, or a same-login sign-in). */
+  activate: () => Promise<void>;
+  /** Clerk user id being switched to, when known. */
+  userId: string | null;
+  kind: AccountKind;
+  handle: string;
+  avatarUri: string | null;
+};
 
 type QuickSwitchContextValue = {
   /** Run on a completed hold: switch to the next account, or open the sheet. */
   quickSwitch: () => void;
+  /** Switch accounts behind the cover; resolves when the new account shows. */
+  switchAccount: (request: SwitchAccountRequest) => Promise<AccountSwitchResult>;
 };
 
-const QuickSwitchContext = createContext<QuickSwitchContextValue>({ quickSwitch: () => {} });
+const QuickSwitchContext = createContext<QuickSwitchContextValue>({
+  quickSwitch: () => {},
+  switchAccount: async (request) => {
+    try { await request.activate(); return 'switched'; } catch { return 'failed'; }
+  },
+});
 
 export function useQuickAccountSwitch() {
   return useContext(QuickSwitchContext);
@@ -54,13 +83,6 @@ export function useQuickAccountSwitch() {
 
 type AccountInfo = { accountType: 'buyer' | 'seller' | null; username: string | null; avatarUrl: string | null };
 
-const PREVIEW_ACCOUNTS = {
-  buyer: { handle: '@ava', avatarUri: null as string | null },
-  seller: { handle: '@atelier.noire', avatarUri: null as string | null },
-};
-
-const VEIL_IN_MS = 110;
-const VEIL_OUT_MS = 220;
 const TOAST_MS = 1800;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -105,50 +127,50 @@ export function QuickAccountSwitchProvider({ children }: { children: React.React
     ));
   }, [toastShown]);
 
+  const switchAccount = useCallback(async (request: SwitchAccountRequest): Promise<AccountSwitchResult> => {
+    if (busy.current) return 'failed';
+    busy.current = true;
+    try {
+      const result = await runAccountSwitch({ userId: request.userId, kind: request.kind }, {
+        cover: () => {
+          veil.set(withTiming(1, { duration: SWITCH_COVER_IN_MS }));
+          return wait(SWITCH_COVER_IN_MS);
+        },
+        uncover: () => veil.set(withDelay(60, withTiming(0, { duration: SWITCH_COVER_OUT_MS }))),
+        activate: request.activate,
+        navigate: (route) => router.replace(route as never),
+        warmRoute: prefetchRouteCode,
+        getScope: getAccountScope,
+        subscribeScope: subscribeAccountScope,
+        subscribeScreenReady: subscribeScreenInteractive,
+      });
+      if (result !== 'failed') showToast(request.handle, request.avatarUri);
+      return result;
+    } finally {
+      busy.current = false;
+    }
+  }, [router, showToast, veil]);
+
   const quickSwitch = useCallback(async () => {
     if (busy.current) return;
-    const isPreview = isBuyerDevPreview() || isSellerDevPreview();
-
-    if (isPreview) {
-      busy.current = true;
-      const next = isSellerDevPreview() ? 'buyer' : 'seller';
-      veil.set(withTiming(1, { duration: VEIL_IN_MS }));
-      await wait(VEIL_IN_MS);
-      setDevWebPreviewRole(next);
-      try { localStorage.setItem('user_role', next); } catch { /* storage off */ }
-      router.replace((next === 'seller' ? '/(tabs)/?bt_preview=seller' : '/(buyer)/?bt_preview=buyer') as never);
-      showToast(PREVIEW_ACCOUNTS[next].handle, PREVIEW_ACCOUNTS[next].avatarUri);
-      veil.set(withDelay(60, withTiming(0, { duration: VEIL_OUT_MS })));
-      busy.current = false;
-      return;
-    }
-
+    // Only real sessions on this device: none other (including preview,
+    // which has no Clerk session at all) opens the sheet, which then leads
+    // straight to Add account.
     const next = pickNextAccount(activeSessions, sessionId);
     if (!next || !setActive) {
       setSheetOpen(true);
       return;
     }
-    busy.current = true;
     const nextUser = next.user!;
     const nextInfo = info[nextUser.id];
-    veil.set(withTiming(1, { duration: VEIL_IN_MS }));
-    await wait(VEIL_IN_MS);
-    try {
-      await setActive({ session: next.id });
-    } catch {
-      veil.set(withTiming(0, { duration: VEIL_OUT_MS }));
-      busy.current = false;
-      return;
-    }
-    // Land on the new account's home. Unknown type (the lookup failed):
-    // "/" lets AuthGate route by the account's own stored role.
-    const home = nextInfo?.accountType === 'seller' ? '/(tabs)/' : nextInfo?.accountType === 'buyer' ? '/(buyer)/' : '/';
-    router.replace(home as never);
-    showToast(getHandle(nextUser, nextInfo?.username), nextInfo?.avatarUrl ?? nextUser.imageUrl ?? null);
-    // One frame for the new shell to paint under the veil, then fade it out.
-    requestAnimationFrame(() => veil.set(withDelay(60, withTiming(0, { duration: VEIL_OUT_MS }))));
-    busy.current = false;
-  }, [activeSessions, info, router, sessionId, setActive, showToast, veil]);
+    await switchAccount({
+      activate: () => setActive({ session: next.id }),
+      userId: nextUser.id,
+      kind: nextInfo?.accountType ?? null,
+      handle: getHandle(nextUser, nextInfo?.username),
+      avatarUri: nextInfo?.avatarUrl ?? nextUser.imageUrl ?? null,
+    });
+  }, [activeSessions, info, sessionId, setActive, switchAccount]);
 
   const veilStyle = useAnimatedStyle(() => ({ opacity: veil.value }));
   const toastStyle = useAnimatedStyle(() => ({
@@ -156,7 +178,10 @@ export function QuickAccountSwitchProvider({ children }: { children: React.React
     transform: [{ translateY: (1 - toastShown.value) * -8 }],
   }));
 
-  const value = useMemo(() => ({ quickSwitch: () => { void quickSwitch(); } }), [quickSwitch]);
+  const value = useMemo(() => ({
+    quickSwitch: () => { void quickSwitch(); },
+    switchAccount,
+  }), [quickSwitch, switchAccount]);
 
   return (
     <QuickSwitchContext.Provider value={value}>
