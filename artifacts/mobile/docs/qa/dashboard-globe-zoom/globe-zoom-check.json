@@ -1,0 +1,302 @@
+{
+ "cardSteps": [
+  {
+   "step": "default",
+   "zoom": 1,
+   "labels": [],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "1-borders",
+   "zoom": 1.73,
+   "labels": [
+    "Canada",
+    "United States",
+    "Mexico"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "2-country-labels",
+   "zoom": 2.27,
+   "labels": [
+    "Canada",
+    "United States",
+    "Mexico",
+    "Cuba"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "3-states",
+   "zoom": 4.16,
+   "labels": [
+    "Québec",
+    "Ontario",
+    "Texas",
+    "Manitoba",
+    "SK",
+    "Montana",
+    "NM",
+    "Colorado",
+    "Wyoming",
+    "Michigan",
+    "Minnesota",
+    "Kansas",
+    "Nebraska",
+    "SD",
+    "ND",
+    "Oklahoma",
+    "Georgia",
+    "Florida",
+    "Iowa",
+    "AR",
+    "New York",
+    "North Carolina",
+    "MS",
+    "PA",
+    "Ohio",
+    "TN",
+    "Virginia",
+    "IN",
+    "BHS"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "4-states-close",
+   "zoom": 7.89,
+   "labels": [
+    "Michigan",
+    "Minnesota",
+    "Kansas",
+    "Missouri",
+    "Oklahoma",
+    "Wisconsin",
+    "Georgia",
+    "Illinois",
+    "Iowa",
+    "Arkansas",
+    "Alabama",
+    "MS",
+    "Ohio",
+    "Tennessee",
+    "Kentucky",
+    "Indiana"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "5-northeast",
+   "zoom": 15.83,
+   "labels": [
+    "New York",
+    "Maine",
+    "Vermont",
+    "NH",
+    "Massachusetts",
+    "NJ",
+    "CT",
+    "DE"
+   ],
+   "overlaps": [],
+   "cut": []
+  }
+ ],
+ "cardDots": {
+  "checked": 2,
+  "white": 2,
+  "sample": [
+   {
+    "city": "New York",
+    "rgb": [
+     238,
+     240,
+     244
+    ]
+   },
+   {
+    "city": "Brooklyn",
+    "rgb": [
+     239,
+     241,
+     245
+    ]
+   }
+  ]
+ },
+ "verticalDrag": {
+  "pitchChange": 0.031,
+  "pageScrolled": false
+ },
+ "fps": {
+  "frames": 150,
+  "avgFps": 60,
+  "p95FrameMs": 16.7
+ },
+ "fpsCountryLevel": {
+  "zoom": 1.48,
+  "rotatingRad": 0.074,
+  "avgFps": 59.3,
+  "p95FrameMs": 16.8
+ },
+ "backOut": {
+  "zoom": 1,
+  "labels": [],
+  "overlaps": [],
+  "cut": []
+ },
+ "pinch": {
+  "from": 1,
+  "to": 2
+ },
+ "fullSteps": [
+  {
+   "step": "default",
+   "zoom": 1,
+   "labels": [],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "1-borders",
+   "zoom": 1.73,
+   "labels": [
+    "Canada",
+    "United States",
+    "Mexico"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "2-country-labels",
+   "zoom": 2.27,
+   "labels": [
+    "Canada",
+    "United States",
+    "Mexico",
+    "CRI",
+    "Cuba"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "3-states",
+   "zoom": 4.16,
+   "labels": [
+    "Québec",
+    "Ontario",
+    "Texas",
+    "Manitoba",
+    "SK",
+    "Montana",
+    "NM",
+    "Colorado",
+    "Wyoming",
+    "Michigan",
+    "Minnesota",
+    "Utah",
+    "Kansas",
+    "Nebraska",
+    "SD",
+    "ND",
+    "Oklahoma",
+    "Georgia",
+    "Florida",
+    "Iowa",
+    "AR",
+    "New York",
+    "North Carolina",
+    "MS",
+    "PA",
+    "Ohio",
+    "TN",
+    "Virginia",
+    "IN",
+    "BHS"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "4-states-close",
+   "zoom": 7.89,
+   "labels": [
+    "Michigan",
+    "Minnesota",
+    "Kansas",
+    "Missouri",
+    "Oklahoma",
+    "Wisconsin",
+    "Georgia",
+    "Illinois",
+    "Iowa",
+    "Arkansas",
+    "Alabama",
+    "MS",
+    "Ohio",
+    "Tennessee",
+    "Kentucky",
+    "Indiana"
+   ],
+   "overlaps": [],
+   "cut": []
+  },
+  {
+   "step": "5-northeast",
+   "zoom": 15.83,
+   "labels": [
+    "New York",
+    "Pennsylvania",
+    "Virginia",
+    "Maryland",
+    "Vermont",
+    "NH",
+    "Massachusetts",
+    "NJ",
+    "CT",
+    "DE"
+   ],
+   "overlaps": [],
+   "cut": []
+  }
+ ],
+ "fullDots": {
+  "checked": 3,
+  "white": 3,
+  "sample": [
+   {
+    "city": "New York",
+    "rgb": [
+     242,
+     243,
+     246
+    ]
+   },
+   {
+    "city": "Toronto",
+    "rgb": [
+     255,
+     255,
+     255
+    ]
+   },
+   {
+    "city": "Brooklyn",
+    "rgb": [
+     245,
+     246,
+     248
+    ]
+   }
+  ]
+ },
+ "errors": []
+}

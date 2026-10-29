@@ -28,6 +28,15 @@ export const GLOBE_COLORS = {
   core: '#FFFFFF',
   /** Outer edge of the halo gradient. */
   clear: 'rgba(0,0,0,0)',
+  /**
+   * Zoom detail (lib/liveMap/globeDetail.ts), as "r,g,b" for per-use alpha:
+   * borders are fine graphite hairlines etched into the silver land; labels
+   * are near-black ink with a soft silver halo, so they read on land and,
+   * for small islands, on the black sea.
+   */
+  borderRgb: '10,11,13',
+  labelInkRgb: '12,13,15',
+  labelHaloRgb: '214,217,222',
   /** Captions and popover meta on the black frame. */
   mutedText: '#9A9CA1',
   text: '#D9DBDF',
