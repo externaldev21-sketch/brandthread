@@ -36,6 +36,7 @@
       "distribution": "store",
       "environment": "production",
       "channel": "production",
+      "pnpm": "10.26.1",
       "ios": {
         "image": "latest",
         "autoIncrement": "buildNumber"
