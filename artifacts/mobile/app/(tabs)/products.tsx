@@ -68,13 +68,12 @@ import { queryKeys } from '@/lib/queryClient';
 
 import { prefetchOnPressIn } from '@/lib/prefetch';
 
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 import { DEFAULT_PRODUCT_SORT, PRODUCT_SORT_OPTIONS, productSortLabel, productSortQuery, type ProductSortKey } from '@/lib/sellerLists/productSort';
 
 import { productEmptyCopy } from '@/lib/sellerLists/emptyCopy';
 
-import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
 import { previewSalesFlags, type SalesFlagMap } from '@/lib/productSalesFlags';
 import { getProductSalesFlags } from '@/services/productSalesFlagsService';
 
@@ -1081,12 +1080,7 @@ export default function ProductsScreen() {
         onClose={() => setStockEditVisible(false)}
         onChanged={handleStockChanged}
       />
-      <FirstRunTip
-        id="seller-products"
-        variant="gesture"
-        contentReady={!loading}
-        gesture={{ ...SELLER_PRODUCTS_GESTURE, target: firstProductRect }}
-      />
+      <ScreenExplainer id="seller-products" contentReady={!loading} />
     </View>
   );
 }

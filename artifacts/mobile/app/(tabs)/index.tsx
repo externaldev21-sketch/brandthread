@@ -15,6 +15,7 @@ import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { SELLER_DASHBOARD_STEPS } from '@/lib/firstRunTips/content';
 import { useScreenInteractive } from '@/lib/perf';
+import { useRouteIsFocused } from '@/hooks/useRouteIsFocused';
 
 const DEFAULT_SETUP: SetupState = {
   started: false,
@@ -37,6 +38,9 @@ const DEFAULT_SETUP: SetupState = {
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const headerTopInset = useHeaderTopInset();
+  // The tour gives up the first-run slot when the seller switches tabs, so
+  // the next screen's explainer isn't blocked by a tour no one can see.
+  const focused = useRouteIsFocused();
   // First-run tour targets, one per SELLER_DASHBOARD_STEPS step. Step 1 is
   // screen-level copy (centered card). Step 3 describes the tab bar's side
   // circles, which are out of scope to instrument, so it stays centered.
@@ -111,6 +115,7 @@ export default function SellerHomeScreen() {
         id="seller-dashboard"
         variant="anchored"
         contentReady={!loading}
+        suppressed={!focused}
         anchored={{ steps: SELLER_DASHBOARD_STEPS, targets: dashboardTipTargets }}
       />
     </View>

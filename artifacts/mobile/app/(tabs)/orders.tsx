@@ -96,10 +96,9 @@ import { groupByLocalDate } from '@/lib/groupByLocalDate';
 import { groupOrdersByRecency } from '@/lib/groupOrdersByRecency';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
+import { tipTargetProps } from '@/components/first-run-tips/tipTargets';
 
-import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 import { readSellerOrdersCache, saveSellerOrdersCache } from '@/lib/sellerOrdersCache';
 
 import { useRealtimeEvents } from '@/lib/realtime/conversationRealtime';
@@ -1237,7 +1236,6 @@ export default function OrdersScreen() {
   }), []);
 
   const selectionMode = selectedIds.length > 0;
-  const sellerOrdersTipTarget = useTipTarget('seller-orders');
   const renderItem = useCallback(({ item }: { item: OrderListItem }) => {
     if (item.type === 'header') {
       return (
@@ -1441,12 +1439,7 @@ export default function OrdersScreen() {
         onSelect={handleBulkOption}
       />
 
-      <FirstRunTip
-        id="seller-orders"
-        variant="gesture"
-        contentReady={!loading}
-        gesture={{ ...SELLER_ORDERS_GESTURE, target: sellerOrdersTipTarget }}
-      />
+      <ScreenExplainer id="seller-orders" contentReady={!loading} />
     </View>
   );
 

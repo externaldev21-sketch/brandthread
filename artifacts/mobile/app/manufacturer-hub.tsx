@@ -15,6 +15,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -252,6 +253,7 @@ export default function ManufacturerHub() {
           router.push('/subscription' as never);
         }}
       />
+      <ScreenExplainer id="explain-manufacturer-hub" suppressed={upsellVisible || !!section} />
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import { haptics, haptic } from '@/lib/haptics';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 /**
  * Brandthread bag — SSENSE's Shopping bag flow 1:1, reskinned
@@ -89,9 +90,7 @@ import { useSignInGate } from '@/hooks/useSignInGate';
 
 import { formatCents } from '@/lib/money';
 
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 
-import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
 import { GroupShippingLine } from '@/components/cart/GroupShippingLine';
 import { StockLimitNote } from '@/components/cart/StockLimitNote';
 import { useBagShippingRates } from '@/hooks/useBagShippingRates';
@@ -843,6 +842,7 @@ export default function CartScreen() {
           onConfirm={handleConfirmVariant}
         />
       )}
+      <ScreenExplainer id="explain-bag" />
     </View>
   );
 }

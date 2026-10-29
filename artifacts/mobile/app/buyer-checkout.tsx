@@ -128,8 +128,7 @@ import { CheckoutNotLive } from '@/components/checkout/CheckoutNotLive';
 import { useCheckoutLive } from '@/lib/checkoutLive';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getLiveCheckoutContext } from '@/lib/live/liveCheckoutContext';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { UnavailableScreen } from '@/components/ui/UnavailableScreen';
 import { useRole } from '@/contexts/RoleContext';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -1632,6 +1631,7 @@ export default function BuyerCheckoutScreen() {
             </View>
           </View>
         </StickyFooter>
+        <ScreenExplainer id="explain-checkout" />
       </KeyboardAvoidingView>
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.

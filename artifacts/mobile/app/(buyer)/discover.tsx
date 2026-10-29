@@ -61,13 +61,11 @@ import { RisingBrandsSection } from '@/components/discover/RisingBrands';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { useDiscoveryShelves } from '@/hooks/useDiscoveryShelves';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { measureTipTargetFrom, useTipTarget } from '@/components/first-run-tips/tipTargets';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { FirstWeekCard, useFirstWeek } from '@/components/FirstWeekCard';
 import { SponsoredAdCard } from '@/components/ads/SponsoredAdCard';
 import { useFeedAds } from '@/hooks/useFeedAds';
 import { sponsoredAnchors, type SponsoredFeedItem } from '@/lib/feedAds';
-import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
   composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops, discoverPostTargetId,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
@@ -106,14 +104,6 @@ export default function DiscoverScreen() {
   const { isSignedIn, userId } = useAuth();
 
   const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
-  // First-run tip target: the scrolling list/grid the swipe-up hint
-  // describes. Reads the list's existing ref after layout — no new ref,
-  // prop, or layout change on the list itself.
-  const discoverTipTarget = useTipTarget('buyer-discover');
-  useEffect(() => {
-    const t = setTimeout(() => measureTipTargetFrom('buyer-discover', () => listRef.current), 400);
-    return () => clearTimeout(t);
-  }, [filter, listRef]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Every list below is sticky (lib/stickyState.ts): a remount — or a first
@@ -608,12 +598,7 @@ export default function DiscoverScreen() {
           } : undefined}
         />
       )}
-      <FirstRunTip
-        id="buyer-discover"
-        variant="gesture"
-        contentReady
-        gesture={{ ...BUYER_DISCOVER_GESTURE, target: discoverTipTarget }}
-      />
+      <ScreenExplainer id="buyer-discover" />
       {search && (
         <DiscoverSearchOverlay
           key={search.q ?? 'search'}

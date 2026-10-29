@@ -1,5 +1,6 @@
 /** Seller giveaways: list with a New entry. */
 import React, { useCallback, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -53,6 +54,7 @@ export default function SellerGiveaways() {
               chevron subtitleNumberOfLines={2} onPress={() => router.push(`/seller-giveaway-detail?id=${encodeURIComponent(g.id)}` as never)} />
           ))}
       </ScrollView>
+      <ScreenExplainer id="explain-seller-giveaways" />
     </View>
   );
 }

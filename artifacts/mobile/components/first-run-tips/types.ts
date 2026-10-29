@@ -1,4 +1,4 @@
-export type FirstRunTipVariant = 'gesture' | 'spotlight' | 'anchored' | 'fullscreen';
+export type FirstRunTipVariant = 'gesture' | 'spotlight' | 'anchored' | 'fullscreen' | 'explainer';
 
 export type GestureKind = 'tap' | 'swipe-left' | 'swipe-right' | 'swipe-up' | 'hold' | 'drag' | 'pinch';
 

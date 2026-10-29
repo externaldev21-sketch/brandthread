@@ -56,6 +56,7 @@ const { apiMock, devPreviewState, focusState, renderCounter } = vi.hoisted(() =>
   renderCounter: vi.fn(),
 }));
 
+vi.mock('@/components/first-run-tips/ScreenExplainer', () => ({ ScreenExplainer: () => null }));
 vi.mock('react-native', () => {
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {

@@ -8,6 +8,7 @@
  * before — nothing about eligibility, amounts, or business logic changed.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { subscribeThreadCashChanged } from '@/lib/threadCashEvents';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -409,6 +410,7 @@ export default function ThreadCashScreen() {
           </View>
       )}
       </ScrollView>
+      <ScreenExplainer id="explain-thread-cash" />
     </BrandthreadScreen>
   );
 }

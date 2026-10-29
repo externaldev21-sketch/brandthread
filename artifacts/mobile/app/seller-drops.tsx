@@ -5,6 +5,7 @@
  * over time, seller-only).
  */
 import React, { useCallback, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
@@ -193,6 +194,7 @@ export default function SellerDrops() {
           ))
         )}
       </ScrollView>
+      <ScreenExplainer id="explain-seller-drops" />
     </View>
   );
 }

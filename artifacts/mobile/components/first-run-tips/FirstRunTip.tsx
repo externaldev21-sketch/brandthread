@@ -15,8 +15,10 @@
  *   />
  *
  * See hooks/useFirstRunTip.ts for the persistence/eligibility rules and
- * components/first-run-tips/{GestureHintTip,SpotlightTip,AnchoredCardTip,FullScreenGuideTip}
- * for the four presentational variants.
+ * components/first-run-tips/{GestureHintTip,SpotlightTip,AnchoredCardTip,FullScreenGuideTip,ExplainerSheet}
+ * for the five presentational variants. Screens that only need the one-time
+ * "what is this screen" explainer use <ScreenExplainer id=... /> instead,
+ * which reads its copy from lib/firstRunTips/content.ts.
  */
 import React from 'react';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
@@ -25,6 +27,7 @@ import { GestureHintTip, GestureHintTipProps } from './GestureHintTip';
 import { SpotlightTip, SpotlightTipProps } from './SpotlightTip';
 import { AnchoredCardTip, AnchoredCardTipProps } from './AnchoredCardTip';
 import { FullScreenGuideTip, FullScreenGuideTipProps } from './FullScreenGuideTip';
+import { ExplainerSheet, ExplainerSheetProps } from './ExplainerSheet';
 import type { FirstRunTipVariant } from './types';
 
 type VariantProps = {
@@ -32,6 +35,7 @@ type VariantProps = {
   spotlight: Omit<SpotlightTipProps, 'visible' | 'onDismiss' | 'reduceMotion'>;
   anchored: Omit<AnchoredCardTipProps, 'visible' | 'onDismiss' | 'reduceMotion'>;
   fullscreen: Omit<FullScreenGuideTipProps, 'visible' | 'onDismiss' | 'reduceMotion'>;
+  explainer: Omit<ExplainerSheetProps, 'visible' | 'onDismiss' | 'reduceMotion'>;
 };
 
 export type FirstRunTipProps<V extends FirstRunTipVariant> = {
@@ -61,10 +65,14 @@ export function FirstRunTip<V extends FirstRunTipVariant>(props: FirstRunTipProp
     const p = (props as unknown as { anchored: VariantProps['anchored'] }).anchored;
     return <AnchoredCardTip visible={visible} onDismiss={dismiss} reduceMotion={reduceMotion} {...p} />;
   }
+  if (variant === 'explainer') {
+    const p = (props as unknown as { explainer: VariantProps['explainer'] }).explainer;
+    return <ExplainerSheet visible={visible} onDismiss={dismiss} reduceMotion={reduceMotion} {...p} />;
+  }
   const p = (props as unknown as { fullscreen: VariantProps['fullscreen'] }).fullscreen;
   return <FullScreenGuideTip visible={visible} onDismiss={dismiss} reduceMotion={reduceMotion} {...p} />;
 }
 
-export { GestureHintTip, SpotlightTip, AnchoredCardTip, FullScreenGuideTip };
+export { GestureHintTip, SpotlightTip, AnchoredCardTip, FullScreenGuideTip, ExplainerSheet };
 export * from './types';
 export { GestureGlyph } from './GestureGlyph';

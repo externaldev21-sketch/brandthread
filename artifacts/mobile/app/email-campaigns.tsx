@@ -3,6 +3,7 @@
  * Route: /email-campaigns (pushed from Marketing).
  */
 import React, { useCallback, useState } from 'react';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -98,6 +99,7 @@ export default function EmailCampaignsScreen() {
           ))
         )}
       </ScrollView>
+      <ScreenExplainer id="explain-email-campaigns" />
     </View>
   );
 }

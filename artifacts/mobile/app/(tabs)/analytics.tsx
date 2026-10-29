@@ -39,8 +39,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { previousPeriodLabel } from '@/components/analytics/InsightCharts';
 import { analyticsSummary } from '@/lib/analyticsSummary';
 import { DEFAULT_INSIGHT_RANGE, type InsightRange } from '@/services/sellerInsightsService';
-import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
-import { SELLER_ANALYTICS_SPOTLIGHT } from '@/lib/firstRunTips/content';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { useMeasuredTarget } from '@/hooks/useMeasuredTarget';
 import { formatDollarsCompact } from '@/lib/compactFormat';
 import { formatMoney } from '@/lib/format';
@@ -264,12 +263,7 @@ export default function AnalyticsScreen() {
 
         </ResponsiveContainer>
       </ScrollView>
-      <FirstRunTip
-        id="seller-analytics"
-        variant="spotlight"
-        contentReady={!loading}
-        spotlight={{ target: revenueTileRect, ...SELLER_ANALYTICS_SPOTLIGHT }}
-      />
+      <ScreenExplainer id="seller-analytics" contentReady={!loading} />
     </View>
   );
 }
