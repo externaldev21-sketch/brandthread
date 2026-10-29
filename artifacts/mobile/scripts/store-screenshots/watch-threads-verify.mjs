@@ -29,6 +29,7 @@ const device = { viewport: { width: 390, height: 844 }, scale: 2, isMobile: true
 const { page, activity } = await openContext(browser, { device, role: 'seller', origin: ORIGIN, images, seedOptions: {} });
 page.setDefaultNavigationTimeout(300_000);
 page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
+if (process.env.DEBUG) page.on('console', (m) => { if (m.type() === 'error') console.log('console.error:', m.text().slice(0, 600)); });
 const cdp = await page.context().newCDPSession(page);
 
 const shot = async (name) => { await page.waitForTimeout(500); await page.screenshot({ path: path.join(OUT, `${name}.png`) }); console.log(`  ✓ ${name}  ${new URL(page.url()).pathname}`); };
@@ -39,9 +40,24 @@ const swipe = async (x1, y1, x2, y2, steps = 12) => {
   for (let i = 1; i <= steps; i++) { await touch('touchMove', x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps); await page.waitForTimeout(16); }
   await touch('touchEnd', x2, y2);
 };
-const tapEl = async (locator) => { const b = await locator.boundingBox(); if (!b) throw new Error('no box'); await tap(b.x + b.width / 2, b.y + b.height / 2); };
+// Playwright's touch tap (Input.dispatchTouchEvent) on the element's centre,
+// once nothing transient (a first-run tip fading out, …) sits on top of it.
+const tapEl = async (locator, timeout = 30_000) => {
+  await locator.waitFor({ timeout });
+  const handle = await locator.elementHandle();
+  await page.waitForFunction((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !!top && (el === top || el.contains(top));
+  }, handle, { timeout }).catch(() => console.log('  (element still covered; tapping anyway)'));
+  await locator.tap({ timeout: 5_000, force: true });
+};
 const labels = async () => (await page.$$eval('[aria-label]', (els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')))).join(' | ').slice(0, 2500);
-const dismissLogBox = async () => { await page.getByRole('button', { name: /accept all/i }).click({ timeout: 1500 }).catch(() => {}); };
+// Expo web's dev-only LogBox toast sits over the tab bar; hide it (dev overlay only, not app UI).
+const dismissLogBox = async () => {
+  await page.getByRole('button', { name: /accept all/i }).click({ timeout: 1500 }).catch(() => {});
+  await page.addStyleTag({ content: '#error-toast, [data-testid="logbox_toast"] { display: none !important; pointer-events: none !important; }' }).catch(() => {});
+};
 
 console.log('loading…');
 await openScreen(page, activity, ORIGIN, 'seller', '/');
@@ -50,15 +66,19 @@ await dismissLogBox();
 await shot('01-seller-dashboard');
 
 // ── Studio menu (touch-dispatched tap on the tab bar's Studio button) ──
-await tapEl(page.getByLabel('Open Studio tools').first());
-await page.waitForTimeout(1200);
+const studioBtn = page.getByLabel('Open Studio tools').first();
+console.log('studio button at', JSON.stringify(await studioBtn.boundingBox()));
+await dismissLogBox();
+await tapEl(studioBtn);
+await page.getByTestId(/^seller-control-center-item-/).first().waitFor({ timeout: 15_000 }).catch(() => console.log('menu did not mount'));
+await page.waitForTimeout(1500);
 await shot('02-studio-menu-first-card');
 const first = await page.$$eval('[data-testid^="seller-control-center-item-"]', (els) => els.map((e) => [e.getAttribute('data-testid'), e.innerText.trim(), Math.round(e.getBoundingClientRect().x)]));
 console.log('cards mounted:', JSON.stringify(first));
 if (STEP === 'menu') { console.log(await labels()); process.exit(0); }
 
 // Tap the current (first) card — opens straight away (tap skips the trace).
-await tap(195, 420);
+await tapEl(page.getByTestId('seller-control-center-item-watch-threads'));
 await page.waitForTimeout(5000);
 await page.getByText('Tap to keep watching').click({ timeout: 2000 }).catch(() => {});
 await shot('03-watch-threads-feed');
