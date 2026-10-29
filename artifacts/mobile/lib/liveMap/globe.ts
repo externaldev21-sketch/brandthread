@@ -155,7 +155,7 @@ export function hitTest<T extends { lat: number; lng: number }>(
   return best;
 }
 
-/** 0 → 1 → 0 pulse for an order dot, staggered per dot so they don't blink in unison. */
+/** 0 → 1 ramp (repeating every periodMs) for an order dot's pulse ring, staggered per dot so they don't blink in unison. */
 export function pulsePhase(timeMs: number, index: number, periodMs = 2400): number {
   'worklet';
   const t = ((timeMs + index * 377) % periodMs) / periodMs;
