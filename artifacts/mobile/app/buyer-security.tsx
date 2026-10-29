@@ -28,15 +28,25 @@ export default function BuyerSecurity() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    loadBuyerSettings().then(loadedSettings => {
-      setLoginAlerts(loadedSettings.loginAlerts);
-      setSaveLogin(loadedSettings.saveLoginInfo);
-      setLoaded(true);
-    });
-    // The server sends the alerts (lib/security/signInAlerts.ts), so its value wins.
-    api.notificationPrefs.get()
-      .then((prefs) => { if (typeof prefs.categories?.login_alerts === 'boolean') setLoginAlerts(prefs.categories.login_alerts); })
-      .catch(() => {});
+    let cancelled = false;
+    loadBuyerSettings()
+      .then(loadedSettings => {
+        if (cancelled) return;
+        setLoginAlerts(loadedSettings.loginAlerts);
+        setSaveLogin(loadedSettings.saveLoginInfo);
+      })
+      // A failed local read keeps the defaults rather than a blank screen forever.
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return;
+        setLoaded(true);
+        // The server sends the alerts (lib/security/signInAlerts.ts), so its value wins —
+        // fetched after the local read so a slower local read can't overwrite it.
+        api.notificationPrefs.get()
+          .then((prefs) => { if (!cancelled && typeof prefs.categories?.login_alerts === 'boolean') setLoginAlerts(prefs.categories.login_alerts); })
+          .catch(() => {});
+      });
+    return () => { cancelled = true; };
   }, [api]);
 
   async function onToggleLoginAlerts(v: boolean) {
