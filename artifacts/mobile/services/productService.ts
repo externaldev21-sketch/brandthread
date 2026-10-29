@@ -210,14 +210,25 @@ function uid(): string {
 // Short-lived cache so one screen load (list + stats) costs a single request.
 const SERVER_LIST_TTL_MS = 3_000;
 let _serverList: { uid: string; at: number; products: Product[] } | null = null;
+const SERVER_LIST_PAGE = 100;
+const SERVER_LIST_MAX_PAGES = 50;
 
 async function fetchServerProducts(): Promise<Product[]> {
   const uid = _productUserId;
   if (_serverList && _serverList.uid === uid && Date.now() - _serverList.at < SERVER_LIST_TTL_MS) {
     return _serverList.products;
   }
-  const rows = await serviceRequest<ServerProductRow[]>('/api/products', {}, false);
-  const products = Array.isArray(rows) ? rows.map(mapServerProduct) : [];
+  // GET /api/products pages at 100 rows (its default and maximum limit), so a
+  // catalog past 100 products needs the following pages too.
+  const rows: ServerProductRow[] = [];
+  for (let page = 0; page < SERVER_LIST_MAX_PAGES; page += 1) {
+    const path = page === 0 ? '/api/products' : `/api/products?offset=${page * SERVER_LIST_PAGE}`;
+    const batch = await serviceRequest<ServerProductRow[]>(path, {}, false);
+    if (!Array.isArray(batch)) break;
+    rows.push(...batch);
+    if (batch.length < SERVER_LIST_PAGE) break;
+  }
+  const products = rows.map(mapServerProduct);
   if (_productUserId === uid) _serverList = { uid, at: Date.now(), products };
   return products;
 }
@@ -471,9 +482,12 @@ export async function adjustInventory(
 
   // Apply to product inventory
   const newTotal = Math.max(0, product.inventory.totalStock + delta);
-  await updateProduct(productId, {
+  const saved = await updateProduct(productId, {
     inventory: { ...product.inventory, totalStock: newTotal, availableStock: Math.max(0, product.inventory.availableStock + delta) },
   });
+  // Nothing was saved (e.g. a server-only product that has no copy in this
+  // device store): never report an adjustment the stock editor can "undo".
+  if (!saved) return undefined;
 
   return adj;
 }
@@ -518,7 +532,7 @@ export async function adjustVariantStock(
     createdAt: new Date().toISOString(),
   };
 
-  await updateProduct(productId, {
+  const saved = await updateProduct(productId, {
     variants,
     inventory: {
       ...product.inventory,
@@ -527,6 +541,7 @@ export async function adjustVariantStock(
       variantStock,
     },
   });
+  if (!saved) return undefined;
 
   return adj;
 }

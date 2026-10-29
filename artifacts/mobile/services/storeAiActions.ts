@@ -53,7 +53,7 @@ export function parseServerSuggestion(raw: unknown): Omit<StoreAISuggestion, 'id
   let action: StoreAISuggestionAction | null = null;
   if (a && (VALUE_TYPES as readonly string[]).includes(String(a.type)) && typeof a.value === 'string' && a.value.trim()) {
     action = { type: a.type as typeof VALUE_TYPES[number], value: a.value.trim() };
-  } else if (a && a.type === 'open_screen' && typeof a.screen === 'string' && a.screen in SCREEN_ROUTES) {
+  } else if (a && a.type === 'open_screen' && typeof a.screen === 'string' && Object.prototype.hasOwnProperty.call(SCREEN_ROUTES, a.screen)) {
     action = { type: 'open_screen', screen: a.screen as keyof typeof SCREEN_ROUTES };
   }
   if (!category || !title || !problem || !recommendation || !action) return null;
