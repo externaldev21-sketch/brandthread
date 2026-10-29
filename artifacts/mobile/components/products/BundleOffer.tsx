@@ -15,7 +15,7 @@
  * variant, with more than one in stock, asks for its size first, in the same
  * picker sheet as Complete the fit.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -117,6 +117,8 @@ export function BundleOffer({ productId, onAdded }: { productId: string; onAdded
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (addedTimer.current) clearTimeout(addedTimer.current); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +144,15 @@ export function BundleOffer({ productId, onAdded }: { productId: string; onAdded
     setMessage(null);
     for (const item of target.items) {
       const variant = choices[item.productId] ?? item.choices[0];
-      const result = await addToCart({ product: item.product, variant, quantity: item.quantity });
+      let result: Awaited<ReturnType<typeof addToCart>>;
+      try {
+        result = await addToCart({ product: item.product, variant, quantity: item.quantity });
+      } catch {
+        // A thrown add (e.g. the bag couldn't be read) must not leave the button spinning.
+        setBusy(false);
+        setMessage(`Could not add ${item.name} to bag.`);
+        return;
+      }
       if (!result.success) {
         setBusy(false);
         setMessage(result.message ?? `Could not add ${item.name} to bag.`);
@@ -153,7 +163,8 @@ export function BundleOffer({ productId, onAdded }: { productId: string; onAdded
     haptic('addToBag');
     onAdded?.();
     setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setAdded(false), 2000);
   }, [onAdded]);
 
   const onAddAll = useCallback(() => {

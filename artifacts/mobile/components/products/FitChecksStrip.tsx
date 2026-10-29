@@ -23,6 +23,8 @@ export function FitChecksStrip({ productId, productName }: { productId: string; 
 
   useEffect(() => {
     let cancelled = false;
+    // Never show the previous product's fit checks under this one.
+    setItems([]);
     if (!isUUID(productId)) return;
     fitsService.productFitChecks(productId, 12)
       .then((r) => { if (!cancelled) setItems(r.fitChecks); })

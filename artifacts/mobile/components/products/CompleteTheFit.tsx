@@ -118,6 +118,8 @@ export function CompleteTheFit({ productId }: { productId: string }) {
   const pickingName = useRef('');
   if (picking) pickingName.current = picking.name;
   const [message, setMessage] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (addedTimer.current) clearTimeout(addedTimer.current); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,12 +139,20 @@ export function CompleteTheFit({ productId }: { productId: string }) {
 
   const add = useCallback(async (item: RailItem, variant: BuyerProductVariant) => {
     if (!item.product) return;
-    const result = await addToCart({ product: item.product, variant, quantity: 1 });
+    let result: Awaited<ReturnType<typeof addToCart>>;
+    try {
+      result = await addToCart({ product: item.product, variant, quantity: 1 });
+    } catch {
+      // A thrown add (e.g. the bag couldn't be read) is a failure, not silence.
+      setMessage('Could not add to bag.');
+      return;
+    }
     if (result.success) {
       haptic('addToBag');
       setMessage(null);
       setAddedId(item.id);
-      setTimeout(() => setAddedId((cur) => (cur === item.id ? null : cur)), 2000);
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+      addedTimer.current = setTimeout(() => setAddedId((cur) => (cur === item.id ? null : cur)), 2000);
     } else {
       setMessage(result.message ?? 'Could not add to bag.');
     }

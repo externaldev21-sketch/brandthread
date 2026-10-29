@@ -12,7 +12,7 @@
  * — share sits with the other floating
  * controls over the photo and opens the system share sheet.
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, Share, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { IconButton } from '@/components/ui';
@@ -43,6 +43,8 @@ export function ProductShareButton({
   const api = useApi();
   const [copied, setCopied] = useState(false);
   const busy = useRef(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
   async function referralCode(): Promise<string | null> {
     if (!isSignedIn || !userId) return null;
@@ -74,7 +76,8 @@ export function ProductShareButton({
       if (result === 'copied') {
         setCopied(true);
         AccessibilityInfo.announceForAccessibility?.('Link copied');
-        setTimeout(() => setCopied(false), 1600);
+        if (copiedTimer.current) clearTimeout(copiedTimer.current);
+        copiedTimer.current = setTimeout(() => setCopied(false), 1600);
       }
     } catch {
       // A dismissed or unavailable share sheet is not an error worth surfacing.

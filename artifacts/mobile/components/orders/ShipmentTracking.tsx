@@ -158,7 +158,10 @@ export function ShipmentMapPlaceholder({ info }: { info: ShipmentInfo }) {
   const cols = width > 0 ? Array.from({ length: Math.ceil(width / 46) }, (_, i) => 18 + i * 46) : [];
   const rows = [20, 52, 84, 116];
   const statusLabel = delivered ? 'Delivered' : info.trackingStatus === 'out_for_delivery' ? 'Out for delivery'
-    : info.trackingStatus === 'label_created' ? 'Label created' : 'In transit';
+    : info.trackingStatus === 'label_created' ? 'Label created'
+    : info.trackingStatus === 'exception' ? 'Delivery problem'
+    : info.trackingStatus === 'returned_to_sender' ? 'Returning to sender'
+    : 'In transit';
 
   return (
     <View

@@ -24,12 +24,16 @@ function dayValue(offset: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const DAY_CHIPS = Array.from({ length: 28 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() + i);
-  const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  return { value: dayValue(i), label };
-});
+// Built per render, not once at module load: a picker opened after midnight
+// in a long-running session must not offer yesterday as "Today".
+function dayChips() {
+  return Array.from({ length: 28 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return { value: dayValue(i), label };
+  });
+}
 
 const TIME_CHIPS = Array.from({ length: 48 }, (_, i) => {
   const hour = Math.floor(i / 2);
@@ -52,10 +56,14 @@ export function LaunchTimePicker({
   dateValue, timeValue, onDateChange, onTimeChange, scrollToSelected = false,
 }: {
   dateValue: string; timeValue: string; onDateChange: (v: string) => void; onTimeChange: (v: string) => void;
-  /** Opt-in: on mount, scroll each chip row so the selected chip is in view (e.g. a 2:30 PM default). */
+  /**
+   * Unused: ChipRow already scrolls each row to its selected chip on mount
+   * (selectedIndex), for every caller. Kept so existing callers still type-check.
+   */
   scrollToSelected?: boolean;
 }) {
   const colors = useColors();
+  const DAY_CHIPS = dayChips();
   const [customOpen, setCustomOpen] = useState(false);
   const dayRow = useRef<ScrollView>(null);
   const timeRow = useRef<ScrollView>(null);
