@@ -116,4 +116,7 @@ export function CallEndedView() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: '18%', gap: 10 },
+  ratingBlock: { alignItems: 'center', gap: 20, marginTop: '14%' },
+  ratingPrompt: { textAlign: 'center' },
+  ratingRow: { flexDirection: 'row', gap: 40 },
 });

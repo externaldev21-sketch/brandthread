@@ -1,12 +1,13 @@
 /**
  * The bag, copied 1:1 from SSENSE's Shopping bag flow
  * (https://mobbin.com/flows/b906e342-83ab-4424-bf3b-59514df7dc6d) and
- * reskinned: "Close" top-left over a big "Bag" title; an Items / Description /
- * Price column row; each line is the photo on the left, brand + name in the
- * middle, price on the right, with "Move to saves" and "Remove" text actions
- * under it; then Subtotal, Shipping total and Order total; a sticky bar with
- * "Total estimate" on the left and "Go to checkout" on the right. Empty bag:
- * one line, "Shop now", and a New arrivals row of real products.
+ * reskinned: a back chevron top-left over a big "Bag" title; an Items /
+ * Description / Price column row; each line is the photo on the left, brand +
+ * name in the middle, price on the right, with "Move to saves" and "Remove"
+ * text actions under it; then Subtotal, Shipping total and Order total; a
+ * sticky bar with the Subtotal row above a full-width "Checkout" button.
+ * Empty bag: "Your bag is empty", "Shop Threads", and a New arrivals row of
+ * real products.
  *
  * Brandthread additions the brief asks for: the size and quantity change in
  * place on each line (size opens the shared picker sheet), and the shipping

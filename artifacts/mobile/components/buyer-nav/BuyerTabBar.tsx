@@ -401,8 +401,16 @@ export function BuyerTabBar({
   const profileHold = useHoldToSwitch({
     onComplete: quickSwitch,
     // Touch-down hid the pill eagerly (Profile isn't a pill slot); a hold
-    // that didn't open Profile puts it back on the tab still on screen.
-    onHoldRelease: () => { if (activeIndex >= 0) pressIndicator(activeIndex); },
+    // that didn't open Profile puts it back on the tab still on screen — and
+    // clears the onProfile flag pressProfile set, or a hold started on Home
+    // would leave the capsule regular-size over the feed (compact needs
+    // !onProfile, and the committed-route sync only reruns on a route change).
+    onHoldRelease: () => {
+      if (activeIndex >= 0) {
+        onProfile.set(false);
+        pressIndicator(activeIndex);
+      }
+    },
   });
 
   const onLongPress = React.useCallback((routeName: string) => {

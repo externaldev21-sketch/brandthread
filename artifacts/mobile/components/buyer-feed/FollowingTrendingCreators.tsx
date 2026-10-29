@@ -34,7 +34,6 @@ export interface TrendingCreator {
   videoUri?: string;
 }
 
-/** Groups authorized public posts by seller, then appends recommended brands not already present. */
 /** Remote, non-local playback URL for a public video post, else null (poster only). */
 export function previewVideoUri(p: Pick<SellerThreadPost, 'contentType' | 'mediaUris' | 'hlsUrl'>, native: boolean): string | null {
   if (p.contentType !== 'video' || !p.mediaUris?.[0]) return null;
@@ -55,6 +54,7 @@ export function centeredIndex(offsetX: number, interval: number, count: number):
   return Math.max(0, Math.min(count - 1, Math.round(offsetX / interval)));
 }
 
+/** Groups authorized public posts by seller, then appends recommended brands not already present. */
 export function buildTrendingCreators(posts: unknown, brands: unknown, viewerId?: string | null, native = Platform.OS !== 'web'): TrendingCreator[] {
   const out = new Map<string, TrendingCreator>();
   for (const p of Array.isArray(posts) ? (posts as SellerThreadPost[]) : []) {

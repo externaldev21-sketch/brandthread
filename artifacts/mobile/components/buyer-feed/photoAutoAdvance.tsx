@@ -27,6 +27,9 @@ export function usePhotoAutoAdvance(): [boolean, (v: boolean) => void] {
     listeners.add(setValue);
     if (cached === null) {
       AsyncStorage.getItem(PHOTO_AUTO_ADVANCE_KEY).then((raw) => {
+        // A toggle made while this read was in flight is newer than what the
+        // read returned — don't let the stale stored value flip it back.
+        if (cached !== null) return;
         cached = raw === '1';
         listeners.forEach((l) => l(cached as boolean));
       }).catch(() => {});

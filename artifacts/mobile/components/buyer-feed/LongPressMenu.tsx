@@ -8,10 +8,9 @@
  * a second page in the same sheet asking why (this video, or this seller),
  * like TikTok's "Not interested" details.
  *
- * Reskinned to Brandthread's theme tokens; same Modal + SheetRise shell as
- * the Share sheet (components/ThreadShareSheet.tsx) so the two feel like one
- * family. The 2x-speed toggle is the same `speedActive` the press-and-hold
- * gesture drives.
+ * Reskinned to Brandthread's theme tokens, on the shared `Sheet` chrome
+ * (components/ui/BottomSheet). The 2x-speed toggle is the same `speedActive`
+ * the press-and-hold gesture drives.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -78,8 +77,8 @@ export function LongPressMenu({
   useEffect(() => { if (!visible) setPage('main'); }, [visible]);
   if (!visible) return null;
 
-  // One haptic per action, then the sheet closes (TikTok closes on every
-  // action except opening the "Not interested" details).
+  // The sheet closes, then the action runs (TikTok closes on every action
+  // except opening the "Not interested" details). Any haptic is the action's own.
   const act = (fn: () => void) => () => { onClose(); fn(); };
 
   const topActions: { key: string; icon: FeatherName; label: string; onPress: () => void; active?: boolean }[] = [

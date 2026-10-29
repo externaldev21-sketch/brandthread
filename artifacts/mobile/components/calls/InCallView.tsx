@@ -120,9 +120,8 @@ export function InCallView() {
             onPress={toggleMute}
             accessibilityLabel={muted ? 'Unmute microphone' : 'Mute microphone'}
           />
-          {/* No "Flip camera" here: this overlay runs on the in-app call
-              provider, which has no camera to switch, so the button did
-              nothing. Real video calls use app/call-screen.tsx. */}
+          {/* "Flip camera" only appears (last, below) for a video call with a
+              live RTC engine — without one there is no camera to switch. */}
           <ControlButton
             icon={speakerOn ? 'volume-2' : 'volume-x'}
             active={speakerOn}

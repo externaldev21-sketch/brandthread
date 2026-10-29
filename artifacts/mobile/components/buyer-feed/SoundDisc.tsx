@@ -1,7 +1,8 @@
 /**
  * TikTok-style spinning album/sound disc, rendered under Share on the right
  * rail. Spins only while its page is the active, playing one; still under
- * reduce-motion. Tapping toggles feed sound (same handler as the sound row).
+ * reduce-motion. Display only: it is not a touch target (`onPress`/`soundOn`
+ * are accepted for existing callers and unused — feed sound is always on).
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

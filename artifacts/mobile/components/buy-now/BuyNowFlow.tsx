@@ -43,6 +43,7 @@ import type { BuyerProduct, BuyerProductVariant } from '@/services/cartTypes';
 import { VariantPickerSheet } from '@/components/buy-now/VariantPickerSheet';
 import { OrderSuccessSheet, type OrderSuccessData } from '@/components/buy-now/OrderSuccessSheet';
 import { track } from '@/lib/analytics';
+import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
 
 type FlowPhase = 'loading' | 'error' | 'variant' | 'review' | 'paying' | 'success';
 
@@ -146,21 +147,42 @@ export function BuyNowFlow({
         },
       );
 
-      const browser = await WebBrowser.openBrowserAsync(result.url);
-      if (browser.type === 'cancel' || browser.type === 'dismiss') {
+      // An auth session closes itself on Stripe's redirect back to the app
+      // (lib/checkoutReturn.ts). Closing the page is never proof the buyer
+      // didn't pay (Done on Stripe's success page reads as a cancel), so
+      // Stripe's live status is always checked before saying anything.
+      const browser = await WebBrowser.openAuthSessionAsync(result.url, currentCheckoutReturnUrls().redirectUrl);
+      const returnedUrl = browser.type === 'success' ? (browser as { url?: string }).url ?? null : null;
+
+      let verification: any;
+      let verifyFailed = false;
+      const attempts = browser.type === 'success' && !/[?&]cancelled=1/.test(returnedUrl ?? '') ? 6 : 2;
+      try {
+        for (let attempt = 0; attempt < attempts; attempt++) {
+          verification = await api.buyer.checkout.verifySession(result.sessionId);
+          if (verification.orderId || verification.paymentStatus === 'paid') break;
+          if (attempt < attempts - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch {
+        // The charge may already exist — never report this as "couldn't start checkout".
+        verifyFailed = true;
+      }
+
+      const verdict = hostedCheckoutVerdict({
+        browserType: browser.type,
+        returnedUrl,
+        paymentStatus: verification?.paymentStatus,
+        orderId: verification?.orderId,
+        declineReason: verification?.declineReason,
+      });
+
+      if (verdict === 'cancelled' && !verifyFailed) {
         setError('Payment was cancelled.');
         setPhase('review');
         return;
       }
 
-      let verification: any;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        verification = await api.buyer.checkout.verifySession(result.sessionId);
-        if (verification.orderId || verification.paymentStatus === 'paid') break;
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-
-      if (verification?.paymentStatus !== 'paid' || !verification.orderId) {
+      if (verdict !== 'paid' || !verification?.orderId) {
         setError(verification?.declineReason ?? "We're still confirming your payment. Check Orders shortly.");
         setPhase('review');
         return;
@@ -183,7 +205,9 @@ export function BuyNowFlow({
         totalCents: verification.amountTotal ?? undefined,
         shippingAddressLine: addressLine || undefined,
         fullShippingAddress: fullAddress || undefined,
-        paymentMethodLabel: 'Card on file',
+        // No paymentMethodLabel: the buyer paid on Stripe's hosted page and the
+        // method isn't known here, so the "Paid with" row is omitted rather
+        // than guessed (see OrderSuccessSheet's "no placeholder copy" rule).
       });
       hapticSuccess();
       setPhase('success');
