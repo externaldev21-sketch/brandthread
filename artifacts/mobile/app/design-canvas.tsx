@@ -2107,7 +2107,13 @@ export default function DesignCanvasScreen() {
     mutateLayer(prev => {
       const sorted = [...prev].sort((a, b) => a.order - b.order);
       const idx = sorted.findIndex(l => l.id === id);
-      if (idx < sorted.length - 1) [sorted[idx].order, sorted[idx + 1].order] = [sorted[idx + 1].order, sorted[idx].order];
+      // Swap on copies: mutating the shared layer objects corrupted the undo
+      // snapshot (`prev`), so Undo couldn't restore the old order.
+      if (idx >= 0 && idx < sorted.length - 1) {
+        const a = sorted[idx], b = sorted[idx + 1];
+        sorted[idx] = { ...a, order: b.order };
+        sorted[idx + 1] = { ...b, order: a.order };
+      }
       return sorted;
     });
   }
@@ -2116,7 +2122,11 @@ export default function DesignCanvasScreen() {
     mutateLayer(prev => {
       const sorted = [...prev].sort((a, b) => a.order - b.order);
       const idx = sorted.findIndex(l => l.id === id);
-      if (idx > 0) [sorted[idx].order, sorted[idx - 1].order] = [sorted[idx - 1].order, sorted[idx].order];
+      if (idx > 0) {
+        const a = sorted[idx], b = sorted[idx - 1];
+        sorted[idx] = { ...a, order: b.order };
+        sorted[idx - 1] = { ...b, order: a.order };
+      }
       return sorted;
     });
   }
@@ -2740,7 +2750,11 @@ export default function DesignCanvasScreen() {
     }
   }
 
-  // Reference pan responder for dragging the reference window
+  // Reference pan responder for dragging the reference window. The responder
+  // is created once, so it reads the live position through a ref — capturing
+  // `refPosition` directly snapped every later drag back to the initial spot.
+  const refPositionRef = useRef(refPosition);
+  refPositionRef.current = refPosition;
   const referencePanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -2749,8 +2763,8 @@ export default function DesignCanvasScreen() {
         refDragRef.current = {
           startPageX: e.nativeEvent.pageX,
           startPageY: e.nativeEvent.pageY,
-          origX: refPosition.x,
-          origY: refPosition.y,
+          origX: refPositionRef.current.x,
+          origY: refPositionRef.current.y,
         };
       },
       onPanResponderMove: (e) => {
