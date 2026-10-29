@@ -115,6 +115,9 @@ export function useLiveSocket({ streamId, enabled, onEvent, onConnected, onFallb
   const attemptsRef = useRef(0);
   const fallbackActiveRef = useRef(false);
   const stoppedRef = useRef(false);
+  // Bumped whenever the connection is restarted or stopped: a token request
+  // still in flight from an earlier connection must not open a socket.
+  const generationRef = useRef(0);
 
   const teardownSocket = useCallback(() => {
     if (heartbeatRef.current) { clearInterval(heartbeatRef.current); heartbeatRef.current = null; }
@@ -146,8 +149,10 @@ export function useLiveSocket({ streamId, enabled, onEvent, onConnected, onFallb
   const connect = useCallback(() => {
     if (stoppedRef.current || !streamId) return;
     teardownSocket();
+    const generation = generationRef.current;
 
     void getToken().then((token) => {
+      if (generation !== generationRef.current) return;
       if (stoppedRef.current || !token) {
         if (!stoppedRef.current) scheduleReconnect();
         return;
@@ -189,18 +194,20 @@ export function useLiveSocket({ streamId, enabled, onEvent, onConnected, onFallb
         if (!stoppedRef.current) scheduleReconnect();
       };
     }).catch(() => {
-      if (!stoppedRef.current) scheduleReconnect();
+      if (generation === generationRef.current && !stoppedRef.current) scheduleReconnect();
     });
   }, [streamId, getToken, teardownSocket, scheduleReconnect, asHost]);
 
   connectRef.current = connect;
 
   useEffect(() => {
+    generationRef.current += 1;
     stoppedRef.current = false;
     attemptsRef.current = 0;
     fallbackActiveRef.current = false;
     if (enabled && streamId) connect();
     return () => {
+      generationRef.current += 1;
       stoppedRef.current = true;
       if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
       teardownSocket();

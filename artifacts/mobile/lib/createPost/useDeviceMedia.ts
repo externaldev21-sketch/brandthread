@@ -47,10 +47,15 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
   const [hasNext, setHasNext] = useState(!isWeb);
   const [loading, setLoading] = useState(false);
   const busy = useRef(false);
+  // Bumped by every reset (first load / album switch). A page that resolves
+  // after a newer reset belongs to the previous album and is dropped, and a
+  // reset is never skipped just because an older page is still loading.
+  const generation = useRef(0);
 
   const loadPage = useCallback(async (target: string | null, reset: boolean, after?: string) => {
     const MediaLibrary = isWeb ? null : getMediaLibrary();
-    if (!MediaLibrary || busy.current) return;
+    if (!MediaLibrary || (!reset && busy.current)) return;
+    const gen = reset ? ++generation.current : generation.current;
     busy.current = true;
     setLoading(true);
     try {
@@ -61,6 +66,7 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
         first: pageSize,
         after: reset ? undefined : after,
       });
+      if (gen !== generation.current) return;
       const mapped: PickedAsset[] = page.assets.map((a) => ({
         id: a.id, uri: a.uri, kind: a.mediaType === 'video' ? 'video' : 'photo',
         duration: a.duration ?? 0, width: a.width, height: a.height,
@@ -69,10 +75,12 @@ export function useDeviceMedia({ pageSize = PAGE_SIZE }: { pageSize?: number } =
       setCursor(page.endCursor);
       setHasNext(page.hasNextPage);
     } catch {
-      setHasNext(false);
+      if (gen === generation.current) setHasNext(false);
     } finally {
-      busy.current = false;
-      setLoading(false);
+      if (gen === generation.current) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
   }, [isWeb, pageSize]);
 

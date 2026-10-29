@@ -42,6 +42,12 @@ export function useLivePager(
   activeRef.current = activeIndex;
   const endingRef = useRef(ending);
   endingRef.current = ending;
+  // Exit-animation timers still pending, cleared on unmount.
+  const removalTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = removalTimers.current;
+    return () => { timers.forEach(clearTimeout); timers.clear(); };
+  }, []);
 
   const seedRuntime = useCallback((list: LiveStream[]) => {
     setRuntime(prev => {
@@ -70,7 +76,8 @@ export function useLivePager(
     setEnding(prev => ({ ...prev, [streamId]: true }));
     if (hostName) setEndedNotice(`${hostName} ended their live`);
     getLiveDirectory().markEnded(streamId);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      removalTimers.current.delete(timer);
       const list = streamsRef.current;
       const endedIndex = list.findIndex(s => s.id === streamId);
       if (endedIndex < 0) return;
@@ -81,6 +88,7 @@ export function useLivePager(
       setEnding(prev => { const n = { ...prev }; delete n[streamId]; return n; });
       if (nextList.length === 0) void loadExtras();
     }, LIVE_END_ANIMATION_MS);
+    removalTimers.current.add(timer);
   }, [loadExtras]);
 
   // Initial load, and `refresh()` after a failed one. Each run bumps the
@@ -119,9 +127,11 @@ export function useLivePager(
   // Periodic refresh: new streams are appended (never reorder pages under
   // the viewer's thumb); streams that disappeared are removed gracefully.
   useEffect(() => {
+    let alive = true;
     const t = setInterval(async () => {
       try {
         const fresh = await provider.listLive();
+        if (!alive) return;
         const freshIds = new Set(fresh.map(s => s.id));
         const current = streamsRef.current;
         for (const s of current) if (!freshIds.has(s.id)) removeStream(s.id, s.host.name);
@@ -133,7 +143,7 @@ export function useLivePager(
         }
       } catch { /* keep what we have */ }
     }, REFRESH_MS);
-    return () => clearInterval(t);
+    return () => { alive = false; clearInterval(t); };
   }, [provider, removeStream, seedRuntime]);
 
   // Join + realtime for the active stream only (neighbours stay preloaded

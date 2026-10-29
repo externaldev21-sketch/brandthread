@@ -146,6 +146,11 @@ export async function updateSkipAllTips(
   api?: FirstRunTipsApi,
 ): Promise<FirstRunTipsLocalState> {
   await writeLocalSkipAll(userId, value);
+  // A "Skip all" stored while the account id was still loading ('anon') is
+  // OR-ed into every read, and the next server sync would re-send it — so
+  // turning it off must clear that record too (as replayAllTips does).
+  const anonSkip = userId && !value ? await readLocalSkipAll(null) : false;
+  if (anonSkip) await writeLocalSkipAll(null, false);
   if (api) {
     try {
       if (api.firstRunTips.setSkipAll) await api.firstRunTips.setSkipAll(value);
@@ -153,6 +158,7 @@ export async function updateSkipAllTips(
       else throw new Error('This app version cannot turn "Skip all tips" off.');
     } catch (error) {
       await writeLocalSkipAll(userId, current.skipAll);
+      if (anonSkip) await writeLocalSkipAll(null, true);
       throw error;
     }
   }

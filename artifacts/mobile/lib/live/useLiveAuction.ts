@@ -37,6 +37,8 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
   const [receivedAt, setReceivedAt] = useState(() => Date.now());
   const viewerRef = useRef(viewerId);
   viewerRef.current = viewerId;
+  const streamRef = useRef(streamId);
+  streamRef.current = streamId;
 
   const accept = useCallback((next: LiveAuction | null) => {
     setAuction(prev => {
@@ -49,7 +51,11 @@ export function useLiveAuction(streamId: string | null | undefined, opts: {
   const refresh = useCallback(() => {
     if (!enabled || !streamId || demo) return;
     fetchActiveAuction(streamId)
-      .then(r => accept(r.enabled ? r.auction : null))
+      .then(r => {
+        // The pager moved on to another stream while this was in flight.
+        if (streamRef.current !== streamId) return;
+        accept(r.enabled ? r.auction : null);
+      })
       .catch(() => {});
   }, [accept, demoKey, enabled, streamId]); // eslint-disable-line react-hooks/exhaustive-deps
 

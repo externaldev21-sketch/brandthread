@@ -3,7 +3,7 @@
  * and the accepted co-host list. The screen forwards live-socket events to
  * `handleEvent` and calls `refresh` on (re)connect for the HTTP backfill.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useApi } from '@/lib/api';
 import type { LiveSocketEvent } from '@/lib/live/useLiveSocket';
 import type { LiveCohostPerson } from '@/lib/live/moderationTypes';
@@ -15,10 +15,15 @@ export function useLiveModeration(streamId: string | undefined) {
   const [pinned, setPinned] = useState<PinnedComment | null>(null);
   const [cohosts, setCohosts] = useState<LiveCohostPerson[]>([]);
 
+  const streamRef = useRef(streamId);
+  streamRef.current = streamId;
+
   const refresh = useCallback(() => {
     if (!streamId) return;
-    api.liveMod.pinned(streamId).then((r) => setPinned(r.pinnedComment ?? null)).catch(() => {});
-    api.liveCohost.list(streamId).then((r) => setCohosts(r.cohosts ?? [])).catch(() => {});
+    // A response for a stream the screen has since left must not land here.
+    const current = () => streamRef.current === streamId;
+    api.liveMod.pinned(streamId).then((r) => { if (current()) setPinned(r.pinnedComment ?? null); }).catch(() => {});
+    api.liveCohost.list(streamId).then((r) => { if (current()) setCohosts(r.cohosts ?? []); }).catch(() => {});
   }, [api, streamId]);
 
   /** Returns true when the event was a moderation/co-host event and has been handled. */

@@ -84,6 +84,8 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
   const [logsByConversation, setLogsByConversation] = useState<Record<string, CallLogEntry[]>>({});
   const unsubRef = useRef<(() => void) | null>(null);
   const incomingTimeoutRef = useRef<(() => void) | null>(null);
+  /** Outgoing calls hung up while `provider.start` was still in flight (their `pending_` ids). */
+  const cancelledPendingRef = useRef(new Set<string>());
   const sessionRef = useRef<CallSession | null>(null);
   sessionRef.current = session;
   const signedInRef = useRef(!!isSignedIn);
@@ -199,6 +201,19 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => () => { agora?.dispose(); }, [agora]);
 
+  // Another account signed in (or this one signed out): the old provider was
+  // disposed with its auth, so drop the previous account's call and call-log
+  // cache instead of showing them (a live call would otherwise sit frozen).
+  const lastUserIdRef = useRef(authUserId);
+  useEffect(() => {
+    if (lastUserIdRef.current === authUserId) return;
+    lastUserIdRef.current = authUserId;
+    teardownSubscription();
+    cancelledPendingRef.current.clear();
+    setSession(null);
+    setLogsByConversation({});
+  }, [authUserId, teardownSubscription]);
+
   const startCall = useCallback(async (input: StartCallInput) => {
     if (sessionRef.current && sessionRef.current.status !== 'ended') return; // one call at a time
     const base: CallSession = {
@@ -221,10 +236,19 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
     setSession(base);
     try {
       const { callId } = await provider.start(input);
+      // Hung up while the server was still recording the call: the local
+      // session already ended, so end the call that now exists on the server
+      // (otherwise the other phone keeps ringing and our media channel stays
+      // joined until the ring timeout).
+      if (cancelledPendingRef.current.delete(base.callId)) {
+        void provider.end(callId, 'cancelled').catch(() => {});
+        return;
+      }
       setSession(prev => (prev && prev.callId === base.callId ? { ...prev, callId } : prev));
       unsubRef.current?.();
       unsubRef.current = provider.subscribe(callId, patch => applyPatch(callId, patch));
     } catch (error) {
+      cancelledPendingRef.current.delete(base.callId);
       const failureMessage = error instanceof CallStartError ? error.message : 'The call couldn’t be placed. Try again.';
       setSession(prev => (prev && prev.callId === base.callId
         ? { ...prev, status: 'ended', endedAt: Date.now(), endReason: 'failed', failureMessage }
@@ -289,6 +313,7 @@ export function CallSessionProvider({ children }: { children: React.ReactNode })
       : s.status === 'outgoing' ? 'cancelled'
       : 'hangup';
     if (provider.id === 'preview' || s.callId.startsWith('pending_')) {
+      if (s.callId.startsWith('pending_')) cancelledPendingRef.current.add(s.callId);
       teardownSubscription();
       if (provider.id === 'preview') await provider.end(s.callId, reason);
       setSession((prev) => {

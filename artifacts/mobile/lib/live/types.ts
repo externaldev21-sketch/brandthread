@@ -10,11 +10,12 @@
  *     runway clips as "streams", ticks viewer counts, and plays a scripted
  *     chat so the whole experience is reviewable with no services.
  *   - `createApiLiveProvider` (lib/live/apiLiveProvider.ts): the real backend
- *     (`/api/live/*`). Listing, chat and viewer counts are real (polling —
- *     the repo has no websocket/realtime transport). Video is NOT: the
- *     backend hands out Agora tokens, but rendering Agora needs the native
- *     `react-native-agora` SDK plus AGORA_APP_ID/AGORA_APP_CERTIFICATE,
- *     which are not configured. See `LiveVideoSource.kind === 'rtc'`.
+ *     (`/api/live/*`). Listing, chat, viewer counts and the pinned product
+ *     are real, delivered over the stream's `/ws/live` socket with an HTTP
+ *     poll fallback (lib/live/liveRoomSocket.ts). Video is Agora RTC: `join`
+ *     returns audience credentials (`LiveJoinResult.rtc`) that the native
+ *     renderer uses when the server has AGORA_APP_ID configured; web / Expo
+ *     Go show the poster (`LiveVideoSource.kind === 'rtc'`).
  *
  * To plug in a real streaming vendor (Mux / LiveKit / Agora / Cloudflare
  * Stream), implement this interface and return it from the single factory

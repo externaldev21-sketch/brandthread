@@ -52,6 +52,8 @@ function currencyFormatter(currency: string, locale?: string): Intl.NumberFormat
  */
 export function formatCents(cents: number, currency = 'USD', locale?: string): string {
   assertCents(cents);
+  // -0 (e.g. from `-x` or `a - b` math) would otherwise format as "-$0.00".
+  if (cents === 0) cents = 0;
   const formatter = currencyFormatter(currency.toUpperCase(), locale);
   if (formatter) {
     try {

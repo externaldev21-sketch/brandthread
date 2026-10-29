@@ -41,15 +41,19 @@ export async function publishListing(api: BrandthreadApi, form: ListingForm, pri
       await api.products.update(id, { ...updatePayload(form), status: 'draft' });
       heldForPayouts = true;
     }
+    const used = new Set<string>();
     for (const v of variantPayloads(form, priceCents)) {
       const existingId = form.variantIdsBySize[v.size ?? ''] ?? (form.sizes.length <= 1 ? form.variantIdsBySize[''] : undefined);
-      if (existingId) await api.products.updateVariant(id, existingId, { priceCents: v.priceCents, stock: v.stock });
-      else await api.products.addVariant(id, v);
+      if (existingId) {
+        used.add(existingId);
+        await api.products.updateVariant(id, existingId, { priceCents: v.priceCents, stock: v.stock });
+      } else await api.products.addVariant(id, v);
     }
-    // Sizes the seller removed stop selling (stock 0); order history keeps the variant.
-    const kept = new Set(form.sizes.map(s => s.size));
-    for (const [size, variantId] of Object.entries(form.variantIdsBySize)) {
-      if (size && !kept.has(size)) await api.products.updateVariant(id, variantId, { stock: 0 });
+    // Variants the form no longer uses stop selling (stock 0) — removed sizes,
+    // and the old no-size variant once the item is split into several sizes.
+    // Order history keeps the variant.
+    for (const variantId of new Set(Object.values(form.variantIdsBySize))) {
+      if (!used.has(variantId)) await api.products.updateVariant(id, variantId, { stock: 0 });
     }
     const videoOk = await syncVideo(api, id, form);
     return { productId: id, kind: 'updated', videoFailed: !videoOk, heldForPayouts };
