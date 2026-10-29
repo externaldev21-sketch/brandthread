@@ -6,7 +6,7 @@
  * A tile that worked flips to a check with "Copied" / "Saved", the way
  * Instagram's share sheet confirms Copy link.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,7 @@ export function CoppedShareSheet({ visible, data, onClose }: {
   const [done, setDone] = useState<TileState>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (doneTimer.current) clearTimeout(doneTimer.current); }, []);
 
   const confirm = useCallback((next: NonNullable<TileState>) => {
     hapticSuccess();

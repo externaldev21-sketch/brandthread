@@ -1,11 +1,11 @@
 /**
  * EngagementButton — Thread action-rail micro-interaction component
  *
- * Compact in-flight, success, and error states for like, save, repost, follow.
+ * Compact in-flight state for like, save, repost, follow.
  * - Prevents duplicate taps while request is in-flight (inflight guard)
- * - Retains optimistic state; rolls back only on confirmed failure
- * - Shows concise inline "toast" banner (FeedToast) instead of Alert
- * - Uses theme tokens exclusively (no arbitrary colors)
+ * - Optimistic state, rollback and error toasts belong to the caller's
+ *   `onPress` (it can use the FeedToast below via useFeedToast); this
+ *   button never shows a toast itself
  * - Fully accessible: accessibilityLabel, accessibilityState, accessibilityRole
  */
 
@@ -177,8 +177,9 @@ const LIKE_POP_SETTLE_MS = 90;
  * Self-contained rail button with:
  * - in-flight deduplication (inflight ref, never double-fires)
  * - subtle opacity pulse during pending state
- * - no count update until action resolves (optimism stays in parent EngagementState)
- * - error/success feedback via FeedToastContext when provided
+ * - count/active state come from props only (optimism stays in the parent)
+ * - no error/success feedback of its own: the caller's `onPress` reports
+ *   failures (e.g. via useFeedToast)
  */
 export function EngagementButton({
   icon,

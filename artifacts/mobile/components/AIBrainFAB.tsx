@@ -68,6 +68,10 @@ export default function AIBrainFAB({
   const slideX  = useRef(new Animated.Value(COLLAPSED_TX)).current; // starts collapsed
   const opacity = useRef(new Animated.Value(1)).current;
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The keyboard listeners are registered once, so they read `hidden`
+  // through a ref — a closure would keep the first render's value forever.
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
 
   // ── Keyboard hide/show ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -88,7 +92,7 @@ export default function AIBrainFAB({
     Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
   }
   function _showAfterKeyboard() {
-    if (hidden) return;
+    if (hiddenRef.current) return;
     Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
   }
 

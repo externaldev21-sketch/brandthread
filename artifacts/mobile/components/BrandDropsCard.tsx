@@ -50,6 +50,8 @@ export function BrandDropsCard({ sellerId, sellerName }: BrandDropsCardProps) {
 
   useEffect(() => {
     let active = true;
+    // Never keep showing the previous seller's drop while this one loads.
+    setDrop(null);
     if (!sellerId) return () => { active = false; };
     Promise.all([
       api.publicDrops.list('live').catch(() => []),
