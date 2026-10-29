@@ -1,11 +1,13 @@
 /**
  * Referral attribution + Thread Cash rewards (DB side). Policy lives in ./policy.
  *
- * Both credits — the friend's and the inviter's — are paid only once the
- * friend completes a real first paid order (qualifyReferralForOrder), never
- * on sign-up: a sign-up alone costs nothing to fake. They pass the same
- * kill switch and monthly budget as every other reward
- * (lib/threadCash/earnGate.ts) and are booked on the money ledger.
+ * The friend's $5 welcome credit is paid when they apply the code or link
+ * (applyReferralCode), which only a brand-new customer with no orders can do.
+ * The inviter's $5 is paid only once the friend completes a real first paid
+ * order (qualifyReferralForOrder), never on sign-up: a sign-up alone costs
+ * nothing to fake. Both pass the same kill switch and monthly budget as
+ * every other reward (lib/threadCash/earnGate.ts) and are booked on the
+ * money ledger.
  *
  * Every cash credit carries the idempotency key `referral:<inviteeId>:<role>`
  * (unique partial index on thread_cash_entries), so a retried request, a
@@ -103,10 +105,13 @@ export async function applyReferralCode(input: {
     return { ok: false, status: 409, error: "Invite codes are for new customers.", code: "NOT_NEW_CUSTOMER" };
   }
 
-  // Attribution and loyalty points commit together. The unique invitee row
-  // plus the idempotency keys make retries and concurrent applies safe. The
-  // invitee's Thread Cash waits for their first paid order
-  // (qualifyReferralForOrder), like the inviter's.
+  // Attribution, loyalty points and the invitee's welcome credit commit
+  // together. The unique invitee row plus the idempotency keys make retries
+  // and concurrent applies safe. Only the inviter's Thread Cash waits for the
+  // invitee's first paid order (qualifyReferralForOrder).
+  // Kill switch (fails closed), read before the transaction like every other
+  // reward: the referral is still recorded, the welcome credit is not paid.
+  const earnPaused = await threadCashEarnPauseReason();
   const applied = await db.transaction(async (tx) => {
     const [created] = await tx.insert(referrals).values({
       inviterId: inviter.clerkId,
@@ -129,6 +134,7 @@ export async function applyReferralCode(input: {
       note: "Referral bonus — friend joined",
     }, tx);
 
+    if (earnPaused) return { inviteeRewardCents: 0 };
     try {
       await assertThreadCashNotFrozen(tx, inviteeId);
       await reserveRewardsBudget(tx, REFERRAL_INVITEE_REWARD_CENTS, new Date());

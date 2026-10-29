@@ -1,7 +1,8 @@
 /**
  * Admin Thread Cash dashboard (BT-448). Everything is derived from the
  * append-only thread_cash_entries ledger:
- *   issued       platform-funded credit: rewards (check-in, streak, referral)
+ *   issued       platform-funded credit: rewards (check-in, streak, referral,
+ *                weekly quests)
  *                plus positive admin adjustments
  *   redeemed     spent toward purchases, net of cancelled reservations and
  *                credit returned by refunds

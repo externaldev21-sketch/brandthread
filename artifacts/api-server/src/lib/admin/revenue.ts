@@ -38,7 +38,7 @@ export const STRIPE_DISPUTE_FEE_CENTS = 1500;
 /** App Store / Google Play commission on in-app purchases (Small Business Program). */
 export const STORE_COMMISSION_BPS = 1500;
 /** Thread Cash sources that are platform-paid rewards. */
-export const THREAD_CASH_REWARD_SOURCES = ["daily_checkin", "streak_bonus", "referral"] as const;
+export const THREAD_CASH_REWARD_SOURCES = ["daily_checkin", "streak_bonus", "referral", "weekly_quests"] as const;
 
 export function estimateCardFeeCents(amountCents: number, charges: number): number {
   if (amountCents <= 0 || charges <= 0) return 0;
@@ -175,7 +175,7 @@ export async function computeRevenueBreakdown(days: number, now = new Date()): P
 
       (SELECT COALESCE(sum(budget_cents), 0) FROM boosts WHERE paid_at >= ${since} AND refund_status <> 'refunded') AS boost_cents,
       (SELECT count(*) FROM boosts WHERE paid_at >= ${since} AND refund_status <> 'refunded') AS boost_n,
-      (SELECT COALESCE(sum(budget_cents), 0) FROM ad_campaigns WHERE paid_at >= ${since}) AS ads_cents,
+      (SELECT COALESCE(sum(GREATEST(COALESCE(paid_amount_cents, budget_cents) - refunded_cents, 0)), 0) FROM ad_campaigns WHERE paid_at >= ${since}) AS ads_cents,
       (SELECT count(*) FROM ad_campaigns WHERE paid_at >= ${since}) AS ads_n,
       (SELECT COALESCE(sum(price_cents), 0) FROM featured_slots WHERE paid_at >= ${since} AND refund_status <> 'refunded') AS featured_cents,
       (SELECT count(*) FROM featured_slots WHERE paid_at >= ${since} AND refund_status <> 'refunded') AS featured_n,
