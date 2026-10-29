@@ -27,6 +27,7 @@ import { isAgentUserId } from "../lib/brandthreadAgent";
 import { cappedUnknown, LIMITS, looseBody, validateBody } from "../middlewares/bodySchemas";
 import { z } from "@workspace/api-zod";
 import { notifyModerators } from "../lib/moderation/alerts";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 
@@ -215,6 +216,8 @@ router.get("/", requireModerator, async (req, res) => {
 // PATCH /api/reports/:id/status — moderators only (legacy)
 router.patch("/:id/status", requireModerator, validateBody(reportStatusBody), async (req, res) => {
   const reportId = String(req.params.id);
+  // reports.id is a uuid: any other value would make Postgres throw (a 500).
+  if (!isUuid(reportId)) return res.status(404).json({ error: "Report not found" });
   const { status } = req.body as { status: string };
   const VALID = ["pending", "reviewed", "actioned", "dismissed"];
   if (!VALID.includes(status)) {

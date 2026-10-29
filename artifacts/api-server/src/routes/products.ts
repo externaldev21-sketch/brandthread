@@ -19,6 +19,7 @@ import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 import { afterStockChange } from "../lib/stockRules";
 import { normalizeUploadedImage } from "../lib/productImageResize";
+import { isUuid } from "../lib/uuid";
 import { z } from "@workspace/api-zod";
 import { bodyObject, cents, dateLike, idParams, str, validateInput } from "../lib/commerceValidation";
 
@@ -124,6 +125,17 @@ router.use(requireAuth);
 // here — product mutations below require the manager role.
 router.use(teamContext());
 
+// Product and variant ids are Postgres uuids: anything else would make the
+// query throw "invalid input syntax for type uuid" (a 500). Answer 404 instead.
+router.param("id", (req, res, next, value) => {
+  if (!isUuid(value)) { res.status(404).json({ error: "Not found" }); return; }
+  next();
+});
+router.param("variantId", (req, res, next, value) => {
+  if (!isUuid(value)) { res.status(404).json({ error: "Variant not found" }); return; }
+  next();
+});
+
 async function getProductAccess(req: any, res: any) {
   const ownerId = req.clerkUserId as string;
   try {
@@ -166,7 +178,7 @@ router.post(
       return;
     }
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_PRODUCT_IMAGE_BYTES) {
-      res.status(400).json({ error: "Product images must be no larger than 8 MB." });
+      res.status(400).json({ error: "Product images must be no larger than 20 MB." });
       return;
     }
     if (!hasValidImageSignature(bytes, contentType)) {
@@ -772,6 +784,13 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), validateInput({
   const [before] = await db.select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
     .from(productVariants)
     .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)));
+  if (before && compareAtPriceCents !== undefined && compareAtPriceCents !== null) {
+    // The strike-through "was" price must be above the price the variant will sell at.
+    const effectivePrice = priceCents !== undefined && priceCents > 0 ? priceCents : before.priceCents;
+    if (compareAtPriceCents <= effectivePrice) {
+      res.status(400).json({ error: "compareAtPriceCents must be greater than priceCents" }); return;
+    }
+  }
 
   const [updated] = await db.update(productVariants)
     .set({
@@ -842,7 +861,9 @@ router.post("/import", requireRole("manager"), validateInput({ body: importProdu
     if (!name) { results.push({ success: false, name: '(empty)', error: 'name is required' }); continue; }
 
     const priceCents = Math.round(parseFloat(String(row.price ?? '0')) * 100);
-    if (isNaN(priceCents) || priceCents < 0) { results.push({ success: false, name, error: 'invalid price' }); continue; }
+    // Bounded like every other cents input (max $1,000,000): a larger value
+    // overflows the integer column and used to fail the whole import with a 500.
+    if (!Number.isSafeInteger(priceCents) || priceCents < 0 || priceCents > 100_000_000) { results.push({ success: false, name, error: 'invalid price' }); continue; }
 
     const category = String(row.category ?? 'apparel').toLowerCase().trim() || 'apparel';
     const description = String(row.description ?? '').trim() || null;

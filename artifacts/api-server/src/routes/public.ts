@@ -296,8 +296,10 @@ router.get("/products/high-demand", async (req, res) => {
   try {
     const viewerId = optionalViewerId(req);
     setViewerScopedCacheHeaders(res, viewerId);
+    // Only products with real reservation demand can qualify (both rules
+    // below need demandCount > 0), so the rest of the catalogue is never loaded.
     const activeProducts = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt), notBlockedWith(viewerId, products.ownerId)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), gt(products.demandCount, 0), notBlockedWith(viewerId, products.ownerId)));
     if (activeProducts.length === 0) return res.json([]);
 
     const productIds = activeProducts.map((product) => product.id);
@@ -346,7 +348,8 @@ router.get("/products/high-demand", async (req, res) => {
         const seller = sellerMap.get(product.ownerId);
         return {
           ...product,
-          variants,
+          // SKU and restock threshold are the seller's (lib/publicProfile.ts).
+          variants: variants.map(toPublicVariant),
           claimedUnits,
           remainingUnits,
           endsAt: product.preOrderClosingDate ?? (product.dropId ? dropEndMap.get(product.dropId) : null) ?? null,
@@ -380,6 +383,8 @@ router.get("/products/:id/videos", async (req, res) => {
     return res.status(400).json({ error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error });
   }
   const lim = Math.min(parsedLimit, 24);
+  // A non-uuid id would make Postgres throw (500); no product has it.
+  if (!isUuid(req.params.id)) return res.json([]);
 
   try {
     const viewerId = optionalViewerId(req);
@@ -421,6 +426,8 @@ router.get("/products/:id/videos", async (req, res) => {
 });
 
 // GET /api/public/products/:id/related
+/** How many candidates the related shelf ranks (see the query below). */
+export const RELATED_CANDIDATE_CAP = 500;
 // This route must precede /products/:id so Express does not treat "related" as
 // a product id.
 router.get("/products/:id/related", async (req, res) => {
@@ -429,6 +436,7 @@ router.get("/products/:id/related", async (req, res) => {
     return res.status(400).json({ error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error });
   }
   const lim = Math.min(parsedLimit, 24);
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Product not found" });
 
   try {
     const viewerId = optionalViewerId(req);
@@ -439,8 +447,18 @@ router.get("/products/:id/related", async (req, res) => {
 
     // Fetch the candidate set in one query and batch its dependent records below.
     // Ranking is application-side because tags/styleTags are JSON arrays.
+    // Bounded: the strongest ranking keys (same seller, then same category,
+    // then newest) are applied in SQL first, so a large catalogue is never
+    // loaded whole on every product page; the full ranking runs on this set.
     const candidates = await db.select().from(products)
-      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id), notBlockedWith(viewerId, products.ownerId)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id), notBlockedWith(viewerId, products.ownerId)))
+      .orderBy(
+        desc(sql`(${products.ownerId} = ${current.ownerId})`),
+        desc(sql`(${products.category} = ${current.category})`),
+        desc(products.createdAt),
+        asc(products.id),
+      )
+      .limit(RELATED_CANDIDATE_CAP);
     const priceRows = await db
       .select({ productId: productVariants.productId, cents: sql<number>`min(${productVariants.priceCents})::int` })
       .from(productVariants)
@@ -465,7 +483,8 @@ router.get("/products/:id/related", async (req, res) => {
     return res.json(ranked.map((product) => ({
       ...product,
       sellerDisplayName: sellerMap.get(product.ownerId) ?? null,
-      variants: variantsByProduct[product.id] ?? [],
+      // SKU and restock threshold are the seller's (lib/publicProfile.ts).
+      variants: (variantsByProduct[product.id] ?? []).map(toPublicVariant),
     })));
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch related products");
@@ -475,6 +494,7 @@ router.get("/products/:id/related", async (req, res) => {
 
 // GET /api/public/products/:id/price-history — the product page's 90-day chart.
 router.get("/products/:id/price-history", async (req, res) => {
+  if (!isUuid(req.params.id)) { res.status(404).json({ error: "Product not found" }); return; }
   try {
     const viewerId = optionalViewerId(req);
     setViewerScopedCacheHeaders(res, viewerId);
@@ -499,6 +519,11 @@ router.get("/products/:id/price-history", async (req, res) => {
 // draft / archived product here ("Preview as buyer"); that response is
 // flagged `previewOnly: true` and is never cached publicly.
 router.get("/products/:id", async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
   try {
     const viewerId = optionalViewerId(req);
     setViewerScopedCacheHeaders(res, viewerId);
@@ -2462,7 +2487,8 @@ router.get("/discover/feed", async (req, res) => {
 const PUBLIC_USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
 router.get("/username-check", async (req, res) => {
-  const raw = (req.query.username as string || "").trim().toLowerCase();
+  // A repeated ?username= arrives as an array; only a single string is a username.
+  const raw = (typeof req.query.username === "string" ? req.query.username : "").trim().toLowerCase();
 
   if (!raw) {
     res.json({ available: false, error: "Username is required." });
@@ -2504,7 +2530,7 @@ router.get("/username-check", async (req, res) => {
 const PUBLIC_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.get("/email-check", async (req, res) => {
-  const raw = (req.query.email as string || "").trim().toLowerCase();
+  const raw = (typeof req.query.email === "string" ? req.query.email : "").trim().toLowerCase();
 
   if (!raw || raw.length > 320 || !PUBLIC_EMAIL_REGEX.test(raw)) {
     res.json({ available: false, error: "Enter a valid email address." });
