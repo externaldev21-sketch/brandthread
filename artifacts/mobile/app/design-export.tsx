@@ -16,7 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Dimensions, Platform } from 'react-native';
+  ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +39,11 @@ import {
 } from '@/components/BrandthreadUI';
 import DesignLayerCompositor, { renderLayer } from '@/components/DesignLayerCompositor';
 import { getProject, updateProject, whenDesignServiceReady } from '@/services/designService';
-import { DesignProject } from '@/services/designTypes';
+import { showAlert } from '@/lib/actionSheet';
+import { DesignProject, type DesignDrawingLayer } from '@/services/designTypes';
+import { buildLayerRuns } from '@/components/design-studio/layerRuns';
+import { composeExport, type ExportItem } from '@/lib/paint/composeExport';
+import { getPlatformBackend, encodeSurface } from '@/lib/paint/platform';
 import { saveImageToCameraRoll, triggerWebDownload } from '@/lib/aiToolMedia';
 import {
   buildDesignPdfHtml, exportFileName, resolveExportDimensions,
@@ -124,6 +128,11 @@ export default function DesignExportScreen() {
   const [selectedSize, setSelectedSize]     = useState<DesignExportSize>('original');
   const [exporting, setExporting]   = useState(false);
   const exportSvgRef = useRef<any>(null);
+  // Painted (brush-engine) layers are replayed from their stroke records at
+  // the output size, like Procreate's export — never upscaled from the
+  // small saved preview. Text / image / shape runs rasterise via their own
+  // off-screen SVGs and are composited between them in z-order.
+  const runSvgRefs = useRef(new Map<string, any>());
 
   useEffect(() => {
     if (!projectId) {
@@ -152,9 +161,42 @@ export default function DesignExportScreen() {
     [project],
   );
 
+  const runs = useMemo(() => (project ? buildLayerRuns(project.layers) : []), [project]);
+  const hasPaintedLayers = runs.some(r => r.kind === 'drawing' && (r.layer.data as DesignDrawingLayer).paths.some(p => p.stroke));
+
+  /** The design as a PNG data URL at exactly dims (full resolution for painted layers). */
+  const renderPng = useCallback(async (): Promise<string> => {
+    const backend = getPlatformBackend();
+    if (!project || !hasPaintedLayers || !backend) {
+      return `data:image/png;base64,${await svgToPngBase64(exportSvgRef.current, dims.width, dims.height)}`;
+    }
+    const items: ExportItem[] = [];
+    for (const run of runs) {
+      if (run.kind === 'drawing') {
+        const l = run.layer;
+        if (!l.visible) continue;
+        const t = l.transform;
+        items.push({ kind: 'raster', id: l.id, paths: (l.data as DesignDrawingLayer).paths, opacity: l.opacity ?? 1, blendMode: l.blendMode, box: { x: t.x, y: t.y, w: t.width, h: t.height }, flipX: t.flipX, flipY: t.flipY });
+      } else if (run.layers.some(l => l.visible)) {
+        items.push({ kind: 'image', uri: `data:image/png;base64,${await svgToPngBase64(runSvgRefs.current.get(run.key), dims.width, dims.height)}` });
+      }
+    }
+    const bg = project.canvas.backgroundHex && project.canvas.backgroundHex !== 'transparent' && !project.canvas.backgroundHidden ? project.canvas.backgroundHex : null;
+    const background = selectedFormat === 'tpng' ? null : (bg ?? (selectedFormat === 'jpg' || selectedFormat === 'pdf' ? '#FFFFFF' : null));
+    const out = await composeExport(backend, {
+      logicalWidth: project.canvas.width, logicalHeight: project.canvas.height,
+      scale: dims.width / project.canvas.width, background, items,
+    });
+    try {
+      return encodeSurface(backend, out, { format: 'png' });
+    } finally {
+      backend.dispose(out);
+    }
+  }, [project, hasPaintedLayers, runs, dims, selectedFormat]);
+
   const handleExport = useCallback(async () => {
     if (!project) {
-      Alert.alert('No project', 'No project loaded to export.');
+      showAlert('No project', 'No project loaded to export.');
       return;
     }
     setExporting(true);
@@ -165,11 +207,11 @@ export default function DesignExportScreen() {
         const json = JSON.stringify(project, null, 2);
         if (Platform.OS === 'web') {
           triggerWebDownload(`data:application/json;charset=utf-8,${encodeURIComponent(json)}`, fileName);
-          Alert.alert('Project downloaded', `${fileName} was downloaded.`);
+          showAlert('Project downloaded', `${fileName} was downloaded.`);
         } else {
           const uri = writeCacheFile(fileName, json, false);
           if (!(await Sharing.isAvailableAsync())) {
-            Alert.alert('Sharing unavailable', 'This device can’t open the share sheet, so the project file was not saved.');
+            showAlert('Sharing unavailable', 'This device can’t open the share sheet, so the project file was not saved.');
             return;
           }
           await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: `Save ${fileName}`, UTI: 'public.json' });
@@ -178,8 +220,8 @@ export default function DesignExportScreen() {
       }
 
       // ── Image-based formats: render the layers at the exact output size ──
-      const pngBase64 = await svgToPngBase64(exportSvgRef.current, dims.width, dims.height);
-      const pngDataUrl = `data:image/png;base64,${pngBase64}`;
+      const pngDataUrl = await renderPng();
+      const pngBase64 = pngDataUrl.slice(pngDataUrl.indexOf(',') + 1);
 
       if (selectedFormat === 'pdf') {
         const html = buildDesignPdfHtml(pngDataUrl, dims.width, dims.height);
@@ -191,7 +233,7 @@ export default function DesignExportScreen() {
         }
         const { uri } = await Print.printToFileAsync({ html, width: dims.width, height: dims.height });
         if (!(await Sharing.isAvailableAsync())) {
-          Alert.alert('Sharing unavailable', 'This device can’t open the share sheet, so the PDF was not saved.');
+          showAlert('Sharing unavailable', 'This device can’t open the share sheet, so the PDF was not saved.');
           return;
         }
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Save ${fileName}`, UTI: 'com.adobe.pdf' });
@@ -209,11 +251,11 @@ export default function DesignExportScreen() {
 
       if (Platform.OS === 'web') {
         triggerWebDownload(imageUri, fileName);
-        Alert.alert('Design downloaded', `${fileName} (${dims.width} × ${dims.height}) was downloaded.`);
+        showAlert('Design downloaded', `${fileName} (${dims.width} × ${dims.height}) was downloaded.`);
       } else {
         const saved = await saveImageToCameraRoll(imageUri, 'design');
         if (!saved.ok) {
-          Alert.alert(
+          showAlert(
             saved.reason === 'permission' ? 'Permission required' : saved.reason === 'unavailable' ? 'Photos unavailable' : 'Export failed',
             saved.reason === 'permission'
               ? 'Allow photo library access to save this design.'
@@ -223,17 +265,17 @@ export default function DesignExportScreen() {
           );
           return;
         }
-        Alert.alert('Saved to Photos', `${fileName} (${dims.width} × ${dims.height}) was saved to your photo library.`);
+        showAlert('Saved to Photos', `${fileName} (${dims.width} × ${dims.height}) was saved to your photo library.`);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       // Best effort: reflect the export on the project card.
       if (project.status !== 'exported') void updateProject(project.id, { status: 'exported' }).catch(() => {});
     } catch {
-      Alert.alert('Export failed', 'Couldn’t export your design. Nothing was saved — please try again.');
+      showAlert('Export failed', 'Couldn’t export your design. Nothing was saved — please try again.');
     } finally {
       setExporting(false);
     }
-  }, [project, selectedFormat, dims]);
+  }, [project, selectedFormat, dims, renderPng]);
 
   const selectFormat = (id: DesignExportFormat) => {
     Haptics.selectionAsync();
@@ -291,6 +333,15 @@ export default function DesignExportScreen() {
               )}
               {exportLayers.map(layer => renderLayer(layer, 1, 1, transparent ? 'transparent' : bgHex))}
             </Svg>
+            {hasPaintedLayers && runs.map(run => run.kind === 'svg' ? (
+              <Svg
+                key={run.key}
+                ref={(el: any) => { if (el) runSvgRefs.current.set(run.key, el); else runSvgRefs.current.delete(run.key); }}
+                width={dims.width} height={dims.height} viewBox={`0 0 ${canvasW} ${canvasH}`}
+              >
+                {run.layers.map(layer => renderLayer(layer, 1, 1, 'transparent'))}
+              </Svg>
+            ) : null)}
           </View>
         )}
 

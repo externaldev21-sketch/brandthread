@@ -22,9 +22,15 @@ import { useSettled } from '@/lib/animationUtils';
  * It is a drop-in replacement for the sheet's outer <View>: same props, same
  * style. Respects Reduce Motion (the Modal's fade still plays).
  */
-export function SheetRise({ style, children, ...rest }: ViewProps & { children?: React.ReactNode }) {
+export function SheetRise({ style, children, durationMs = SHEET_OPEN_MS, distance: distanceOverride, ...rest }: ViewProps & {
+  children?: React.ReactNode;
+  /** Rise duration; defaults to the app-wide SHEET_OPEN_MS. */
+  durationMs?: number;
+  /** Rise distance in px; defaults to half the window (240–460). */
+  distance?: number;
+}) {
   const { height } = useWindowDimensions();
-  const distance = Math.min(460, Math.max(240, height * 0.5));
+  const distance = distanceOverride ?? Math.min(460, Math.max(240, height * 0.5));
   const progress = useRef(new Animated.Value(0)).current;
   // Once the rise has settled at rest, this stops rendering an Animated.View
   // with an identity `transform: [{ translateY: 0 }]` — which react-native-web
@@ -45,7 +51,7 @@ export function SheetRise({ style, children, ...rest }: ViewProps & { children?:
       settled.run(
         Animated.timing(progress, {
           toValue: 1,
-          duration: SHEET_OPEN_MS,
+          duration: durationMs,
           easing: Easing.bezier(...SHEET_EASING_BEZIER),
           useNativeDriver: Platform.OS !== 'web',
         }),

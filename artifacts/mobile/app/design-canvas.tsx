@@ -45,7 +45,7 @@ import { Feather } from '@expo/vector-icons';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -68,7 +68,6 @@ import {
   RED,
   PURPLE_LIGHT,
   FONT, FS, SP, RADIUS, ICON,
-  OVERLAY,
 } from '@/lib/theme';
 import {
   SelectionRegion, SelectionMode, LogicalPoint,
@@ -80,7 +79,7 @@ import {
   computeHandlePositions, applyFreeformHandle, applyUniformHandle,
   transformToQuad, deriveAffineFromQuad, defaultWarpMesh, deriveAffineFromWarpMesh,
   computeRotationDelta, applyRotateHandle,
-  DistortQuad, WarpMeshPoint,
+  DistortQuad, WarpMeshPoint, transformReadout, fitInsertBox,
 } from '@/lib/transformModel';
 import { isDoubleTap, isPointInTransformBounds, TapRecord } from '@/lib/doubleTapModel';
 import {
@@ -93,6 +92,7 @@ import {
 } from '@/lib/adjustmentsModel';
 import { buildLayerTransform } from '@/lib/layerRenderer';
 import { buildAdjustmentStages } from '@/components/design-studio/layerFilterChain';
+import { buildLayerRuns, drawingNeedsSvg } from '@/components/design-studio/layerRuns';
 import { ADJ_CATEGORIES, ADJ_TOOL_LABELS, type AdjCategory, type AdjTool } from '@/lib/adjustmentsCatalog';
 import { AdjCategoryGrid, AdjToolList, AdjEffectPanel } from '@/components/design-studio/AdjustmentsMenu';
 import {
@@ -118,6 +118,7 @@ import type {
   DesignTextLayer, DesignImageLayer, DesignShapeLayer, DesignDrawingLayer,
   DrawPath, BlendModeKind,
 } from '@/services/designTypes';
+import Reanimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { SheetRise } from '@/components/motion/SheetRise';
 import CanvasHost, { type CanvasHostHandle } from '@/components/design-studio/CanvasHost';
 import { PaintbrushGlyph, SmudgeGlyph, EraserGlyph, LayersGlyph } from '@/components/design-studio/ProcreateToolIcons';
@@ -131,11 +132,14 @@ import { parseHex as hexToRgb } from '@/lib/paint/canvas2dBackend';
 import { composeExport, type ExportItem } from '@/lib/paint/composeExport';
 import { brushDiameter, type BrushPreset } from '@/lib/paint/brushPresets';
 import { renderBrushDab } from '@/lib/paint/brushPreview';
-import { setDesignArtwork } from '@/lib/designHandoff';
+import { setDesignArtwork, setDesignPostMedia, takeDesignRestored } from '@/lib/designHandoff';
+import { setPendingMockup } from '@/lib/mockupProductHandoff';
+import { triggerWebDownload } from '@/lib/aiToolMedia';
 import { drawPathFromRecord, fillRecord, mergeRecord } from '@/lib/paint/strokeRecord';
 import { newSeed } from '@/lib/paint/rng';
 import {
-  CanvasGestureModel, IDENTITY_VIEWPORT, applyPinch, settleViewport, stageToArtboard,
+  CanvasGestureModel, IDENTITY_VIEWPORT, applyPinch, stageToArtboard,
+  GLIDE_MS, isQuickPinch, lerpViewport, projectGlide, viewportVelocity, type ViewportSample,
   type Viewport,
 } from '@/lib/paint/canvasGestureModel';
 import { useBrushLibrary, type PaintTool } from '@/hooks/useBrushLibrary';
@@ -161,7 +165,7 @@ import { getColorPickerState, saveColorPickerState } from '@/services/designServ
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { DESIGN_STUDIO_FONTS, DEFAULT_DESIGN_STUDIO_FONT, useDesignStudioFonts } from '@/lib/designStudioFonts';
 import { radius } from '@/constants/radii';
-import { showAlert, confirmAlert } from '@/lib/actionSheet';
+import { showAlert } from '@/lib/actionSheet';
 import { computeCanvasFit } from '@/lib/canvasFit';
 import { SupportChatModal } from '@/components/SupportChatBubble';
 import { Alert } from 'react-native';
@@ -217,7 +221,7 @@ function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 type ActiveTopTool = 'brush' | 'smudge' | 'eraser' | 'select' | 'transform' | 'adjustments' | 'crop' | 'none';
 type ActiveSheet =
   | 'brushLib' | 'color' | 'layers' | 'wrench' | 'text' | 'canvasInfo'
-  | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | 'shareImage' | null;
+  | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | 'shareImage' | 'copyPaste' | null;
 
 // Wrench tab type — Procreate's own Actions tabs are Add / Canvas / Guides /
 // Share / Video / Preferences / Help. 'video' is deliberately absent: its
@@ -284,31 +288,11 @@ const DEFAULT_GUIDE_SETTINGS: GuideSettings = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-type LayerRun = { kind: 'drawing'; key: string; layer: DesignLayer } | { kind: 'svg'; key: string; layers: DesignLayer[] };
-
-/**
- * A drawing layer whose look depends on the SVG pipeline — adjustments
- * (HSB, curves, blur, …), Distort / Warp / Liquify, or a clipping mask —
- * renders as an SVG image of its engine pixels so those keep applying.
- */
-function drawingNeedsSvg(l: DesignLayer): boolean {
-  if (l.type !== 'drawing') return false;
-  const t = l.transform;
-  return buildAdjustmentStages(l.adjustments, 1).stages.length > 0
-    || !!t.affineSvgMatrix
-    || Math.abs(t.liquifyDx ?? 0) > 0.01 || Math.abs(t.liquifyDy ?? 0) > 0.01
-    || !!l.clippingMask;
-}
-
-/** Splits the (non-template) layer stack into raster drawing layers and runs of consecutive SVG-rendered layers, bottom → top. */
-function buildLayerRuns(all: DesignLayer[]): LayerRun[] {
-  const runs: LayerRun[] = [];
-  for (const l of [...all].filter(x => !x.isTemplate).sort((a, b) => a.order - b.order)) {
-    if (l.type === 'drawing' && !drawingNeedsSvg(l)) { runs.push({ kind: 'drawing', key: l.id, layer: l }); continue; }
-    const last = runs[runs.length - 1];
-    if (last && last.kind === 'svg') last.layers.push(l); else runs.push({ kind: 'svg', key: `run_${l.id}`, layers: [l] });
-  }
-  return runs;
+/** Natural pixel size of an image URI, or null if it can't be read. */
+function imageSizeOf(uri: string): Promise<{ width: number; height: number } | null> {
+  return new Promise(resolve => {
+    RNImage.getSize(uri, (width, height) => resolve({ width, height }), () => resolve(null));
+  });
 }
 
 export default function DesignCanvasScreen() {
@@ -456,6 +440,9 @@ export default function DesignCanvasScreen() {
   const warpMeshRef = useRef(warpMesh);
   warpMeshRef.current = warpMesh;
   // Extended 8-handle drag state
+  // Width/Height px bubble while a transform handle is dragged (Procreate).
+  const [transformReadoutOn, setTransformReadoutOn] = useState(false);
+  const extTransformBeforeRef = useRef<DesignLayer[] | null>(null);
   const extHandleDragRef = useRef<{
     layerId: string;
     kind: ExtHandleKind;
@@ -543,6 +530,10 @@ export default function DesignCanvasScreen() {
   // canvasSize.w / logicalW === canvasSize.h / logicalH === canvasFit.scale.
   const [stageSize, setStageSize]         = useState({ w: 0, h: 0 });
   const [colorSaveErrorKey, setColorSaveErrorKey] = useState<number | null>(null);
+  // Procreate's brief, non-blocking confirmation ("Copied", "Cut"…).
+  const [studioToast, setStudioToast] = useState<{ key: number; message: string; icon: IconName; actionLabel?: string; onAction?: () => void } | null>(null);
+  const flashToast = (message: string, icon: IconName = 'check', action?: { label: string; run: () => void }) =>
+    setStudioToast({ key: Date.now(), message, icon, actionLabel: action?.label, onAction: action?.run });
   const [modeBarHeight, setModeBarHeight] = useState(0);
   const modeBarActive = activeTopTool === 'select' || activeTopTool === 'transform' || activeTopTool === 'adjustments';
   const canvasFit = useMemo(() => computeCanvasFit({
@@ -581,14 +572,14 @@ export default function DesignCanvasScreen() {
   // for whichever of paint/smudge/erase you tapped).
   const [brushLibTool, setBrushLibTool] = useState<PaintTool>('brush');
   // Size slider positions (1..80 = 1%..100% of the brush's max size).
-  const [brushSize, setBrushSize]       = useState(36);
+  const [brushSize, setBrushSize]       = useState(0.45); // size-slider fraction 0..1 (see brushDiameter)
   const [brushOpacity, setBrushOpacity] = useState(1.0);
   // Black ink by default: the default artboard is white (#FFFFFF), so a
   // white default made the first stroke/text invisible.
   const [drawColor, setDrawColor]       = useState('#000000');
   const [prevColor, setPrevColor]       = useState('#FFFFFF');
-  const [eraserSize, setEraserSize]     = useState(24);
-  const [smudgeSize, setSmudgeSize]     = useState(20);
+  const [eraserSize, setEraserSize]     = useState(0.4);
+  const [smudgeSize, setSmudgeSize]     = useState(0.4);
 
   const [sizeSliderDragging, setSizeSliderDragging] = useState(false);
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
@@ -631,6 +622,8 @@ export default function DesignCanvasScreen() {
   // a color. The color sheet is closed while this is true so the canvas is
   // tappable (it's rendered as a full-screen Modal otherwise).
   const [eyedropperActive, setEyedropperActive] = useState(false);
+  const eyedropperActiveRef = useRef(false);
+  eyedropperActiveRef.current = eyedropperActive;
   const canvasHostRef = useRef<CanvasHostHandle>(null);
 
   // ── Layer options ──────────────────────────────────────────────────────────
@@ -670,6 +663,14 @@ export default function DesignCanvasScreen() {
   }, []);
 
   // ─── Load project ──────────────────────────────────────────────────────────
+  // Bumped when Version history restored this project: reload it in place.
+  const [reloadKey, setReloadKey] = useState(0);
+  useFocusEffect(useCallback(() => {
+    if (!takeDesignRestored(projectId)) return;
+    undoModelRef.current = new UndoModel<DesignLayer[]>({ maxHistory: 50 });
+    setSelectedLayerId(null);
+    setReloadKey(k => k + 1);
+  }, [projectId]));
   useEffect(() => {
     let cancelled = false;
     async function load(attempt = 0) {
@@ -700,14 +701,11 @@ export default function DesignCanvasScreen() {
             const lw = proj.canvas.width  || 1080;
             const lh = proj.canvas.height || 1080;
             const maxOrder = initialLayers.reduce((m, l) => Math.max(m, l.order), 0);
-            const tw = Math.round(lw * 0.6);
+            const dims = await imageSizeOf(asset.uri);
             const assetLayer: DesignLayer = {
               id: uid(), name: asset.name || 'Asset', type: 'image',
               visible: true, locked: false, order: maxOrder + 1,
-              transform: {
-                x: Math.round((lw - tw) / 2), y: 60,
-                width: tw, height: tw, rotation: 0, scaleX: 1, scaleY: 1,
-              },
+              transform: { ...fitInsertBox(lw, lh, dims?.width, dims?.height), rotation: 0, scaleX: 1, scaleY: 1 },
               data: { kind: 'image', uri: asset.uri, opacity: 1, fit: 'contain', blendMode: 'normal' } as DesignImageLayer,
               opacity: 1,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -781,7 +779,7 @@ export default function DesignCanvasScreen() {
     }
     load();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, reloadKey]);
 
   // ─── Dirty generation tracking ─────────────────────────────────────────────
   function markDirty() {
@@ -1045,6 +1043,17 @@ export default function DesignCanvasScreen() {
     }
   }
 
+  /** The selected layer's own Distort corners / Warp mesh (saved ones, else its box). */
+  function syncDistortWarpFrom(layerId: string | null) {
+    const layer = layerId ? layersRef.current.find(l => l.id === layerId) : null;
+    if (!layer) { setDistortQuad(null); setWarpMesh(null); return; }
+    const parse = <T,>(json?: string): T | null => { try { return json ? JSON.parse(json) as T : null; } catch { return null; } };
+    setDistortQuad(parse<DistortQuad>(layer.transform.distortQuad) ?? transformToQuad(layer.transform));
+    setWarpMesh(parse<WarpMeshPoint[]>(layer.transform.warpMesh) ?? defaultWarpMesh(layer.transform));
+  }
+  // A different layer never inherits the last layer's Distort / Warp handles.
+  useEffect(() => { syncDistortWarpFrom(selectedLayerId); }, [selectedLayerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function activePaintTool(): PaintTool {
     const t = activeTopToolRef.current;
     return t === 'eraser' ? 'eraser' : t === 'smudge' ? 'smudge' : 'brush';
@@ -1237,12 +1246,74 @@ export default function DesignCanvasScreen() {
   }, [paintEngine, paintBackend, layers]);
 
   // ─── Canvas viewport (pinch zoom / rotate / pan) ───────────────────────────
+  // The artboard's transform lives in reanimated shared values written
+  // straight from the gesture model, so pinching never re-renders this
+  // screen (Procreate's canvas tracks the fingers 1:1). `viewportRef` is the
+  // exact current viewport at every frame (strokes map through it); React
+  // state only catches up once the canvas comes to rest, for the few bits of
+  // UI that read the zoom (e.g. the size card's true-size dot).
   const [viewport, setViewport] = useState<Viewport>(IDENTITY_VIEWPORT);
-  const viewportRef = useRef(viewport);
-  viewportRef.current = viewport;
+  // Four-finger tap: Procreate's full-screen mode — the interface fades away,
+  // the canvas stays exactly where it is.
+  const [fullScreen, setFullScreen] = useState(false);
+  const viewportRef = useRef<Viewport>(IDENTITY_VIEWPORT);
+  const vpScale = useSharedValue(1);
+  const vpRotation = useSharedValue(0);
+  const vpTx = useSharedValue(0);
+  const vpTy = useSharedValue(0);
+  // Brush cursor (Preferences → Brush Cursor): the brush outline under the
+  // finger while painting, at its true on-screen diameter.
+  const cursorX = useSharedValue(0);
+  const cursorY = useSharedValue(0);
+  const cursorD = useSharedValue(0);
+  const cursorOn = useSharedValue(0);
+  const brushCursorStyle = useAnimatedStyle(() => ({
+    opacity: cursorOn.value,
+    width: cursorD.value,
+    height: cursorD.value,
+    transform: [{ translateX: cursorX.value - cursorD.value / 2 }, { translateY: cursorY.value - cursorD.value / 2 }],
+  }));
+  const artboardViewportStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: vpTx.value }, { translateY: vpTy.value },
+      { rotate: `${vpRotation.value}rad` }, { scale: vpScale.value },
+    ],
+  }));
   const pinchStartRef = useRef<Viewport>(IDENTITY_VIEWPORT);
+  const pinchStartTRef = useRef(0);
+  const pinchSamplesRef = useRef<ViewportSample[]>([]);
+  const glideRafRef = useRef<number | null>(null);
   const canvasFitRef = useRef(canvasFit);
   canvasFitRef.current = canvasFit;
+
+  /** Moves the canvas this frame (no React render). */
+  function writeViewport(v: Viewport) {
+    viewportRef.current = v;
+    vpScale.value = v.scale;
+    vpRotation.value = v.rotation;
+    vpTx.value = v.tx;
+    vpTy.value = v.ty;
+  }
+
+  function stopGlide() {
+    if (glideRafRef.current !== null) { cancelAnimationFrame(glideRafRef.current); glideRafRef.current = null; }
+  }
+
+  /** Damped ease-out to `to`, then commits it to React state. */
+  function glideViewport(to: Viewport, ms = GLIDE_MS) {
+    stopGlide();
+    const from = viewportRef.current;
+    const t0 = Date.now();
+    const step = () => {
+      const k = Math.min(1, (Date.now() - t0) / ms);
+      writeViewport(k >= 1 ? to : lerpViewport(from, to, k));
+      if (k >= 1) { glideRafRef.current = null; setViewport(to); return; }
+      glideRafRef.current = requestAnimationFrame(step);
+    };
+    glideRafRef.current = requestAnimationFrame(step);
+  }
+
+  useEffect(() => stopGlide, []);
 
   function stageToLogical(pt: { x: number; y: number }) {
     const fit = canvasFitRef.current;
@@ -1252,16 +1323,40 @@ export default function DesignCanvasScreen() {
   }
 
   function handlePinch(v: { scale: number; rotation: number; dx: number; dy: number; cx: number; cy: number; phase: 'start' | 'move' | 'end' }) {
-    if (v.phase === 'start') { pinchStartRef.current = viewportRef.current; return; }
-    if (v.phase === 'end') { setViewport(prev => settleViewport(prev)); return; }
+    if (v.phase === 'start') {
+      stopGlide();
+      pinchStartRef.current = viewportRef.current;
+      pinchStartTRef.current = Date.now();
+      pinchSamplesRef.current = [{ t: Date.now(), v: viewportRef.current }];
+      return;
+    }
+    if (v.phase === 'end') {
+      const start = pinchStartRef.current;
+      const now = viewportRef.current;
+      // Quick pinch (fingers snapped together fast) → fit the canvas to the screen.
+      if (isQuickPinch(Date.now() - pinchStartTRef.current, now.scale / start.scale)) {
+        Haptics.selectionAsync();
+        glideViewport(IDENTITY_VIEWPORT, 240);
+        return;
+      }
+      // Otherwise the canvas carries the release velocity a little and settles.
+      glideViewport(projectGlide(now, viewportVelocity(pinchSamplesRef.current)));
+      return;
+    }
     const fit = canvasFitRef.current;
-    setViewport(applyPinch(pinchStartRef.current, v, { x: fit.offsetX + fit.width / 2, y: fit.offsetY + fit.height / 2 }));
+    const next = applyPinch(pinchStartRef.current, v, { x: fit.offsetX + fit.width / 2, y: fit.offsetY + fit.height / 2 });
+    writeViewport(next);
+    const samples = pinchSamplesRef.current;
+    samples.push({ t: Date.now(), v: next });
+    if (samples.length > 12) samples.shift();
   }
 
   // ─── Strokes ───────────────────────────────────────────────────────────────
   const strokeRef = useRef<{ layerId: string; before: DesignLayer[]; createdLayer: boolean } | null>(null);
 
   function beginPaintStroke(pt: { x: number; y: number; p: number; t: number }) {
+    // A finger landing stops any glide where it is, so the stroke maps exactly.
+    if (glideRafRef.current !== null) { stopGlide(); setViewport(viewportRef.current); }
     const engine = paintEngineRef.current;
     const tool = activeTopToolRef.current;
     if (!engine || (tool !== 'brush' && tool !== 'eraser' && tool !== 'smudge')) return;
@@ -1289,9 +1384,13 @@ export default function DesignCanvasScreen() {
     const layer = layersRef.current.find(l => l.id === targetId)!;
     const brush = resolveActiveBrush();
     const mode = tool === 'eraser' ? 'erase' : tool === 'smudge' ? 'smudge' : 'paint';
-    const diameter = brushDiameter(brush.params, resolveActiveSize() / 80, Math.max(engine.logicalWidth, engine.logicalHeight));
+    const diameter = brushDiameter(brush.params, resolveActiveSize(), Math.max(engine.logicalWidth, engine.logicalHeight));
     const at = stageToLogical(pt);
     strokeRef.current = { layerId: targetId, before: current, createdLayer: created };
+    cursorD.value = Math.max(4, diameter * (canvasFitRef.current.scale || 1) * viewportRef.current.scale);
+    cursorX.value = pt.x;
+    cursorY.value = pt.y;
+    cursorOn.value = 1;
     engine.beginStroke(targetId, {
       v: 1, mode, brushId: brush.id, brushName: brush.name, params: brush.params,
       color: drawColorRef.current, diameter, opacity: brushOpacityRef.current, seed: newSeed(),
@@ -1303,9 +1402,12 @@ export default function DesignCanvasScreen() {
     const engine = paintEngineRef.current;
     if (!engine || !strokeRef.current) return;
     engine.addSamples(pts.map(p => ({ ...stageToLogical(p), p: p.p, t: p.t })));
+    const last = pts[pts.length - 1];
+    if (last) { cursorX.value = last.x; cursorY.value = last.y; }
   }
 
   function endPaintStroke() {
+    cursorOn.value = 0;
     const engine = paintEngineRef.current;
     const s = strokeRef.current;
     strokeRef.current = null;
@@ -1330,6 +1432,7 @@ export default function DesignCanvasScreen() {
   }
 
   function cancelPaintStroke() {
+    cursorOn.value = 0;
     const s = strokeRef.current;
     strokeRef.current = null;
     paintEngineRef.current?.cancelStroke();
@@ -1373,7 +1476,7 @@ export default function DesignCanvasScreen() {
   // One gesture model for the canvas's lifetime; callbacks read the latest closures.
   const paintHandlersRef = useRef({
     begin: beginPaintStroke, move: movePaintStroke, end: endPaintStroke, cancel: cancelPaintStroke,
-    undo: () => {}, redo: () => {}, pinch: handlePinch, hold: handleHold,
+    undo: () => {}, redo: () => {}, pinch: handlePinch, hold: handleHold, copyPaste: () => {}, fullScreen: () => {},
   });
   const gestureModel = useMemo(() => new CanvasGestureModel({
     strokeBegin: pt => paintHandlersRef.current.begin(pt),
@@ -1384,10 +1487,46 @@ export default function DesignCanvasScreen() {
     redo: () => paintHandlersRef.current.redo(),
     viewport: v => paintHandlersRef.current.pinch(v),
     hold: (pt, phase) => paintHandlersRef.current.hold(pt, phase),
+    copyPasteMenu: () => paintHandlersRef.current.copyPaste(),
+    fullScreen: () => paintHandlersRef.current.fullScreen(),
   }), []);
+  // Eyedropper armed (modify square / Colours panel): the next touch samples
+  // instead of painting — loupe while the finger moves, colour on lift.
+  const eyeTouchRef = useRef<{ x: number; y: number } | null>(null);
+  function eyedropperTouch(pt: { x: number; y: number }, phase: 'start' | 'move' | 'end') {
+    eyeTouchRef.current = phase === 'end' ? null : pt;
+    handleHold(pt, phase);
+    if (phase === 'end') {
+      setEyedropperActive(false);
+      if (eyedropperFromPanelRef.current) openSheet('color');
+      eyedropperFromPanelRef.current = false;
+    }
+  }
   paintHandlersRef.current = {
-    begin: beginPaintStroke, move: movePaintStroke, end: endPaintStroke, cancel: cancelPaintStroke,
-    undo: handleUndo, redo: handleRedo, pinch: handlePinch, hold: handleHold,
+    begin: pt => (eyedropperActiveRef.current ? eyedropperTouch(pt, 'start') : beginPaintStroke(pt)),
+    move: pts => {
+      if (!eyeTouchRef.current) { movePaintStroke(pts); return; }
+      const last = pts[pts.length - 1];
+      if (last) eyedropperTouch(last, 'move');
+    },
+    end: () => (eyeTouchRef.current ? eyedropperTouch(eyeTouchRef.current, 'end') : endPaintStroke()),
+    cancel: () => {
+      if (eyeTouchRef.current) { eyeTouchRef.current = null; setHoldSample(null); return; }
+      cancelPaintStroke();
+    },
+    undo: handleUndo, redo: handleRedo, pinch: handlePinch,
+    hold: (pt, phase) => (eyedropperActiveRef.current ? eyedropperTouch(pt, phase) : handleHold(pt, phase)),
+    copyPaste: () => {
+      // Procreate always has a current layer: with nothing explicitly
+      // selected, Copy & Paste acts on the layer you'd paint on.
+      if (!selectedLayerIdRef.current) {
+        const current = resolveActiveDrawingLayerId(layersRef.current);
+        if (current) setSelectedLayerId(current);
+      }
+      Haptics.selectionAsync();
+      openSheet('copyPaste');
+    },
+    fullScreen: () => { Haptics.selectionAsync(); setFullScreen(v => !v); },
   };
 
   // ─── startHandle — called by Pressable overlays before pan responder fires ──
@@ -1678,6 +1817,8 @@ export default function DesignCanvasScreen() {
           startLocX: e.nativeEvent.locationX,
           startLocY: e.nativeEvent.locationY,
         };
+        extTransformBeforeRef.current = layersRef.current;
+        if (kind !== 'move') setTransformReadoutOn(true);
         // Double-tap-to-edit only makes sense for a plain body tap (kind
         // 'move' — pendingExtHandleRef always resets to 'move' after each
         // gesture, so a tap that didn't land on a specific resize/rotate
@@ -1717,11 +1858,11 @@ export default function DesignCanvasScreen() {
 
           if (mode === 'freeform') {
             const newT = applyFreeformHandle(orig, drag.kind, ddx, ddy, transformSnapEnabledRef.current);
-            return { ...l, transform: { ...newT, affineSvgMatrix: undefined } };
+            return { ...l, transform: { ...newT, affineSvgMatrix: undefined, distortQuad: undefined, warpMesh: undefined } };
           }
           if (mode === 'uniform') {
             const newT = applyUniformHandle(orig, drag.kind, ddx, ddy, transformSnapEnabledRef.current);
-            return { ...l, transform: { ...newT, affineSvgMatrix: undefined } };
+            return { ...l, transform: { ...newT, affineSvgMatrix: undefined, distortQuad: undefined, warpMesh: undefined } };
           }
           if (mode === 'distort') {
             const quad = drag.origQuad ?? transformToQuad(orig);
@@ -1760,13 +1901,20 @@ export default function DesignCanvasScreen() {
       onPanResponderRelease: () => {
         if (extHandleDragRef.current) {
           extHandleDragRef.current = null;
+          // One undo step per transform drag (Procreate's transforms undo).
+          const before = extTransformBeforeRef.current;
+          if (before && before !== layersRef.current) pushUndo(before, layersRef.current);
           markDirty();
         }
+        extTransformBeforeRef.current = null;
+        setTransformReadoutOn(false);
         // Always reset handle to 'move' so next gesture starts fresh
         pendingExtHandleRef.current = 'move';
       },
 
       onPanResponderTerminate: () => {
+        setTransformReadoutOn(false);
+        extTransformBeforeRef.current = null;
         extHandleDragRef.current = null;
         // Reset handle on responder steal
         pendingExtHandleRef.current = 'move';
@@ -1855,15 +2003,19 @@ export default function DesignCanvasScreen() {
         const current = tool === 'eraser' ? eraserSizeRef.current
           : tool === 'smudge' ? smudgeSizeRef.current
           : brushSizeRef.current;
-        sizeSliderStartPctRef.current = Math.max(0, Math.min(1, current / 80));
+        sizeSliderStartPctRef.current = Math.max(0, Math.min(1, current));
       },
       onPanResponderMove: (_e, gestureState) => {
-        const deltaPct = -gestureState.dy / sizeSliderHeightRef.current;
+        // Track = view height minus its 6px top/bottom padding: the thumb moves
+        // exactly as far as the finger (1:1).
+        const deltaPct = -gestureState.dy / Math.max(1, sizeSliderHeightRef.current - 12);
         const pct = Math.max(0, Math.min(1, sizeSliderStartPctRef.current + deltaPct));
         const tool = activeTopToolRef.current;
-        if (tool === 'eraser')       setEraserSize(Math.max(2, Math.round(pct * 80)));
-        else if (tool === 'smudge')  setSmudgeSize(Math.max(2, Math.round(pct * 80)));
-        else                         setBrushSize(Math.max(1, Math.round(pct * 80)));
+        // Continuous (no 1/80 steps): the exponential curve in brushDiameter
+        // turns every pixel of travel into a visible size change.
+        if (tool === 'eraser')       setEraserSize(pct);
+        else if (tool === 'smudge')  setSmudgeSize(pct);
+        else                         setBrushSize(pct);
       },
       onPanResponderRelease: () => setSizeSliderDragging(false),
       onPanResponderTerminate: () => setSizeSliderDragging(false),
@@ -1885,7 +2037,7 @@ export default function DesignCanvasScreen() {
         opacitySliderStartPctRef.current = Math.max(0.02, Math.min(1, brushOpacityRef.current));
       },
       onPanResponderMove: (_e, gestureState) => {
-        const deltaPct = -gestureState.dy / opacitySliderHeightRef.current;
+        const deltaPct = -gestureState.dy / Math.max(1, opacitySliderHeightRef.current - 12);
         const pct = Math.max(0.02, Math.min(1, opacitySliderStartPctRef.current + deltaPct));
         setBrushOpacity(pct);
       },
@@ -1913,20 +2065,12 @@ export default function DesignCanvasScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
+  // Procreate deletes a layer the moment you tap Delete — no confirm, the
+  // Layers panel stays open, and two-finger tap / Undo brings it back.
   function handleDeleteLayer(id: string) {
-    const name = layers.find(l => l.id === id)?.name;
-    void confirmAlert({
-      title: name ? `Delete "${name}"?` : 'Delete layer?',
-      message: 'This removes the layer from your design.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    }).then(ok => {
-      if (!ok) return;
-      mutateLayer(prev => prev.filter(l => l.id !== id));
-      setSelectedLayerId(cur => (cur === id ? null : cur));
-      closeSheet();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    });
+    mutateLayer(prev => prev.filter(l => l.id !== id));
+    setSelectedLayerId(cur => (cur === id ? null : cur));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
   function handleDuplicateLayer(id: string) {
@@ -2128,11 +2272,21 @@ export default function DesignCanvasScreen() {
     const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
     // Place text in logical canvas coordinates
     const lw = project?.canvas.width || 1080;
+    const lh = project?.canvas.height || 1080;
+    // The sheet's "pt" is relative to a 1080px canvas (like brush size), so
+    // 72pt reads the same on a square post and a 4500×5400 print canvas.
+    const k = Math.max(lw, lh) / 1080;
+    const fs = Math.round(fontSize * k);
+    const lines = content.split('\n');
+    const longest = Math.max(...lines.map(l => l.length), 1);
+    const width = Math.min(Math.round(lw * 0.9), Math.round(fs * 0.62 * longest + fs * 0.6));
+    const height = Math.round(fs * lineHeight * lines.length + fs * 0.3);
     const newLayer: DesignLayer = {
       id: uid(), name: 'Text', type: 'text',
       visible: true, locked: false, order: maxOrder + 1,
-      transform: { x: 50, y: 120, width: Math.min(lw - 100, 400), height: 80, rotation: 0, scaleX: 1, scaleY: 1 },
-      data: { kind: 'text', content, fontFamily, fontSize, bold, italic, underline: false, align, color, letterSpacing, lineHeight } as DesignTextLayer,
+      // Centred on the canvas, box fitted to the text (Procreate's Add Text).
+      transform: { x: Math.round((lw - width) / 2), y: Math.round((lh - height) / 2), width, height, rotation: 0, scaleX: 1, scaleY: 1 },
+      data: { kind: 'text', content, fontFamily, fontSize: fs, bold, italic, underline: false, align, color, letterSpacing: letterSpacing * k, lineHeight } as DesignTextLayer,
       opacity: 1,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
@@ -2165,15 +2319,12 @@ export default function DesignCanvasScreen() {
       const lw = project?.canvas.width  || 1080;
       const lh = project?.canvas.height || 1080;
       const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
-      // Default image size in logical coords: 60% canvas width
-      const tw = Math.round(lw * 0.6);
-      const th = asset.height && asset.width ? Math.round((tw / asset.width) * asset.height) : tw;
+      const box = fitInsertBox(lw, lh, asset.width, asset.height);
       const newLayer: DesignLayer = {
         id: uid(), name: 'Photo', type: 'image',
         visible: true, locked: false, order: maxOrder + 1,
         transform: {
-          x: Math.round((lw - tw) / 2), y: 60,
-          width: tw, height: th, rotation: 0, scaleX: 1, scaleY: 1,
+          ...box, rotation: 0, scaleX: 1, scaleY: 1,
         },
         data: { kind: 'image', uri: localUri, opacity: 1, fit: 'contain', blendMode: 'normal' } as DesignImageLayer,
         opacity: 1,
@@ -2409,6 +2560,21 @@ export default function DesignCanvasScreen() {
     setClipboard([layer]);
     mutateLayer(prev => prev.filter(l => l.id !== selId));
     setSelectedLayerId(null);
+    flashToast('Cut', 'scissors');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+
+  /** Procreate's Cut & Paste: the layer's content moves to a new layer on top. */
+  function handleCutAndPaste() {
+    const selId = selectedLayerId;
+    const src = selId ? layers.find(l => l.id === selId) : null;
+    if (!src) return;
+    const id = uid();
+    mutateLayer(prev => {
+      const maxOrder = prev.reduce((m, l) => Math.max(m, l.order), 0);
+      return [...prev.filter(l => l.id !== src.id), { ...src, id, name: `${src.name} (cut)`, order: maxOrder + 1, updatedAt: new Date().toISOString() }];
+    });
+    setSelectedLayerId(id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
@@ -2418,6 +2584,7 @@ export default function DesignCanvasScreen() {
     const layer = layers.find(l => l.id === selId);
     if (!layer) return;
     setClipboard([{ ...layer }]);
+    flashToast('Copied', 'copy');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
@@ -2425,7 +2592,7 @@ export default function DesignCanvasScreen() {
     // Snapshot all current layers as clipboard (does NOT mutate original)
     const snap = JSON.parse(JSON.stringify(layers)) as DesignLayer[];
     setClipboard(snap);
-    showAlert('Canvas copied', 'Paste to create a copy of the current composition.');
+    flashToast('Copied all', 'copy');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
@@ -2478,8 +2645,8 @@ export default function DesignCanvasScreen() {
     // ── JSON import ─────────────────────────────────────────────────────────
     if (mime === 'application/json' || asset.name.toLowerCase().endsWith('.json')) {
       try {
-        const fileObj = new File(uri);
-        const raw     = await fileObj.text();
+        // expo-file-system's File is native-only; the web picker hands back a blob/data URI.
+        const raw = Platform.OS === 'web' ? await (await fetch(uri)).text() : await new File(uri).text();
 
         // Step 2: Actual byte-length gate — guards against missing/false metadata.
         const sizeResult = validateJsonByteLength(raw);
@@ -2520,8 +2687,7 @@ export default function DesignCanvasScreen() {
     // MIME+ext pair already validated above.  Now inspect magic bytes before
     // calling makeDurableUri — we never persist unvalidated file content.
     try {
-      const fileObj   = new File(uri);
-      const buf       = await fileObj.arrayBuffer();
+      const buf = Platform.OS === 'web' ? await (await fetch(uri)).arrayBuffer() : await new File(uri).arrayBuffer();
       const bytes     = new Uint8Array(buf, 0, Math.min(buf.byteLength, 16));
       const magicResult = validateMagicBytes(bytes, mime);
       if (!magicResult.ok) {
@@ -2533,7 +2699,7 @@ export default function DesignCanvasScreen() {
       const lw = project?.canvas.width  || 1080;
       const lh = project?.canvas.height || 1080;
       const maxOrder = layersRef.current.reduce((m, l) => Math.max(m, l.order), 0);
-      const tw = Math.round(lw * 0.8);
+      const dims = await imageSizeOf(durableUri);
       const newLayer: DesignLayer = {
         id: uid(),
         name: asset.name || 'Imported image',
@@ -2541,13 +2707,7 @@ export default function DesignCanvasScreen() {
         visible: true,
         locked: false,
         order: maxOrder + 1,
-        transform: {
-          x: Math.round((lw - tw) / 2),
-          y: Math.round(lh * 0.1),
-          width: tw,
-          height: tw,
-          rotation: 0, scaleX: 1, scaleY: 1,
-        },
+        transform: { ...fitInsertBox(lw, lh, dims?.width, dims?.height), rotation: 0, scaleX: 1, scaleY: 1 },
         data: { kind: 'image', uri: durableUri, opacity: 1, fit: 'contain', blendMode: 'normal' } as DesignImageLayer,
         opacity: 1,
         createdAt: new Date().toISOString(),
@@ -2613,7 +2773,7 @@ export default function DesignCanvasScreen() {
       // Flush latest gen first — duplicateProject reads from the persisted project.
       await coordinatedSave();
       const copy = await duplicateProject(project.id);
-      showAlert('Saved', `"${copy.name}" saved to your gallery.`);
+      flashToast(`"${copy.name}" saved to your gallery`, 'copy');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       showAlert("Couldn't save a copy", 'Something went wrong saving a copy of this design. Try again.');
@@ -2623,131 +2783,57 @@ export default function DesignCanvasScreen() {
   // ─── Brandthread flow actions ─────────────────────────────────────────────
 
   /**
-   * triggerWebDownload — programmatically download a data URL in the browser.
-   * Reuses the same anchor-click pattern as handleExport.
+   * The full-resolution PNG (background included unless hidden) as a URI the
+   * next screen can read: a data URI on web, a verified file on native.
    */
-  function triggerWebDownload(dataUrl: string, filename: string) {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  async function exportHandoffPng(suffix: string): Promise<{ uri: string; width: number; height: number }> {
+    const desc   = buildMasterDescriptor();
+    const base64 = await captureFullResolutionPngBase64(desc);
+    if (Platform.OS === 'web') {
+      const dataUrl = `data:image/png;base64,${base64}`;
+      await verifyExportDimensionsWeb(dataUrl, desc);
+      void syncVerifiedDesignAsset(project!.id, { uri: dataUrl, mimeType: 'image/png', width: desc.width, height: desc.height, format: 'png', lossless: true }, 'master').catch(() => {});
+      return { uri: dataUrl, width: desc.width, height: desc.height };
+    }
+    const localUri = await writePngToDocument(base64, suffix);
+    await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
+    void syncVerifiedDesignAsset(project!.id, { uri: localUri, mimeType: 'image/png', width: desc.width, height: desc.height, format: 'png', lossless: true }, 'master').catch(() => {});
+    return { uri: localUri, width: desc.width, height: desc.height };
   }
 
+  /** "Use as product photo": pick one of your products and the design becomes its photo. */
   async function handleUseAsProductPhoto() {
-    if (!project) return;
+    if (!project || exporting) return;
     closeSheet();
     setExporting(true);
     try {
-      // Full-resolution PNG — never display fallback
-      const desc   = buildMasterDescriptor();
-      const base64 = await captureFullResolutionPngBase64(desc);
-      const slug   = (projectName || 'design').replace(/\s+/g, '_');
-
-      if (Platform.OS === 'web') {
-        const dataUrl = `data:image/png;base64,${base64}`;
-        await verifyExportDimensionsWeb(dataUrl, desc);
-        const asset: MasterExportAsset = {
-          uri: dataUrl, mimeType: 'image/png',
-          width: desc.width, height: desc.height, format: 'png', lossless: true,
-        };
-        triggerWebDownload(asset.uri, `${slug}_product.png`);
-        void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        showAlert(
-          'Design downloaded',
-          `Your full-resolution PNG (${desc.width}×${desc.height}) has been downloaded. ` +
-          'Upload it as the product photo in your Seller dashboard.',
-          [{ text: 'OK' }],
-        );
-        return;
-      }
-
-      // Native: write PNG, verify, save to Camera Roll
-      const localUri = await writePngToDocument(base64, '_product');
-      await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
-      const asset: MasterExportAsset = {
-        uri: localUri, mimeType: 'image/png',
-        width: desc.width, height: desc.height, format: 'png', lossless: true,
-      };
-      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
-      if (mediaSaveResult !== 'saved') {
-        showAlert(
-          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
-          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
-        );
-        return;
-      }
-      void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      showAlert(
-        'Saved to Camera Roll',
-        `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
-        'Open "Add Product" in the Seller tab and select it as your product photo.',
-        [{ text: 'OK' }],
-      );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await new Promise<void>(r => setTimeout(r, 60)); // let "Exporting" paint first
+      const { uri } = await exportHandoffPng('_product');
+      setPendingMockup({ projectId: project.id, uri, name: projectName });
+      await coordinatedSave().catch(() => {});
+      router.push(`/(tabs)/products?pickForMockup=1&projectId=${encodeURIComponent(project.id)}` as never);
     } catch (err) {
-      console.error('[design-canvas] export failed', err);
-      showAlert('Export failed', "Couldn't save your design. Try again.");
+      console.error('[design-canvas] use as product photo failed', err);
+      showAlert('Export failed', "Couldn't prepare your design. Try again.");
     } finally {
       setExporting(false);
     }
   }
 
+  /** "Use in a post": opens the post composer on its editor with the design as the photo. */
   async function handleUseInPost() {
-    if (!project) return;
+    if (!project || exporting) return;
     closeSheet();
     setExporting(true);
     try {
-      // Full-resolution PNG — never display fallback
-      const desc   = buildMasterDescriptor();
-      const base64 = await captureFullResolutionPngBase64(desc);
-      const slug   = (projectName || 'design').replace(/\s+/g, '_');
-
-      if (Platform.OS === 'web') {
-        const dataUrl = `data:image/png;base64,${base64}`;
-        await verifyExportDimensionsWeb(dataUrl, desc);
-        const asset: MasterExportAsset = {
-          uri: dataUrl, mimeType: 'image/png',
-          width: desc.width, height: desc.height, format: 'png', lossless: true,
-        };
-        triggerWebDownload(asset.uri, `${slug}_post.png`);
-        void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-        showAlert(
-          'Design downloaded',
-          `Full-resolution PNG (${desc.width}×${desc.height}) downloaded. ` +
-          'Attach it when composing your Thread post.',
-          [{ text: 'OK' }],
-        );
-        return;
-      }
-
-      // Native: write PNG, verify, save to Camera Roll
-      const localUri = await writePngToDocument(base64, '_post');
-      await verifyExportDimensionsNative(localUri, desc, RNImage.getSize.bind(RNImage));
-      const asset: MasterExportAsset = {
-        uri: localUri, mimeType: 'image/png',
-        width: desc.width, height: desc.height, format: 'png', lossless: true,
-      };
-      const mediaSaveResult = await saveImageToMediaLibrary(asset.uri);
-      if (mediaSaveResult !== 'saved') {
-        showAlert(
-          mediaSaveResult === 'unavailable' ? 'Unavailable' : 'Permission required',
-          mediaSaveResult === 'unavailable' ? mediaLibraryUnavailableMessage() : 'Allow photo library access to save this design.',
-        );
-        return;
-      }
-      void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
-      showAlert(
-        'Saved to Camera Roll',
-        `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
-        'Open the Thread composer and select it to create a post.',
-        [{ text: 'OK' }],
-      );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await new Promise<void>(r => setTimeout(r, 60));
+      const { uri, width, height } = await exportHandoffPng('_post');
+      setDesignPostMedia({ projectId: project.id, uri, width, height, createdAt: Date.now() });
+      await coordinatedSave().catch(() => {});
+      router.push(`/create-post?fromDesign=${encodeURIComponent(project.id)}` as never);
     } catch (err) {
-      console.error('[design-canvas] export failed', err);
-      showAlert('Export failed', "Couldn't save your design. Try again.");
+      console.error('[design-canvas] use in post failed', err);
+      showAlert('Export failed', "Couldn't prepare your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2771,10 +2857,7 @@ export default function DesignCanvasScreen() {
       // 3. If a mutation raced while createVersion was running, stay dirty.
       //    The next autosave / user press will persist the new edits.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showAlert('Version saved', 'You can restore or duplicate it from Version history.', [
-        { text: 'OK' },
-        { text: 'Version history', onPress: () => handleOpenVersionHistory() },
-      ]);
+      flashToast('Version saved', 'bookmark', { label: 'History', run: () => { void handleOpenVersionHistory(); } });
     } catch {
       setSaveStatus('unsaved');
       showAlert(
@@ -2793,7 +2876,7 @@ export default function DesignCanvasScreen() {
       // Versions already on disk are still worth showing; the canvas keeps
       // its own unsaved state and save indicator.
     }
-    router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}` as never);
+    router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}&from=canvas` as never);
   }
 
   async function handleOpenExportOptions() {
@@ -2896,6 +2979,7 @@ export default function DesignCanvasScreen() {
           kind: 'raster', id: l.id, paths: (l.data as DesignDrawingLayer).paths,
           opacity: l.opacity ?? 1, blendMode: l.blendMode,
           box: { x: t.x, y: t.y, w: t.width, h: t.height },
+          flipX: t.flipX, flipY: t.flipY,
         });
       } else if (run.layers.some(l => l.visible)) {
         items.push({ kind: 'image', uri: await svgRunToPng(run.key, desc.width, desc.height) });
@@ -3184,19 +3268,23 @@ export default function DesignCanvasScreen() {
   }
 
   /** Samples a color at a canvas-local DISPLAY point (e.g. from a touch event) and applies it. */
+  // Set when the eyedropper was started from the Colours panel: picking then
+  // returns there. From the sidebar's modify square it stays on the canvas.
+  const eyedropperFromPanelRef = useRef(false);
   function sampleEyedropperAt(displayX: number, displayY: number) {
-    const skiaHex = canvasHostRef.current?.readPixelColor(displayX, displayY);
-    if (skiaHex) {
-      applyColor(skiaHex);
-    } else {
-      const sx = dispScaleXRef.current || 1;
-      const sy = dispScaleYRef.current || 1;
-      const approx = approximateColorAtPoint(displayX / sx, displayY / sy);
-      if (approx) applyColor(approx);
-    }
+    if (!Number.isFinite(displayX) || !Number.isFinite(displayY)) return;
+    const sx = dispScaleXRef.current || 1;
+    const sy = dispScaleYRef.current || 1;
+    // The real composited pixels first (the paint engine, same as
+    // touch-and-hold), then the legacy vector canvas, then the layer guess.
+    const picked = (paintEngineRef.current ? sampleCanvasColor(displayX / sx, displayY / sy) : null)
+      ?? canvasHostRef.current?.readPixelColor(displayX, displayY)
+      ?? approximateColorAtPoint(displayX / sx, displayY / sy);
+    if (picked) applyColor(picked);
     setEyedropperActive(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    openSheet('color');
+    if (eyedropperFromPanelRef.current) openSheet('color');
+    eyedropperFromPanelRef.current = false;
   }
 
   // ─── Sorted layers ─────────────────────────────────────────────────────────
@@ -3307,6 +3395,18 @@ export default function DesignCanvasScreen() {
       icon="alert-circle"
       onDismiss={() => setColorSaveErrorKey(null)}
       testID="colour-save-error-toast"
+    />
+  ) : null;
+  const studioToastEl = studioToast ? (
+    <TopToast
+      key={studioToast.key}
+      message={studioToast.message}
+      icon={studioToast.icon}
+      actionLabel={studioToast.actionLabel}
+      onAction={studioToast.onAction}
+      durationMs={studioToast.actionLabel ? 3000 : 1400}
+      onDismiss={() => setStudioToast(null)}
+      testID="studio-toast"
     />
   ) : null;
 
@@ -3779,7 +3879,7 @@ export default function DesignCanvasScreen() {
           bar either (name lives in the gallery's own rename flow; undo/
           redo moved to the left sidebar below; export lives in the Actions
           sheet's Share tab, reached via the wrench icon in row 2). ── */}
-      <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }]}>
+      <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }, fullScreen && styles.chromeHidden]} pointerEvents={fullScreen ? 'none' : 'auto'}>
         <View style={styles.topGroup}>
           <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back" hitSlop={TOP_BTN_HIT_SLOP} accessibilityRole="button" accessibilityLabel="Back">
             <Icon name="chevron-left" size={ICON.md} color={FG} />
@@ -3867,7 +3967,7 @@ export default function DesignCanvasScreen() {
           only visible once "Modify" is tapped. Matches Procreate's own
           second row exactly: wrench, magic-wand, "S", arrow. ── */}
       {modifyExpanded && (
-        <View style={styles.modifyRow2} testID="modify-row-2">
+        <View style={[styles.modifyRow2, fullScreen && styles.chromeHidden]} pointerEvents={fullScreen ? 'none' : 'auto'} testID="modify-row-2">
           <TouchableOpacity
             style={[styles.topBtn, activeSheet === 'wrench' && styles.topBtnActive]}
             onPress={() => openSheet('wrench')}
@@ -3944,14 +4044,14 @@ export default function DesignCanvasScreen() {
         {paintEngine && (
           <PaintSurface
             model={gestureModel}
-            enabled={isPaintTool && !eyedropperActive && canvasFit.scale > 0}
+            enabled={isPaintTool && canvasFit.scale > 0}
             testID="paint-surface"
           />
         )}
 
         {/* Canvas-level touch listeners observe QuickMenu long-press while the
             active tool PanResponder retains gesture ownership. */}
-        <View
+        <Reanimated.View
           style={[
             styles.canvas,
             {
@@ -3961,14 +4061,9 @@ export default function DesignCanvasScreen() {
               height: canvasFit.height,
             },
             canvasFit.scale <= 0 && styles.canvasUnmeasured,
-            paintEngine && {
-              transform: [
-                { translateX: viewport.tx }, { translateY: viewport.ty },
-                { rotate: `${viewport.rotation}rad` }, { scale: viewport.scale },
-              ],
-            },
+            paintEngine && artboardViewportStyle,
           ]}
-          pointerEvents={paintEngine && isPaintTool && !eyedropperActive ? 'box-none' : 'auto'}
+          pointerEvents={paintEngine && isPaintTool ? 'box-none' : 'auto'}
           testID="canvas-artboard"
           onTouchStart={handleCanvasTouchStart}
           onTouchMove={handleCanvasTouchMove}
@@ -4245,7 +4340,7 @@ export default function DesignCanvasScreen() {
                 paths={[]}
                 brushKind="ink"
                 color={drawColor}
-                size={Math.max(1, (activeSize / 80) * activeBrush.params.maxSize * dispScaleX)}
+                size={Math.max(1, brushDiameter(activeBrush.params, activeSize, Math.max(logicalW, logicalH)) * dispScaleX)}
                 opacity={brushOpacity}
                 pressureCurve={prefs.pressureCurve}
                 streamline={activeBrush.params.streamline}
@@ -4261,7 +4356,9 @@ export default function DesignCanvasScreen() {
               anywhere samples that point via CanvasHostHandle.readPixelColor
               (real GPU surface read on the Skia path) or, on the SVG
               fallback, approximateColorAtPoint's layer-color approximation. */}
-          {eyedropperActive && (
+          {/* Paint tools sample through the gesture model (above); this tap
+              overlay only serves the eyedropper outside the paint tools. */}
+          {eyedropperActive && !(paintEngine && isPaintTool) && (
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={e => sampleEyedropperAt(e.nativeEvent.locationX, e.nativeEvent.locationY)}
@@ -4293,8 +4390,24 @@ export default function DesignCanvasScreen() {
                 onPressIn={() => { pendingExtHandleRef.current = 'rotate'; }}
               />
             ) : null;
+            const ro = transformReadoutOn ? transformReadout(t, transformMode, distortQuad, warpMesh) : null;
+            const readout = ro ? (
+              <View
+                key="readout"
+                pointerEvents="none"
+                testID="transform-readout"
+                style={[styles.transformReadout, {
+                  left: Math.max(4, Math.min(canvasSize.w - 128, (ro.x + ro.width) * dispScaleX + 10)),
+                  top: Math.max(4, Math.min(canvasSize.h - 48, ro.y * dispScaleY + (ro.height * dispScaleY) / 2 - 22)),
+                }]}
+              >
+                <View style={styles.transformReadoutRow}><Text style={styles.transformReadoutKey}>Width</Text><Text style={styles.transformReadoutVal} testID="transform-readout-width">{ro.width}px</Text></View>
+                <View style={styles.transformReadoutRow}><Text style={styles.transformReadoutKey}>Height</Text><Text style={styles.transformReadoutVal} testID="transform-readout-height">{ro.height}px</Text></View>
+              </View>
+            ) : null;
             return (
               <>
+                {readout}
                 {handles.map(h => (
                   <Pressable
                     key={h.kind}
@@ -4471,7 +4584,7 @@ export default function DesignCanvasScreen() {
               functionality (text, photo, camera, file, cut/copy/paste) lives
               in the wrench icon's Add tab (WrenchActionsSheet), reached from
               the top bar's row 2 wrench button. */}
-        </View>
+        </Reanimated.View>
 
         {/* Left sidebar: Procreate's own vertically-centred handles — size on
             top, opacity below, undo/redo beneath both — inset from the edge
@@ -4480,7 +4593,19 @@ export default function DesignCanvasScreen() {
             visible at rest (a short line + a small dot), matching
             Procreate; dragging either one shows the large "Size 99%"-style
             preview card top-left, exactly like the reference. */}
-        <View style={styles.leftSliderRail} pointerEvents="box-none">
+        {fullScreen && (
+          <TouchableOpacity
+            style={styles.exitFullScreen}
+            onPress={() => setFullScreen(false)}
+            testID="btn-exit-fullscreen"
+            accessibilityRole="button"
+            accessibilityLabel="Show interface"
+            hitSlop={SIDEBAR_BTN_HIT_SLOP}
+          >
+            <Icon name="minimize-2" size={ICON.sm} color={FG} />
+          </TouchableOpacity>
+        )}
+        <View style={[styles.leftSliderRail, fullScreen && styles.chromeHidden]} pointerEvents={fullScreen ? 'none' : 'box-none'} testID="left-slider-rail">
           {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
             <>
               <View
@@ -4490,14 +4615,14 @@ export default function DesignCanvasScreen() {
                 testID="brush-size-slider"
               >
                 <View style={styles.sizeTrack}>
-                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
+                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, activeSize * 100))}%`, marginBottom: -6 }]} />
                 </View>
               </View>
 
               {/* Procreate's square "modify" button: tap = eyedropper, hold = QuickMenu. */}
               <TouchableOpacity
                 style={styles.modifySquare}
-                onPress={() => { Haptics.selectionAsync(); setEyedropperActive(true); }}
+                onPress={() => { Haptics.selectionAsync(); eyedropperFromPanelRef.current = false; setEyedropperActive(v => !v); }}
                 onLongPress={() => {
                   if (prefsRef.current.quickMenuSlots.some(sl => sl !== 'none')) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -4554,32 +4679,55 @@ export default function DesignCanvasScreen() {
             top-left of the canvas while actively dragging either handle,
             with a live dot at the actual brush size/opacity. Replaces the
             old small inline bubble that sat next to the slider itself. */}
-        {(sizeSliderDragging || opacitySliderDragging) && (
-          <View style={styles.dragPreviewCard} pointerEvents="none">
-            <Text style={styles.dragPreviewLabel}>
-              {sizeSliderDragging ? `Size ${Math.round((activeSize / 80) * 100)}%` : `Opacity ${Math.round(brushOpacity * 100)}%`}
-            </Text>
-            <View style={styles.dragPreviewDotWrap}>
-              {(() => {
-                const onScreen = brushDiameter(activeBrush.params, activeSize / 80, Math.max(logicalW, logicalH)) * dispScaleX * viewport.scale;
-                const px = Math.max(3, Math.min(104, onScreen));
-                const dab = renderBrushDab(activeBrush.id, activeBrush.params, activeTopTool === 'eraser' ? '#FFFFFF' : drawColor, px);
-                if (sizeSliderDragging && dab) {
-                  return <RNImage source={{ uri: dab }} style={{ width: px + 6, height: px + 6 }} testID="size-hud-dab" />;
-                }
-                return (
+        {(sizeSliderDragging || opacitySliderDragging) && (() => {
+          // The dot is the brush at its TRUE on-screen diameter (canvas
+          // scale × zoom), like Procreate's card: Size 1% is a pin-prick,
+          // Size 100% fills the card. The opacity card keeps that size and
+          // fades the dot instead.
+          const onScreen = brushDiameter(activeBrush.params, activeSize, Math.max(logicalW, logicalH)) * dispScaleX * viewport.scale;
+          const sizePx = Math.max(2, Math.min(DRAG_PREVIEW_DOT_MAX, onScreen));
+          // Procreate previews size/opacity in white whatever the colour (a
+          // black brush would vanish on the dark card).
+          const tint = '#FFFFFF';
+          const dab = sizeSliderDragging && sizePx >= 6 ? renderBrushDab(activeBrush.id, activeBrush.params, tint, sizePx) : null;
+          const opacityPx = Math.max(28, sizePx);
+          return (
+            <View style={styles.dragPreviewCard} pointerEvents="none" testID="slider-preview-card">
+              <Text style={styles.dragPreviewLabel} testID="slider-preview-label">
+                {sizeSliderDragging
+                  ? `Size ${Math.max(1, Math.round(activeSize * 100))}%`
+                  : `Opacity ${Math.max(1, Math.round(brushOpacity * 100))}%`}
+              </Text>
+              <View style={styles.dragPreviewDotWrap}>
+                {dab ? (
+                  <RNImage source={{ uri: dab }} style={{ width: Math.round(sizePx) + 6, height: Math.round(sizePx) + 6 }} testID="size-hud-dab" />
+                ) : (
                   <View
+                    testID="slider-preview-dot"
                     style={[
                       styles.dragPreviewDot,
                       sizeSliderDragging
-                        ? { width: px, height: px, backgroundColor: activeTopTool === 'eraser' ? '#FFFFFF' : drawColor }
-                        : { width: 44, height: 44, backgroundColor: drawColor, opacity: brushOpacity },
+                        ? { width: sizePx, height: sizePx, backgroundColor: tint }
+                        : { width: opacityPx, height: opacityPx, backgroundColor: tint, opacity: brushOpacity },
                     ]}
                   />
-                );
-              })()}
+                )}
+              </View>
             </View>
-          </View>
+          );
+        })()}
+
+        {paintEngine && prefs.brushCursor !== 'none' && (
+          <Reanimated.View pointerEvents="none" style={[styles.brushCursor, prefs.brushCursor === 'crosshair' && styles.brushCursorBare, brushCursorStyle]} testID="brush-cursor">
+            {prefs.brushCursor === 'circle' ? (
+              <View style={styles.brushCursorRing} />
+            ) : (
+              <>
+                <View style={styles.brushCursorH} />
+                <View style={styles.brushCursorV} />
+              </>
+            )}
+          </Reanimated.View>
         )}
 
         {/* Touch-and-hold eyedropper loupe: Procreate's ring — sampled colour
@@ -4655,12 +4803,9 @@ export default function DesignCanvasScreen() {
                   style={[styles.subModeChip, transformMode === mode && styles.subModeChipActive]}
                   onPress={() => {
                     setTransformMode(mode);
-                    if (mode === 'distort' && selectedLayer && !distortQuad) {
-                      setDistortQuad(transformToQuad(selectedLayer.transform));
-                    }
-                    if (mode === 'warp' && selectedLayer && !warpMesh) {
-                      setWarpMesh(defaultWarpMesh(selectedLayer.transform));
-                    }
+                    // Handles always start from the layer as it is now (a
+                    // Freeform move since the last Distort must not snap back).
+                    if (mode === 'distort' || mode === 'warp') syncDistortWarpFrom(selectedLayer?.id ?? null);
                   }}
                   testID={`transform-mode-${mode}`}
                 >
@@ -4784,14 +4929,11 @@ export default function DesignCanvasScreen() {
             const lw = project?.canvas.width  || 1080;
             const lh = project?.canvas.height || 1080;
             const maxOrder = layers.reduce((m, l) => Math.max(m, l.order), 0);
-            const tw = Math.round(lw * 0.6);
-            const th = result.assets[0].height && result.assets[0].width
-              ? Math.round((tw / result.assets[0].width) * result.assets[0].height)
-              : tw;
+            const box = fitInsertBox(lw, lh, result.assets[0].width, result.assets[0].height);
             const newLayer: DesignLayer = {
               id: uid(), name: 'Camera Photo', type: 'image',
               visible: true, locked: false, order: maxOrder + 1,
-              transform: { x: Math.round((lw - tw) / 2), y: 60, width: tw, height: th, rotation: 0, scaleX: 1, scaleY: 1 },
+              transform: { ...box, rotation: 0, scaleX: 1, scaleY: 1 },
               data: { kind: 'image', uri, opacity: 1, fit: 'contain', blendMode: 'normal' } as DesignImageLayer,
               opacity: 1,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -4807,10 +4949,11 @@ export default function DesignCanvasScreen() {
         onOpenHelpCenter={() => { closeSheet(); router.push('/help' as never); }}
         onOpenLiveChat={() => { closeSheet(); setSupportChatOpen(true); }}
         onOpenSettings={() => { closeSheet(); router.push('/settings' as never); }}
-        onCut={handleCut}
-        onCopy={handleCopyLayer}
-        onCopyCanvas={handleCopyCanvas}
-        onPaste={handlePaste}
+        // Picking an action dismisses Actions, as in Procreate.
+        onCut={() => { closeSheet(); handleCut(); }}
+        onCopy={() => { closeSheet(); handleCopyLayer(); }}
+        onCopyCanvas={() => { closeSheet(); handleCopyCanvas(); }}
+        onPaste={() => { closeSheet(); handlePaste(); }}
         hasClipboard={!!clipboard && clipboard.length > 0}
         // CANVAS tab
         onCropResize={() => { closeSheet(); openSheet('canvasResize'); }}
@@ -4853,7 +4996,7 @@ export default function DesignCanvasScreen() {
         // SHARE tab
         onOpenShareImage={() => openSheet('shareImage')}
         onUseOnMockup={() => { void handleUseOnMockup(); }}
-        onSaveCopy={handleSaveCopy}
+        onSaveCopy={() => { closeSheet(); void handleSaveCopy(); }}
         onSaveVersion={() => { closeSheet(); void handleManualSave(); }}
         onOpenVersionHistory={() => { closeSheet(); void handleOpenVersionHistory(); }}
         onOpenExportOptions={() => { closeSheet(); void handleOpenExportOptions(); }}
@@ -4881,10 +5024,10 @@ export default function DesignCanvasScreen() {
       <SupportChatModal visible={supportChatOpen} onClose={() => setSupportChatOpen(false)} />
 
       {/* ── SHARE IMAGE — Procreate's format list (Actions → Share → Share image). ── */}
-      <Modal visible={activeSheet === 'shareImage'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'shareImage'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle} testID="share-image-title">Share Image</Text>
@@ -4927,7 +5070,7 @@ export default function DesignCanvasScreen() {
           tool is the brush itself. Eraser/Smudge keep the small Size-only
           sheet below — they were never a "Brush Library" sheet, just a
           quick size control, so that part is unchanged. ── */}
-      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'brushLib'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <BrushLibraryComponent
             library={brushLib.library}
@@ -4955,7 +5098,7 @@ export default function DesignCanvasScreen() {
       {/* ── COLOR PICKER — Procreate's own full-height "Colours" sheet
           (Disc/Classic/Harmony/Value/Palettes tabs), not a small floating
           popover. Drops from the top like the Layers sheet. ── */}
-      <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'color'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <View style={[styles.layersModalSheetWrap, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 32) }]} pointerEvents="box-none">
@@ -4970,7 +5113,7 @@ export default function DesignCanvasScreen() {
               onRenamePalette={handleRenamePalette}
               onDeletePalette={handleDeletePalette}
               onSetDefaultPalette={handleSetDefaultPalette}
-              onRequestEyedropper={() => { closeSheet(); setEyedropperActive(true); }}
+              onRequestEyedropper={() => { closeSheet(); eyedropperFromPanelRef.current = true; setEyedropperActive(true); }}
               onClose={closeSheet}
             />
           </View>
@@ -4978,9 +5121,10 @@ export default function DesignCanvasScreen() {
         </View>
       </Modal>
       {activeSheet !== 'color' && colorSaveToast}
+      {studioToastEl}
       {/* ── LAYER MANAGER — Procreate's own full-height Layers sheet, dropping
           down from the top under the status bar, not a small corner popover. ── */}
-      <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layers'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.layersModalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
           <View style={[styles.layersModalSheetWrap, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 32) }]} pointerEvents="box-none">
@@ -5020,10 +5164,10 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── LAYER OPTIONS ── */}
-      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>{layerOptionsLayer?.name ?? 'Layer'}</Text>
@@ -5085,7 +5229,7 @@ export default function DesignCanvasScreen() {
               <Button label="Duplicate" icon="copy" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleDuplicateLayer(layerOptionsTarget); }} />
               <Button label="Move Up" icon="arrow-up" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleMoveLayerUp(layerOptionsTarget); }} />
               <Button label="Move Down" icon="arrow-down" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleMoveLayerDown(layerOptionsTarget); }} />
-              <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => { if (layerOptionsTarget) handleDeleteLayer(layerOptionsTarget); }} />
+              <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => { if (layerOptionsTarget) { handleDeleteLayer(layerOptionsTarget); closeSheet(); } }} />
             </View>
           </SheetRise>
         </View>
@@ -5102,10 +5246,10 @@ export default function DesignCanvasScreen() {
       />
 
       {/* ── CANVAS RESIZE / CROP SHEET ── */}
-      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Size & Crop</Text>
 
@@ -5176,10 +5320,44 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── CANVAS INFO ── */}
-      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="fade" onRequestClose={closeSheet}>
+      {/* ── COPY & PASTE — Procreate's three-finger-swipe-down menu ── */}
+      <Modal visible={activeSheet === 'copyPaste'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]} testID="copy-paste-menu">
+            <Text style={styles.sheetTitle}>Copy & Paste</Text>
+            <View style={styles.copyPasteGrid}>
+              {([
+                { key: 'cut', label: 'Cut', icon: 'scissors', enabled: !!selectedLayerId, run: handleCut },
+                { key: 'copy', label: 'Copy', icon: 'copy', enabled: !!selectedLayerId, run: handleCopyLayer },
+                { key: 'copy-all', label: 'Copy All', icon: 'layers', enabled: layers.length > 0, run: handleCopyCanvas },
+                { key: 'duplicate', label: 'Duplicate', icon: 'plus-square', enabled: !!selectedLayerId, run: () => selectedLayerId && handleDuplicateLayer(selectedLayerId) },
+                { key: 'cut-paste', label: 'Cut & Paste', icon: 'move', enabled: !!selectedLayerId, run: handleCutAndPaste },
+                { key: 'paste', label: 'Paste', icon: 'clipboard', enabled: !!clipboard && clipboard.length > 0, run: handlePaste },
+              ] as { key: string; label: string; icon: IconName; enabled: boolean; run: () => void }[]).map(a => (
+                <TouchableOpacity
+                  key={a.key}
+                  style={[styles.copyPasteTile, !a.enabled && styles.exportRowDisabled]}
+                  disabled={!a.enabled}
+                  onPress={() => { closeSheet(); a.run(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={a.label}
+                  accessibilityState={{ disabled: !a.enabled }}
+                  testID={`copy-paste-${a.key}`}
+                >
+                  <Icon name={a.icon} size={ICON.sm} color={FG} />
+                  <Text style={styles.shareTileLabel}>{a.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </SheetRise>
+        </View>
+      </Modal>
+
+      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="none" onRequestClose={closeSheet}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Info</Text>
             {[
@@ -5207,7 +5385,7 @@ export default function DesignCanvasScreen() {
       <Modal
         visible={quickMenuVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setQuickMenuVisible(false)}
         testID="quick-menu-modal"
       >
@@ -5267,10 +5445,10 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── SELECTION SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'selection'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'selection'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Selection Settings</Text>
@@ -5309,10 +5487,10 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── TRANSFORM SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'transformTool'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'transformTool'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Transform Settings</Text>
@@ -5360,10 +5538,10 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── ADJUSTMENTS (CURVES) PANEL ── */}
-      <Modal visible={activeSheet === 'adjustments'} transparent animationType="fade" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'adjustments'} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} accessibilityLabel="Close" accessibilityRole="button" />
-          <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '70%' }]}>
+          <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1 }}>
@@ -5711,7 +5889,8 @@ function WrenchActionsSheet({
         disabled={disabled}
         accessibilityLabel={label}
         accessibilityRole="button"
-        testID={testID}
+        accessibilityState={{ disabled }}
+        testID={testID ?? `action-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
       >
         <Icon name={icon} size={ICON.md} color={active ? FG : disabled ? SUBTLE : MUTED} />
         <Text style={styles.actionCellLabel}>{label}</Text>
@@ -5762,9 +5941,9 @@ function WrenchActionsSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
-      <SheetRise style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
         <SheetHandle />
 
         {/* Tab row */}
@@ -6016,14 +6195,14 @@ function WrenchActionsSheet({
                   },
                   {
                     label: 'Use as product photo',
-                    sub: `PNG — Lossless · ${desc.width} × ${desc.height} · save for product listing`,
+                    sub: `Pick a product — this ${desc.width} × ${desc.height} PNG becomes its photo`,
                     icon: 'shopping-bag' as const,
                     onPress: onUseAsProductPhoto,
                     disabled: exporting,
                   },
                   {
                     label: 'Use in a post',
-                    sub: `PNG — Lossless · ${desc.width} × ${desc.height} · save for Thread composer`,
+                    sub: `Opens the post composer with this ${desc.width} × ${desc.height} design`,
                     icon: 'send' as const,
                     onPress: onUseInPost,
                     disabled: exporting,
@@ -6248,7 +6427,7 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   const insets = useSafeAreaInsets();
   const sheetBottomPad = { paddingBottom: insets.bottom + SP.lg };
   const [content, setContent]       = useState('');
-  const [fontSize, setFontSize]     = useState(28);
+  const [fontSize, setFontSize]     = useState(72);
   const [color, setColor]           = useState(drawColor);
   const [bold, setBold]             = useState(false);
   const [italic, setItalic]         = useState(false);
@@ -6266,10 +6445,10 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
-        <SheetRise style={[styles.sheet, sheetBottomPad, { maxHeight: '85%' }]}>
+        <SheetRise {...STUDIO_SHEET_MOTION} style={[styles.sheet, sheetBottomPad, { maxHeight: '85%' }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeaderRow}>
@@ -6322,13 +6501,13 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
 
             <Text style={styles.sheetLabel}>Size: {fontSize}pt</Text>
             <View style={styles.sliderRow}>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease" onPress={() => setFontSize(v => Math.max(8, v - 2))}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Decrease" onPress={() => setFontSize(v => Math.max(8, v - 4))}>
                 <Icon name="minus" size={14} color={MUTED} />
               </TouchableOpacity>
               <View style={styles.sliderTrack}>
                 <View style={[styles.sliderFill, { width: `${((fontSize - 8) / 192) * 100}%` }]} />
               </View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase font size" onPress={() => setFontSize(v => Math.min(200, v + 2))}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase font size" onPress={() => setFontSize(v => Math.min(200, v + 4))}>
                 <Icon name="plus" size={14} color={MUTED} />
               </TouchableOpacity>
               <Text style={styles.sliderValue}>{fontSize}</Text>
@@ -6430,6 +6609,13 @@ const TOP_BTN_HIT_SLOP = minHitSlop({ width: 36, height: 36 });
 const COLOR_SWATCH_HIT_SLOP = minHitSlop({ width: 28, height: 28 });
 // 32pt undo/redo with 16pt between them → 44×44 without overlapping.
 const SIDEBAR_BTN_HIT_SLOP = minHitSlop({ width: 32, height: 32 });
+// Procreate's panels snap in: Studio modals mount instantly (no 300ms Modal
+// cross-fade) and the sheet rises a short distance on a fast, damped curve.
+const STUDIO_SHEET_MOTION = { durationMs: 160, distance: 96 } as const;
+// Procreate's slider preview card (~160pt square on a phone) and the
+// largest true-size dot it shows before the brush outgrows the card.
+const DRAG_PREVIEW_CARD = 160;
+const DRAG_PREVIEW_DOT_MAX = 140;
 
 const styles = StyleSheet.create({
   loupe: { position: 'absolute', width: 88, height: 88 },
@@ -6439,6 +6625,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)',
   },
   shareTileLabel: { fontFamily: FONT.medium, fontSize: FS.md, color: FG },
+  chromeHidden: { opacity: 0 },
+  transformReadout: { position: 'absolute', width: 120, paddingVertical: 6, paddingHorizontal: SP.sm, borderRadius: RADIUS.sm, backgroundColor: 'rgba(28,28,30,0.92)', zIndex: 8, gap: 2 },
+  transformReadoutRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  transformReadoutKey: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs },
+  transformReadoutVal: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
+  // Two hairline rings (dark outside, light inside) so the outline reads on
+  // any colour, like Procreate's grey cursor.
+  brushCursor: { position: 'absolute', left: 0, top: 0, zIndex: 4, borderRadius: 9999, borderWidth: 1, borderColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  brushCursorBare: { borderWidth: 0 },
+  brushCursorRing: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: 9999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.85)' },
+  brushCursorH: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: 'rgba(255,255,255,0.85)' },
+  brushCursorV: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, backgroundColor: 'rgba(255,255,255,0.85)' },
+  exitFullScreen: { position: 'absolute', top: SP.sm, left: SP.sm, zIndex: 7, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
+  copyPasteGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.md },
+  copyPasteTile: {
+    width: '31%', minHeight: 72, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.xs, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)',
+  },
   shareImageRow: {
     paddingVertical: 14, paddingHorizontal: SP.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -6529,7 +6733,7 @@ const styles = StyleSheet.create({
   // read as solid grey once the canvas became a real white artboard).
   dragPreviewCard: {
     position: 'absolute', top: SP.xl, left: SP.xl + 14, zIndex: 6,
-    width: 150, minHeight: 150,
+    width: DRAG_PREVIEW_CARD, height: DRAG_PREVIEW_CARD + 20,
     backgroundColor: '#2A2A2C', borderRadius: RADIUS.md,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
     padding: SP.sm, alignItems: 'flex-start', justifyContent: 'flex-start',
@@ -6591,11 +6795,12 @@ const styles = StyleSheet.create({
   wrenchItem:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 11, paddingHorizontal: SP.md },
   wrenchItemText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
 
-  modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  // No dim: Procreate's panels sit over the live canvas (tap outside closes).
+  modalOverlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   // Full-height sheets (Layers, Colours) drop from the top under the status
   // bar — Procreate's own placement — rather than sitting at the bottom
   // like the other sheets.
-  layersModalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-start' },
+  layersModalOverlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-start' },
   // flex: 1 here (not just paddingTop) matters on web: a sheet inside this
   // wrap (e.g. the Colours picker) sizes itself with a percentage height
   // ('82%'). RNW's flexbox only resolves a percentage height against an

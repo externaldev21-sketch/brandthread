@@ -913,13 +913,19 @@ export default function ProductsScreen() {
 
   // No count row on an empty list — the empty state below already says so;
   // showing "0 products" next to it is just clutter with no information.
+  // Arrived from Design Studio / Mockup preview with an image to attach.
+  const picking = params.pickForMockup === '1';
   const ListHeader = useMemo(() => (
     sortedProducts.length === 0 ? null : (
       <View style={sellerListCountRowStyles.row}>
-        <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
+        <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]} testID={picking ? 'products-pick-hint' : undefined}>
+          {picking
+            ? 'Tap a product to add your design as its photo'
+            : `${sortedProducts.length} ${sortedProducts.length === 1 ? 'product' : 'products'}`}
+        </Text>
       </View>
     )
-  ), [sortedProducts.length, SUBTLE]);
+  ), [sortedProducts.length, SUBTLE, picking]);
 
   // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
   // FlashList's web renderer doesn't always honor a large contentContainerStyle

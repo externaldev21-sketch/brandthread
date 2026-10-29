@@ -13,12 +13,33 @@ import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 
 /** Programmatically download a data/http(s) URL in the browser. */
 export function triggerWebDownload(url: string, filename: string) {
+  // data: URIs go through a Blob URL: print-size images are many MB, which
+  // browsers can refuse to download straight from an href.
+  let href = url;
+  let objectUrl: string | null = null;
+  if (url.startsWith('data:') && typeof Blob !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    const comma = url.indexOf(',');
+    const meta = url.slice(5, comma);
+    const mime = meta.split(';')[0] || 'application/octet-stream';
+    const body = url.slice(comma + 1);
+    let bytes: Uint8Array<ArrayBuffer>;
+    if (meta.includes(';base64')) {
+      const bin = atob(body);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else {
+      bytes = new TextEncoder().encode(decodeURIComponent(body));
+    }
+    objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    href = objectUrl;
+  }
   const a = document.createElement('a');
-  a.href = url;
+  a.href = href;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl!), 30_000);
 }
 
 /** File extension matching a data URL's image type (the AI tools return PNG cutouts and JPEG photos). */

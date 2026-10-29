@@ -129,7 +129,10 @@ describe('high-impact call sites use showAlert instead of the dead-on-web Alert.
     expect(src).toContain("showAlert('Couldn’t delete', 'Try again.');");
   });
 
-  it('keeps the design canvas delete-layer confirm copy', () => {
-    expect(read('app/design-canvas.tsx')).toContain("showAlert('Delete Layer', 'This cannot be undone.', [");
+  it('deletes a design canvas layer instantly and undoably, like Procreate (no confirm to go dead on web)', () => {
+    const src = read('app/design-canvas.tsx');
+    const fn = src.slice(src.indexOf('function handleDeleteLayer('), src.indexOf('function handleDuplicateLayer('));
+    expect(fn).toContain('mutateLayer(prev => prev.filter(l => l.id !== id));');
+    expect(fn).not.toMatch(/Alert|confirm/);
   });
 });

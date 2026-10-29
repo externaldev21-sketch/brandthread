@@ -242,7 +242,8 @@ describe('WrenchActionsSheet tab structure', () => {
     const canvasSrc = readFileSync(resolve(__dirname, '../app/design-canvas.tsx'), 'utf8');
     expect(canvasSrc).toMatch(/onSaveVersion=\{\(\) => \{ closeSheet\(\); void handleManualSave\(\); \}\}/);
     expect(canvasSrc).toMatch(/async function handleManualSave\(\)[\s\S]{0,400}await createVersion\(project\.id\);/);
-    expect(canvasSrc).toContain('router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}` as never);');
+    // from=canvas: a Restore goes back to this same canvas, which reloads in place.
+    expect(canvasSrc).toContain('router.push(`/design-versions?projectId=${encodeURIComponent(project.id)}&from=canvas` as never);');
     expect(canvasSrc).toContain('router.push(`/design-export?projectId=${encodeURIComponent(project.id)}` as never);');
     // The old full-screen Export sheet was unreachable (nothing opened it) and is gone.
     expect(canvasSrc).not.toContain("activeSheet === 'export'");

@@ -10,7 +10,7 @@
  * requested tile size.
  */
 
-import type { CompositeMode, IRect, RasterBackend, SurfaceDab } from './backend';
+import type { CompositeMode, DrawFlip, IRect, RasterBackend, SurfaceDab } from './backend';
 import { getGrainMask, getTipMask, type AlphaMask, type GrainKind, type TipShape } from './tips';
 
 type Surface = HTMLCanvasElement;
@@ -82,13 +82,19 @@ export class Canvas2DBackend implements RasterBackend<Surface> {
     else c.clearRect(0, 0, s.width, s.height);
   }
 
-  draw(dst: Surface, src: Surface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode) {
+  draw(dst: Surface, src: Surface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode, flip?: DrawFlip) {
     const c = ctx2d(dst);
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.beginPath();
     c.rect(dr.x, dr.y, dr.w, dr.h);
     c.clip();
+    if (flip?.x || flip?.y) {
+      const cx = dr.x + dr.w / 2, cy = dr.y + dr.h / 2;
+      c.translate(cx, cy);
+      c.scale(flip.x ? -1 : 1, flip.y ? -1 : 1);
+      c.translate(-cx, -cy);
+    }
     if (mode === 'copy') c.clearRect(dr.x, dr.y, dr.w, dr.h);
     c.globalCompositeOperation = OPS[mode];
     c.globalAlpha = Math.max(0, Math.min(1, alpha));

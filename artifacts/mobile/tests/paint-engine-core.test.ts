@@ -26,6 +26,21 @@ describe('brush library', () => {
     const ink = preset('studio-pen');
     expect(brushDiameter(ink, 0.5, 4500 * 1.2)).toBeCloseTo(brushDiameter(ink, 0.5, 1080) * 5, 3);
   });
+
+  it('size slider is exponential and extreme, like Procreate (pin-prick at 1%, massive at 100%)', () => {
+    for (const b of DEFAULT_BRUSH_PRESETS) {
+      const lo = brushDiameter(b.params, 0.01, 1080);
+      const hi = brushDiameter(b.params, 1, 1080);
+      expect(hi / lo).toBeGreaterThan(25); // finest pencils bottom out at a 1px dab
+      expect(hi).toBeGreaterThanOrEqual(b.params.maxSize * 2);
+    }
+    const ink = preset('studio-pen');
+    // Equal slider steps give equal size ratios (every pixel of travel visibly changes the stroke).
+    const r1 = brushDiameter(ink, 0.3, 1080) / brushDiameter(ink, 0.2, 1080);
+    const r2 = brushDiameter(ink, 0.9, 1080) / brushDiameter(ink, 0.8, 1080);
+    expect(r1).toBeCloseTo(r2, 5);
+    expect(brushDiameter(ink, 0.99, 1080) / brushDiameter(ink, 0.11, 1080)).toBeGreaterThan(20);
+  });
 });
 
 describe('tips and grain', () => {

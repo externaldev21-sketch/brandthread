@@ -37,6 +37,7 @@ import { PostScreen, type PublishState } from '@/components/create-post/PostScre
 import { remixClipToVideoClip, remixErrorMessage } from '@/lib/remix';
 import { attachThreadPoll } from '@/lib/createPost/attachPoll';
 import { decodeFitTags } from '@/lib/closet';
+import { takeDesignPostMedia } from '@/lib/designHandoff';
 
 type Step = 'capture' | 'gallery' | 'edit' | 'post';
 
@@ -72,7 +73,7 @@ export default function CreatePostScreen() {
   const router = useRouter();
   const api = useApi();
   const { role, isLoaded: roleLoaded } = useRole();
-  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string; remixOf?: string; bts?: string; fitTags?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string; capture?: string; remixOf?: string; bts?: string; fitTags?: string; fromDesign?: string }>();
   const isSeller = role === 'seller' && params.accountType !== 'buyer';
   const roleKey = isSeller ? 'seller' : 'buyer';
   // Platform admins (users.role = admin) can publish Threads as @brandthread.
@@ -236,6 +237,21 @@ export default function CreatePostScreen() {
     }
     setStep('edit');
   }, [postMode]);
+
+  // Design Studio → Actions → Share → "Use in a post": open on the editor
+  // with the flattened design as the post's photo.
+  const fromDesign = typeof params.fromDesign === 'string' ? params.fromDesign : undefined;
+  const designTaken = useRef(false);
+  useEffect(() => {
+    if (!fromDesign || designTaken.current || editId) return;
+    designTaken.current = true;
+    const art = takeDesignPostMedia(fromDesign);
+    if (!art) return;
+    void buildFromAssets([{
+      id: `design-${art.projectId}-${art.createdAt}`, uri: art.uri, kind: 'photo', duration: 0,
+      width: art.width, height: art.height, mimeType: 'image/png',
+    }], 'gallery');
+  }, [buildFromAssets, editId, fromDesign]);
 
   // ── Publish ────────────────────────────────────────────────────────────────
   const submit = useCallback(async (asDraft: boolean) => {

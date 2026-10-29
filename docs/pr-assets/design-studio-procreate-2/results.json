@@ -1,0 +1,182 @@
+[
+  {
+    "name": "Size slider bottoms out at \"Size 1%\" with a pin-prick dot",
+    "ok": true,
+    "detail": "Size 1%, dot 2.0px"
+  },
+  {
+    "name": "Size slider tops out at \"Size 100%\" with a massive dot",
+    "ok": true,
+    "detail": "Size 100%, dot 53.0px"
+  },
+  {
+    "name": "a Size 100% stroke is dramatically thicker than a Size 1% stroke",
+    "ok": true,
+    "detail": "1px → 33px on screen"
+  },
+  {
+    "name": "Opacity slider shows \"Opacity N%\" with the dot faded to match",
+    "ok": true,
+    "detail": "Opacity 25%, dot opacity 0.25"
+  },
+  {
+    "name": "all 45 brushes across 12 sets paint",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "smudge drags paint and the eraser removes it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "undo/redo buttons and 2-/3-finger taps step history",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "layer opacity slider fades the layer",
+    "ok": true,
+    "detail": "opacity 0.356699"
+  },
+  {
+    "name": "Merge Down combines the two layers",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Delete is instant (no confirm) and the panel stays open",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Undo brings a deleted layer back",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a single tap on the colour disc picks a colour",
+    "ok": true,
+    "detail": "rgb(255, 77, 77)"
+  },
+  {
+    "name": "modify-square eyedropper: loupe while dragging, red on lift, no paint",
+    "ok": true,
+    "detail": "rgb(232, 48, 46)"
+  },
+  {
+    "name": "Colours panel eyedropper samples the composited blue and returns to the panel",
+    "ok": true,
+    "detail": "rgb(174, 196, 255)"
+  },
+  {
+    "name": "touch-and-hold eyedropper shows the loupe and picks red",
+    "ok": true,
+    "detail": "rgb(232, 48, 46)"
+  },
+  {
+    "name": "Automatic / Freehand / Rectangle / Ellipse selections all select",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "an inserted photo lands whole on the canvas, in Transform",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a transform drag is one undo step",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Freeform / Uniform / Distort / Warp all show the live Width/Height px readout",
+    "ok": true,
+    "detail": "{\"freeform\":\"Width 284px Height 795px\",\"uniform\":\"Width 170px Height 475px\",\"distort\":\"Width 170px Height 475px\",\"warp\":\"Width 170px Height 475px\"}"
+  },
+  {
+    "name": "Copy (toast, Actions closes) → Paste adds a layer → Cut removes one",
+    "ok": true,
+    "detail": "Copied · 4 → 5 → 4"
+  },
+  {
+    "name": "Insert a file adds an image layer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Flip horizontal mirrors the canvas",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Canvas info shows the canvas size",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "two-finger pinch zooms + rotates together and glides on after release",
+    "ok": true,
+    "detail": "matrix(1.42548, 0.121987, -0.121987, 1.42548, 47.7101, 5.7944) → matrix(1.5988, 0.190775, -0.190775, 1.5988, 73.2579, 8.61561)"
+  },
+  {
+    "name": "a quick pinch-in snaps the canvas back to fit",
+    "ok": true,
+    "detail": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "name": "three-finger swipe down opens Copy & Paste, acting on the current layer",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "four-finger tap hides the interface (full screen)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "brush cursor outlines the brush under the finger while painting",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Share image saves PNG (transparent) / PNG / JPEG at 4500×5400",
+    "ok": true,
+    "detail": "{\"png-transparent\":{\"name\":\"Apparel_Print_transparent.png\",\"w\":4500,\"h\":5400,\"cornerAlpha\":0},\"png\":{\"name\":\"Apparel_Print.png\",\"w\":4500,\"h\":5400,\"cornerAlpha\":255},\"jpeg\":{\"name\":\"Apparel_Print.jpg\",\"w\":4500,\"h\":5400,\"cornerAlpha\":255}}"
+  },
+  {
+    "name": "More export options downloads every format at its size (Original = 4500×5400)",
+    "ok": true,
+    "detail": "PNG/Original 4500×5400, JPG/Web 1000×1200, Transparent PNG/Product Page 1667×2000"
+  },
+  {
+    "name": "Save a copy saves to the gallery (toast, Actions closes)",
+    "ok": true,
+    "detail": "\"Apparel Print (copy)\" saved to your gallery"
+  },
+  {
+    "name": "Save version snapshots the project (toast with History)",
+    "ok": true,
+    "detail": "Version savedHistory"
+  },
+  {
+    "name": "Version history → Restore reverts the same canvas in place",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Use in a post opens the composer with the design attached",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Use as product photo opens the product picker with the design waiting",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Use on mockup puts the design on the garment",
+    "ok": true,
+    "detail": ""
+  }
+]

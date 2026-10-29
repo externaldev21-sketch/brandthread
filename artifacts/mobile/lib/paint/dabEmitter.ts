@@ -108,12 +108,15 @@ export class DabEmitter {
     if (!this.lastRaw) return out;
     const { x, y, p } = this.lastRaw;
     // Catch up in a few eased steps so StreamLine doesn't leave the end short.
+    // The catch-up isn't real finger movement, so the stroke's speed and
+    // pressure stay as they were at lift — otherwise simulated pressure
+    // jumps to full and the stroke ends in a fat blob.
     for (let i = 0; i < 4; i++) {
       const tx = this.sx + (x - this.sx) * 0.6;
       const ty = this.sy + (y - this.sy) * 0.6;
-      this.advanceTo(out, tx, ty, p, 16);
+      this.advanceTo(out, tx, ty, p, 16, true);
     }
-    this.advanceTo(out, x, y, p, 16);
+    this.advanceTo(out, x, y, p, 16, true);
     if (!this.emittedAny) this.emitAt(out, x, y, this.sp);
     return out;
   }
@@ -125,12 +128,14 @@ export class DabEmitter {
     return Math.max(0.35, Math.min(1, 1.08 - speed * 0.22));
   }
 
-  private advanceTo(out: Dab[], tx: number, ty: number, rawP: number, dt: number) {
+  private advanceTo(out: Dab[], tx: number, ty: number, rawP: number, dt: number, frozen = false) {
     const dx = tx - this.sx, dy = ty - this.sy;
     const len = Math.hypot(dx, dy);
-    const instSpeed = len / dt / this.unitScale;
-    this.speed += (instSpeed - this.speed) * 0.35;
-    const targetP = this.effectivePressure(rawP, this.speed);
+    if (!frozen) {
+      const instSpeed = len / dt / this.unitScale;
+      this.speed += (instSpeed - this.speed) * 0.35;
+    }
+    const targetP = frozen ? this.sp : this.effectivePressure(rawP, this.speed);
     const p0 = this.sp;
     const p1 = this.sp + (targetP - this.sp) * 0.5;
     this.sp = p1;

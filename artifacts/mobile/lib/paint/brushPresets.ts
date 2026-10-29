@@ -173,11 +173,22 @@ export function findPreset(presets: BrushPreset[], id: string): BrushPreset {
  * canvas resolution.
  */
 export function brushDiameter(params: BrushParams, sizeFraction: number, canvasLong: number): number {
-  const f = Math.max(0.01, Math.min(1, sizeFraction));
-  // Perceptual curve: the bottom of the slider gives fine control.
-  const curved = 0.02 + 0.98 * Math.pow(f, 1.6);
-  return Math.max(1, params.maxSize * curved * (canvasLong / 1080));
+  const f = Math.max(0, Math.min(1, sizeFraction));
+  const scale = canvasLong / 1080;
+  // Procreate's size slider is exponential across the brush's min→max
+  // diameter: Size 1% is a pin-prick, Size 100% a massive disc. `maxSize`
+  // is the preset's working diameter; the slider top reaches
+  // BRUSH_SIZE_HEADROOM × that (capped to most of the canvas) and the bottom
+  // is BRUSH_SIZE_RANGE times smaller, with equal ratios per slider step.
+  const max = Math.min(params.maxSize * BRUSH_SIZE_HEADROOM, 1080 * 0.8) * scale;
+  const min = max / BRUSH_SIZE_RANGE;
+  return Math.max(1, min * Math.pow(max / min, f));
 }
+
+/** How far past a preset's `maxSize` Size 100% reaches. */
+export const BRUSH_SIZE_HEADROOM = 4.5;
+/** Ratio between Size 100% and Size 0% diameters (Procreate's is ~15–40× per brush). */
+export const BRUSH_SIZE_RANGE = 40;
 
 /** Groups presets by category in library order (categories with no brushes are kept, so empty sets show). */
 export function groupPresets(presets: BrushPreset[], categories: string[]): { category: string; brushes: BrushPreset[] }[] {

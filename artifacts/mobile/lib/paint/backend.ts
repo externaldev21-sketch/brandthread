@@ -12,6 +12,9 @@ import type { GrainKind, TipShape } from './tips';
 
 export interface IRect { x: number; y: number; w: number; h: number }
 
+/** Mirror a draw horizontally / vertically about the destination rect's centre (a layer's Flip). */
+export interface DrawFlip { x?: boolean; y?: boolean }
+
 /**
  * How `src` lands on `dst`:
  *  - over:  normal paint (source-over)
@@ -35,8 +38,8 @@ export interface RasterBackend<S> {
   width(s: S): number;
   height(s: S): number;
   clear(s: S, rect?: IRect): void;
-  /** Composites a region of `src` onto `dst` (rects may differ in size → scaled). */
-  draw(dst: S, src: S, srcRect: IRect, dstRect: IRect, alpha: number, mode: CompositeMode): void;
+  /** Composites a region of `src` onto `dst` (rects may differ in size → scaled), optionally mirrored within dstRect. */
+  draw(dst: S, src: S, srcRect: IRect, dstRect: IRect, alpha: number, mode: CompositeMode, flip?: DrawFlip): void;
   /** Prints dabs of a tinted tip onto `dst` (source-over), or as a mask (destination-in) when mode is 'mask'. */
   stamp(dst: S, tip: TipShape, color: string, dabs: SurfaceDab[], mode?: 'over' | 'mask'): void;
   /** Multiplies dst's alpha by the tiled grain texture inside `rect`. */
