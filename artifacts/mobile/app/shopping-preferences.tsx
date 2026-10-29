@@ -382,7 +382,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   page: { flex: 1, backgroundColor: 'transparent' },
 
   sectionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.lg, marginBottom: 4 },
-  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm, lineHeight: 18 },
+  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm, lineHeight: 14 },
 
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: BORDER, marginLeft: 16 },

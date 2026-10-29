@@ -23,6 +23,7 @@ import { buildStoreUrl } from '@/lib/shareLinks';
 import { shareLinkWithFallback } from '@/lib/shareProfile';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
+import { FONT } from '@/lib/theme';
 type Profile = { username: string | null; brandName: string | null; displayName: string | null; profileImageUrl: string | null; logoUrl: string | null };
 type ProductRow = { id: string; name: string; status?: string; images?: string[]; media?: Array<{ uri?: string }> };
 
@@ -180,7 +181,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   root: { flex: 1, backgroundColor: theme.background },
   topBar: { paddingHorizontal: 16, paddingBottom: 8 },
   body: { paddingHorizontal: 24, alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: '700', color: theme.text, letterSpacing: -0.6, marginTop: 8, marginBottom: 24, textAlign: 'center' },
+  title: { fontSize: 28, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.6, marginTop: 8, marginBottom: 24, textAlign: 'center' },
   preview: {
     width: PREVIEW_W, borderRadius: 22, overflow: 'hidden', paddingBottom: 12,
     backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
@@ -190,8 +191,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     width: 52, height: 52, borderRadius: 26, overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
   },
-  avatarInitial: { color: theme.text, fontSize: 20, fontWeight: '600' },
-  previewBrand: { marginTop: 8, fontSize: 15, fontWeight: '700', color: theme.text, maxWidth: '100%' },
+  avatarInitial: { color: theme.text, fontSize: 20, fontFamily: FONT.semibold },
+  previewBrand: { marginTop: 8, fontSize: 15, fontFamily: FONT.bold, color: theme.text, maxWidth: '100%' },
   previewHandle: { marginTop: 1, fontSize: 12, color: theme.muted, maxWidth: '100%' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingHorizontal: 12 },
   tile: { width: TILE_W, height: TILE_W * 1.25, borderRadius: 6, overflow: 'hidden', backgroundColor: theme.surface },
@@ -207,7 +208,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   linkText: { flex: 1, fontSize: 15, color: theme.text },
   actions: { alignSelf: 'stretch', gap: 12, marginTop: 20 },
   primaryBtn: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.text },
-  primaryText: { color: theme.background, fontSize: 16, fontWeight: '600' },
+  primaryText: { color: theme.background, fontSize: 16, fontFamily: FONT.semibold },
   secondaryBtn: { height: 48, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { color: theme.text, fontSize: 16, fontWeight: '600' },
+  secondaryText: { color: theme.text, fontSize: 16, fontFamily: FONT.semibold },
 });

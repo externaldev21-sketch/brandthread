@@ -447,7 +447,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   ticketSection:   { gap: SP.md },
   ticketHeader:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   ticketTitle:     { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  ticketSub:       { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 19 },
+  ticketSub:       { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   submittedBadge:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, backgroundColor: `${theme.success}1F`, borderRadius: RADIUS.sm },
   submittedText:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   sendAnotherText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textDecorationLine: 'underline' },
@@ -457,5 +457,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   sheetCategoryPill: { alignSelf: 'flex-start', backgroundColor: theme.accentDim, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   sheetCategoryText: { fontSize: FS.xs, fontFamily: FONT.bold },
   sheetTitle:    { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
-  sheetBody:     { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, lineHeight: 23 },
+  sheetBody:     { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },
 });

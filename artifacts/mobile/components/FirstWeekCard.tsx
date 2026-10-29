@@ -18,6 +18,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { progressLabel, rewardLine, type FirstWeekState } from '@/lib/firstWeek';
 
+import { FONT } from '@/lib/theme';
 /** Loads the checklist on focus. `visible` is false until loaded, then follows the server. */
 export function useFirstWeek() {
   const api = useApi();
@@ -124,7 +125,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     backgroundColor: theme.card, paddingTop: 14, paddingBottom: 4,
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingBottom: 10, gap: 12 },
-  title: { fontSize: 17, fontWeight: '700', color: theme.text, letterSpacing: -0.2 },
+  title: { fontSize: 17, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 },
   sub: { fontSize: 13, color: theme.muted, marginTop: 2, fontVariant: ['tabular-nums'] },
   list: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, marginHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },

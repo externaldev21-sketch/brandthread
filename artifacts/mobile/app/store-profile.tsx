@@ -23,7 +23,7 @@ import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { pickFromLibrary } from '@/lib/pickProfileImage';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { saveBio } from '@/services/growthService';
 
@@ -169,8 +169,8 @@ const s = StyleSheet.create({
   body: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   photoWrap: { alignItems: 'center', gap: 10, marginBottom: 8 },
   photo: { width: 96, height: 96, borderRadius: 48 },
-  photoLabel: { fontSize: 15, fontWeight: '600' },
-  section: { fontSize: 17, fontWeight: '600', marginTop: 12 },
+  photoLabel: { fontSize: 15, fontFamily: FONT.semibold },
+  section: { fontSize: 17, fontFamily: FONT.semibold, marginTop: 12 },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md },

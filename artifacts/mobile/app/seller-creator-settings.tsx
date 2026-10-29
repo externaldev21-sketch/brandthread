@@ -127,7 +127,7 @@ export default function SellerCreatorSettingsScreen() {
                 testID="commission-stepper"
               />
               <InlineError message={errors.commission} />
-              <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 16 }}>Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid.</Text>
+              <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 4, lineHeight: 14 }}>Paid on the item subtotal after discounts. Tax and shipping are excluded. Fractions of a cent round down. It comes out of your payout for that order before the creator is paid.</Text>
             </View>
             <Field label="Buyer discount on creator codes" value={discount} onChange={edit('discount', setDiscount)} error={errors.discount} suffix="%" help="0 keeps the code for tracking only." />
             <Field label="Attribution window" value={windowDays} onChange={edit('windowDays', setWindowDays)} error={errors.windowDays} suffix="days" help="How long a clicked link keeps crediting the creator." />

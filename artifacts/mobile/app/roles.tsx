@@ -12,6 +12,7 @@ import { OptionSheet } from '@/components/ui/OptionSheet';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { ROLE_FILTERS, filterRoles, permissionSummary, roleFilterLabel, type RoleFilter, type RoleRow } from '@/lib/rolesFilter';
 
+import { FONT, FS } from '@/lib/theme';
 // Role definitions shown while the live list (with member counts) loads or
 // if it fails. No member counts here: those only come from the server.
 const DEFAULT_ROLES: RoleRow[] = [
@@ -230,17 +231,17 @@ const styles = StyleSheet.create({
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   allPill: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  allPillText: { fontSize: 13, fontFamily: FONT.semibold },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   searchWrap: { paddingHorizontal: 20, paddingBottom: 8 },
-  searchInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  searchInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: FS.base, fontFamily: FONT.regular },
   listWrap: { paddingHorizontal: 20 },
   roleRow: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  roleName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  roleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  roleName: { fontSize: FS.base, fontFamily: FONT.semibold },
+  roleSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   footerNote: { paddingVertical: 18, alignItems: 'center', marginTop: 4 },
-  footerText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  footerText: { fontSize: 13, fontFamily: FONT.regular },
   learnMore: { alignSelf: 'stretch', paddingHorizontal: 20, paddingTop: 14, gap: 12 },
-  learnMoreText: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+  learnMoreText: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   learnMoreRow: { gap: 1 },
 });

@@ -122,5 +122,5 @@ const styles = StyleSheet.create({
   desc: { fontFamily: FONT.regular, fontSize: FS.sm },
   pill: { minWidth: 72, height: 36, paddingHorizontal: SP.md, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  error: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingBottom: SP.sm },
+  error: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, paddingBottom: SP.sm },
 });

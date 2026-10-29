@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   brand: { fontFamily: FONT.medium, fontSize: FS.meta, color: SILVER, letterSpacing: 0.4, textTransform: 'uppercase' },
   name: { fontFamily: FONT.semibold, fontSize: FS.md, color: PAPER, marginTop: 2 },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: HAIRLINE, marginVertical: SP.sm + 2 },
-  number: { fontFamily: FONT.bold, fontSize: 44, color: PAPER, letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  number: { fontFamily: FONT.bold, fontSize: 44, color: PAPER, letterSpacing: -1, fontVariant: ['tabular-nums'] }, // type-exempt: share-card stat, display size
   of: { fontFamily: FONT.regular, fontSize: FS.base, color: SILVER, marginTop: -2 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   metaLabel: { fontFamily: FONT.regular, fontSize: FS.sm, color: SILVER },

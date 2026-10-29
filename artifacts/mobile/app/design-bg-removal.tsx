@@ -764,7 +764,7 @@ const s = StyleSheet.create({
     position: 'absolute', left: SP.md, right: SP.md, bottom: SP.md, alignItems: 'center',
     backgroundColor: BG, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED, paddingVertical: SP.sm, paddingHorizontal: SP.md,
   },
-  errorText: { fontFamily: FONT.medium, fontSize: FS.sm, color: RED, textAlign: 'center', lineHeight: 19 },
+  errorText: { fontFamily: FONT.medium, fontSize: FS.sm, color: RED, textAlign: 'center', lineHeight: 18 },
 
   stripList: { flexGrow: 0, marginTop: SP.sm },
   strip: { gap: SP.sm, paddingVertical: 2 },

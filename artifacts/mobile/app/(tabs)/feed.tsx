@@ -3849,7 +3849,7 @@ function FeedScreenContent({
                   <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                     {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
                   </Text>
-                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
+                  <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 }}>
                     {feedTab === 'following' ? 'Follow sellers to build your Following feed' : 'Check back soon for new drops'}
                   </Text>
                   {feedTab === 'following' && (
@@ -3881,7 +3881,7 @@ function FeedScreenContent({
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                 {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
               </Text>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 }}>
                 {feedTab === 'following' ? 'Follow sellers to build your Following feed' : 'Check back soon for new drops'}
               </Text>
               {feedTab === 'following' && (
@@ -4575,7 +4575,7 @@ const styles = StyleSheet.create({
   repostEducationPreviewLineLong: { height: 8, width: 130, borderRadius: 4, backgroundColor: '#FFFFFF24' },
   repostEducationPreviewShare: { position: 'absolute', right: 16, bottom: 19 },
   repostEducationTitle: {
-    color: FG, fontFamily: FONT.bold, fontSize: 28, lineHeight: 32,
+    color: FG, fontFamily: FONT.bold, fontSize: 28, lineHeight: 34,
     textAlign: 'center', paddingHorizontal: 12, marginBottom: 22,
   },
   repostEducationPoint: {
@@ -4605,7 +4605,7 @@ const styles = StyleSheet.create({
   },
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
-  notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  notifRow: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
   feedEndTitle: { fontSize: FS.lg, fontFamily: FONT.bold, paddingHorizontal: SP.md, marginBottom: SP.md },
   // flexGrow 0 + flex-start: the row keeps its cards' own height and stays
   // vertically centered on the page instead of stretching to fill it.

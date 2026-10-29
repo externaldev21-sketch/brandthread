@@ -443,16 +443,16 @@ function makeStyles(colors: Colors) {
     card: { marginHorizontal: SP.md, gap: SP.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
     fieldRow: { gap: SP.sm },
-    fieldLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold, color: colors.mutedForeground },
+    fieldLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, color: colors.mutedForeground },
     input: {
-      fontSize: FS.base, lineHeight: 19, fontFamily: FONT.regular, color: colors.foreground,
+      fontSize: FS.base, lineHeight: 20, fontFamily: FONT.regular, color: colors.foreground,
       backgroundColor: colors.secondary, borderRadius: RADIUS.sm,
       borderWidth: 1, borderColor: colors.border,
       paddingHorizontal: SP.md, paddingVertical: 12,
       minHeight: 44,
     },
     urlRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-    urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
+    urlSuffix: { flexShrink: 0, fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     chipScroll: { flexDirection: 'row', gap: SP.sm },
     statusChip: {
@@ -460,10 +460,10 @@ function makeStyles(colors: Colors) {
       borderWidth: 1, borderColor: colors.border,
       minHeight: 44, justifyContent: 'center',
     },
-    statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
+    statusChipLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium },
     errorText: {
       marginHorizontal: SP.md, marginTop: SP.md,
-      fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.destructive,
+      fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium, color: colors.destructive,
     },
   });
 }

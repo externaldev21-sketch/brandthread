@@ -278,7 +278,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     alignItems: 'center', justifyContent: 'center',
   },
   photoNote: { marginTop: 4, gap: 4 },
-  noteText: { fontSize: FS.xs, lineHeight: 15, fontFamily: FONT.regular },
+  noteText: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.regular },
   noteAction: { fontSize: FS.xs, fontFamily: FONT.semibold },
   attachBtn: {
     width: ATTACH_SIZE, height: ATTACH_SIZE, borderRadius: ATTACH_SIZE / 2,

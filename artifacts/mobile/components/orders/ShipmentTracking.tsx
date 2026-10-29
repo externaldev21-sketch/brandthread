@@ -210,7 +210,7 @@ export function ShipmentMapPlaceholder({ info }: { info: ShipmentInfo }) {
 const styles = StyleSheet.create({
   headline: { marginBottom: SP.md },
   title: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4 },
-  subtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 19 },
+  subtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 18 },
   map: {
     height: MAP_H, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden', marginBottom: SP.md,

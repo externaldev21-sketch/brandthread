@@ -93,11 +93,11 @@ function makeStyles(ck: CheckoutColors) {
     },
     copy: { flex: 1, minWidth: 0 },
     title: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
-    status: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 2, color: ck.muted },
+    status: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 2, color: ck.muted },
     spinner: { width: 51, height: 31 },
     noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.xs + 2, marginTop: SP.sm + 2 },
     noteIcon: { marginTop: 3 },
-    note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.text },
+    note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.text },
     linkRow: { flexDirection: 'row', marginTop: SP.sm + 2, paddingLeft: 36 + SP.sm + 4 },
   });
 }

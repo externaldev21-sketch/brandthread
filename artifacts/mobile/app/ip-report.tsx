@@ -81,7 +81,7 @@ export default function IpReportScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:{flex:1,backgroundColor:theme.background},
   content:{padding:SP.md,gap:SP.sm,paddingBottom:SP.xl},
-  legal:{color:theme.muted,fontFamily:FONT.regular,fontSize:FS.sm,lineHeight:19,backgroundColor:theme.card,borderRadius:RADIUS.sm,padding:SP.sm,marginBottom:SP.sm},
+  legal:{color:theme.muted,fontFamily:FONT.regular,fontSize:FS.sm,lineHeight: 18,backgroundColor:theme.card,borderRadius:RADIUS.sm,padding:SP.sm,marginBottom:SP.sm},
   label:{color:theme.text,fontFamily:FONT.semibold,fontSize:FS.sm,marginTop:SP.xs},
   input:{color:theme.text,fontFamily:FONT.regular,fontSize:FS.base,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.sm,backgroundColor:theme.card,padding:SP.sm,minHeight:46},
   area:{height:100,textAlignVertical:'top'},

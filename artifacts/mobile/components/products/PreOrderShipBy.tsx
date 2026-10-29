@@ -62,6 +62,6 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   title: { fontFamily: FONT.bold, fontSize: FS.md },
   days: { fontFamily: FONT.medium, fontSize: FS.sm },
-  copy: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  note: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+  copy: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
+  note: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14 },
 });

@@ -84,5 +84,5 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 13, fontFamily: FONT.medium },
   iconBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   footerNote: { paddingHorizontal: 20, paddingVertical: 16 },
-  footerText: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
+  footerText: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 16 },
 });

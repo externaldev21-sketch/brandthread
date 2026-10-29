@@ -126,11 +126,11 @@ export default function ProductFeedScreen() {
   const s = useMemo(() => StyleSheet.create({
     content: { paddingHorizontal: SP.md, paddingTop: SP.md },
     title: { fontFamily: FONT.semibold, fontSize: FS.lg, color: theme.text },
-    body: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, lineHeight: 20, marginTop: 6, marginBottom: SP.lg },
+    body: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, lineHeight: 18, marginTop: 6, marginBottom: SP.lg },
     block: { marginBottom: SP.lg },
     labelRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md },
     label: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
-    url: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 19 },
+    url: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 18 },
     copy: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, paddingTop: 2 },
     meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 6 },
     counts: {

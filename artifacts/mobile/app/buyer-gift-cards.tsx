@@ -240,7 +240,7 @@ function makeStyles(ck: CheckoutColors) {
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text },
     label: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.muted },
     total: { fontVariant: ['tabular-nums'],  fontFamily: FONT.bold, fontSize: 34, color: ck.text, marginTop: SP.xs },
-    fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
+    fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted },
     cardWrap: { marginTop: SP.md },
     history: { paddingTop: SP.sm, gap: SP.sm },
     historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs },

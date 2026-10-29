@@ -14,7 +14,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, TEXT_DISABLED } from '@/lib/theme';
+import { FONT, TEXT_DISABLED, FS } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { ASPECT_RATIO_VALUE, MAX_SLIDES_BY_MODE } from '@/constants/postLimits';
 import { DEFAULT_SLIDE_CROP } from '@/lib/createPost/crop';
@@ -322,13 +322,13 @@ const ed = StyleSheet.create({
   presetLabel: { fontFamily: FONT.semibold, fontSize: 13 },
   presetThumb: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', borderWidth: 2, borderColor: CP.line },
   toolCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: crispPx(1.5), borderColor: CP.line, alignItems: 'center', justifyContent: 'center' },
-  toolValue: { position: 'absolute', bottom: 6, color: CP.silver, fontFamily: FONT.semibold, fontSize: 10 },
+  toolValue: { position: 'absolute', bottom: 6, color: CP.silver, fontFamily: FONT.semibold, fontSize: FS.xs },
   sliderBox: { paddingHorizontal: 24, paddingTop: 12 },
   sliderLabel: { color: CP.white, fontFamily: FONT.bold, fontSize: 15, textAlign: 'center', marginBottom: 6 },
   sliderActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   sliderBtn: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 15, padding: 6 },
   applyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
-  applyLabel: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 14 },
+  applyLabel: { color: CP.silver, fontFamily: FONT.semibold, fontSize: FS.base },
   tools: { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingVertical: 10 },
   toolBtn: { width: 76, height: 52, borderRadius: 10, backgroundColor: CP.surface2, alignItems: 'center', justifyContent: 'center', gap: 3 },
   toolText: { fontFamily: FONT.semibold, fontSize: 12 },

@@ -108,5 +108,5 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: 4, borderRadius: 999,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  badgeText: { fontFamily: FONT.medium, fontSize: 10, color: MUTED, includeFontPadding: false },
+  badgeText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, includeFontPadding: false },
 });

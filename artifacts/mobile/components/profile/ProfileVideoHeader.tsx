@@ -274,11 +274,11 @@ const styles = StyleSheet.create({
   statsInline: { flex: 1, minWidth: 0, marginLeft: 14 },
   // Below the fade, on solid background: name → @handle+chip → bio/link.
   belowAvatarRow: { paddingHorizontal: SP.md, paddingTop: 12 },
-  name: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 23, letterSpacing: -0.3 },
+  name: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 22, letterSpacing: -0.3 },
   handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm, marginTop: 4 },
-  handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 18, flexShrink: 1 },
+  handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, flexShrink: 1 },
   // Seller own profile (chips row under the handle): a smaller handle under the name.
-  handleCompact: { fontSize: 13, lineHeight: 17 },
+  handleCompact: { fontSize: 13, lineHeight: 18 },
   // Chips side by side on one line ("Seller" · plan), wrapping only if they can't fit.
   chipStack: { marginTop: 6, gap: 6, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   meta: { paddingTop: 8, gap: 2 },
@@ -289,14 +289,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
   },
   affordancePressed: { opacity: 0.6 },
-  affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
+  affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 16 },
 
   // Space-around, centered columns filling the row beside the avatar —
   // Instagram's own stat treatment (not the old left-aligned fixed-gap row).
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   statCell: { alignItems: 'center', minWidth: 44 },
   statPressed: { opacity: 0.6 },
-  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, fontVariant: ['tabular-nums'] },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 22, fontVariant: ['tabular-nums'] },
   // 12pt at 60% white under the 17pt bold number.
-  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 15 },
+  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16 },
 });

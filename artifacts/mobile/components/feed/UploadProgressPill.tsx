@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   thumbFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textCol: { flexShrink: 1, minWidth: 80 },
   title: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.xs },
-  subtitle: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs - 1, marginTop: 1 },
+  subtitle: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
   track: { height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 5, overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: '#fff', borderRadius: 1.5 },
 });

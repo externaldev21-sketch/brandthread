@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingVertical: SP.lg },
   heroIcon: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   heroTitle: { fontFamily: FONT.bold, fontSize: FS.xl, textAlign: 'center' },
-  heroSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, textAlign: 'center', marginTop: SP.xs, maxWidth: 300 },
+  heroSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, textAlign: 'center', marginTop: SP.xs, maxWidth: 300 },
   retry: { marginTop: SP.md, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2 },
   retryText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   section: { marginTop: SP.lg, gap: SP.sm },

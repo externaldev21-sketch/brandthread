@@ -69,6 +69,6 @@ const styles = StyleSheet.create({
     width: 24, height: 24, borderRadius: 12, backgroundColor: MEDIA.background,
     alignItems: 'center', justifyContent: 'center',
   },
-  text: { flexShrink: 1, color: MEDIA.background, fontFamily: FONT.medium, fontSize: 13, lineHeight: 17 },
+  text: { flexShrink: 1, color: MEDIA.background, fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
   name: { fontFamily: FONT.bold },
 });

@@ -244,10 +244,10 @@ const styles = StyleSheet.create({
     marginBottom: SP.xl - SP.xs,
   },
   headline: {
-    fontSize: FS.h1 + 4,
+    fontSize: FS.h1,
     fontFamily: FONT.bold,
     letterSpacing: -1.5,
-    lineHeight: 46,
+    lineHeight: 41,
     marginBottom: SP.sm,
   },
   sub: {

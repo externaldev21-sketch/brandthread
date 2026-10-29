@@ -251,7 +251,7 @@ function Section({
 
 const sec = StyleSheet.create({
   title:    { fontSize: FS.base, fontFamily: FONT.bold, letterSpacing: -0.1 },
-  subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, marginBottom: SP.sm, lineHeight: 16 },
+  subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, marginBottom: SP.sm, lineHeight: 14 },
   card:     { borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, gap: SP.md },
 });
 
@@ -1141,12 +1141,12 @@ export default function CreateAdScreen() {
 
 const styles = StyleSheet.create({
   stageHeading:    { fontSize: FS.xl, fontFamily: FONT.bold, marginBottom: SP.xs },
-  stageSub:        { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  stageSub:        { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   fieldLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.xs },
   pickerCard:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.md },
   pickerCardTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
   infoBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1 },
-  infoBoxText:     { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
+  infoBoxText:     { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 14 },
   textInputField:  { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, marginTop: SP.xs },
   charCount:       { fontSize: FS.xs, fontFamily: FONT.regular, alignSelf: 'flex-end', marginTop: 2, fontVariant: ['tabular-nums'] },
   textArea:        { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 70, marginTop: SP.xs },
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
   reachBody:       { flex: 1, minWidth: 0 },
   reachLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 2 },
   reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
-  reachDisclaimer: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 18 },
+  reachDisclaimer: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 14 },
   stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm },
   metaAdsLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.sm, minHeight: 44 },
   metaAdsLinkText: { fontSize: FS.xs, fontFamily: FONT.semibold },

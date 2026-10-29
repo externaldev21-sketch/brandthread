@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   close: { alignSelf: 'flex-end', marginTop: SP.sm },
   edge: { position: 'absolute', width: '28%' },
   kicker: { fontFamily: FONT.medium, fontSize: FS.base, color: SILVER },
-  giant: { fontFamily: FONT.bold, fontSize: 64, color: PAPER, letterSpacing: -2, lineHeight: 70 },
+  giant: { fontFamily: FONT.bold, fontSize: 64, color: PAPER, letterSpacing: -2, lineHeight: 70 }, // type-exempt: Wrapped recap stat, display size
   big: { fontFamily: FONT.semibold, fontSize: FS.xxl, color: PAPER, letterSpacing: -0.5 },
   small: { fontFamily: FONT.regular, fontSize: FS.sm, color: SILVER },
   link: { fontFamily: FONT.semibold, fontSize: FS.base, color: PAPER },

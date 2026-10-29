@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   },
   badge: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   title: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
-  body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20, marginBottom: SP.sm },
+  body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18, marginBottom: SP.sm },
   btn: { width: '100%', height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontSize: FS.base, fontFamily: FONT.bold },
 });

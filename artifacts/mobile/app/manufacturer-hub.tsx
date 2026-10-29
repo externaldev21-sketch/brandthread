@@ -952,5 +952,5 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   listHeader:   { marginTop: SP.xl, marginBottom: SP.xs, paddingHorizontal: 0 },
   manufacturerRow: { minHeight: 64 },
   landingEmpty: { alignItems: 'flex-start', gap: SP.md, paddingVertical: SP.md },
-  landingEmptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },
+  landingEmptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
 });

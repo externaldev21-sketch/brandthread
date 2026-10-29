@@ -183,8 +183,8 @@ export function CashOutSheet({
 const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: SP.md, paddingBottom: SP.lg },
   amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  dollarSign: { fontFamily: FONT.bold, fontSize: 40, lineHeight: 52, marginRight: 2 },
-  amountInput: { fontFamily: FONT.bold, fontSize: 56, lineHeight: 64, minWidth: 60, textAlign: 'center', padding: 0, fontVariant: ['tabular-nums'] },
+  dollarSign: { fontFamily: FONT.bold, fontSize: 40, lineHeight: 52, marginRight: 2 }, // type-exempt: amount entry, display size
+  amountInput: { fontFamily: FONT.bold, fontSize: 56, lineHeight: 64, minWidth: 60, textAlign: 'center', padding: 0, fontVariant: ['tabular-nums'] }, // type-exempt: amount entry, display size
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
   balanceText: { fontFamily: FONT.medium, fontSize: FS.sm },
   useAll: { fontFamily: FONT.semibold, fontSize: FS.sm, marginLeft: SP.xs },

@@ -308,7 +308,7 @@ export default function SellerGiveawayCreate() {
 
 const styles = StyleSheet.create({
   label: { fontSize: FS.meta, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
-  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, marginBottom: 6 },
+  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular },
   multiline: { minHeight: 200, textAlignVertical: 'top' },
   search: { marginHorizontal: SHEET_GUTTER, marginBottom: SP.sm },

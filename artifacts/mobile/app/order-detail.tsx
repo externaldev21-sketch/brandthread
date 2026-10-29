@@ -1432,7 +1432,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   blockActions:     { gap: SP.sm, marginTop: SP.md },
   pillLine:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flexShrink: 1 },
   pill:             { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: FILL_ELEVATED },
-  pillText:         { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold, color: FG },
+  pillText:         { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.semibold, color: FG },
   bannerWrap:       { paddingHorizontal: SP.md, paddingTop: SP.sm },
   flagRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md },
 

@@ -86,7 +86,7 @@ export function SellerDashboardTodo({
 const styles = StyleSheet.create({
   shipRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingBottom: SP.md },
   shipCopy: { flex: 1, minWidth: 0 },
-  shipCount: { fontFamily: FONT.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  shipCount: { fontFamily: FONT.bold, fontSize: 34, lineHeight: 41, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   shipLabel: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20 },
   shipButton: { minHeight: 44, minWidth: 120, paddingHorizontal: SP.md, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   shipButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },

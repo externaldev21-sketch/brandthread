@@ -105,10 +105,10 @@ export function AddToProductSheet({ visible, onClose, onPick }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  subtitle: { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 17, paddingHorizontal: SCREEN_GUTTER, marginTop: 8 },
+  subtitle: { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 16, paddingHorizontal: SCREEN_GUTTER, marginTop: 8 },
   spinner: { marginTop: 40 },
   center: { alignItems: 'center', gap: 14, paddingHorizontal: SCREEN_GUTTER, marginTop: 40 },
-  message: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
+  message: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18 },
   list: { padding: SCREEN_GUTTER },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   thumb: { width: 44, height: 44, borderRadius: 8 },

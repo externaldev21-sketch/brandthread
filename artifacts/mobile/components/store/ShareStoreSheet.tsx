@@ -35,7 +35,7 @@ import { displayStoreLink } from '@/lib/storeShare';
 import { SHARE_TARGETS, shareTargetUrls, type ShareTargetKey } from '@/lib/shareTargets';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 import { RADII } from '@/constants/radii';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { QR_DARK, QR_LIGHT } from '@/lib/storeSiteDesign';
 
@@ -249,12 +249,12 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 44 },
   headerSide: { width: 30, height: 30 },
   close: { borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
+  title: { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: FONT.semibold },
   body: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   previewWrap: { alignItems: 'center' },
   previewFrame: { borderRadius: 16, borderWidth: 1, padding: 1 },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 12, paddingHorizontal: 8 },
-  linkText: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
+  linkText: { fontSize: 17, fontFamily: FONT.semibold, flexShrink: 1 },
   copyBtn: { marginTop: 8 },
   targetsScroll: { marginTop: 20, marginHorizontal: -16 },
   targets: { paddingHorizontal: 12, gap: 4 },
@@ -265,10 +265,10 @@ const s = StyleSheet.create({
   qrWrap: { alignItems: 'center', paddingVertical: 12, gap: 4 },
   qrTile: { padding: 12, borderRadius: 12 },
   noLink: { paddingVertical: 24, gap: 16 },
-  noLinkTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  noLinkTitle: { fontSize: 17, fontFamily: FONT.semibold, textAlign: 'center' },
   toast: {
     position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: FILL_ELEVATED, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
   },
-  toastText: { fontSize: 15, fontWeight: '600' },
+  toastText: { fontSize: 15, fontFamily: FONT.semibold },
 });

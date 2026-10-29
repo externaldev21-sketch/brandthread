@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: SP.xl },
   cta: { alignSelf: 'stretch', marginTop: SP.lg },
   title: { fontSize: FS.xl, fontFamily: FONT.bold, textAlign: 'center' },
-  body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, lineHeight: 20 },
+  body: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, lineHeight: 18 },
   code: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: 0, marginTop: SP.lg, fontVariant: ['tabular-nums'] },
   note: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm },
 });

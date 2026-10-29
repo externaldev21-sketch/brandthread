@@ -636,8 +636,8 @@ const styles = StyleSheet.create({
   // Instagram stats: 17pt bold number over a 12pt label at 60% white,
   // evenly spaced — no dividers, no caps.
   statCell: { height: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 1 },
-  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, ...TABULAR_NUMS },
-  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 15 },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 22, ...TABULAR_NUMS },
+  statLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16 },
 
   tabs: {
     flexDirection: 'row', paddingHorizontal: SP.xs, position: 'relative',
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
   tabIconOnly: { height: 44, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   // TikTok's short centered bar: ~26pt wide, 2pt tall, rounded.
   tabIndicatorFlat: { height: 2, borderRadius: 1 },
-  tabLabel: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
+  tabLabel: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 16 },
   tabLabelActive: { fontFamily: FONT.bold },
   tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 2, borderRadius: 1 },
 
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   pillFull: { maxWidth: undefined, minWidth: 0, alignSelf: 'stretch' },
   pillIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   pillCopy: { flexShrink: 1, flexGrow: 1 },
-  pillLabel: { fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 21, letterSpacing: -0.3 },
+  pillLabel: { fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 22, letterSpacing: -0.3 },
   pillSub: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, opacity: 0.7 },
   pillArrow: { width: 46, height: 46, borderRadius: 23, borderWidth: crispPx(1.5), alignItems: 'center', justifyContent: 'center' },
 

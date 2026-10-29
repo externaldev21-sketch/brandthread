@@ -875,7 +875,7 @@ const esS = StyleSheet.create({
   rootCompact: { paddingVertical: SP.lg },
   illustration: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
-  desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
+  desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },
   btn:     { width: '100%' },
   // Slim, fit-to-text pill: 36px tall, equal 16px side padding, black text
@@ -1202,7 +1202,7 @@ export function FormInput({
 const fiS = StyleSheet.create({
   wrap:         { gap: SP.sm },
   label:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  note:         { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
+  note:         { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 14 },
   optional:     { fontFamily: FONT.regular },
   pricePrefix:  { flex: 0 },
   // Solid near-black fill, no resting border (Dev's addendum); the border

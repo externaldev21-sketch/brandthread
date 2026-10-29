@@ -875,7 +875,7 @@ function makeStyles(theme: any) {
     },
     qtyInput: {
       flex: 1, minWidth: 0, height: 80, borderRadius: 40,
-      backgroundColor: FILL_ELEVATED, textAlign: 'center', ...TYPE_SCALE.title1, fontSize: 40, lineHeight: 46,
+      backgroundColor: FILL_ELEVATED, textAlign: 'center', ...TYPE_SCALE.title1, fontSize: 40, lineHeight: 46, // type-exempt: big quantity entry field
       color: theme.text, padding: 0, outlineWidth: 0, ...TABULAR_NUMS,
     } as any,
     qtyCaption: { ...TYPE_SCALE.footnote, color: theme.muted, textAlign: 'center', marginTop: SP.sm },

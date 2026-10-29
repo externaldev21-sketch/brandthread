@@ -1802,7 +1802,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyContext: { fontFamily: FONT.regular, fontSize: FS.meta, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
-  commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 19 },
+  commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 20 },
   commentTextHeld: { color: MUTED },
   translationLink: { alignSelf: 'flex-start', marginTop: 2, color: MUTED },
   reviewPill: {
@@ -1895,7 +1895,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   emojiBtn: { alignItems: 'center', justifyContent: 'center' },
   composerFlush: { paddingHorizontal: 0, paddingTop: 0, backgroundColor: CARD },
   inputTool: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 17, lineHeight: 20 },
+  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 17, lineHeight: 22 },
 
   // Actions sheet
   sheetPreview: {
@@ -1903,8 +1903,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingTop: SP.xs, paddingBottom: SP.md,
   },
   sheetPreviewName: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
-  sheetPreviewText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 2 },
+  sheetPreviewText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 2 },
   confirmBlock: { paddingTop: SP.md, paddingBottom: SP.xs },
   confirmTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
-  confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: 6 },
+  confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 6 },
 });

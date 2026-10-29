@@ -410,7 +410,7 @@ function makePubStyles(c: { FG: string; MUTED: string; SUCCESS: string; RED: str
     dangerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: c.RED },
     dangerDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED },
     shareTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: c.FG },
-    shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED, lineHeight: 19 },
+    shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED, lineHeight: 18 },
     shareActions: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs },
     revokeBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.sm },
     revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.MUTED },

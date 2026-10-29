@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   row: { borderBottomWidth: StyleSheet.hairlineWidth },
   rowHead: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
-  rowBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, paddingBottom: SP.md },
+  rowBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, paddingBottom: SP.md },
   inBag: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm },
   inBagText: { fontFamily: FONT.medium, fontSize: FS.sm },
 });

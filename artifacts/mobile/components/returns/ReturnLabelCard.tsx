@@ -58,7 +58,7 @@ export function ReturnLabelCard({ labelUrl, carrier, trackingNumber }: {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, letterSpacing: 0.4, textTransform: 'uppercase', color: theme.muted, marginBottom: SP.sm },
-  body: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
+  body: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 18 },
   qrPlate: {
     alignSelf: 'center', marginTop: SP.md, padding: SP.md, borderRadius: RADIUS.md,
     // The light quiet zone around the QR code is part of the code.

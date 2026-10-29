@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   cardCompact: { minHeight: 112, gap: SP.md, padding: SP.md, borderRadius: 16 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
   store: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.md, color: CARD_FG },
-  amount: { fontFamily: FONT.bold, fontSize: 44, lineHeight: 50, color: CARD_FG, ...TABULAR_NUMS },
+  amount: { fontFamily: FONT.bold, fontSize: 44, lineHeight: 50, color: CARD_FG, ...TABULAR_NUMS }, // type-exempt: gift card face artwork
   amountCompact: { fontSize: 28, lineHeight: 34 },
   caption: { fontFamily: FONT.regular, fontSize: FS.sm, color: CARD_MUTED, marginTop: 2, ...TABULAR_NUMS },
 });

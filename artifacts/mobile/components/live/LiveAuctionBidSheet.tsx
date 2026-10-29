@@ -90,7 +90,7 @@ function makeStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     step: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
     stepPlus: { backgroundColor: theme.accent },
     stepDisabled: { opacity: 0.4 },
-    amount: { fontFamily: FONT.bold, fontSize: 40, color: theme.text },
+    amount: { fontFamily: FONT.bold, fontSize: 40, color: theme.text }, // type-exempt: hero money figure, display size
     error: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, textAlign: 'center', marginBottom: SP.sm },
   });
 }

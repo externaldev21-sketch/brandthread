@@ -3614,7 +3614,7 @@ const requestPanelStyles = StyleSheet.create({
     gap: SP.xs,
   },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
-  subline: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, textAlign: 'center', marginBottom: SP.sm },
+  subline: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
   actionsRow: { flexDirection: 'row', gap: SP.sm },
   // PressableScale applies `style` only to its inner view, never to the
   // outer node that takes part in this row — so the equal thirds live on a

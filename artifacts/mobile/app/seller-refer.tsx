@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   headline: { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, marginTop: SP.md },
-  body: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21, marginTop: SP.sm },
+  body: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 20, marginTop: SP.sm },
   section: { fontSize: FS.md, fontFamily: FONT.semibold, marginTop: SP.xl, marginBottom: SP.sm },
   step: { flexDirection: 'row', gap: SP.md, paddingVertical: 10 },
   stepTitle: { fontSize: FS.base, fontFamily: FONT.semibold },

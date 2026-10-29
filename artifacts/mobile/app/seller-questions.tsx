@@ -165,7 +165,7 @@ const s = StyleSheet.create({
   card: { paddingVertical: SP.md, borderTopWidth: 1, gap: 6 },
   product: { fontSize: FS.meta, fontFamily: FONT.semibold },
   q: { fontSize: FS.base, fontFamily: FONT.bold, lineHeight: 22 },
-  a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 20 },
+  a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 18 },
   meta: { fontSize: FS.meta, fontFamily: FONT.medium },
   answer: { borderRadius: 8, padding: 12, gap: 6 },
   link: { fontSize: FS.meta, fontFamily: FONT.semibold },

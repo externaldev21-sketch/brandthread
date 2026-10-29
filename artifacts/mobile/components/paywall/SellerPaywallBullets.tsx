@@ -29,5 +29,5 @@ export function SellerPaywallBullets({ theme, bullets }: SellerPaywallBulletsPro
 const styles = StyleSheet.create({
   list: { gap: 10, paddingHorizontal: 4 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  text: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 19 },
+  text: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
 });

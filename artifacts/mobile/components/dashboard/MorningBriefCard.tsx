@@ -86,7 +86,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, color: theme.muted },
+  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, color: theme.muted },
   suggestionTitle: { fontFamily: FONT.semibold, color: theme.text },
   action: {
     marginTop: SP.sm,

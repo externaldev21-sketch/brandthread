@@ -629,10 +629,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18, alignItems: 'center', gap: 8,
   },
   promptTitle: { fontFamily: FONT.bold, fontSize: FS.md, textAlign: 'center', marginTop: 4 },
-  promptBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, textAlign: 'center', marginBottom: 8 },
+  promptBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, textAlign: 'center', marginBottom: 8 },
 
   countdownWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 25 },
-  countdownText: { fontFamily: FONT.bold, fontSize: 96, lineHeight: 104 },
+  countdownText: { fontFamily: FONT.bold, fontSize: 96, lineHeight: 104 }, // type-exempt: camera timer countdown over the viewfinder
 
   topRow: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 40,
@@ -657,7 +657,7 @@ const s = StyleSheet.create({
 
   rail: { position: 'absolute', right: 10, zIndex: 35, alignItems: 'center', gap: 6 },
   railBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  railBadge: { position: 'absolute', bottom: 2, fontFamily: FONT.semibold, fontSize: 10 },
+  railBadge: { position: 'absolute', bottom: 2, fontFamily: FONT.semibold, fontSize: FS.xs },
 
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 35, alignItems: 'center' },
   errorText: { fontFamily: FONT.medium, fontSize: FS.xs, textAlign: 'center', paddingHorizontal: 24, marginBottom: 10 },

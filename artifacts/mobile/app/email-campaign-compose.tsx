@@ -315,8 +315,8 @@ const st = StyleSheet.create({
   pvStore: { fontFamily: FONT.bold, fontSize: FS.xs, marginBottom: 16 },
   pvImage: { width: '100%', height: 160, marginBottom: 14 },
   pvHead: { fontFamily: FONT.bold, fontSize: FS.xl, marginBottom: 10 },
-  pvText: { fontFamily: FONT.regular, fontSize: FS.md, lineHeight: 24, marginBottom: 14 },
+  pvText: { fontFamily: FONT.regular, fontSize: FS.md, lineHeight: 22, marginBottom: 14 },
   pvThumb: { aspectRatio: 1, overflow: 'hidden' },
   pvBtn: { alignSelf: 'flex-start', paddingHorizontal: 22, paddingVertical: 13, marginBottom: 16 },
-  pvFoot: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 8, lineHeight: 16 },
+  pvFoot: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 8, lineHeight: 14 },
 });

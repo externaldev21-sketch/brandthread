@@ -1198,8 +1198,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADIUS.xl,
     borderWidth: 1,
   },
-  sheetTitle: { fontSize: FS.lg, fontWeight: '700', marginBottom: SP.sm },
-  sheetLabel: { fontSize: FS.xs, fontWeight: '500', marginTop: SP.sm },
+  sheetTitle: { fontSize: FS.lg, fontFamily: FONT.bold, marginBottom: SP.sm },
+  sheetLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: SP.sm },
   sheetInput: {
     borderWidth: 1,
     borderRadius: RADIUS.md,
@@ -1216,7 +1216,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  sheetBtnText: { fontSize: FS.md, fontWeight: '600' },
+  sheetBtnText: { fontSize: FS.md, fontFamily: FONT.semibold },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: FONT.medium },
   pageTitle: { fontSize: 28, fontFamily: FONT.bold, marginBottom: 4 },
@@ -1232,7 +1232,7 @@ const styles = StyleSheet.create({
   // Follows a sectionTitleRow (heading + "Add" pill, centred on one row);
   // the row's own marginBottom gives the description clear space below the
   // pill instead of the old negative margin that pulled it up under it.
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 17 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 16 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, minHeight: 32, marginBottom: SP.sm },
   addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   addRateBtnText: { fontSize: 12, fontFamily: FONT.semibold },

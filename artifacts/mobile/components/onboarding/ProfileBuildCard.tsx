@@ -16,6 +16,7 @@ import { PressableScale } from './OnboardingUI';
 import { SPACE, useOnboardingMotion } from './onboardingTokens';
 import { profileInitial, type ProfileCardData } from '@/lib/profileCard';
 
+import { FONT, FS } from '@/lib/theme';
 export type { ProfileCardData };
 
 type Theme = ReturnType<typeof useAppTheme>['theme'];
@@ -140,7 +141,7 @@ export function FlippingProfileCard({ data, delayMs = 500, onFlipped }: { data: 
           <View style={[styles.photo, { width: 44, height: 44, borderRadius: 22 }]}>
             {data.photoUri
               ? <Image source={{ uri: data.photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              : <Text style={[styles.initial, { fontSize: 18 }]}>{profileInitial(data)}</Text>}
+              : <Text style={[styles.initial, { fontSize: FS.md }]}>{profileInitial(data)}</Text>}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.backName} numberOfLines={1}>{data.name.trim()}</Text>
@@ -173,17 +174,17 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
     backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
   },
-  initial: { color: theme.text, fontWeight: '600' },
+  initial: { color: theme.text, fontFamily: FONT.semibold },
   editBadge: {
     position: 'absolute', right: 0, bottom: 0, width: 26, height: 26, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center', backgroundColor: theme.text,
     borderWidth: 2, borderColor: theme.card,
   },
-  handle: { marginTop: SPACE.sm, fontSize: 15, fontWeight: '600', color: theme.text, maxWidth: '100%' },
-  name: { marginTop: 2, fontSize: 14, color: theme.muted, maxWidth: '100%' },
+  handle: { marginTop: SPACE.sm, fontSize: 15, fontFamily: FONT.semibold, color: theme.text, maxWidth: '100%' },
+  name: { marginTop: 2, fontSize: FS.sm, color: theme.muted, maxWidth: '100%' },
   placeholder: { color: theme.subtle },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
-  backName: { fontSize: 15, fontWeight: '600', color: theme.text },
+  backName: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
   backHandle: { fontSize: 13, color: theme.muted, marginTop: 1 },
-  ready: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: theme.text, letterSpacing: -0.8 },
+  ready: { fontSize: 34, lineHeight: 41, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.8 },
 });

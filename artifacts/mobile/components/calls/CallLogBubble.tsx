@@ -20,6 +20,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import type { CallLogEntry } from '@/lib/calls/types';
 
+import { FONT } from '@/lib/theme';
 /** Matches the "h:mm AM/PM" format the conversation screens already use for
  *  message timestamps (see buyer-conversation.tsx's local `formatTime`). Kept
  *  as a small local copy rather than importing a non-exported helper. */
@@ -102,5 +103,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textCol: { flexShrink: 1 },
-  missedTitle: { fontWeight: '700' },
+  missedTitle: { fontFamily: FONT.bold },
 });

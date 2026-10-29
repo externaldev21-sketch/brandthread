@@ -103,13 +103,13 @@ export function LegalContinueNotice({ style }: { style?: StyleProp<TextStyle> })
 }
 
 const styles = StyleSheet.create({
-  notice: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  notice: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 4 },
   box: {
     width: 22, height: 22, borderRadius: 11, borderWidth: crispPx(1.5),
     alignItems: 'center', justifyContent: 'center', marginTop: 0,
   },
-  text: { flex: 1, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
+  text: { flex: 1, fontFamily: FONT.regular, fontSize: 13, lineHeight: 18 },
   link: { fontFamily: FONT.semibold, textDecorationLine: 'underline' },
   error: { fontFamily: FONT.medium, fontSize: 12, marginTop: 6, marginLeft: 34 },
 });

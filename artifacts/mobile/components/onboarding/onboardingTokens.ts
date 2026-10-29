@@ -10,14 +10,14 @@ import { type TextStyle } from 'react-native';
 
 import { Easing, useReducedMotion } from 'react-native-reanimated';
 
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 
 /** Brandthread type scale for the onboarding flow (Inter). */
 export const TYPE = {
   /** One-idea hero lines: Welcome, Success. */
-  display: { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -1.6 } satisfies TextStyle,
+  display: { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -1.6 } satisfies TextStyle, // type-exempt: onboarding display role
   /** Step questions — display weight, sized so two short lines fit a 375pt phone. */
-  headline: { fontSize: 36, lineHeight: 40, fontFamily: FONT.bold, letterSpacing: -1.2 } satisfies TextStyle,
+  headline: { fontSize: FS.h1, lineHeight: 41, fontFamily: FONT.bold, letterSpacing: -1.2 } satisfies TextStyle,
   title1: { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.7 } satisfies TextStyle,
   body: { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular } satisfies TextStyle,
   bodyStrong: { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold } satisfies TextStyle,

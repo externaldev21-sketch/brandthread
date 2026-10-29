@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   thumb: { width: 44, height: 44, marginTop: 4, borderRadius: RADIUS.sm, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: FILL_ELEVATED },
   thumbImg: { width: '100%', height: '100%' },
   badge: { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold },
+  badgeText: { fontSize: 11, lineHeight: 14, fontFamily: FONT.semibold },
   itemBody: { flex: 1, minWidth: 0 },
   fieldGap: { marginBottom: SP.sm },
   fieldIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -SP.sm },

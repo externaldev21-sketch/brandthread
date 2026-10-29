@@ -78,7 +78,7 @@ function makeStyles(theme: AppThemePreset) {
     content: { paddingHorizontal: SP.md, paddingTop: SP.sm },
     flex: { flex: 1 },
     badgeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.md },
-    lead: { flex: 1, fontFamily: FONT.regular, fontSize: FS.md, lineHeight: 24, color: theme.text },
+    lead: { flex: 1, fontFamily: FONT.regular, fontSize: FS.md, lineHeight: 22, color: theme.text },
     section: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.text, marginTop: SP.lg, marginBottom: SP.sm },
     rule: { paddingVertical: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
     ruleTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text, marginBottom: 4 },

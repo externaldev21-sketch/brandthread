@@ -121,5 +121,5 @@ const s = StyleSheet.create({
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   section:    { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md + 2 },
   rowDivider: { height: StyleSheet.hairlineWidth },
-  note:       { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 16, marginTop: SPACING.sm, paddingHorizontal: 2 },
+  note:       { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 16, marginTop: SPACING.sm, paddingHorizontal: 2 },
 });

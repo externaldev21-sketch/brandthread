@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.xs },
   title: { fontFamily: FONT.semibold, fontSize: FS.lg, textAlign: 'center' },
-  message: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },
+  message: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 18 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
   time: { width: 40, paddingTop: 12, fontFamily: FONT.medium, fontSize: FS.xs },
   input: {

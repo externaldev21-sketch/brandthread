@@ -157,11 +157,11 @@ export default function SellerCounterNoticeScreen() {
 }
 
 const styles = StyleSheet.create({
-  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   label: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: SP.md, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.base, fontFamily: FONT.regular },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm },
-  checkText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  checkText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: SP.md },
 });

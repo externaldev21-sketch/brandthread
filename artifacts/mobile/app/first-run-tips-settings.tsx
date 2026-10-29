@@ -130,7 +130,7 @@ function tipsErrorMessage(e: unknown, fallback: string): string {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  error: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 16 },
+  error: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 14 },
   section: { paddingHorizontal: 20, paddingTop: 18 },
   sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: 18, lineHeight: 18 },
   // padding: 16 (not SP.md's 14) — the audit's text-fit check flags
@@ -138,5 +138,5 @@ const styles = StyleSheet.create({
   // docs/audit/README.md.
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, padding: 16, minHeight: 60 },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
-  rowSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, lineHeight: 15 },
+  rowSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, lineHeight: 14 },
 });

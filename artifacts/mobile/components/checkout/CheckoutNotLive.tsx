@@ -34,7 +34,7 @@ export function CheckoutNotLive({ onBackToBag, onKeepShopping }: { onBackToBag: 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: GUTTER },
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
-  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, marginTop: SP.xs },
+  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, marginTop: SP.xs },
   primary: { marginTop: SP.lg },
   link: { alignSelf: 'center', marginTop: SP.md },
   linkText: { fontFamily: FONT.medium, fontSize: FS.base, textDecorationLine: 'underline' },

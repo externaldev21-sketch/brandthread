@@ -875,7 +875,7 @@ const sizeChipStyles = StyleSheet.create({
     height: 44, minWidth: 56, paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.sm,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  label: { fontSize: 15, lineHeight: 20, fontWeight: '500' },
+  label: { fontSize: 15, lineHeight: 20, fontFamily: FONT.medium },
 });
 
 /** Full-width 56pt row with a chevron (Details / Fit / Returns). */
@@ -915,7 +915,7 @@ function InfoRow({ label, expanded, onPress, opensSheet = false, children, testI
 const infoRowStyles = StyleSheet.create({
   wrap: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: SP.md },
   row: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  label: { fontSize: 16, lineHeight: 21, fontWeight: '500' },
+  label: { fontSize: 16, lineHeight: 21, fontFamily: FONT.medium },
   body: { paddingBottom: SP.md },
 });
 const SOLD_OUT_HINT = 'Select to set a restock reminder';
@@ -1400,7 +1400,7 @@ export default function BuyerProductDetailScreen() {
           <AppIcon name={loadFailed ? 'alert-circle' : 'package'} size={ICON.xl} color={loadFailed ? RED : FG} />
           <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>{loadFailed ? "Couldn't load this product" : 'This drop is gone'}</Text>
           {loadFailed ? (
-            <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
+            <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 18 }}>
               Check your connection and try again.
             </Text>
           ) : null}
@@ -2842,7 +2842,7 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
   headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center' },
   sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
   valueText:  { fontFamily: FONT.medium, fontSize: FS.meta, color: MUTED, textAlign: 'center' },
-  notes:      { fontFamily: FONT.medium, fontSize: FS.meta, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
+  notes:      { fontFamily: FONT.medium, fontSize: FS.meta, color: SUBTLE, marginTop: SP.sm, lineHeight: 16 },
   });
 };
 
@@ -2863,7 +2863,7 @@ export function PolicyRow({ icon, label, value }: { icon: IconName; label: strin
 const pr = StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  value: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2, lineHeight: 17 },
+  value: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2, lineHeight: 16 },
 });
 
 /** Raised seller block (#1C1C1E — iOS secondarySystemBackground, dark). */
@@ -2906,7 +2906,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingBottom: SP.sm,
   },
   topBarTitleWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  topBarTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center' },
+  topBarTitle: { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold, textAlign: 'center' },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   // `right: 0` (was `-4`, pushing the badge outward past the button's
   // own bounds) — same class of fix as the buyer feed top bar's cart
@@ -2917,7 +2917,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute', top: -4, right: 0, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center',
   },
-  cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
+  cartBadgeText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: 11, lineHeight: 14 },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   sellerActions: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
   soldByRow: { alignSelf: 'flex-start', marginTop: -SP.xs, marginBottom: SP.md },
@@ -2932,8 +2932,8 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   brandLink: { alignSelf: 'flex-start', marginBottom: 4 },
-  brandText: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  productName: { fontSize: 20, lineHeight: 26, fontWeight: '600', color: FG, marginBottom: SP.xs },
+  brandText: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular },
+  productName: { fontSize: 20, lineHeight: 24, fontFamily: FONT.semibold, color: FG, marginBottom: SP.xs },
   drawLine: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, marginBottom: SP.md, fontVariant: ['tabular-nums'] },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
   addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
@@ -2968,14 +2968,14 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   paymentWarningCopy: { flex: 1, gap: 2 },
   paymentWarningTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
-  paymentWarningText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, lineHeight: 17 },
+  paymentWarningText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, lineHeight: 16 },
   vacationBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
     borderWidth: 1, borderColor: `${ORANGE}66`, backgroundColor: `${ORANGE}12`,
     borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md,
   },
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-  vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
+  vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 16 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   promiseRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
@@ -2993,7 +2993,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   preOrderTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
   preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  preOrderDisclaimer: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 4, lineHeight: 17 },
+  preOrderDisclaimer: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 4, lineHeight: 16 },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.md },
   sizeGuideLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.xs, marginBottom: SP.sm },
   sizeGuideLinkText: { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -3001,7 +3001,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stockDot: { width: 8, height: 8, borderRadius: 4 },
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
   descTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
-  desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
+  desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
   // Passed as StickyFooter's own `style` — it already supplies the absolute
   // positioning, safe-area/tab-bar-aware bottom padding, background, and
   // top border/shadow; only the original paddingTop is preserved here.
@@ -3025,7 +3025,7 @@ export const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },
-  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20 },
+  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 18 },
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   ratingAvg: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },

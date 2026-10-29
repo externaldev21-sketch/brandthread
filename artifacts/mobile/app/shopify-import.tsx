@@ -380,7 +380,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   block: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 120, gap: SP.sm + SP.xs },
   centerBlock: { alignItems: 'center', paddingTop: SP.xxl, gap: SP.md },
   title: { fontFamily: FONT.bold, fontSize: 22, lineHeight: 28, color: theme.text, textAlign: 'auto' },
-  copy: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, color: theme.muted },
+  copy: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, color: theme.muted },
   fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.subtle },
   label: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted, marginTop: SP.sm },
   list: { gap: SP.sm, paddingVertical: SP.sm },

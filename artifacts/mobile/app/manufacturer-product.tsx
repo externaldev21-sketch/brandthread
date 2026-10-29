@@ -178,7 +178,7 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   body: { padding: SP.md, gap: SP.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
   title: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text, flex: 1 },
-  description: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20 },
+  description: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   statsGrid: { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
   statItem: { flex: 1, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm, alignItems: 'center', gap: SP.xs },
   statLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },

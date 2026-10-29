@@ -155,8 +155,8 @@ describe('Row and username/text typography', () => {
     expect(comments).toContain('authorName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED');
   });
 
-  it('comment text is 15pt (FS.base) regular FG with lineHeight 19', () => {
-    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 19 },');
+  it('comment text is 15pt (FS.base) regular FG with lineHeight 20 (the type scale pairing)', () => {
+    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, lineHeight: 20 },');
   });
 });
 

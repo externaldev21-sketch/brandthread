@@ -239,6 +239,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   message: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   row: { minHeight: 57, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  rowText: { fontFamily: FONT.regular, fontSize: 20, lineHeight: 25 },
+  rowText: { fontFamily: FONT.regular, fontSize: 20, lineHeight: 24 },
   cancelText: { fontFamily: FONT.semibold },
 });

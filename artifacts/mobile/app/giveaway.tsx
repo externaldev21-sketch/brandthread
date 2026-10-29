@@ -124,9 +124,9 @@ export default function GiveawayScreen() {
 
 const styles = StyleSheet.create({
   meta: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: 8 },
-  title: { fontSize: FS.xxl, fontFamily: FONT.bold, lineHeight: 32 },
+  title: { fontSize: FS.xxl, fontFamily: FONT.bold, lineHeight: 34 },
   prize: { fontSize: FS.base, fontFamily: FONT.semibold, marginTop: 8, marginBottom: 4 },
-  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   section: { fontSize: FS.base, fontFamily: FONT.bold, marginTop: SP.lg, marginBottom: SP.sm },
   step: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   stepDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

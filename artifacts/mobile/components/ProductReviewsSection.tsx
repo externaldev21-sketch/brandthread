@@ -353,7 +353,7 @@ const s = StyleSheet.create({
   breakdownBlock: { flex: 1, gap: 4 },
   summaryStack: { gap: 12, marginBottom: 16 },
   avgInlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avgNumberLarge: { fontSize: 34, lineHeight: 40, fontWeight: '700', color: FG },
+  avgNumberLarge: { fontSize: 34, lineHeight: 41, fontFamily: FONT.bold, color: FG },
   countTextInline: { fontSize: 13, color: MUTED },
   breakdownBlockFull: { gap: 4 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -374,7 +374,7 @@ const s = StyleSheet.create({
   reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
-  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 19, marginBottom: 8 },
+  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 18, marginBottom: 8 },
   photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   photoThumb: { width: 88, height: 110, borderRadius: 6, backgroundColor: CARD_ELEVATED },
   photoStripWrap: { marginBottom: 16 },
@@ -392,7 +392,7 @@ const replyS = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { fontSize: FS.meta, fontFamily: FONT.bold, flex: 1 },
   date: { fontSize: FS.meta, fontFamily: FONT.medium },
-  body: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 19 },
+  body: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 18 },
 });
 
 const fitS = StyleSheet.create({

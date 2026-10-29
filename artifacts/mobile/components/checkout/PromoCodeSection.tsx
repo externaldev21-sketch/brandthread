@@ -107,6 +107,6 @@ function makeStyles(ck: CheckoutColors) {
     applied: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.xs },
     appliedCode: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
     appliedDesc: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, color: ck.muted },
-    unavailable: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
+    unavailable: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted },
   });
 }

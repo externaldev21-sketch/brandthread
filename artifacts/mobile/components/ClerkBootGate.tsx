@@ -26,6 +26,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
+import { FONT } from '@/lib/theme';
 /** How long to show the plain boot logo before offering a retry affordance. */
 const BOOT_TIMEOUT_MS = 12_000;
 
@@ -112,7 +113,7 @@ export default function ClerkBootGate() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
-  title: { fontSize: 17, fontWeight: '700', marginTop: 20, textAlign: 'center' },
+  title: { fontSize: 17, fontFamily: FONT.bold, marginTop: 20, textAlign: 'center' },
   body: { fontSize: 15, textAlign: 'center', lineHeight: 20 },
   button: { marginTop: 12, minWidth: 160 },
 });

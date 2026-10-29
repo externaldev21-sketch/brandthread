@@ -127,5 +127,5 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.destructive + '4d',
     paddingHorizontal: SPACING.sm, paddingVertical: 10, marginTop: SPACING.md,
   },
-  errorText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: colors.destructive, lineHeight: 18 },
+  errorText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: colors.destructive, lineHeight: 14 },
 });

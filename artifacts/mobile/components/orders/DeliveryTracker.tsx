@@ -193,7 +193,7 @@ function styles(theme: AppThemePreset) {
     },
     headline: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text, letterSpacing: -0.3 },
     store: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted, marginBottom: 4 },
-    sub: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
+    sub: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 18 },
     stepRow: { flexDirection: 'row', marginTop: SP.md },
     stepCol: { flex: 1, alignItems: 'center' },
     dotRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },

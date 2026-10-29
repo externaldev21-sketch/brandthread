@@ -81,8 +81,8 @@ const s = StyleSheet.create({
   title: { fontSize: FS.sm, fontFamily: FONT.bold, },
   seeAll: { fontSize: FS.sm, fontFamily: FONT.semibold },
   qa: { gap: 4, marginBottom: 14 },
-  q: { fontSize: FS.base, fontFamily: FONT.semibold, lineHeight: 21 },
-  a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 19 },
-  empty: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 19, marginBottom: 14 },
+  q: { fontSize: FS.base, fontFamily: FONT.semibold, lineHeight: 20 },
+  a: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 18 },
+  empty: { fontSize: FS.sm, fontFamily: FONT.medium, lineHeight: 18, marginBottom: 14 },
   askWrap: { marginBottom: 8 },
 });

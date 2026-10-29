@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   contentWebShell: { maxWidth: WEB_SHELL_MAX_WIDTH },
   icon: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.lg },
   title: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
-  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 23, marginTop: SP.sm },
+  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, marginTop: SP.sm },
   docs: { marginTop: SP.lg, borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, minHeight: 54 },
   docTitle: { fontFamily: FONT.semibold, fontSize: FS.base },

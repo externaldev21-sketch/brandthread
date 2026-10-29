@@ -39,7 +39,7 @@ import { pickFromLibrary } from '@/lib/pickProfileImage';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { storeSiteTheme } from '@/lib/storeSiteDesign';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import {
   BLOCK_LIMITS, KIND_LABEL, blockCard, defaultButtonText, draftCard, draftFromBlock, draftPatch, draftPricing, draftProblems,
   emptyDraft, liveBlocks, priceLabel, shipByLabel, type BlockDraft, type BlockKind, type DraftStep, type StoreBlock,
@@ -393,18 +393,18 @@ const s = StyleSheet.create({
   tabs: { paddingHorizontal: 16, marginTop: 8 },
   form: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
   group: {},
-  section: { fontSize: 17, fontWeight: '600', marginTop: 12 },
+  section: { fontSize: 17, fontFamily: FONT.semibold, marginTop: 12 },
   note: { fontSize: 13 },
   error: { fontSize: 13 },
   imageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
   image: { width: 56, height: 56, borderRadius: 12 },
   faded: { opacity: 0.6 },
   imageText: { flex: 1, minWidth: 0, gap: 2 },
-  imageLabel: { fontSize: 16, fontWeight: '600' },
+  imageLabel: { fontSize: 16, fontFamily: FONT.semibold },
   summary: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40, gap: 12 },
   summaryLabel: { fontSize: 15 },
-  summaryValue: { fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  summaryValue: { fontSize: 15, fontFamily: FONT.semibold, flexShrink: 1, textAlign: 'right' },
   problems: { gap: 8 },
   problem: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },
   problemText: { fontSize: 15 },

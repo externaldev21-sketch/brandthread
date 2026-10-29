@@ -222,7 +222,7 @@ function makeStyles(ck: CheckoutColors) {
     section: { marginTop: SP.sm },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm },
     title: { fontFamily: FONT.semibold, fontSize: FS.base, color: ck.text },
-    fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 2 },
+    fine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted, marginTop: 2 },
     error: { fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text, marginVertical: SP.sm },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginBottom: SP.md },
     chip: { minHeight: 40, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, borderWidth: 1, borderColor: ck.fieldBorder, justifyContent: 'center' },

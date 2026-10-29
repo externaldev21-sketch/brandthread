@@ -7,7 +7,7 @@
  *         https://mobbin.com/screens/29a6cf9e-6c19-46f8-8b27-f387df675e40
  */
 import React from 'react';
-import { MEDIA } from '@/lib/theme';
+import { MEDIA, FONT, FS } from '@/lib/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -126,15 +126,15 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: GUTTER },
   body: { flex: 1, paddingHorizontal: GUTTER + 8 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.4, marginTop: 24 },
-  titleLogin: { fontSize: 26, lineHeight: 32, textAlign: 'center' },
+  title: { fontSize: FS.h1, lineHeight: 41, fontFamily: FONT.bold, letterSpacing: -0.4, marginTop: 24 },
+  titleLogin: { fontSize: FS.xxl, lineHeight: 34, textAlign: 'center' },
   invite: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   inviteLogin: { alignSelf: 'center' },
-  inviteText: { fontSize: 13, fontWeight: '600' },
+  inviteText: { fontSize: 13, fontFamily: FONT.semibold },
   options: { marginTop: 36, gap: 12 },
-  legal: { fontSize: 12, lineHeight: 17, textAlign: 'center', paddingHorizontal: GUTTER + 12, marginBottom: 20 },
-  legalLink: { fontWeight: '600' },
+  legal: { fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: GUTTER + 12, marginBottom: 20 },
+  legalLink: { fontFamily: FONT.semibold },
   band: { paddingTop: 20, alignItems: 'center' },
   bandText: { fontSize: 15 },
-  bandLink: { fontWeight: '700', textDecorationLine: 'underline' },
+  bandLink: { fontFamily: FONT.bold, textDecorationLine: 'underline' },
 });

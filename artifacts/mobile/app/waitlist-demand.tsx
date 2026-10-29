@@ -158,7 +158,7 @@ const s = StyleSheet.create({
   summaryValue: { fontFamily: FONT.bold, fontSize: FS.xxl, fontVariant: ['tabular-nums'] },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  meta: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
+  meta: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16 },
   btn: { minHeight: 40, paddingHorizontal: SP.md, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

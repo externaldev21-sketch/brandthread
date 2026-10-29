@@ -277,7 +277,7 @@ export default function MutedWordsScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md },
+  lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginBottom: SP.md },
   inputShell: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: SP.md, paddingRight: SP.sm, height: 54,
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
@@ -313,5 +313,5 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, marginBottom: 4,
   },
   emptyTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
-  emptyBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, textAlign: 'center' },
+  emptyBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, textAlign: 'center' },
 });

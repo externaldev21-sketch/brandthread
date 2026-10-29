@@ -348,7 +348,7 @@ const s = StyleSheet.create({
   panel: { flex: 1, backgroundColor: '#0A0A0A' },
   doneRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: SP.lg, paddingTop: SP.md, minHeight: 36 },
   done: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, includeFontPadding: false },
-  title: { fontFamily: FONT.bold, fontSize: 32, color: FG, paddingHorizontal: SP.lg, marginTop: SP.md, includeFontPadding: false },
+  title: { fontFamily: FONT.bold, fontSize: FS.h1, color: FG, paddingHorizontal: SP.lg, marginTop: SP.md, includeFontPadding: false },
   actionsRow: { flexDirection: 'row', gap: SP.lg, paddingHorizontal: SP.lg, marginTop: SP.md, marginBottom: SP.md },
   action: { fontFamily: FONT.medium, fontSize: FS.md, color: FG, includeFontPadding: false },
 

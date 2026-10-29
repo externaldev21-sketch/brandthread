@@ -1105,15 +1105,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   addressRow: { flexDirection: 'row', gap: SP.xs },
   regionInput: { width: 72 },
   postalInput: { width: 88 },
-  checkoutError: { color: RED, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 17 },
+  checkoutError: { color: RED, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
   buyNowButton: { minHeight: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.xs },
   buyNowDisabled: { opacity: 0.45 },
   buyNowText: { color: BG, fontFamily: FONT.bold, fontSize: FS.sm },
-  purchaseFootnote: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 15 },
+  purchaseFootnote: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 14 },
   // Ended
   endedIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   endedTitle:       { fontSize: FS.lg, fontFamily: FONT.bold },
-  endedSub:         { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
+  endedSub:         { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 40, lineHeight: 18 },
   backBtn:          { marginTop: 24, borderRadius: radius.md, paddingHorizontal: 28, paddingVertical: 12 },
   backBtnText:      { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
   });

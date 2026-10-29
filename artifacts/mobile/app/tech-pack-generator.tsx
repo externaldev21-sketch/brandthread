@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   stepDot: { width: 8, height: 8, borderRadius: 4 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 6 },
   sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 16 },
   row2: { flexDirection: 'row', gap: 12 },
   inputLabel: { fontSize: 12, fontFamily: FONT.semibold, marginBottom: 6 },
   input: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 15, fontFamily: FONT.regular },

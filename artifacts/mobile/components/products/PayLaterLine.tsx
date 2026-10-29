@@ -94,5 +94,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT.semibold, fontSize: FS.meta, overflow: 'hidden',
   },
   stepText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22 },
-  note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
+  note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16 },
 });

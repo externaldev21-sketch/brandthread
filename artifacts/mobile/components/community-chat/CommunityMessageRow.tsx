@@ -303,7 +303,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   quoteName: { fontSize: FS.xs, fontFamily: FONT.semibold },
   quoteText: { fontSize: FS.xs, fontFamily: FONT.regular },
   text: {
-    fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21,
+    fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 20,
     ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),
   },
   meta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4, gap: 4 },

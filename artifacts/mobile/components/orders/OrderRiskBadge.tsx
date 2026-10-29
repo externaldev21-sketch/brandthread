@@ -89,6 +89,6 @@ const styles = StyleSheet.create({
   panelTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
   flagRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
   dot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1, marginTop: 5 },
-  flagText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 19 },
+  flagText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   score: { fontSize: FS.meta, fontFamily: FONT.regular },
 });

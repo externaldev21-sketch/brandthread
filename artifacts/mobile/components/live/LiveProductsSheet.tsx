@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   thumb: { width: 104, height: 104, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1, minWidth: 0 },
-  name: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 19 },
+  name: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 20 },
   meta: { fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 2 },
   price: { fontFamily: FONT.bold, fontSize: FS.md, marginTop: 4 },
   rowBtn: { height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 'auto' },

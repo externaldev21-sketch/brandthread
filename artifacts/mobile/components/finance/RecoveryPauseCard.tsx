@@ -58,7 +58,7 @@ export function RecoveryPauseCard({
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md, marginBottom: 20 },
   label: { fontFamily: FONT.medium, fontSize: FS.xs },
-  balance: { fontFamily: FONT.bold, fontSize: 30, letterSpacing: -0.5, marginTop: 2 },
+  balance: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.5, marginTop: 2 },
   divider: { height: 1, marginVertical: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   icon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

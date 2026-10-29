@@ -318,7 +318,7 @@ function makeCardStyles(colors: Colors) {
     section: { marginBottom: 22 },
     sectionTitle: { fontSize: 12, fontFamily: FONT.semibold, color: colors.mutedForeground, marginBottom: 8, marginLeft: 2 },
     sectionCard: { backgroundColor: colors.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-    sectionFooter: { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 8, marginLeft: 2, lineHeight: 15 },
+    sectionFooter: { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 8, marginLeft: 2, lineHeight: 14 },
 
     // Row
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 16, minHeight: 52 },
@@ -327,17 +327,17 @@ function makeCardStyles(colors: Colors) {
     rowCopy: { flex: 1, minWidth: 0 },
     rowLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium },
     rowSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-    rowValue: { fontSize: 13, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, maxWidth: 120 },
+    rowValue: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, maxWidth: 120 },
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
-    rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
+    rowBadgeText: { fontSize: 11, lineHeight: 14, fontFamily: FONT.bold, color: '#FFFFFF' },
     rowSoonBadge: { backgroundColor: colors.secondary, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
-    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground },
+    rowSoonBadgeText: { fontSize: 11, lineHeight: 14, fontFamily: FONT.semibold, color: colors.mutedForeground },
 
     // Confirm sheet
     sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
     sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
     sheetTitle: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
-    sheetMessage: { fontSize: 15, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
+    sheetMessage: { fontSize: 15, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 20, paddingHorizontal: 8 },
     sheetConfirmBtn: { borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },
     sheetConfirmText: { fontSize: FS.base, fontFamily: FONT.bold },
     sheetCancelBtn: { paddingVertical: 13, alignItems: 'center' },

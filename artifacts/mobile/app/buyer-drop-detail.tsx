@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   timerUnit: { minWidth: 58 },
   flipDigitClip: { overflow: 'hidden', height: 48 },
-  timerNumber: { color: ON_DARK, fontFamily: FONT.light, fontSize: 42, lineHeight: 48, letterSpacing: -1.8, fontVariant: ['tabular-nums'] },
+  timerNumber: { color: ON_DARK, fontFamily: FONT.light, fontSize: 42, lineHeight: 48, letterSpacing: -1.8, fontVariant: ['tabular-nums'] }, // type-exempt: drop countdown digits, display size
   timerLabel: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
   timerRule: { height: 2, marginTop: 13, width: 58 },
   earlyAccessRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
   productMedia: { justifyContent: 'flex-end' },
   productFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
   productCaption: { padding: 11 },
-  productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
+  productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 18 },
   productCategory: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: 5 },
   lockOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   lockBadge: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
@@ -783,5 +783,5 @@ const styles = StyleSheet.create({
   soldOutBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   emptyProducts: { margin: SP.md, padding: SP.xl, borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', gap: SP.sm },
   emptyTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },
+  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 18 },
 });

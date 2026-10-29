@@ -46,7 +46,7 @@ export default function StorePixelsScreen() {
           <Field label="Meta Pixel ID" value={meta} onChangeText={(v) => { setMeta(v); setSaved(false); }} keyboardType="number-pad" autoCapitalize="none" autoCorrect={false} placeholder="1234567890123456" error={metaErr} />
           <Field label="TikTok Pixel ID" value={tt} onChangeText={(v) => { setTt(v); setSaved(false); }} autoCapitalize="characters" autoCorrect={false} placeholder="C4ABCD1234567890ABCD" error={ttErr} />
           <PrimaryButton label={saved ? 'Saved' : 'Save'} onPress={save} loading={busy} disabled={busy || !!metaErr || !!ttErr || !loaded} />
-          <Text style={{ marginTop: SP.lg, color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 }}>
+          <Text style={{ marginTop: SP.lg, color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 }}>
             Tracks PageView, ViewContent, AddToCart, InitiateCheckout and Purchase on your public store site. Nothing fires for visitors who send Global Privacy Control or Do Not Track.
           </Text>
         </ScrollView>

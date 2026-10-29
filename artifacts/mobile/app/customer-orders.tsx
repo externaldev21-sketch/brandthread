@@ -149,7 +149,7 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title={customer?.name ?? 'Customer orders'} onBack={() => goBackOr(router, '/customers')} />
+      <ScreenHeader title={customer?.name ?? 'Customer'} onBack={() => goBackOr(router, '/customers')} />
 
       {!customerId ? (
         // No customerId in the URL: nothing to load (this used to render an
@@ -158,7 +158,7 @@ export default function CustomerOrdersScreen() {
         <View style={s.center}>
           <Feather name="user-x" size={28} color={colors.mutedForeground} />
           <Text style={[s.errorText, { color: colors.mutedForeground }]}>
-            This customer couldn't be found.
+            Customer not found
           </Text>
           <Button label="Back to customers" variant="secondary" size="small" style={s.retryBtn} onPress={() => goBackOr(router, '/customers')} />
         </View>
@@ -243,7 +243,7 @@ export default function CustomerOrdersScreen() {
             <Text style={[TEXT.footnote, { color: colors.mutedForeground, marginTop: 2 }]}>{ordersLabel(orders.length)}</Text>
           </View>
           {orders.length === 0 ? (
-            <EmptyState title="No orders yet." />
+            <EmptyState title="No orders yet" />
           ) : (
             <View>
               {orders.map((order, i) => (
@@ -256,19 +256,19 @@ export default function CustomerOrdersScreen() {
                   accessibilityLabel={`Order ${order.orderNumber}`}
                 >
                   <View style={s.orderTop}>
-                    <Text style={[TEXT.headline, { color: colors.foreground }]} numberOfLines={1}>#{order.orderNumber}</Text>
-                    <Text style={[TEXT.subhead, TABULAR, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
+                    <Text style={[s.orderNum, { color: colors.foreground }]} numberOfLines={1}>#{order.orderNumber}</Text>
+                    <Text style={[s.orderAmount, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
                   </View>
-                  <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  <Text style={[s.orderMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
                     {orderMetaLine(customer?.name, order)}
                   </Text>
                   {order.trackingNumber ? (
-                    <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    <Text style={[s.orderMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
                       {order.carrier ? `${order.carrier} • ` : ''}{order.trackingNumber}
                     </Text>
                   ) : null}
                   <View style={s.statusChip}>
-                    <Text style={[TEXT.caption, { color: order.status === 'cancelled' ? colors.mutedForeground : colors.foreground }]}>
+                    <Text style={[s.statusText, { color: order.status === 'cancelled' ? colors.mutedForeground : colors.foreground }]}>
                       {STATUS_LABEL[order.status] ?? order.status}
                     </Text>
                   </View>
@@ -292,20 +292,27 @@ const s = StyleSheet.create({
   custCard:     { gap: 16 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   avatar:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { fontSize: 16, fontFamily: FONT.bold },
-  custName:     { fontSize: 16, fontFamily: FONT.bold },
-  custEmail:    { fontSize: 12, fontFamily: FONT.regular },
+  avatarText:   { fontSize: FS.base, fontFamily: FONT.bold },
+  // The header already shows the name at title size; here it is the
+  // section-heading role, like "Order history" below.
+  custName:     { fontSize: FS.md, lineHeight: 22, fontFamily: FONT.semibold },
+  custEmail:    { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.regular },
   statsRow:     { flexDirection: 'row', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   stat:         { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:      { fontSize: 15, fontFamily: FONT.bold, ...TABULAR },
-  statLabel:    { fontSize: FS.xs, fontFamily: FONT.regular },
+  statVal:      { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.semibold, ...TABULAR },
+  statLabel:    { fontSize: FS.meta, lineHeight: 16, fontFamily: FONT.regular },
   statDiv:      { width: 1, marginVertical: 4 },
   tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, backgroundColor: FILL_ELEVATED },
-  tagText:      { fontSize: 11, fontFamily: FONT.semibold },
-  notes:        { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
+  tagText:      { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold },
+  notes:        { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
 
   orderRow:     { paddingVertical: 14, gap: 4 },
+  // Order rows use the Orders list's sizes (app/(tabs)/orders.tsx OrderRow).
+  orderNum:     { flexShrink: 1, fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.bold },
+  orderAmount:  { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.bold, ...TABULAR },
+  orderMeta:    { fontSize: FS.meta, lineHeight: 16, fontFamily: FONT.regular },
+  statusText:   { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold },
   orderTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   statusChip:   { alignSelf: 'flex-start', backgroundColor: FILL_ELEVATED, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4 },
 });

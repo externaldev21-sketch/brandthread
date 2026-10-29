@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   // up against a bright/high-key clip (e.g. Maison Vela's silver dress),
   // where the old, lighter shadow washed out to nearly nothing.
   creatorName: {
-    fontSize: 16, lineHeight: 20, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 16, lineHeight: 21, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   sponsoredLabel: {
@@ -372,13 +372,13 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 0,
+    fontSize: FS.sm, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 0,
     lineHeight: 18, letterSpacing: 0.1,
     // ~38 characters a line at 14pt — a comfortable reading measure.
     maxWidth: 280,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  moreText: { fontFamily: FONT.bold, fontSize: 15, lineHeight: 19, color: ON_DARK, marginLeft: 4,
+  moreText: { fontFamily: FONT.bold, fontSize: 15, lineHeight: 20, color: ON_DARK, marginLeft: 4,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   captionWrap: { alignSelf: 'stretch', maxWidth: 280, marginBottom: 8 },
   captionMeasure: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0, marginBottom: 0 },

@@ -71,6 +71,6 @@ export function SystemLine({
 
 const s = StyleSheet.create({
   wrap: { paddingHorizontal: SP.xl, paddingVertical: SP.sm, alignItems: 'center' },
-  text: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 16 },
+  text: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 14 },
   link: { fontFamily: FONT.semibold },
 });

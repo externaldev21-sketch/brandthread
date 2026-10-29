@@ -197,7 +197,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   formatLabelActive: { color: theme.accentLight },
   formatDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: theme.surface, borderRadius: 8, padding: 12 },
-  noteText:     { flex: 1, fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
+  noteText:     { flex: 1, fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
   resultCard:   { backgroundColor: theme.success + '1A', borderRadius: 12, borderWidth: 1, borderColor: theme.success + '4D', padding: 16, gap: 8 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resultTitle:  { fontSize: 15, fontFamily: FONT.bold, color: theme.text },

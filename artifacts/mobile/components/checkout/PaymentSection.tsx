@@ -335,13 +335,13 @@ const walletStyles = StyleSheet.create({
   wallet: { height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
   walletMark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // The platform's own typeface, not Inter (see the module comment).
-  walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },
-  walletText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: FS.md + 1, letterSpacing: -0.2, color: WALLET_FG },
+  walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG }, // type-exempt: Apple/Google Pay mark set in the platform wallet font
+  walletText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: FS.md + 1, letterSpacing: -0.2, color: WALLET_FG }, // type-exempt: Apple/Google Pay mark set in the platform wallet font
   rowMark: {
     flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, minWidth: 44, paddingHorizontal: 6,
     borderRadius: 5, backgroundColor: WALLET_BG, justifyContent: 'center',
   },
-  rowMarkText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: 12, color: WALLET_FG },
+  rowMarkText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: 12, color: WALLET_FG }, // type-exempt: Apple/Google Pay mark set in the platform wallet font
 });
 
 function makeStyles(ck: CheckoutColors) {
@@ -350,7 +350,7 @@ function makeStyles(ck: CheckoutColors) {
     hidden: { display: 'none' },
     orRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md + 2, marginBottom: SP.xs + 2 },
     orLine: { flex: 1, height: 1, backgroundColor: ck.divider },
-    orText: { fontFamily: FONT.medium, fontSize: FS.xs + 1, color: ck.subtle },
+    orText: { fontFamily: FONT.medium, fontSize: FS.meta, color: ck.subtle },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4 },
     cardIcon: {
       width: 40, height: 28, borderRadius: 8, borderWidth: 1, borderColor: ck.fieldBorder,
@@ -361,8 +361,8 @@ function makeStyles(ck: CheckoutColors) {
     cardEntryUnderRows: { paddingTop: SP.md },
     noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
     noteIcon: { marginTop: 2 },
-    note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
+    note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted },
     secure: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.md },
-    secureText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, color: ck.muted },
+    secureText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, color: ck.muted },
   });
 }

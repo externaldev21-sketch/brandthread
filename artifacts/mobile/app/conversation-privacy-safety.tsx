@@ -111,5 +111,5 @@ const makeStyles = () => StyleSheet.create({
   list: { marginTop: SP.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
-  explainer: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, paddingHorizontal: SP.md, marginTop: SP.md },
+  explainer: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, paddingHorizontal: SP.md, marginTop: SP.md },
 });

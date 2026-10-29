@@ -778,7 +778,7 @@ function makeStyles(theme: AppThemePreset) {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm,
       padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
     },
-    blockedBannerText: { flex: 1, color: theme.muted, fontSize: FS.xs, lineHeight: 18 },
+    blockedBannerText: { flex: 1, color: theme.muted, fontSize: FS.xs, lineHeight: 14 },
     blockedBannerAction: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },
   });
 }

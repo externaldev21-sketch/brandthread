@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   hero: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 20, gap: 8 },
   heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   heroTitle: { fontSize: 17, fontFamily: FONT.bold, textAlign: 'center' },
-  heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 19 },
+  heroSub: { fontSize: 13, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18 },
 
   section: { borderRadius: 12, borderWidth: 1, padding: 18 },
   label: { fontSize: 12, fontFamily: FONT.medium, marginBottom: 8 },
@@ -269,5 +269,5 @@ const styles = StyleSheet.create({
   disconnectText: { fontSize: 13, fontFamily: FONT.medium },
 
   infoBlock: { flexDirection: 'row', gap: 8, marginTop: 20, paddingHorizontal: 4 },
-  infoText: { flex: 1, fontSize: 11, fontFamily: FONT.regular, lineHeight: 16 },
+  infoText: { flex: 1, fontSize: 11, fontFamily: FONT.regular, lineHeight: 14 },
 });

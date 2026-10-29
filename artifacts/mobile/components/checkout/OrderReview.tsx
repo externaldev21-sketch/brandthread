@@ -341,7 +341,7 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   item: { flexDirection: 'row', gap: SP.md, paddingVertical: SP.md },
   rule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider },
   itemCopy: { flex: 1, minWidth: 0, gap: 4 },
-  itemName: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 21, color: ck.text, marginBottom: SP.xs },
+  itemName: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 20, color: ck.text, marginBottom: SP.xs },
   itemMeta: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.text },
   thumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C1C1E' },
 
@@ -374,7 +374,7 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   lineLabel: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted },
   lineValue: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted, ...TABULAR_NUMS },
 
-  legal: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, color: ck.muted, textAlign: 'center' },
+  legal: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14, color: ck.muted, textAlign: 'center' },
   detailRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 56, paddingVertical: SP.sm + 4,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ck.divider,
@@ -385,6 +385,6 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   detailText: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.text },
   sheetBody: { paddingHorizontal: SP.md, paddingBottom: SP.lg, gap: SP.sm + 2 },
   sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: ck.text, marginBottom: SP.xs },
-  sheetText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: ck.muted },
+  sheetText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted },
   link: { color: ck.text, textDecorationLine: 'underline' },
 });

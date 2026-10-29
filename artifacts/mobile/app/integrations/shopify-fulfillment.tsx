@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   stepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   stepBadgeText: { fontSize: 11, fontFamily: FONT.bold },
-  explainerStep: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
+  explainerStep: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 16 },
   disconnectBtn: { alignItems: 'center', justifyContent: 'center', minHeight: COMP.minTouchTarget, paddingVertical: 16 },
   disconnectText: { fontSize: 13, fontFamily: FONT.medium },
 });

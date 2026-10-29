@@ -856,6 +856,6 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: SP.xs },
   pointsInput: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: '#1C1C1E', color: theme.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
-  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17 },
+  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 14 },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
 });

@@ -120,7 +120,7 @@ function makeRadioStyles(theme: AppThemePreset) {
     radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.accent },
     label: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, flex: 1 },
     labelSelected: { color: theme.text, fontFamily: FONT.semibold },
-    detail: { fontSize: FS.xs + 1, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
+    detail: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 16 },
   });
 }
 
@@ -546,7 +546,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   textarea: {
     minHeight: 110, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: theme.border, padding: SP.md,
-    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18,
   },
   counter: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'right', marginTop: 6 },
 
@@ -562,17 +562,17 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: theme.cardElevated,
   },
   addPhotoText: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.text },
-  photoNotice: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.sm, lineHeight: 18 },
+  photoNotice: { fontFamily: FONT.regular, fontSize: FS.meta, color: theme.muted, marginTop: SP.sm, lineHeight: 16 },
 
   summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
   summaryTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  summarySub: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
+  summarySub: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 16 },
 
-  disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
+  disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 14, marginBottom: SP.lg },
 
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: theme.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, gap: SP.sm },
   submitError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
-  submitErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 18 },
+  submitErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 16 },
 
   successWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
   successIcon: {

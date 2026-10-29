@@ -579,7 +579,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.card, borderWidth: 1, borderColor: theme.error + '55', marginTop: SP.md, marginBottom: SP.md,
   },
   title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
-  lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 23, marginTop: SP.sm },
+  lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, marginTop: SP.sm },
   loadingCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.lg, padding: SP.md,
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
@@ -589,7 +589,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md, padding: SP.md,
     borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.error + '55', backgroundColor: theme.card,
   },
-  errorText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19 },
+  errorText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18 },
   link: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
   blockerCard: {
     marginTop: SP.lg, padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1,
@@ -597,13 +597,13 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   blockerHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   blockerHeading: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.base },
-  blockerIntro: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  blockerIntro: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   blockerRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingTop: SP.sm,
     borderTopWidth: 1, borderTopColor: theme.borderSubtle,
   },
   blockerTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
-  blockerDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, marginTop: 2 },
+  blockerDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, marginTop: 2 },
   blockerBtn: {
     paddingHorizontal: 12, height: 34, borderRadius: radius.sm, borderWidth: 1, borderColor: theme.border,
     backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
@@ -619,8 +619,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, marginTop: SP.lg, marginBottom: SP.sm },
   listCard: { padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, gap: 10 },
   listRow: { flexDirection: 'row', gap: SP.sm },
-  listText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: SP.sm },
+  listText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
+  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14, marginTop: SP.sm },
   exportRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.lg, padding: SP.md,
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
@@ -646,7 +646,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
   checkboxOn: { backgroundColor: theme.accent, borderColor: theme.accent },
-  ackText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  ackText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   deleteBtn: {
     height: 54, borderRadius: RADIUS.md, backgroundColor: theme.error, marginTop: SP.xl,
     alignItems: 'center', justifyContent: 'center',

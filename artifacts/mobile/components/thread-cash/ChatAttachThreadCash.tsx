@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', gap: SP.xs, marginBottom: SP.lg },
   chip: { flex: 1, borderWidth: 1, borderRadius: radius.sm, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: FS.base, fontFamily: FONT.bold },
-  bigAmount: { fontSize: 56, fontFamily: FONT.bold, textAlign: 'center', marginVertical: SP.md, fontVariant: ['tabular-nums'] },
+  bigAmount: { fontSize: 56, fontFamily: FONT.bold, textAlign: 'center', marginVertical: SP.md, fontVariant: ['tabular-nums'] }, // type-exempt: hero money figure, display size
   insufficientText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center', marginTop: -SP.sm, marginBottom: SP.sm },
   numpad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: SP.sm },
   numpadKey: { width: '32%', height: 56, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },

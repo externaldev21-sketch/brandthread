@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },
   sectionTitle: { fontSize: 16, fontFamily: FONT.bold, marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 16 },
   dropzone: {
     borderRadius: 16, borderWidth: crispPx(1.5), borderStyle: 'dashed', alignItems: 'center',
     justifyContent: 'center', paddingVertical: 40, gap: 10,

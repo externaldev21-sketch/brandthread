@@ -343,7 +343,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   header: { paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
   closeBtn: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   closeText: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text },
-  title: { fontFamily: FONT.bold, fontSize: 32, lineHeight: 38, color: theme.text, marginTop: SP.xs },
+  title: { fontFamily: FONT.bold, fontSize: FS.h1, lineHeight: 41, color: theme.text, marginTop: SP.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.md },
   headerAction: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
 
@@ -355,7 +355,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   image: { width: IMAGE_W, height: IMAGE_H, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   desc: { flex: 1, minWidth: 0, marginLeft: SP.md, gap: 2 },
   brand: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
-  name: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: theme.text },
+  name: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.text },
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted },
   sizeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 28, marginTop: 2 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.xs },

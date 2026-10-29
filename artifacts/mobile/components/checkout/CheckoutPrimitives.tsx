@@ -58,7 +58,7 @@ function makeStyles(ck: CheckoutColors) {
     optionDivider: { borderBottomWidth: 1, borderBottomColor: ck.divider },
     optionCopy: { flex: 1, minWidth: 0 },
     optionTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
-    optionLine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 1 },
+    optionLine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted, marginTop: 1 },
     field: { marginBottom: SP.sm + 4 },
     fieldLabel: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: 6, color: ck.muted },
     input: {

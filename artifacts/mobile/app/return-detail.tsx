@@ -578,7 +578,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   statusPill: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 9, paddingVertical: 3 },
   statusPillText: { fontFamily: FONT.bold, fontSize: FS.xs, color: theme.muted },
   headline: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4, color: theme.text },
-  headlineBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
+  headlineBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 18 },
 
   steps: { marginTop: SP.md },
   stepRow: { flexDirection: 'row' },
@@ -591,11 +591,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   stepTime: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
 
   cardTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.muted, marginBottom: SP.sm },
-  cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
+  cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 18 },
   actions: { gap: SP.sm, marginTop: SP.md },
   row: { flexDirection: 'row', gap: SP.sm },
   cell: { flex: 1 },
-  fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.xs + 1, color: theme.muted },
+  fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.meta, color: theme.muted },
   input: {
     backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
     padding: SP.md, minHeight: 90, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, textAlignVertical: 'top',
@@ -603,7 +603,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44 },
   switchLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   inlineError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: SP.sm },
-  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 18 },
+  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta, color: theme.text, lineHeight: 16 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
   itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -618,5 +618,5 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, marginTop: SP.md },
 
   footNote: { flexDirection: 'row', gap: 6, alignItems: 'flex-start', paddingHorizontal: 2 },
-  footNoteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, lineHeight: 17 },
+  footNoteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, lineHeight: 14 },
 });

@@ -462,7 +462,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   stateBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
   stateButton: { alignSelf: 'stretch', width: '100%', marginTop: SP.lg },
   stateButtonSecondary: { alignSelf: 'stretch', width: '100%', marginTop: SP.sm },
-  bigAmount: { fontSize: 44, fontFamily: FONT.bold, color: theme.text, marginTop: SP.md, fontVariant: ['tabular-nums'] },
+  bigAmount: { fontSize: 44, fontFamily: FONT.bold, color: theme.text, marginTop: SP.md, fontVariant: ['tabular-nums'] }, // type-exempt: hero money figure, display size
   contactless: { transform: [{ rotate: '90deg' }], marginTop: SP.lg },
 
   scroll: { paddingBottom: SP.lg },

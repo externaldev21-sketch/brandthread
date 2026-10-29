@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   text: { flex: 1, minWidth: 0, minHeight: 64, justifyContent: 'center', gap: 2, paddingVertical: 10 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
   name: { flexShrink: 1, minWidth: 0, fontSize: 15, lineHeight: 20, fontFamily: FONT.bold },
-  meta: { fontSize: 13, lineHeight: 16, fontFamily: FONT.regular },
+  meta: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular },
   action: { justifyContent: 'center', paddingLeft: 12, paddingRight: GUTTER },
   follow: { minWidth: 92 },
   pressed: { opacity: 0.6 },

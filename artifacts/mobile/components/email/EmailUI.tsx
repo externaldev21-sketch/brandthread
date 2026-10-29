@@ -90,6 +90,6 @@ const st = StyleSheet.create({
   btn: { minHeight: 50, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   btnText: { fontFamily: FONT.bold, fontSize: FS.md },
   notice: { borderWidth: 1, borderRadius: RADIUS.md, padding: 14, marginBottom: SP.md },
-  noticeText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  noticeText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   heading: { fontFamily: FONT.semibold, fontSize: FS.xs, marginTop: SP.lg, marginBottom: SP.sm },
 });

@@ -164,7 +164,7 @@ export default function BuyerSettingsDetail() {
 }
 const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
-  intro: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginBottom: SP.md },
+  intro: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginBottom: SP.md },
   card: { padding: 0, paddingHorizontal: SP.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });
