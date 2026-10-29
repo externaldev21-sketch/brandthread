@@ -124,11 +124,13 @@ router.post(
         return;
       }
 
+      const deletionSuccessEffects: (() => void)[] = [];
       const result = await runHandlerCapturing(accountDeletionHandler, {
         clerkUserId: claimed.clerkId,
         body: { confirmation: "DELETE" },
         deletionEmailVerified: true,
         log: req.log,
+        deletionSuccessEffects,
       });
 
       if (result.status === 200) {
@@ -136,6 +138,7 @@ router.post(
           .set({ status: "completed", completedAt: new Date() })
           .where(eq(accountDeletionRequests.id, claimed.id));
         res.json({ ok: true });
+        for (const effect of deletionSuccessEffects) effect();
         return;
       }
 

@@ -10,6 +10,7 @@ A comprehensive clothing brand management mobile app covering 18 modules: brand 
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Apple deletion revocation (server only): `APPLE_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, `APPLE_SIGN_IN_PRIVATE_KEY` (Sign in with Apple `.p8`, escaped newlines accepted), `APPLE_BUNDLE_ID` (defaults to `com.brandthread.mobile`). These are the single shared settings for all deletion paths; the old `APPLE_SIGNIN_*` names are not used. This is a Sign in with Apple key, not the App Store Connect submission key. See `docs/review-readiness/apple-signin.md` for native token limitations and validation.
 
 ## Stack
 

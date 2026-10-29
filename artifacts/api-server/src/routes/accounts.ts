@@ -27,6 +27,7 @@ import {
   type ProfileRole,
 } from "../lib/accountProfiles";
 import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
+import { revokeAppleSignInAfterDeletion } from "../lib/appleSignInRevoke";
 
 // ─── /api/accounts ──────────────────────────────────────────────────────────
 // One login (email/password, Apple, Google) holds at most one buyer profile
@@ -254,13 +255,19 @@ router.delete("/login", rateLimit("authentication"), async (req, res) => {
       return;
     }
     let scheduledFor: Date | null = null;
+    const newlyScheduled: string[] = [];
     for (const id of ids) {
-      scheduledFor = (await scheduleAccountDeletion(id)) ?? scheduledFor;
+      const date = await scheduleAccountDeletion(id);
+      if (date) newlyScheduled.push(id);
+      scheduledFor = date ?? scheduledFor;
     }
     for (const id of ids) {
       await revokeAllSessions(id).catch((err) => req.log.warn({ err }, "Could not revoke sessions after scheduling login deletion"));
     }
     res.json({ ok: true, profiles: ids.size, scheduledFor: scheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
+    for (const id of newlyScheduled) {
+      void revokeAppleSignInAfterDeletion(id, id === caller ? req.body?.appleAuthorizationCode : null);
+    }
   } catch (err) {
     req.log.error({ err }, "Login deletion failed");
     res.status(502).json({ error: "We couldn't schedule your login deletion. Try again or contact support." });

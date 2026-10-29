@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { clerkClient } from "@clerk/express";
-import { revokeAppleSignInOnAccountDeletion } from "../lib/appleSignInRevoke";
+import { revokeAppleSignInAfterDeletion } from "../lib/appleSignInRevoke";
 import {
   db, users, orders, orderItems, conversationParticipants, conversations, messages,
   passwordResetCodes,
@@ -36,7 +36,6 @@ import {
   resumeRenewalAfterRestore,
   stopRenewalForDeletion,
 } from "../lib/accountDeletionBilling";
-import { revokeAppleTokens } from "../lib/appleAuth";
 
 /** Clerk session facts that count as re-authentication for account deletion (QA-0074). */
 function reauthContext(req: Parameters<typeof getAuth>[0]) {
@@ -91,10 +90,6 @@ import { UNLOCKABLE_ICON_IDS, canUseAppIcon } from "../lib/unlockableIcons";
 
 const router = Router();
 
-// Sign in with Apple: revoke the Apple tokens once an account deletion
-// succeeds (runs ahead of the DELETE /account handler; off until the
-// APPLE_SIGNIN_* keys are set — see lib/appleSignInRevoke.ts).
-router.delete("/account", requireAuth, revokeAppleSignInOnAccountDeletion);
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
 const optionalProfileText = z.string().trim().max(160).optional();
 const syncBodySchema = z.object({
@@ -570,14 +565,6 @@ export async function accountDeletionHandler(req: Request, res: Response) {
 
     const keepsLogin = await isLoginWithLiveSiblings(clerkUserId);
     const scheduledFor = await scheduleAccountDeletion(clerkUserId);
-    // App Store 5.1.1(v): revoke the Sign in with Apple tokens with the code
-    // from the re-authentication. Best effort; never blocks deletion.
-    const appleCode = typeof req.body?.appleAuthorizationCode === "string" ? req.body.appleAuthorizationCode : null;
-    if (appleCode) {
-      void revokeAppleTokens(appleCode).then((result) => {
-        req.log.info({ clerkUserId, result }, "Sign in with Apple token revocation");
-      });
-    }
     try {
       // Deleting one profile keeps the other: the login's sessions are how
       // the person still reaches their remaining profile.
@@ -588,6 +575,16 @@ export async function accountDeletionHandler(req: Request, res: Response) {
       req.log.warn({ err, clerkUserId }, "Could not revoke sessions after scheduling account deletion");
     }
     res.json({ ok: true, scheduledFor: scheduledFor?.toISOString() ?? null, graceDays: DELETION_GRACE_DAYS });
+    // The DB's conditional update is the cross-request claim. Repeats and
+    // concurrent requests which did not schedule anything never revoke again.
+    if (scheduledFor) {
+      const revoke = () => { void revokeAppleSignInAfterDeletion(clerkUserId, req.body?.appleAuthorizationCode); };
+      // The public email-link adapter captures this handler's response. It
+      // must finish its own request bookkeeping before running side effects.
+      const deferred = (req as Request & { deletionSuccessEffects?: (() => void)[] }).deletionSuccessEffects;
+      if (deferred) deferred.push(revoke);
+      else revoke();
+    }
   } catch (err) {
     req.log.error({ err, clerkUserId }, "Account deletion failed");
     res.status(502).json({

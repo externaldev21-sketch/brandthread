@@ -100,30 +100,39 @@ export async function verifyAppleIdentityToken(
 }
 
 export function appleRevocationConfigured(env: Env = process.env): boolean {
-  return !!(env.APPLE_TEAM_ID?.trim() && env.APPLE_SIGN_IN_KEY_ID?.trim() && env.APPLE_SIGN_IN_PRIVATE_KEY?.trim());
+  return appleRevokeConfig(env) !== null;
+}
+
+export function appleRevokeConfig(env: Env = process.env) {
+  const teamId = env.APPLE_TEAM_ID?.trim();
+  const keyId = env.APPLE_SIGN_IN_KEY_ID?.trim();
+  const privateKey = env.APPLE_SIGN_IN_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
+  if (!teamId || !keyId || !privateKey) return null;
+  return { teamId, keyId, privateKey, clientId: appleBundleId(env) };
 }
 
 /** ES256 client secret Apple's token endpoints require (valid 5 minutes). */
 export function appleClientSecret(env: Env = process.env, now = Date.now()): string {
+  const config = appleRevokeConfig(env);
+  if (!config) throw new Error("Apple revocation is not configured");
   const iat = Math.floor(now / 1000);
-  const header = { alg: "ES256", kid: env.APPLE_SIGN_IN_KEY_ID!.trim() };
-  const payload = { iss: env.APPLE_TEAM_ID!.trim(), iat, exp: iat + 300, aud: APPLE_ISSUER, sub: appleBundleId(env) };
+  const header = { alg: "ES256", kid: config.keyId };
+  const payload = { iss: config.teamId, iat, exp: iat + 300, aud: APPLE_ISSUER, sub: config.clientId };
   const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
   const input = `${enc(header)}.${enc(payload)}`;
-  const pem = env.APPLE_SIGN_IN_PRIVATE_KEY!.replace(/\\n/g, "\n");
-  const signature = crypto.sign("sha256", Buffer.from(input), { key: pem, dsaEncoding: "ieee-p1363" });
+  const signature = crypto.sign("sha256", Buffer.from(input), { key: config.privateKey, dsaEncoding: "ieee-p1363" });
   return `${input}.${signature.toString("base64url")}`;
 }
 
 export type AppleRevokeResult = "revoked" | "not_configured" | "no_code" | "failed";
 
-/** Exchange the one-time authorization code for a refresh token, then revoke it. Never throws. */
+/** Prefer the authorization code; otherwise revoke the supplied Clerk access token. Never both, never throws. */
 export async function revokeAppleTokens(
   authorizationCode: string | null | undefined,
-  opts: { env?: Env; fetchImpl?: FetchLike; now?: number } = {},
+  opts: { env?: Env; fetchImpl?: FetchLike; now?: number; accessToken?: string | null } = {},
 ): Promise<AppleRevokeResult> {
   const env = opts.env ?? process.env;
-  if (!authorizationCode) return "no_code";
+  if (!authorizationCode && !opts.accessToken) return "no_code";
   if (!appleRevocationConfigured(env)) return "not_configured";
   const fetchImpl = opts.fetchImpl ?? (fetch as unknown as FetchLike);
   try {
@@ -131,19 +140,24 @@ export async function revokeAppleTokens(
     const clientSecret = appleClientSecret(env, opts.now);
     const form = (o: Record<string, string>) => new URLSearchParams(o).toString();
     const headers = { "Content-Type": "application/x-www-form-urlencoded" };
-    const tokenRes = await fetchImpl(`${APPLE_ISSUER}/auth/token`, {
-      method: "POST", headers,
-      body: form({ client_id: clientId, client_secret: clientSecret, code: authorizationCode, grant_type: "authorization_code" }),
-    });
-    if (!tokenRes.ok) return "failed";
-    const tokens = await tokenRes.json();
-    const token = tokens?.refresh_token ?? tokens?.access_token;
+    let token = opts.accessToken;
+    let tokenType = "access_token";
+    if (authorizationCode) {
+      const tokenRes = await fetchImpl(`${APPLE_ISSUER}/auth/token`, {
+        method: "POST", headers,
+        body: form({ client_id: clientId, client_secret: clientSecret, code: authorizationCode, grant_type: "authorization_code" }),
+      });
+      if (!tokenRes.ok) return "failed";
+      const tokens = await tokenRes.json();
+      token = tokens?.refresh_token ?? tokens?.access_token;
+      tokenType = tokens?.refresh_token ? "refresh_token" : "access_token";
+    }
     if (typeof token !== "string") return "failed";
     const revokeRes = await fetchImpl(`${APPLE_ISSUER}/auth/revoke`, {
       method: "POST", headers,
       body: form({
         client_id: clientId, client_secret: clientSecret, token,
-        token_type_hint: tokens?.refresh_token ? "refresh_token" : "access_token",
+        token_type_hint: tokenType,
       }),
     });
     return revokeRes.ok ? "revoked" : "failed";
