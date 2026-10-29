@@ -437,49 +437,52 @@ async function recordOrderLoss(input: {
  * Tries to pull an open recovery back right away by reversing the disputed
  * order's own transfer, up to what that transfer still holds for the seller.
  * Never throws: a failed or partial reversal leaves the rest owed.
+ *
+ * The seller's recovery lock is held across the Stripe call, so a release
+ * netting the same debt meanwhile cannot shrink it after `amount` was
+ * reversed (which would book less than Stripe actually took back).
  */
 export async function recoverByTransferReversal(
   recoveryId: string,
   options: { stripe?: StripeTransfers | null } = {},
 ): Promise<{ reversedCents: number; recovered: boolean }> {
   const stripeClient = options.stripe === undefined ? defaultStripe : options.stripe;
-  const [recovery] = await db.select().from(sellerRecoveries).where(eq(sellerRecoveries.id, recoveryId)).limit(1);
-  if (!recovery || recovery.status !== "open" || !recovery.orderId || !stripeClient) return { reversedCents: 0, recovered: false };
-  const ledgerKey = `recovery-reversal/${recovery.id}`;
-  const already = rows(await db.execute(sql`SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${ledgerKey}`));
-  if (already.length) return { reversedCents: 0, recovered: false };
-
-  const [order] = rows<LossOrder & { release_transfer_id: string | null }>(await db.execute(sql`
-    SELECT o.id, o.owner_id, o.stripe_transfer_id, o.stripe_thread_cash_transfer_id, o.thread_cash_applied_cents,
-           (SELECT r.stripe_transfer_id FROM order_releases r WHERE r.order_id = o.id AND r.state = 'paid' LIMIT 1) AS release_transfer_id
-    FROM orders o WHERE o.id = ${recovery.orderId}::uuid
-  `));
-  const transferId = order?.stripe_transfer_id ?? order?.release_transfer_id ?? null;
-  if (!order || !transferId) return { reversedCents: 0, recovered: false };
-  const amount = Math.min(outstandingCents(recovery), await orderPaidOutCents(db, order));
-  if (amount <= 0) return { reversedCents: 0, recovered: false };
-
-  let reversal: Stripe.TransferReversal;
-  try {
-    reversal = await stripeClient.transfers.createReversal(transferId, {
-      amount,
-      description: "Brandthread: lost chargeback",
-      metadata: { kind: "chargeback_recovery", recoveryId: recovery.id, orderId: recovery.orderId, disputeId: recovery.stripeDisputeId },
-    }, { idempotencyKey: ledgerKey });
-  } catch (err) {
-    logger.warn({ err, recoveryId: recovery.id, transferId }, "Chargeback transfer reversal failed; the debt stays open and is netted from upcoming payouts");
-    return { reversedCents: 0, recovered: false };
-  }
+  const [peek] = await db.select().from(sellerRecoveries).where(eq(sellerRecoveries.id, recoveryId)).limit(1);
+  if (!peek || peek.status !== "open" || !peek.orderId || !stripeClient) return { reversedCents: 0, recovered: false };
+  const ledgerKey = `recovery-reversal/${peek.id}`;
 
   const result = await db.transaction(async (tx) => {
-    await lockSellerRecoveries(tx, recovery.sellerId);
-    const [fresh] = await tx.select().from(sellerRecoveries).where(eq(sellerRecoveries.id, recovery.id)).limit(1);
-    if (!fresh || fresh.status !== "open") return { applied: 0, recovered: [] as SellerRecovery[] };
-    // Stripe moved `amount`; the books must say so even if something else
-    // recovered part of this debt in the meantime (the excess stays as credit).
+    await lockSellerRecoveries(tx, peek.sellerId);
+    const already = rows(await tx.execute(sql`SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${ledgerKey}`));
+    if (already.length) return null;
+    const [recovery] = await tx.select().from(sellerRecoveries).where(eq(sellerRecoveries.id, peek.id)).limit(1);
+    if (!recovery || recovery.status !== "open" || !recovery.orderId) return null;
+
+    const [order] = rows<LossOrder & { release_transfer_id: string | null }>(await tx.execute(sql`
+      SELECT o.id, o.owner_id, o.stripe_transfer_id, o.stripe_thread_cash_transfer_id, o.thread_cash_applied_cents,
+             (SELECT r.stripe_transfer_id FROM order_releases r WHERE r.order_id = o.id AND r.state = 'paid' LIMIT 1) AS release_transfer_id
+      FROM orders o WHERE o.id = ${recovery.orderId}::uuid
+    `));
+    const transferId = order?.stripe_transfer_id ?? order?.release_transfer_id ?? null;
+    if (!order || !transferId) return null;
+    const amount = Math.min(outstandingCents(recovery), await orderPaidOutCents(tx, order));
+    if (amount <= 0) return null;
+
+    let reversal: Stripe.TransferReversal;
+    try {
+      reversal = await stripeClient.transfers.createReversal(transferId, {
+        amount,
+        description: "Brandthread: lost chargeback",
+        metadata: { kind: "chargeback_recovery", recoveryId: recovery.id, orderId: recovery.orderId, disputeId: recovery.stripeDisputeId },
+      }, { idempotencyKey: ledgerKey });
+    } catch (err) {
+      logger.warn({ err, recoveryId: recovery.id, transferId }, "Chargeback transfer reversal failed; the debt stays open and is netted from upcoming payouts");
+      return null;
+    }
+
     return applyToRecoveries(tx, {
       sellerId: recovery.sellerId,
-      allocations: [{ recovery: fresh, amountCents: Math.min(amount, outstandingCents(fresh)) }],
+      allocations: [{ recovery, amountCents: amount }],
       source: "transfer_reversal",
       ledgerKey,
       kind: "recovery_transfer_reversed",
@@ -489,6 +492,7 @@ export async function recoverByTransferReversal(
       orderId: recovery.orderId,
     });
   });
+  if (!result) return { reversedCents: 0, recovered: false };
   return { reversedCents: result.applied, recovered: result.recovered.length > 0 };
 }
 

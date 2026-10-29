@@ -247,6 +247,16 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       throw new RefundError("This refund was already started with a different refund method", 409, "IDEMPOTENCY_CONFLICT");
     }
     if (existing?.state === "succeeded") return { kind: "done" as const, refund: existing };
+    if (existing?.state === "failed" && existing.failureCode === "failed_after_success") {
+      // Its ledger entry (order-refund/<id>) was already posted and then
+      // reversed by recordRefundFailedLater; a retry under the same row would
+      // refund the card again with no ledger entry. A person decides, and
+      // issues a new refund (new key) if the buyer is still owed.
+      throw new RefundError(
+        "Stripe reversed this refund after it succeeded. Start a new refund instead.",
+        409, "REFUND_FAILED_AFTER_SUCCESS",
+      );
+    }
 
     if (!existing || existing.state === "failed") await options.precondition?.(order, tx);
     if (order.funds_state === "release_pending") {
@@ -491,14 +501,7 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       await adjustDropWalletForRefund(tx, locked.drop_id, sellerShare - reversalCents);
     }
     if (release?.id && reversalCents > 0) {
-      const newReversed = release.reversed + reversalCents;
-      const fully = newReversed >= release.amount;
-      if (fully) releaseMachine.assert("paid", "reversed");
-      await tx.update(orderReleases).set({
-        reversedCents: newReversed,
-        ...(fully ? { state: "reversed" } : {}),
-        updatedAt: new Date(),
-      }).where(eq(orderReleases.id, release.id));
+      await recordReleaseReversal(tx, release, reversalCents);
     }
 
     await finishRefund(tx, { options, stripeClient, locked, refundId: refund.id, amount, pfr, destination, moveFundsState: true, restockedLines });
@@ -512,6 +515,26 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
 type OrderRefundRow = typeof orderRefunds.$inferSelect;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ReleaseInfo = { id: string; amount: number; reversed: number; transferId: string | null; state: string };
+
+/**
+ * Adds a refund's transfer reversal to the order's release. Reads the
+ * current reversed total under the order lock (held by the caller's phase C)
+ * rather than the phase-A snapshot: two refunds of the same order can be in
+ * phase B at once, and adding to a stale snapshot would drop the other's
+ * reversal.
+ */
+async function recordReleaseReversal(tx: DbExecutor, release: ReleaseInfo, reversalCents: number): Promise<void> {
+  const [current] = await tx.select({ reversedCents: orderReleases.reversedCents, state: orderReleases.state })
+    .from(orderReleases).where(eq(orderReleases.id, release.id)).limit(1);
+  const newReversed = (current?.reversedCents ?? release.reversed) + reversalCents;
+  const fully = newReversed >= release.amount && (current?.state ?? release.state) === "paid";
+  if (fully) releaseMachine.assert("paid", "reversed");
+  await tx.update(orderReleases).set({
+    reversedCents: newReversed,
+    ...(fully ? { state: "reversed" } : {}),
+    updatedAt: new Date(),
+  }).where(eq(orderReleases.id, release.id));
+}
 
 /**
  * The part of phase C every refund method shares: the order's refunded
@@ -719,12 +742,14 @@ async function settleNonCardRefund(input: {
         postings.push({ account: "seller_paid_out", partyId: sellerId, amountCents: -reversalCents });
       } else if (locked.funds_state === "released") {
         postings.push({ account: "seller_paid_out", partyId: sellerId, amountCents: -reversalCents });
-        postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(sellerShare - reversalCents) });
+        postings.push(refundShortfallPosting(locked, -(sellerShare - reversalCents)));
       } else {
         const held = Math.max(0, await orderHeldCents(tx, locked.id, sellerId));
         const fromOrder = Math.min(sellerShare, held);
         postings.push({ account: "seller_held", partyId: sellerId, amountCents: -fromOrder });
-        postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(sellerShare - fromOrder) });
+        // Same as a card refund: a drop absorbs the shortfall, an order
+        // without a drop leaves a seller debt netted from later payouts.
+        postings.push(refundShortfallPosting(locked, -(sellerShare - fromOrder)));
       }
       await postLedgerTransaction(tx, {
         idempotencyKey: `order-refund/${refund.id}`,
@@ -740,14 +765,7 @@ async function settleNonCardRefund(input: {
         await adjustDropWalletForRefund(tx, locked.drop_id, sellerShare - reversalCents);
       }
       if (release?.id && reversalCents > 0) {
-        const newReversed = release.reversed + reversalCents;
-        const fully = newReversed >= release.amount;
-        if (fully) releaseMachine.assert("paid", "reversed");
-        await tx.update(orderReleases).set({
-          reversedCents: newReversed,
-          ...(fully ? { state: "reversed" } : {}),
-          updatedAt: new Date(),
-        }).where(eq(orderReleases.id, release.id));
+        await recordReleaseReversal(tx, release, reversalCents);
       }
       const credit = await creditRefundToThreadCash(tx, {
         buyerId: locked.buyer_id!,
@@ -865,66 +883,104 @@ export async function recordExternalRefunds(input: {
 }): Promise<{ recordedCents: number; orderId: string | null }> {
   if (!input.paymentIntentId && !input.chargeId) return { recordedCents: 0, orderId: null };
   return db.transaction(async (tx) => {
-    const [match] = rows<{ id: string }>(await tx.execute(sql`
+    // A one-page checkout cart is ONE PaymentIntent/charge for several
+    // orders, and Stripe's amount_refunded is cumulative for the whole
+    // charge. Compare it with every order on that payment, never just one:
+    // a Brandthread refund of one order must not look like a dashboard
+    // refund of another.
+    const matches = rows<{ id: string }>(await tx.execute(sql`
       SELECT id FROM orders
       WHERE ${input.paymentIntentId ? sql`stripe_payment_intent_id = ${input.paymentIntentId}` : sql`FALSE`}
          OR ${input.chargeId ? sql`stripe_charge_id = ${input.chargeId}` : sql`FALSE`}
-      LIMIT 1
+      ORDER BY id
     `));
-    if (!match) return { recordedCents: 0, orderId: null };
-    const order = await lockOrder(tx, match.id);
-    if (!order || !order.charge_model) return { recordedCents: 0, orderId: match.id };
-    // Only card refunds show on the Stripe charge; Thread Cash and store
-    // credit refunds are in refunded_cents but were never refunded by Stripe.
-    const known = order.refunded_cents - await nonCardRefundedCents(tx, order.id)
-      + await inFlightRefundCents(tx, order.id, undefined, { cardOnly: true });
-    const delta = Math.min(input.cumulativeRefundedCents, orderGrossCents(order)) - known;
-    if (!Number.isSafeInteger(delta) || delta <= 0) return { recordedCents: 0, orderId: order.id };
-
-    const [refund] = await tx.insert(orderRefunds).values({
-      orderId: order.id,
-      sellerId: order.owner_id,
-      idempotencyKey: `external-refund/${input.providerEventId}`,
-      amountCents: delta,
-      reason: "stripe_dashboard",
-      initiatedBy: "stripe",
-      state: "succeeded",
-      succeededAt: new Date(),
-    }).onConflictDoNothing({ target: orderRefunds.idempotencyKey }).returning();
-    if (!refund) return { recordedCents: 0, orderId: order.id };
-
-    const sellerId = order.owner_id;
-    const postings: LedgerPosting[] = [{ account: "buyer_payments", amountCents: delta }];
-    if ((order.charge_model === "held" || order.charge_model === "transfer") && order.funds_state !== "released") {
-      const held = Math.max(0, await orderHeldCents(tx, order.id, sellerId));
-      const fromOrder = Math.min(delta, held);
-      postings.push({ account: "seller_held", partyId: sellerId, amountCents: -fromOrder });
-      postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(delta - fromOrder) });
-      if (order.drop_id) await adjustDropWalletForRefund(tx, order.drop_id, delta);
-    } else {
-      postings.push({ account: "platform_funds_advanced", partyId: sellerId, amountCents: -delta });
+    if (matches.length === 0) return { recordedCents: 0, orderId: null };
+    const covered: Array<{ order: LockedOrder; known: number }> = [];
+    for (const match of matches) {
+      const order = await lockOrder(tx, match.id);
+      if (!order || !order.charge_model) continue;
+      // Only card refunds show on the Stripe charge; Thread Cash and store
+      // credit refunds are in refunded_cents but were never refunded by Stripe.
+      const known = order.refunded_cents - await nonCardRefundedCents(tx, order.id)
+        + await inFlightRefundCents(tx, order.id, undefined, { cardOnly: true });
+      covered.push({ order, known });
     }
-    await postLedgerTransaction(tx, {
-      idempotencyKey: `order-refund/${refund.id}`,
-      kind: "refund_stripe_dashboard",
-      sellerId,
-      orderId: order.id,
-      dropId: order.drop_id,
-      stripeObjectId: input.chargeId,
-      memo: "Refund issued outside Brandthread (Stripe dashboard) — needs review",
-      postings,
-    });
-    const newRefunded = order.refunded_cents + delta;
-    const from = order.funds_state as OrderFundsState | null;
-    const full = newRefunded >= orderGrossCents(order) && from && orderFundsMachine.can(from, "refunded");
-    await tx.update(orders).set({
-      refundedCents: newRefunded,
-      ...(full ? { fundsState: "refunded" } : {}),
-      updatedAt: new Date(),
-    }).where(eq(orders.id, order.id));
-    logger.warn({ orderId: order.id, amountCents: delta }, "Recorded a refund made outside Brandthread");
-    return { recordedCents: delta, orderId: order.id };
+    if (covered.length === 0) return { recordedCents: 0, orderId: matches[0].id };
+    const grossTotal = covered.reduce((sum, c) => sum + orderGrossCents(c.order), 0);
+    const knownTotal = covered.reduce((sum, c) => sum + c.known, 0);
+    const delta = Math.min(input.cumulativeRefundedCents, grossTotal) - knownTotal;
+    if (!Number.isSafeInteger(delta) || delta <= 0) return { recordedCents: 0, orderId: covered[0].order.id };
+
+    if (covered.length === 1) {
+      const recorded = await recordExternalRefundOnOrder(tx, covered[0].order, delta, `external-refund/${input.providerEventId}`, input.chargeId);
+      return { recordedCents: recorded, orderId: covered[0].order.id };
+    }
+    // Several orders: the dashboard refund names none of them, so spread it
+    // over what each can still take (oldest id first) for a person to review.
+    let recordedCents = 0;
+    let firstOrderId: string | null = null;
+    for (const { order } of covered) {
+      const room = orderGrossCents(order) - order.refunded_cents - await inFlightRefundCents(tx, order.id);
+      const part = Math.min(delta - recordedCents, Math.max(0, room));
+      if (part <= 0) continue;
+      const recorded = await recordExternalRefundOnOrder(
+        tx, order, part, `external-refund/${input.providerEventId}/${order.id}`, input.chargeId,
+      );
+      if (recorded > 0) firstOrderId ??= order.id;
+      recordedCents += recorded;
+      if (recordedCents >= delta) break;
+    }
+    return { recordedCents, orderId: firstOrderId ?? covered[0].order.id };
   });
+}
+
+/** Records `delta` of a refund made outside Brandthread on one locked order. Returns what was recorded. */
+async function recordExternalRefundOnOrder(
+  tx: DbTransaction, order: LockedOrder, delta: number, idempotencyKey: string, chargeId: string | null,
+): Promise<number> {
+  const [refund] = await tx.insert(orderRefunds).values({
+    orderId: order.id,
+    sellerId: order.owner_id,
+    idempotencyKey,
+    amountCents: delta,
+    reason: "stripe_dashboard",
+    initiatedBy: "stripe",
+    state: "succeeded",
+    succeededAt: new Date(),
+  }).onConflictDoNothing({ target: orderRefunds.idempotencyKey }).returning();
+  if (!refund) return 0;
+
+  const sellerId = order.owner_id;
+  const postings: LedgerPosting[] = [{ account: "buyer_payments", amountCents: delta }];
+  if ((order.charge_model === "held" || order.charge_model === "transfer") && order.funds_state !== "released") {
+    const held = Math.max(0, await orderHeldCents(tx, order.id, sellerId));
+    const fromOrder = Math.min(delta, held);
+    postings.push({ account: "seller_held", partyId: sellerId, amountCents: -fromOrder });
+    postings.push({ account: "seller_held", partyId: sellerId, orderId: null, amountCents: -(delta - fromOrder) });
+    if (order.drop_id) await adjustDropWalletForRefund(tx, order.drop_id, delta);
+  } else {
+    postings.push({ account: "platform_funds_advanced", partyId: sellerId, amountCents: -delta });
+  }
+  await postLedgerTransaction(tx, {
+    idempotencyKey: `order-refund/${refund.id}`,
+    kind: "refund_stripe_dashboard",
+    sellerId,
+    orderId: order.id,
+    dropId: order.drop_id,
+    stripeObjectId: chargeId,
+    memo: "Refund issued outside Brandthread (Stripe dashboard) — needs review",
+    postings,
+  });
+  const newRefunded = order.refunded_cents + delta;
+  const from = order.funds_state as OrderFundsState | null;
+  const full = newRefunded >= orderGrossCents(order) && from && orderFundsMachine.can(from, "refunded");
+  await tx.update(orders).set({
+    refundedCents: newRefunded,
+    ...(full ? { fundsState: "refunded" } : {}),
+    updatedAt: new Date(),
+  }).where(eq(orders.id, order.id));
+  logger.warn({ orderId: order.id, amountCents: delta }, "Recorded a refund made outside Brandthread");
+  return delta;
 }
 
 /**
