@@ -102,6 +102,16 @@ interface Comment {
 }
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
+/**
+ * The socket and the HTTP backfill (poll) can both deliver the same comment
+ * (one arriving while the other's request is in flight) — append each id once.
+ */
+function appendComments(prev: Comment[], incoming: Comment[]): Comment[] {
+  const seen = new Set(prev.map(c => c.id));
+  const fresh = incoming.filter(c => !seen.has(c.id) && (seen.add(c.id), true));
+  return fresh.length ? [...prev, ...fresh].slice(-80) : prev;
+}
+
 export default function BuyerLiveScreen() {
   // `&demo=1` renders the viewer screen in a browser (video placeholders)
   // for the screenshot harness; a real web visit still gets the notice.
@@ -241,7 +251,7 @@ function BuyerLiveNativeScreen() {
     auctionEventRef.current(event as any);
     if (event.type === 'comment') {
       lastTs.current = event.comment.created_at;
-      setComments(prev => [...prev, event.comment].slice(-80));
+      setComments(prev => appendComments(prev, [event.comment]));
       commentsScroll.requestScrollToEnd();
     } else if (event.type === 'products') {
       setProductTags(event.productTags);
@@ -443,8 +453,10 @@ function BuyerLiveNativeScreen() {
       ]);
       const fresh: Comment[] = (commData.comments ?? []).reverse();
       if (fresh.length) {
-        lastTs.current = fresh[fresh.length - 1].created_at;
-        setComments(prev => [...prev, ...fresh].slice(-80));
+        const newest = fresh[fresh.length - 1].created_at;
+        // Never move the cursor back past a newer socket comment.
+        if (!(Date.parse(lastTs.current) > Date.parse(newest))) lastTs.current = newest;
+        setComments(prev => appendComments(prev, fresh));
         commentsScroll.requestScrollToEnd();
       }
       if (streamData.stream?.status !== 'live') setEnded(true);

@@ -13,6 +13,7 @@ export function useStoreGiftCards(sellerId: string | null | undefined): boolean 
   useEffect(() => {
     if (!sellerId) { setEnabled(false); return; }
     if (isBuyerDevPreview() || isSellerDevPreview()) { setEnabled(isPreviewDemoMode()); return; }
+    setEnabled(false); // not the previous store's answer while this one loads
     let active = true;
     api.giftCards.store(sellerId).then(info => { if (active) setEnabled(info.enabled); }).catch(() => {});
     return () => { active = false; };

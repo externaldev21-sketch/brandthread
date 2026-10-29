@@ -113,9 +113,14 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
     return () => !!owner && userRef.current === owner;
   }, []);
 
+  // Account whose collections are currently in `collections`.
+  const listOwnerRef = useRef<string | null | undefined>(null);
+
   const load = useCallback(async () => {
-    if (!userRef.current) { setLoading(false); setCollections([]); return; }
+    if (!userRef.current) { setLoading(false); setCollections([]); listOwnerRef.current = null; return; }
     const isCurrent = bindAccount();
+    // Never keep another account's boards listed (e.g. if this account's load fails).
+    if (listOwnerRef.current !== userRef.current) { setCollections([]); listOwnerRef.current = userRef.current; }
     setLoading(true); setLoadError(false);
     try {
       const rows = await getCollections();

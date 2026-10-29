@@ -7,7 +7,7 @@
  *  CodeScreen      Depop "Check your inbox" (+ code) https://mobbin.com/screens/fd03dc84-8c32-4f9c-b062-307316b6d83d
  *  DetailsScreen   TikTok "Create password"          https://mobbin.com/flows/d07ea40f-5774-4111-95bc-bfe13af206f5
  */
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { InertContext } from './motion';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -149,7 +149,11 @@ export function CodeScreen({
     return () => clearTimeout(t);
   }, [seconds]);
 
+  // A second tap while the first resend is in flight must not send another code.
+  const resendingRef = useRef(false);
   async function resend() {
+    if (resendingRef.current) return;
+    resendingRef.current = true;
     setResendNote('');
     try {
       await onResend();
@@ -157,6 +161,8 @@ export function CodeScreen({
       setResendNote('New code sent.');
     } catch (e: any) {
       setResendNote(e?.message || 'Couldn’t send a new code. Try again.');
+    } finally {
+      resendingRef.current = false;
     }
   }
 

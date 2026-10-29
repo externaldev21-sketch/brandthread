@@ -63,7 +63,8 @@ export function IconButton({
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  // Disabled is a solid gray glyph, not a faded one.
+  // Disabled: the glyph switches to the solid TEXT_DISABLED gray, and the
+  // whole button (glyph, fill, badge) is also dimmed to DISABLED_OPACITY below.
   const resolvedColor = disabled ? TEXT_DISABLED : color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
 
   return (

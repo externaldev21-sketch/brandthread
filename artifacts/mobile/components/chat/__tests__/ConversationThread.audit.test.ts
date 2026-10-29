@@ -51,6 +51,11 @@ describe('ConversationThread sends', () => {
     expect(sendToAlert).not.toContain('getMessages(');
   });
 
+  it('a direct send that succeeded is not handed back as "not sent" when the refresh fails', () => {
+    const sendToAlert = between('await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);', "Alert.alert('Message not sent'");
+    expect(sendToAlert).not.toContain('getMessages(');
+  });
+
   it('a failed outbox save hands the draft back instead of losing it', () => {
     const block = between('if (userId) {\n      const threadId = conv.id;', 'void flushOutboxNow();\n      return;\n    }\n    setIsSending(true);');
     expect(block).toMatch(/try \{\s*await enqueueOutboxMessage\(userId, threadId,/);

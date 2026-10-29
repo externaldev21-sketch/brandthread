@@ -310,19 +310,28 @@ export default function SellerHomeCommerceDashboard({
     return () => { cancelled = true; };
   }, [api, sellerPreview]);
 
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
   const handleCopyStoreUrl = useCallback(() => {
     if (!storeUrl) return;
     (async () => {
-      if (Platform.OS === 'web') {
-        await navigator?.clipboard?.writeText?.(storeUrl);
-      } else {
-        const Clipboard = await import('expo-clipboard');
-        await Clipboard.setStringAsync(storeUrl);
+      try {
+        if (Platform.OS === 'web') {
+          await navigator?.clipboard?.writeText?.(storeUrl);
+        } else {
+          const Clipboard = await import('expo-clipboard');
+          await Clipboard.setStringAsync(storeUrl);
+        }
+      } catch {
+        // Clipboard write refused — don't show the "copied" checkmark.
+        return;
       }
+      // Checkmark only once the URL is really on the clipboard.
+      setStoreUrlCopied(true);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setStoreUrlCopied(false), 1200);
       if (isSignedIn && !sellerPreview) await api.firstWeek.storeShared().catch(() => {});
     })();
-    setStoreUrlCopied(true);
-    setTimeout(() => setStoreUrlCopied(false), 1200);
   }, [storeUrl, api, isSignedIn, sellerPreview]);
 
   useEffect(() => subscribeStoreContext(() => {
@@ -500,7 +509,18 @@ export default function SellerHomeCommerceDashboard({
     }
   }, [sellerPreview, source, userId]);
 
-  useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick, storeContextTick]);
+  // Pull-to-refresh loads the secondary data itself (and awaits it for the
+  // spinner) while also bumping retryTick for the analytics fetch; this marks
+  // the tick that load already covers so the effect doesn't load it twice.
+  const ticksRef = useRef({ retryTick, storeContextTick });
+  ticksRef.current = { retryTick, storeContextTick };
+  const secondaryCoveredRef = useRef<string | null>(null);
+  useEffect(() => {
+    const covered = secondaryCoveredRef.current === `${retryTick}:${storeContextTick}`;
+    secondaryCoveredRef.current = null;
+    if (covered) return;
+    void loadSecondaryData();
+  }, [loadSecondaryData, retryTick, storeContextTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
@@ -573,6 +593,7 @@ export default function SellerHomeCommerceDashboard({
   const reloadThreadCash = threadCash.reload;
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    secondaryCoveredRef.current = `${ticksRef.current.retryTick + 1}:${ticksRef.current.storeContextTick}`;
     setRetryTick((n) => n + 1);
     await Promise.all([loadSecondaryData(), loadFinanceBalance(), reloadThreadCash()]);
     setRefreshing(false);

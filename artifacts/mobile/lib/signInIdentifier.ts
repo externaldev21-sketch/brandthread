@@ -6,7 +6,8 @@
 export type IdentifierKind = 'email' | 'phone' | 'invalid';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Loose E.164-ish check: optional leading +, 7-15 digits total, spaces/
+// Loose phone check: optional leading +, at least 7 digits (no digit upper
+// bound — only the 20-character cap on the whole entry), spaces/dots/
 // dashes/parens allowed as visual separators only. Real validation is
 // Clerk's job — this just decides which strategy to try.
 const PHONE_RE = /^\+?[0-9()\-.\s]{7,20}$/;

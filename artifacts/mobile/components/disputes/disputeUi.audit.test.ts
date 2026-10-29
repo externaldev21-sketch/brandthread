@@ -15,7 +15,9 @@ describe('dueChipLabel around the deadline', () => {
     expect(dueChipLabel(inHours(-23), now)).toBe('Past due');
   });
 
-  it('still reads "Due in 1 day" for a deadline later today', () => {
-    expect(dueChipLabel(inHours(2), now)).toBe('Due in 1 day');
+  // Round 2: daysLeft counts calendar days, so later today is "Due today"
+  // (disputeUi.audit2.test.ts) — the old ceil made that label unreachable.
+  it('reads "Due today" for a deadline later today', () => {
+    expect(dueChipLabel(inHours(2), now)).toBe('Due today');
   });
 });

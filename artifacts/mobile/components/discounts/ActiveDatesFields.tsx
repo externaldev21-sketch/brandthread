@@ -16,7 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { listSupportedTimeZones } from '@/lib/dropSchedule';
 import { hapticSelection } from '@/lib/haptics';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
-import { formatFields, zoneAbbreviation, type ScheduleForm } from '@/lib/scheduleWindow';
+import { formatFields, instantFromFields, zoneAbbreviation, type ScheduleForm } from '@/lib/scheduleWindow';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
 export function ActiveDatesFields({ value, onChange }: {
@@ -26,7 +26,12 @@ export function ActiveDatesFields({ value, onChange }: {
   const { theme } = useAppTheme();
   const s = useMemo(() => createStyles(theme), [theme]);
   const [zoneOpen, setZoneOpen] = useState(false);
-  const abbr = zoneAbbreviation(value.zone);
+  // Each field's own abbreviation: a start in summer and an end in winter
+  // read EDT and EST, not today's abbreviation for both.
+  const abbrAt = (date: string, time: string) =>
+    zoneAbbreviation(value.zone, instantFromFields(date, time, value.zone) ?? new Date());
+  const startAbbr = abbrAt(value.startDate, value.startTime);
+  const endAbbr = abbrAt(value.endDate, value.endTime);
   const set = (patch: Partial<ScheduleForm>) => onChange({ ...value, ...patch, touched: true });
 
   return (
@@ -34,7 +39,7 @@ export function ActiveDatesFields({ value, onChange }: {
       <Text style={s.label}>Active dates</Text>
 
       <View style={s.fieldHead}>
-        <Text style={s.subLabel}>Start date and time ({abbr})</Text>
+        <Text style={s.subLabel}>Start date and time ({startAbbr})</Text>
         <Text style={s.picked} numberOfLines={1}>{formatFields(value.startDate, value.startTime)}</Text>
       </View>
       <LaunchTimePicker
@@ -52,7 +57,7 @@ export function ActiveDatesFields({ value, onChange }: {
       {value.hasEnd && (
         <>
           <View style={[s.fieldHead, { marginTop: SP.md }]}>
-            <Text style={s.subLabel}>End date and time ({abbr})</Text>
+            <Text style={s.subLabel}>End date and time ({endAbbr})</Text>
             <Text style={s.picked} numberOfLines={1}>{formatFields(value.endDate, value.endTime)}</Text>
           </View>
           <LaunchTimePicker

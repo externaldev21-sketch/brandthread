@@ -271,11 +271,11 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
   return lastMessage?.trim() || fallback;
 }
 
-/** Fire-and-forget "mark read" for a conversation row tap. A seeded preview
- *  conversation (see lib/previewInbox.ts) has no real backend record, so a
- *  real PATCH for it 401s with no signed-in user — skip the network call
- *  entirely there, and everywhere else swallow the rejection so a slow/failed
- *  read receipt never surfaces as an uncaught error. */
+/** Fire-and-forget "mark read" that skips seeded preview conversations (see
+ *  lib/previewInbox.ts — no backend record) and swallows a failed receipt.
+ *  Currently unused: openConversation makes its own guarded
+ *  markConversationRead call (it also drops its local read claim on
+ *  failure), and swipeMarkReadConversation awaits the PATCH itself. */
 function markReadSafely(conversationId: string): void {
   if (isPreviewConversationId(conversationId) || isSellerPreviewConversationId(conversationId)) return;
   void markConversationRead(conversationId).catch(() => {});
@@ -517,10 +517,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const isAuthorLive = useCallback((authorId: string) => !!liveDirectory.streamFor(authorId), [liveDirectory]);
 
   const loadStoryTray = useCallback(async () => {
-    // See loadData's identical isBuyerDevPreview() comment above — a
-    // fake-signed-in Clerk stub (audit/e2e harnesses) still reports a
-    // truthy userId, which must not be enough on its own to reach the real
-    // stories endpoints below.
+    // Signed out: the seeded preview tray (when enabled) or nothing — never
+    // the real stories endpoints below. isPreviewSession() itself requires
+    // !userId, so it adds nothing for a signed-in (or stubbed) session.
     if (!userId || isPreviewSession()) {
       if (isPreviewStoriesEnabled() && !sellerFreshPreview) {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
@@ -616,14 +615,9 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   useEffect(() => () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); }, []);
 
   const loadData = useCallback(async () => {
-    // isBuyerDevPreview() (not just !userId): a stubbed/fake-signed-in Clerk
-    // session (this app's own audit/e2e harnesses fake a signed-in user so
-    // protected screens render at all) still reports a truthy userId, which
-    // used to fall through to the real getConversations() call below and
-    // 404 against a harness with no backend. bt_preview is read straight
-    // off the URL/persisted role (lib/devPreview.ts), independent of
-    // Clerk's auth state, so it still routes to the preview branch however
-    // Clerk is stubbed.
+    // Signed out → the preview branch below; signed in → the real
+    // getConversations(). isPreviewSession() is `!userId && <dev preview>`,
+    // so it never diverts a signed-in (or stubbed signed-in) session.
     if (!userId || isPreviewSession()) {
       if (isSeller) {
         // Seller preview: the seeded seller inbox is a DEMO dataset, shown
@@ -697,8 +691,8 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   // whenever the social pub/sub fires (e.g. after a follow/unfollow changes
   // who counts as a suggestion).
   const loadSuggested = useCallback(async () => {
-    // See loadData's identical isBuyerDevPreview() comment above. Sellers
-    // don't get the list: its "Message" starts a buyer↔buyer thread.
+    // Signed out (isPreviewSession() also requires !userId): no list.
+    // Sellers don't get the list: its "Message" starts a buyer↔buyer thread.
     if (!userId || isPreviewSession() || isSeller) {
       setSuggestedPeople([]);
       setSuggestedLoading(false);
@@ -909,7 +903,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
 
   // Requests-tab row tap: opens the conversation in request mode (see
   // buyer-conversation.tsx's isRequestMode branch — hidden composer, bottom
-  // accept/delete/block panel). Deliberately does NOT call markReadSafely —
+  // accept/delete/block panel). Deliberately does NOT mark it read —
   // per the Instagram-style request flow, the sender shouldn't see a read
   // receipt until the recipient actually accepts.
   function openRequestConversation(conv: Conversation) {
@@ -1117,7 +1111,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   async function swipeMarkReadConversation(conv: Conversation) {
     if (conv.unreadCount <= 0) return;
     // A seeded preview conversation has no real backend record to PATCH —
-    // just update local state, matching openConversation's markReadSafely.
+    // just update local state, matching openConversation's preview-id skip.
     if (isPreviewId(conv.id)) {
       setConversations(prev => prev.map(item =>
         item.id === conv.id ? { ...item, unreadCount: 0 } : item

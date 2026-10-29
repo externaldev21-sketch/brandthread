@@ -1827,10 +1827,6 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
-      if (userId) void requestContextualPushPermission(userId, api, 'message');
-      const msgs = await getMessages(conv.id);
-      setMessages(msgs);
-      listScroll.requestScrollToEnd();
     } catch (e) {
       // Seller side: the request was still pending server-side (e.g. a stale
       // load) — swap the composer for the request panel instead of letting
@@ -1842,7 +1838,17 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
       setText(t);
       setSelectedAttachment(att);
       setReplyTo(replyingTo);
-    } finally {
+      setIsSending(false);
+      return;
+    }
+    // Sent. A failed refresh is not a failed send: handing the text back
+    // would invite a duplicate; the next poll / realtime event catches up.
+    if (userId) void requestContextualPushPermission(userId, api, 'message');
+    try {
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+      listScroll.requestScrollToEnd();
+    } catch { /* refreshed later */ } finally {
       setIsSending(false);
     }
   }
@@ -3171,12 +3177,17 @@ export function ConversationThread({ variant = 'buyer' }: { variant?: Conversati
                     }
                     try {
                       await sendMessage(conv.id, '', attachment);
+                    } catch (e) {
+                      Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
+                      return;
+                    }
+                    // Posted. A failed refresh is not a failed chat message;
+                    // the next poll / realtime event catches up.
+                    try {
                       const msgs = await getMessages(conv.id);
                       setMessages(msgs);
                       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-                    } catch (e) {
-                      Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
-                    }
+                    } catch { /* refreshed later */ }
                   }}
                 />
               ) : null}

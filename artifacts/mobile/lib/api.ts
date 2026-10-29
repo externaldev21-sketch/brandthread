@@ -2359,6 +2359,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/push/voip-token',
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
+          false,
+          getCacheScope,
         ),
       register:   (body: { token: string; platform?: string; accountIds?: string[]; timezone?: string }) =>
         post<{ ok: boolean }>('/api/push/register', body),
@@ -2367,6 +2369,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/push/deregister',
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
+          false,
+          getCacheScope,
         ),
     },
     notifications: {

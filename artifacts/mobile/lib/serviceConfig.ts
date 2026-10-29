@@ -80,10 +80,11 @@ async function fetchWithTimeout(
 function whenConfigured(timeoutMs = 8_000): Promise<void> {
   if (_getToken) return Promise.resolve();
   _configured ??= new Promise<void>((resolve) => { _resolveConfigured = resolve; });
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     _configured,
-    new Promise<void>((_, reject) => setTimeout(() => reject(new Error("Services not configured")), timeoutMs)),
-  ]);
+    new Promise<void>((_, reject) => { timer = setTimeout(() => reject(new Error("Services not configured")), timeoutMs); }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 /**

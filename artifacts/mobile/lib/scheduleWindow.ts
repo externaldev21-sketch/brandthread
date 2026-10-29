@@ -150,9 +150,11 @@ export function schedulePayload(f: ScheduleForm): SchedulePayload {
 export function scheduleSummary(f: ScheduleForm): string {
   const immediate = f.startWasEmpty && !f.startTouched;
   if (immediate && !f.hasEnd) return 'Active immediately, no end date';
-  const abbr = zoneAbbreviation(f.zone);
-  const startPart = immediate ? 'Starts immediately' : `Starts ${formatFields(f.startDate, f.startTime)} ${abbr}`;
-  const endPart = f.hasEnd ? `Ends ${formatFields(f.endDate, f.endTime)} ${abbr}` : 'No end date';
+  // Abbreviation at each instant, so a window crossing a DST change reads "EDT" → "EST".
+  const abbrAt = (date: string, time: string) =>
+    zoneAbbreviation(f.zone, instantFromFields(date, time, f.zone) ?? new Date());
+  const startPart = immediate ? 'Starts immediately' : `Starts ${formatFields(f.startDate, f.startTime)} ${abbrAt(f.startDate, f.startTime)}`;
+  const endPart = f.hasEnd ? `Ends ${formatFields(f.endDate, f.endTime)} ${abbrAt(f.endDate, f.endTime)}` : 'No end date';
   return `${startPart} · ${endPart}`;
 }
 
