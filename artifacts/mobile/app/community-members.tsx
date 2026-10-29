@@ -97,6 +97,11 @@ export default function CommunityMembersScreen() {
 
   const generation = useRef(0);
   const firstQuery = useRef(true);
+  // loadAll is memoised on [client, id] only, so it reads the live search term from
+  // a ref — otherwise pull-to-refresh / approve / unban mid-search refetched the
+  // unfiltered list while the search box still showed a query.
+  const debouncedRef = useRef('');
+  debouncedRef.current = debounced;
 
   const role: CommunityRole | null = community?.role ?? null;
   const isOwner = role === 'owner';
@@ -116,7 +121,8 @@ export default function CommunityMembersScreen() {
     setNeedsSignIn(false);
     try {
       const c = await client.get(id);
-      const page = await client.members(id, debounced ? { q: debounced } : undefined);
+      const q = debouncedRef.current;
+      const page = await client.members(id, q ? { q } : undefined);
       const staff = c.kind === 'user' && (c.role === 'owner' || c.role === 'admin');
       const pending = staff && c.requireApproval ? await client.requests(id).catch(() => [] as CommunityJoinRequest[]) : [];
       if (gen !== generation.current) return;

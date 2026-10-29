@@ -101,6 +101,8 @@ export default function CustomersScreen() {
     finally { setGranting(false); }
   }, [granting, isPreviewMode, fetchSuperfans]);
   const hasDataRef = useRef(false);
+  // Search fetches can resolve out of order; only the latest one may land.
+  const fetchGen = useRef(0);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
     if (isPreviewMode) {
@@ -111,23 +113,26 @@ export default function CustomersScreen() {
       setLoading(false);
       return;
     }
+    const gen = ++fetchGen.current;
     try {
       const url = searchText.trim()
         ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
         : '/api/customers';
       const res = await serviceRequest<SellerCustomer[]>(url);
+      if (gen !== fetchGen.current) return;
       if (Array.isArray(res)) {
         setCustomers(res);
         hasDataRef.current = res.length > 0;
         setError(false);
       }
     } catch {
+      if (gen !== fetchGen.current) return;
       // Only surface a full ErrorState when there's nothing already on
       // screen — a failed background refresh (e.g. while searching) keeps
       // the last good list visible instead of replacing it with an error.
       setError(!hasDataRef.current);
     } finally {
-      setLoading(false);
+      if (gen === fetchGen.current) setLoading(false);
     }
   }, [isPreviewMode, previewDemo]);
 
