@@ -427,6 +427,8 @@ export default function ManufacturerMessagesScreen() {
       <FlatList
         ref={listRef}
         data={rows}
+        // Drag the thread down to pull the keyboard away with it (pack 2, item 33).
+        keyboardDismissMode="interactive"
         inverted={INVERTED}
         onContentSizeChange={() => { if (!INVERTED) listRef.current?.scrollToEnd({ animated: false }); }}
         keyExtractor={(row) => (row.kind === 'day' ? row.id : row.message.id)}

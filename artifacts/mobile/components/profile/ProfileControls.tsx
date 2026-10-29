@@ -374,11 +374,16 @@ export function ProfileTabs({
   active,
   onChange,
   variant = 'labeled',
+  position,
 }: {
   tabs: ProfileTab[];
   active: string;
   onChange: (key: string) => void;
   variant?: 'labeled' | 'iconOnly';
+  /** Additive (pack 2, item 31): a fractional tab index driven by the
+   *  content swipe (useProfileTabSwipe) so the underline tracks the finger.
+   *  Omitted, the indicator animates on its own as before. */
+  position?: Animated.Value;
 }) {
   const iconOnly = variant === 'iconOnly';
   const { theme } = useAppTheme();
@@ -387,8 +392,10 @@ export function ProfileTabs({
   const indicatorX = useRef(new Animated.Value(activeIndex)).current;
 
   useEffect(() => {
+    if (position) return;
     Animated.timing(indicatorX, { toValue: activeIndex, duration: 150, useNativeDriver: true }).start();
-  }, [activeIndex, indicatorX]);
+  }, [activeIndex, indicatorX, position]);
+  const indicatorPos = position ?? indicatorX;
 
   const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
   // TikTok's own-profile indicator is a short bar centered under the icon,
@@ -447,7 +454,7 @@ export function ProfileTabs({
               backgroundColor: iconOnly ? theme.text : theme.accent,
               transform: [
                 {
-                  translateX: indicatorX.interpolate({
+                  translateX: indicatorPos.interpolate({
                     inputRange: [0, Math.max(tabs.length - 1, 1)],
                     outputRange: [
                       cellWidth / 2 - indicatorWidth / 2,

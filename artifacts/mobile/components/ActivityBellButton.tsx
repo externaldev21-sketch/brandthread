@@ -7,6 +7,8 @@ import { FONT, FS } from '@/lib/theme';
 import { getUnreadActivityCount, subscribeActivity, subscribeUnreadOverride, watchActivityRealtime } from '@/services/activityService';
 import { Icon } from '@/components/ui/Icon';
 import { crispPx } from '@/lib/crispPixel';
+import Animated from 'react-native-reanimated';
+import { useBadgeSpring } from '@/components/motion/BadgeSpring';
 
 /**
  * Unread Activity Center count. Refreshes when the host screen gains focus,
@@ -80,6 +82,8 @@ export default function ActivityBellButton({
     ? `Activity, ${unread} unread`
     : 'Activity';
 
+  // Badge springs in/out (pack 2, item 26).
+  const badgeSpring = useBadgeSpring(unread);
   return (
     <TouchableOpacity
       testID={testID}
@@ -96,17 +100,18 @@ export default function ActivityBellButton({
           hit-area size the host header gives the button. */}
       <View>
         <Icon name="bell" size={size} color={color ?? theme.text} />
-        {unread > 0 && (
-          <View
+        {badgeSpring.visible && (
+          <Animated.View
             style={[
               styles.badge,
               { backgroundColor: theme.accent, borderColor: badgeBorderColor ?? theme.background },
+              badgeSpring.style,
             ]}
           >
             <Text style={[styles.badgeText, { color: theme.onAccent }]} allowFontScaling={false}>
-              {unread > 99 ? '99+' : unread}
+              {badgeSpring.shown > 99 ? '99+' : badgeSpring.shown}
             </Text>
-          </View>
+          </Animated.View>
         )}
       </View>
     </TouchableOpacity>

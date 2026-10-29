@@ -23,6 +23,7 @@ import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import type { PostProductTag, PostVisibility } from '@/services/types';
 import type { MentionPerson } from '@/services/socialTypes';
+import { PersonAvatar } from '@/components/MentionPickerSheet';
 import { MODE_LABEL, type PostMode } from '@/constants/postLimits';
 import { activeToken, CAPTION_MAX, replaceToken, tokenizeCaption } from '@/lib/createPost/caption';
 import type { MediaDraft, PostDetails, PublishInput } from '@/lib/createPost/types';
@@ -667,8 +668,12 @@ export function PostScreen({
             <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={s.people} testID="mention-suggestions">
               {people.map((p) => (
                 <Pressable key={p.userId} onPress={() => pickPerson(p)} style={s.person} accessibilityRole="button" testID={`mention-${p.userId}`}>
-                  <Text style={s.personName} numberOfLines={1}>{p.name}</Text>
-                  <Text style={s.personHandle} numberOfLines={1}>{p.handle}</Text>
+                  {/* Avatar beside each suggestion (pack 2, item 34), Instagram's @mention row. */}
+                  <PersonAvatar person={p} size={28} />
+                  <View style={s.personText}>
+                    <Text style={s.personName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={s.personHandle} numberOfLines={1}>{p.handle}</Text>
+                  </View>
                 </Pressable>
               ))}
             </ScrollView>
@@ -747,7 +752,8 @@ const s = StyleSheet.create({
   chip: { backgroundColor: CP.surface2, paddingHorizontal: 12, width: 124, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base },
   people: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
-  person: { backgroundColor: CP.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, maxWidth: 180 },
+  person: { backgroundColor: CP.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, maxWidth: 210, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  personText: { flexShrink: 1 },
   personName: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base },
   personHandle: { color: CP.silver, fontFamily: FONT.regular, fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, minHeight: 60, paddingVertical: 10 },

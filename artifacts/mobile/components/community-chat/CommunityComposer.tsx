@@ -23,6 +23,8 @@ import type { CommunityAttachment } from '@/lib/communities/types';
 import type { DisplayMessage } from '@/lib/communities/chatMerge';
 import type { SendOutcome } from './useCommunityChat';
 import { prepareImageBase64ForUpload } from '@/lib/imageUploadPrep';
+import { MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+import { activeMentionQuery, insertMentionHandle } from '@/lib/commentMentions';
 
 /** Links the message list's KeyboardGestureArea to this TextInput (interactive keyboard dismiss). */
 export const COMMUNITY_CHAT_INPUT_ID = 'community-chat-composer-input';
@@ -167,8 +169,17 @@ export function CommunityComposer({ onSend, uploadPhoto, replyTo, onCancelReply,
     setInlineNote((n) => (n ? null : n));
   }, []);
 
+  // @mention autocomplete row with avatars (pack 2, item 34) — the same
+  // suggestions strip and mention-search API the comment composer uses.
+  const mentionQuery = activeMentionQuery(text);
   const topSlot = (
     <>
+      <MentionSuggestionsBar
+        query={mentionQuery ?? ''}
+        active={mentionQuery !== null}
+        enabled
+        onPick={(person) => setText((t) => insertMentionHandle(t, person.username ?? person.handle))}
+      />
       {replyTo && (
         <ReplyBanner
           testID="community-reply-banner"

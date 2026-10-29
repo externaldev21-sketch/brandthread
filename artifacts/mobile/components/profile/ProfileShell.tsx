@@ -34,6 +34,7 @@
  * replaces the hero / video header — name, handle and stats on the banner,
  * avatar on the right. No banner → the layouts above, exactly as before.
  */
+import { useProfileTabSwipe } from '@/components/profile/useProfileTabSwipe';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Animated, FlatList, Platform, RefreshControl, StyleSheet, Text, View,
@@ -195,6 +196,15 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const openLive = useOpenLive();
   const layout = useProfileLayout();
   const { columnWidth } = layout;
+  // Swipe between content tabs with the underline tracking the finger
+  // (pack 2, item 31). Inert on a profile without tabs.
+  const tabSwipe = useProfileTabSwipe({
+    keys: tabs?.items.map((t) => t.key) ?? [],
+    active: tabs?.active ?? '',
+    onChange: tabs?.onChange ?? (() => {}),
+    width: columnWidth,
+    enabled: !!tabs && tabs.items.length > 1,
+  });
   const bannerH = bannerHeight(layout.windowHeight);
   // With a banner, the collapse choreography + "hero on screen" track the banner instead.
   const heroHeight = bannerMode ? bannerH : layout.heroHeight;
@@ -596,7 +606,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         onLayout={(event) => setTabsHeight(Math.round(event.nativeEvent.layout.height))}
       >
         {tabs ? (
-          <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} variant={tabsVariant} />
+          <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} variant={tabsVariant} position={tabSwipe.position} />
         ) : section ? (
           <ProfileSectionLabel label={section.label} count={section.count} />
         ) : null}
@@ -613,6 +623,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         onLayout={(event) => setViewportHeight(Math.round(event.nativeEvent.layout.height))}
       >
         <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
+        {/* Swipe the grid to change content tab (pack 2, item 31). */}
+        <View style={styles.swipeArea} {...tabSwipe.panHandlers} testID="profile-tab-swipe-area">
         <AnimatedFlatList
           ref={(node: FlatList<T> | null) => {
             // Two independent mechanisms share this one FlatList instance:
@@ -643,6 +655,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.muted} progressViewOffset={insets.top} />
           ) : undefined}
         />
+        </View>
         </ProfileEmptyAreaContext.Provider>
 
         {isVideoHeader && stickyHeader ? (
@@ -704,6 +717,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
+    swipeArea: { flex: 1 },
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1, backgroundColor: theme.background },
     hero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },

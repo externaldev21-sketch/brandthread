@@ -17,6 +17,7 @@ import { openContextMenu, anchorFromEvent, type MenuAnchor } from '@/lib/context
  *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
  *    3-column, 1pt-gutter, 4:5 grid.
  */
+import { useProfileTabSwipe } from '@/components/profile/useProfileTabSwipe';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useStickyState } from '@/lib/stickyState';
 import { getCachedTabData } from '@/lib/tabDataCache';
@@ -668,6 +669,14 @@ export default function ProfileScreen() {
   const handleTabPress = useCallback((tab: string) => {
     setActiveTab(tab as Tab);
   }, []);
+  // Swipe the grid between tabs, underline tracking the finger (pack 2, item 31).
+  const { width: tabSwipeWidth } = useWindowDimensions();
+  const tabSwipe = useProfileTabSwipe({
+    keys: TAB_ITEMS.map((t) => t.key),
+    active: activeTab,
+    onChange: handleTabPress,
+    width: tabSwipeWidth,
+  });
 
   const handleClosetPiecePress = useCallback((piece: ClosetPiece) => {
     // A numbered piece opens its proof card; everything else its product page.
@@ -1178,6 +1187,7 @@ export default function ProfileScreen() {
           variant="labeled"
           active={activeTab}
           onChange={handleTabPress}
+          position={tabSwipe.position}
         />
       </View>
       {activeTab === 'Closet' && closetPieces.length > 0 ? (
@@ -1195,6 +1205,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.root} testID="buyer-profile">
       <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
+      <View style={{ flex: 1 }} {...tabSwipe.panHandlers} testID="profile-tab-swipe-area">
       <Animated.FlatList
         key={`buyer-${numColumns}`}
         ref={listRef as any}
@@ -1237,6 +1248,7 @@ export default function ProfileScreen() {
         onEndReached={activeTab === 'Liked' && likedCursor ? () => { void loadLiked('more'); } : undefined}
         onEndReachedThreshold={0.5}
       />
+      </View>
       </ProfileEmptyAreaContext.Provider>
       <ProfileStickyHeader
         visible={profileStickyVisible && focused}

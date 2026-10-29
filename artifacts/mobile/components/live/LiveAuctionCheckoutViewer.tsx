@@ -912,6 +912,8 @@ function BuyerLiveNativeScreen() {
         <ScrollView
           ref={scrollRef}
           style={s.commentScroll}
+          // Drag the comments down to pull the keyboard away (pack 2, item 33).
+          keyboardDismissMode="interactive"
           onContentSizeChange={commentsScroll.onContentSizeChange}
           onScrollBeginDrag={commentsScroll.cancelScrollToEnd}
           contentContainerStyle={s.commentContent}

@@ -57,7 +57,7 @@ function useMentionSearch(query: string, active: boolean, enabled: boolean) {
   return { people, loading, failed, retry: () => setAttempt((n) => n + 1) };
 }
 
-function PersonAvatar({ person, size }: { person: MentionPerson; size: number }) {
+export function PersonAvatar({ person, size }: { person: MentionPerson; size: number }) {
   return person.avatarUrl ? (
     <Image cachePolicy="memory-disk" source={{ uri: person.avatarUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (

@@ -115,6 +115,7 @@ import { ActionSheetHost, installConfirmationSheets } from '@/components/ui/Acti
 import { AppAlertHost } from '@/components/ui/AppAlertHost';
 import { ToastHost } from '@/components/ui/Toast';
 import { ContextMenuHost } from '@/components/ui/ContextMenuHost';
+import { UploadHairline } from '@/components/motion/UploadHairline';
 import { PushPrePromptHost } from '@/components/PushPrePromptHost';
 import { handleNotificationAction } from '@/lib/notificationActions';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
@@ -1647,6 +1648,7 @@ const RootLayoutRuntime = React.memo(function RootLayoutRuntime({ featurePaused 
       <AppLockGate />
       <AppAlertHost />
       <ToastHost />
+      <UploadHairline />
       <ContextMenuHost />
       <ForceUpdateGate />
       <AppSettingsEffects />
