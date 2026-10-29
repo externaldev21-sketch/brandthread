@@ -150,12 +150,14 @@ async function serializePublicManufacturer(
 
 // ── GET /api/manufacturers/public ─────────────────────────────────────────────
 
+// Every sort ends on the primary key so ?limit=&offset= pages (the hub's
+// Brandthread Manufacturers grid) never repeat or skip rows that tie.
 const DIRECTORY_SORTS: Record<string, SQL> = {
-  recommended: sql`${manufacturers.verifiedAt} DESC NULLS LAST, jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0 DESC, ${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
-  newest: sql`${manufacturers.createdAt} DESC`,
-  experience: sql`${manufacturers.yearsInBusiness} DESC, ${manufacturers.createdAt} DESC`,
-  rating: sql`${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
-  moq: sql`${manufacturers.moq} ASC, ${manufacturers.createdAt} DESC`,
+  recommended: sql`${manufacturers.verifiedAt} DESC NULLS LAST, jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0 DESC, ${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC, ${manufacturers.id}`,
+  newest: sql`${manufacturers.createdAt} DESC, ${manufacturers.id}`,
+  experience: sql`${manufacturers.yearsInBusiness} DESC, ${manufacturers.createdAt} DESC, ${manufacturers.id}`,
+  rating: sql`${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC, ${manufacturers.id}`,
+  moq: sql`${manufacturers.moq} ASC, ${manufacturers.createdAt} DESC, ${manufacturers.id}`,
 };
 
 function intParam(value: unknown, min: number, max: number): number | null {

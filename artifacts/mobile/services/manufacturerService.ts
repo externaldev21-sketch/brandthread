@@ -151,6 +151,8 @@ export async function searchManufacturers(opts: {
   ratingMin?: number; material?: string; minYears?: number; hasPhotos?: boolean; sort?: DirectorySort;
   /** A "Find a manufacturer" picker key, e.g. 'denim' (lib/manufacturer-flow categories). */
   categoryKey?: string;
+  /** One page of the directory (the hub's Brandthread Manufacturers grid). */
+  limit?: number; offset?: number;
 }): Promise<Manufacturer[]> {
   if (isSellerDevPreview()) {
     if (!isPreviewDemoMode()) return [];
@@ -174,6 +176,7 @@ export async function searchManufacturers(opts: {
     else if (opts.sort === 'experience') results.sort((a, b) => b.yearsInBusiness - a.yearsInBusiness);
     else if (opts.sort === 'rating') results.sort((a, b) => b.rating - a.rating);
     else if (opts.sort === 'moq') results.sort((a, b) => a.moq - b.moq);
+    if (opts.limit !== undefined) results = results.slice(opts.offset ?? 0, (opts.offset ?? 0) + opts.limit);
     return results;
   }
   const params = new URLSearchParams();
@@ -187,6 +190,8 @@ export async function searchManufacturers(opts: {
   if (opts.verifiedOnly) params.set('verified', 'true');
   if (opts.hasPhotos) params.set('hasPhotos', 'true');
   if (opts.sort && opts.sort !== 'recommended') params.set('sort', opts.sort);
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  if (opts.offset) params.set('offset', String(opts.offset));
   const rows = await serviceRequest<any[]>(`/api/manufacturers/public${params.toString() ? `?${params}` : ''}`);
   if (!Array.isArray(rows)) throw new Error('Manufacturer directory returned an invalid response.');
   let results = rows.map(mapFreshPublicManufacturer);

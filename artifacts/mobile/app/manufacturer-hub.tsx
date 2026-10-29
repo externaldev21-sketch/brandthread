@@ -2,19 +2,19 @@
  * Manufacturer Hub — landing + the Quotes / Samples / Orders / Messages
  * sections.
  *
- * The landing is deliberately short: two actions at the top ("Find a
- * manufacturer" → the category picker in app/manufacturer-find.tsx, "Invite
- * your factory" → the unchanged invite flow), a compact row into the four
- * existing sections, then one plain list of the manufacturers this seller
- * already works with (lib/manufacturerHubSummary.ts). The old five-tab
- * strip clipped at 390pt and crowded everything onto one screen.
+ * The landing, top to bottom: "Invite your factory" (the unchanged invite
+ * flow), a compact row into the four existing sections, the manufacturers
+ * this seller already works with (lib/manufacturerHubSummary.ts) — whose
+ * "Find a manufacturer" button is the hub's only one (→ the category picker
+ * in app/manufacturer-find.tsx) — then "Brandthread Manufacturers", every
+ * manufacturer in the public directory as a paged two-column grid.
  *
  * `?tab=quotes|samples|production|messages` opens that section as its own
  * pushed screen, so existing deep links (profile "Inbox", order screens)
  * keep working; the section components below are unchanged.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -27,6 +27,10 @@ import { Button } from '@/components/ui/Button';
 import { ListRow } from '@/components/ui/ListRow';
 
 import { RetryRow } from '@/components/ui/RetryRow';
+
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+
+import { CachedImage as Image } from '@/components/CachedImage';
 
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
@@ -53,7 +57,9 @@ import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 import { buildMyManufacturers, type MyManufacturerRow } from '@/lib/manufacturerHubSummary';
 
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { manufacturerCategoryKeys } from '@/lib/manufacturerCategories';
+
+import { FONT, FS, SP, RADIUS, COMP, ICON, FILL_ELEVATED, ON_DARK_MUTED, OVERLAY } from '@/lib/theme';
 
 import { ListSkeleton } from '@/components/layout';
 
@@ -61,13 +67,13 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 
-import { getRelationships, getManufacturersByIds, getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest, getSamples, getProductionOrders, getConversations } from '@/services/manufacturerService';
+import { getRelationships, getManufacturersByIds, getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest, getSamples, getProductionOrders, getConversations, searchManufacturers } from '@/services/manufacturerService';
 
 import { getSellerOrders, type SellerOrderRow } from '@/services/manufacturerOrderFlow';
 
-import { formatMoney, orderStatusLabel, stageIndex } from '@workspace/manufacturer-flow';
+import { formatMoney, getManufacturerCategory, orderStatusLabel, stageIndex } from '@workspace/manufacturer-flow';
 
-import { ManufacturerConversation, QuoteRequest, Quote, Sample, ProductionOrder } from '@/services/manufacturerTypes';
+import { Manufacturer, ManufacturerConversation, QuoteRequest, Quote, Sample, ProductionOrder } from '@/services/manufacturerTypes';
 
 import { formatCents } from '@/lib/money';
 
@@ -309,24 +315,20 @@ function HubLanding({ router }: { router: ReturnType<typeof useRouter> }) {
     }
   }, [router]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const directory = useDirectoryPages();
+  const reloadDirectory = directory.reload;
+  useFocusEffect(useCallback(() => { load(); reloadDirectory(); }, [load, reloadDirectory]));
 
   const findHref = (productId ? `/manufacturer-find?productId=${encodeURIComponent(productId)}` : '/manufacturer-find') as never;
   const openSection = (key: Section) => {
     haptic('select');
     router.push((`/manufacturer-hub?tab=${key}`) as never);
   };
+  const openProfile = (id: string) => router.push((`/manufacturer-profile?id=${encodeURIComponent(id)}`) as never);
 
-  return (
-    <ScrollView
-      contentContainerStyle={s.landingContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
-    >
-      <View style={s.ctaStack}>
-        <Button label="Find a manufacturer" icon="search" fullWidth onPress={() => router.push(findHref)} testID="button-find-manufacturer" />
-        <Button label="Invite your factory" icon="user-plus" variant="secondary" fullWidth onPress={() => router.push('/invite-manufacturer' as never)} testID="button-invite-factory" />
-      </View>
+  const header = (
+    <>
+      <Button label="Invite your factory" icon="user-plus" variant="secondary" size="small" fullWidth onPress={() => router.push('/invite-manufacturer' as never)} testID="button-invite-factory" />
 
       {/* The four existing sections, one tap each — not a scrolling tab strip. */}
       <View style={s.sectionRow}>
@@ -339,7 +341,7 @@ function HubLanding({ router }: { router: ReturnType<typeof useRouter> }) {
             accessibilityLabel={item.label}
             testID={`hub-section-${item.key}`}
           >
-            <Icon name={item.icon} size={ICON.sm} color={theme.text} />
+            <Icon name={item.icon} size={ICON.xs} color={theme.text} />
             <Text style={s.sectionTileLabel} numberOfLines={1}>{item.label}</Text>
           </Pressable>
         ))}
@@ -353,7 +355,7 @@ function HubLanding({ router }: { router: ReturnType<typeof useRouter> }) {
       ) : rows.length === 0 ? (
         <View style={s.landingEmpty} testID="my-manufacturers-empty">
           <Text style={s.landingEmptyText}>Factories you message, quote or order from will show up here.</Text>
-          <Button label="Find a manufacturer" variant="secondary" size="small" onPress={() => router.push(findHref)} />
+          <Button label="Find a manufacturer" variant="secondary" size="small" onPress={() => router.push(findHref)} testID="button-find-manufacturer" />
         </View>
       ) : (
         <View testID="my-manufacturers-list">
@@ -368,14 +370,164 @@ function HubLanding({ router }: { router: ReturnType<typeof useRouter> }) {
               chevron
               divider={index < rows.length - 1}
               style={s.manufacturerRow}
-              onPress={() => router.push((`/manufacturer-profile?id=${row.manufacturerId}`) as never)}
+              onPress={() => openProfile(row.manufacturerId)}
               testID={`my-manufacturer-${row.manufacturerId}`}
             />
           ))}
+          {/* The hub's one Find button: also reachable once the list has rows. */}
+          <View style={s.findAfterList}>
+            <Button label="Find a manufacturer" variant="secondary" size="small" onPress={() => router.push(findHref)} testID="button-find-manufacturer" />
+          </View>
         </View>
       )}
-    </ScrollView>
+
+      <SectionHeader title="Brandthread Manufacturers" style={s.directoryHeader} />
+      {directory.loading ? (
+        <View testID="directory-loading"><ListSkeleton rows={2} /></View>
+      ) : directory.error ? (
+        <RetryRow label="Couldn't load manufacturers" onRetry={directory.reload} testID="directory-retry" />
+      ) : directory.items.length === 0 ? (
+        <Text style={s.landingEmptyText} testID="directory-empty">Manufacturers joining soon.</Text>
+      ) : null}
+    </>
   );
+
+  // An odd trailing card keeps its half width instead of stretching.
+  const gridData: (Manufacturer | null)[] = directory.items.length % 2 ? [...directory.items, null] : directory.items;
+
+  return (
+    <FlatList
+      data={gridData}
+      keyExtractor={(item, index) => item?.id ?? `spacer-${index}`}
+      numColumns={2}
+      columnWrapperStyle={s.gridRow}
+      renderItem={({ item }) => (item ? <DirectoryCard mfg={item} onPress={() => openProfile(item.id)} /> : <View style={s.gridSpacer} />)}
+      ListHeaderComponent={header}
+      ListFooterComponent={directory.loadingMore ? <View style={s.gridFooter}><ListSkeleton rows={1} /></View> : null}
+      onEndReached={directory.loadMore}
+      onEndReachedThreshold={0.6}
+      contentContainerStyle={s.landingContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); directory.reload(); }} tintColor={theme.accent} />}
+      testID="manufacturer-hub-landing"
+    />
+  );
+}
+
+// ─── Brandthread Manufacturers (the public directory) ────────────────────────
+
+const DIRECTORY_PAGE_SIZE = 20;
+
+/** Every manufacturer in the public directory, a page at a time. */
+function useDirectoryPages() {
+  const [items, setItems] = useState<Manufacturer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  // A reload supersedes any page still in flight.
+  const requestRef = useRef(0);
+  const busyRef = useRef(false);
+
+  const fetchPage = useCallback(async (offset: number) => {
+    const request = ++requestRef.current;
+    busyRef.current = true;
+    try {
+      const page = await searchManufacturers({ limit: DIRECTORY_PAGE_SIZE, offset });
+      if (request !== requestRef.current) return;
+      setItems((prev) => {
+        if (offset === 0) return page;
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...page.filter((item) => !seen.has(item.id))];
+      });
+      setHasMore(page.length === DIRECTORY_PAGE_SIZE);
+      setError(false);
+    } catch (e) {
+      if (request !== requestRef.current) return;
+      // A failed later page keeps the cards already shown.
+      if (offset === 0) { setItems([]); setError(true); }
+      setHasMore(false);
+      console.error(e);
+    } finally {
+      if (request === requestRef.current) {
+        busyRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  }, []);
+
+  const reload = useCallback(() => { fetchPage(0); }, [fetchPage]);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const loadMore = useCallback(() => {
+    if (busyRef.current || !hasMore) return;
+    setLoadingMore(true);
+    fetchPage(itemsRef.current.length);
+  }, [fetchPage, hasMore]);
+
+  return { items, loading, loadingMore, error, reload, loadMore };
+}
+
+/**
+ * One directory card: photo on top, then name (+ verified tick), rating,
+ * and specialty tags; years in business rides on the photo. The Alibaba
+ * supplier card, minus its response-rate, min-order and promo lines.
+ */
+function DirectoryCard({ mfg, onPress }: { mfg: Manufacturer; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
+  const photo = mfg.profileImageUri ?? mfg.galleryUris[0];
+  const tags = useMemo(() => {
+    const labels = manufacturerCategoryKeys(mfg).map((key) => getManufacturerCategory(key)?.label).filter((label): label is string => !!label);
+    return (labels.length ? labels : mfg.specialties).slice(0, 2);
+  }, [mfg]);
+  const rated = mfg.reviewCount > 0;
+  const years = mfg.yearsInBusiness > 0 ? `${mfg.yearsInBusiness} ${mfg.yearsInBusiness === 1 ? 'yr' : 'yrs'}` : null;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [s.card, pressed && s.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${mfg.name}${mfg.isVerified ? ', verified' : ''}${rated ? `, rated ${mfg.rating.toFixed(1)} from ${mfg.reviewCount} reviews` : ''}${years ? `, ${years} in business` : ''}`}
+      testID={`directory-card-${mfg.id}`}
+    >
+      <View style={s.cardPhoto}>
+        {photo ? (
+          <Image cachePolicy="memory-disk" source={{ uri: photo }} style={s.cardPhotoImage} contentFit="cover" />
+        ) : (
+          <View style={s.cardMonogram}><Text style={s.cardMonogramText}>{monogram(mfg.name)}</Text></View>
+        )}
+        {years && <View style={s.yearsChip}><Text style={s.yearsChipText}>{years}</Text></View>}
+      </View>
+      <View style={s.cardNameRow}>
+        <Text style={s.cardName} numberOfLines={1}>{mfg.name}</Text>
+        {mfg.isVerified && <VerifiedBadge />}
+      </View>
+      <View style={s.cardRating}>
+        {rated ? (
+          <>
+            <Icon name="star" size={ICON.xs - 2} color={theme.text} />
+            <Text style={s.cardRatingValue}>{mfg.rating.toFixed(1)}</Text>
+            <Text style={s.cardRatingCount}>({mfg.reviewCount})</Text>
+          </>
+        ) : (
+          <Text style={s.cardRatingCount}>No reviews yet</Text>
+        )}
+      </View>
+      {tags.length > 0 && (
+        <View style={s.cardTags}>
+          {tags.map((tag) => <Text key={tag} style={s.cardTag} numberOfLines={1}>{tag}</Text>)}
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function monogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : (words[0] ?? '?').slice(0, 2)).toUpperCase();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -943,14 +1095,36 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
 
   // Landing — one 16pt gutter, generous vertical rhythm, no cards.
   landingContent: { paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xxl + COMP.tabBarH },
-  ctaStack:     { gap: SP.sm },
-  sectionRow:   { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },
-  sectionTile:  { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: SP.xs, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card },
+  sectionRow:   { flexDirection: 'row', gap: SP.sm, marginTop: SP.md },
+  sectionTile:  { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: SP.xs, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card },
   sectionTilePressed: { backgroundColor: theme.cardElevated },
   sectionTileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text },
   // SectionHeader brings its own 16pt gutter; the landing already has one.
-  listHeader:   { marginTop: SP.xl, marginBottom: SP.xs, paddingHorizontal: 0 },
+  listHeader:   { marginTop: SP.lg, marginBottom: SP.xs, paddingHorizontal: 0 },
   manufacturerRow: { minHeight: 64 },
+  findAfterList: { alignItems: 'flex-start', paddingTop: SP.sm },
   landingEmpty: { alignItems: 'flex-start', gap: SP.md, paddingVertical: SP.md },
   landingEmptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
+
+  // Brandthread Manufacturers — two-column grid straight on black: photo
+  // with square corners (BRANDTHREAD_DESIGN.md grids), caption beneath.
+  directoryHeader: { marginTop: SP.lg, marginBottom: SP.sm, paddingHorizontal: 0 },
+  gridRow:      { gap: SP.sm, marginBottom: SP.md },
+  gridSpacer:   { flex: 1 },
+  gridFooter:   { marginTop: SP.xs },
+  card:         { flex: 1, minWidth: 0 },
+  cardPressed:  { opacity: 0.7 },
+  cardPhoto:    { aspectRatio: 1, backgroundColor: FILL_ELEVATED, overflow: 'hidden' },
+  cardPhotoImage: { width: '100%', height: '100%' },
+  cardMonogram: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  cardMonogramText: { fontSize: FS.xxl, fontFamily: FONT.semibold, color: ON_DARK_MUTED },
+  yearsChip:    { position: 'absolute', left: SP.sm, bottom: SP.sm, paddingHorizontal: 6, paddingVertical: 2, borderRadius: RADIUS.pill, backgroundColor: OVERLAY },
+  yearsChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
+  cardNameRow:  { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
+  cardName:     { flexShrink: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  cardRating:   { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  cardRatingValue: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.text, fontVariant: ['tabular-nums'] },
+  cardRatingCount: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, fontVariant: ['tabular-nums'] },
+  cardTags:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.xs },
+  cardTag:      { maxWidth: '100%', fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK_MUTED, backgroundColor: FILL_ELEVATED, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
 });
