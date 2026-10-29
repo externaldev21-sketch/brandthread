@@ -390,6 +390,14 @@ router.post("/", requirePermission("marketing"), validateInput({ body: createDis
 
 // ─── Buyer Endpoint ───────────────────────────────────────────────────────────
 
+function isCartLine(value: unknown): value is { productId: string; priceCents: number; quantity: number } {
+  if (!value || typeof value !== "object") return false;
+  const line = value as Record<string, unknown>;
+  return typeof line.productId === "string" && line.productId.length <= 160 &&
+    typeof line.priceCents === "number" && Number.isFinite(line.priceCents) && line.priceCents >= 0 &&
+    typeof line.quantity === "number" && Number.isInteger(line.quantity) && line.quantity > 0 && line.quantity <= 10_000;
+}
+
 // GET /validate?code=CODE&sellerId=SELLER_ID&subtotalCents=AMOUNT&productIds=a,b,c
 router.get("/validate", async (req, res) => {
   try {
@@ -407,7 +415,7 @@ router.get("/validate", async (req, res) => {
     }
 
     const subtotal = Number(subtotalCents);
-    if (isNaN(subtotal) || subtotal < 0) {
+    if (!Number.isFinite(subtotal) || subtotal < 0) {
       res.status(400).json({ error: "subtotalCents must be a non-negative number" });
       return;
     }
@@ -417,7 +425,9 @@ router.get("/validate", async (req, res) => {
     if (itemsParam) {
       try {
         const parsed = JSON.parse(itemsParam);
-        if (Array.isArray(parsed)) lines = parsed;
+        // Client-supplied JSON: keep only well-formed lines, so a stray null
+        // or a non-numeric price can't throw (500) or price the code at NaN.
+        if (Array.isArray(parsed)) lines = parsed.slice(0, 500).filter(isCartLine);
       } catch { /* fall through to synthetic single-line cart below */ }
     }
     if (lines.length === 0) {
@@ -595,12 +605,18 @@ router.get("/:id/uses", async (req, res) => {
       res.status(404).json({ error: "Discount code not found" });
       return;
     }
-    const rows = await db
+    // Opt-in ?limit=&offset=; no params = same bare array, capped generously
+    // (a popular code's ledger previously came back whole on every open).
+    const page = parseListPage(req.query, { defaultLimit: 500, maxLimit: 500 });
+    const fetched = await db
       .select({ use: discountCodeUses, displayName: users.displayName, name: users.name, username: users.username })
       .from(discountCodeUses)
       .leftJoin(users, eq(users.clerkId, discountCodeUses.customerKey))
       .where(eq(discountCodeUses.discountCodeId, id))
-      .orderBy(desc(discountCodeUses.usedAt));
+      .orderBy(desc(discountCodeUses.usedAt), desc(discountCodeUses.id))
+      .limit(page.limit + 1)
+      .offset(page.offset);
+    const rows = finishListPage(res, page, fetched);
     // Same row shape as before, plus who redeemed it (buyer's name, or the guest's email).
     res.json(rows.map((r) => ({
       ...r.use,

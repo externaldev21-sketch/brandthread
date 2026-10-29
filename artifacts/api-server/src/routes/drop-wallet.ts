@@ -20,9 +20,21 @@ import { db, drops, dropWallets, dropWalletTransactions, orderReleases, orders }
 import { requireAuth } from "../middlewares/requireAuth";
 import { accountBalanceCents } from "../lib/money/ledger";
 import { releaseOrderFunds } from "../lib/money/escrow";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
+
+// Drop and order ids are uuid columns: a malformed one would make Postgres
+// throw (a 500). It cannot name anything of the seller's, so it is a 404.
+router.param("dropId", (_req, res, next, id) => {
+  if (!isUuid(id)) { res.status(404).json({ error: "Drop not found" }); return; }
+  next();
+});
+router.param("orderId", (_req, res, next, id) => {
+  if (!isUuid(id)) { res.status(404).json({ error: "Order not found for this drop" }); return; }
+  next();
+});
 
 function iso<T extends { createdAt: Date; updatedAt?: Date }>(row: T) {
   return {

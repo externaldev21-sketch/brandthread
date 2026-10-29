@@ -34,8 +34,25 @@ import { MAX_EARLY_ACCESS_MINUTES, isValidEarlyAccessMinutes } from "../lib/mone
 import { loadDropHype } from "../lib/dropHype";
 import { parseTzOffsetMinutes } from "../lib/analyticsTime";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const router = Router();
 router.use(requireAuth);
+
+// drops.id is a uuid column: a malformed id would make Postgres throw (a 500).
+// It cannot name any drop, so every /:id route answers a plain 404 — the same
+// as another seller's drop, so ids can't be probed.
+router.param("id", (_req, res, next, id) => {
+  if (!UUID_RE.test(String(id))) { res.status(404).json({ error: "Drop not found" }); return; }
+  next();
+});
+
+/** A seller-supplied date, or "invalid" when it does not parse. */
+function optionalDate(value: unknown): Date | undefined | "invalid" {
+  if (!value) return undefined; // same as the old `value && new Date(value)`
+  const d = new Date(value as string | number);
+  return Number.isNaN(d.valueOf()) ? "invalid" : d;
+}
 
 // ── Request schemas ──────────────────────────────────────────────────────────
 // Type/size guards; the handlers keep the date parsing, enum, deadline and
@@ -175,6 +192,10 @@ router.post("/", requireRole("manager"), validateInput({ body: createDropBody })
   if (parsedReleaseAt && parsedEndsAt && parsedEndsAt.valueOf() <= parsedReleaseAt.valueOf()) {
     res.status(400).json({ error: "endsAt must be after releaseAt" }); return;
   }
+  const payoutDate = optionalDate(estimatedPayoutDate);
+  if (payoutDate === "invalid") {
+    res.status(400).json({ error: "estimatedPayoutDate must be a valid ISO date" }); return;
+  }
   if (earlyAccessMinutes !== undefined && !isValidEarlyAccessMinutes(earlyAccessMinutes)) {
     res.status(400).json({ error: `earlyAccessMinutes must be a whole number from 0 to ${MAX_EARLY_ACCESS_MINUTES}` }); return;
   }
@@ -203,7 +224,7 @@ router.post("/", requireRole("manager"), validateInput({ body: createDropBody })
     type,
     payoutStatus,
     estimatedShipDate: shipDate,
-    estimatedPayoutDate: estimatedPayoutDate ? new Date(estimatedPayoutDate) : undefined,
+    estimatedPayoutDate: payoutDate,
     ...(parsedReleaseAt && { releaseAt: parsedReleaseAt }),
     ...(parsedEndsAt && { endsAt: parsedEndsAt }),
     ...(typeof heroImageUrl === "string" && { heroImageUrl }),
@@ -305,11 +326,16 @@ router.patch("/:id", requireRole("manager"), validateInput({ params: dropIdParam
   if (membersOnly !== undefined && typeof membersOnly !== "boolean") {
     res.status(400).json({ error: "membersOnly must be a boolean" }); return;
   }
+  const parsedShipDate = optionalDate(estimatedShipDate);
+  if (parsedShipDate === "invalid") {
+    res.status(400).json({ error: "estimatedShipDate must be a valid ISO date" }); return;
+  }
 
   const [currentDrop] = await db.select({
     id: drops.id,
     status: drops.status,
     releaseAt: drops.releaseAt,
+    endsAt: drops.endsAt,
     escrowState: drops.escrowState,
     earlyAccessMinutes: drops.earlyAccessMinutes,
   }).from(drops)
@@ -320,8 +346,20 @@ router.patch("/:id", requireRole("manager"), validateInput({ params: dropIdParam
     (!!parsedReleaseAt && parsedReleaseAt.getTime() !== currentDrop.releaseAt?.getTime()) ||
     (earlyAccessMinutes !== undefined && earlyAccessMinutes !== currentDrop.earlyAccessMinutes);
 
-  if (estimatedShipDate && currentDrop.escrowState) {
-    const shipDateError = validatePreorderShipDate(new Date(estimatedShipDate));
+  // Same rule as create: the sale window must end after it opens. Only checked
+  // when this request moves one of its ends.
+  // `endsAt: null` is the app's "Set an end time" turned off: it clears the end.
+  const clearsEndsAt = endsAt === null;
+  if (parsedReleaseAt || parsedEndsAt) {
+    const effectiveRelease = parsedReleaseAt ?? currentDrop.releaseAt;
+    const effectiveEnd = clearsEndsAt ? null : parsedEndsAt ?? currentDrop.endsAt;
+    if (effectiveRelease && effectiveEnd && effectiveEnd.valueOf() <= effectiveRelease.valueOf()) {
+      res.status(400).json({ error: "endsAt must be after releaseAt" }); return;
+    }
+  }
+
+  if (parsedShipDate && currentDrop.escrowState) {
+    const shipDateError = validatePreorderShipDate(parsedShipDate);
     if (shipDateError) { res.status(400).json({ error: shipDateError, code: "INVALID_SHIP_DATE" }); return; }
   }
 
@@ -385,11 +423,12 @@ router.patch("/:id", requireRole("manager"), validateInput({ params: dropIdParam
       ...(name             && { name }),
       ...(status           && { status }),
       ...(mfgProgress      !== undefined && { mfgProgress }),
-      ...(estimatedShipDate && { estimatedShipDate: new Date(estimatedShipDate) }),
+      ...(parsedShipDate && { estimatedShipDate: parsedShipDate }),
       ...(deadline && { fulfillmentDeadlineAt: deadline }),
       ...(scheduleWasProvided && { scheduledBroadcastAt: scheduledBroadcastDate }),
       ...(parsedReleaseAt && { releaseAt: parsedReleaseAt }),
       ...(parsedEndsAt && { endsAt: parsedEndsAt }),
+      ...(clearsEndsAt && { endsAt: null }),
       ...(typeof heroImageUrl === "string" && { heroImageUrl }),
       ...(typeof heroVideoUrl === "string" && { heroVideoUrl }),
       ...(typeof launchTimezone === "string" && launchTimezone && { launchTimezone }),
@@ -503,7 +542,6 @@ router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
 // grew, as a gap-free cumulative series by the seller's local day. Another
 // seller's drop (or a malformed id) is a 404, never a 403, so drop ids
 // can't be probed.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 router.get("/:id/hype", async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
   if (!UUID_RE.test(req.params.id)) {
