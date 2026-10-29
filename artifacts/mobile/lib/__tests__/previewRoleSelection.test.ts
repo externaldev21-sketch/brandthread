@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { resolvePreviewRole } from '../previewRoleSelection';
 
 describe('development preview role selection', () => {
-  it('defaults to the buyer side without a selection', () => {
-    expect(resolvePreviewRole('', null)).toBe('buyer');
+  // Deliberate (5e153020): the owner's current review defaults to seller
+  // until instructed otherwise — see .agents/memory/guest-browsing-contract.md.
+  it('defaults to the seller side without a selection', () => {
+    expect(resolvePreviewRole('', null)).toBe('seller');
   });
 
   it('remembers the buyer side after navigation removes the query', () => {
@@ -18,7 +20,7 @@ describe('development preview role selection', () => {
 
   it('remembers an explicit seller choice and ignores invalid stored roles', () => {
     expect(resolvePreviewRole('', 'seller')).toBe('seller');
-    expect(resolvePreviewRole('', 'admin')).toBe('buyer');
+    expect(resolvePreviewRole('', 'admin')).toBe('seller');
   });
 
   it('keeps guest testing selected until an explicit role overrides it', () => {

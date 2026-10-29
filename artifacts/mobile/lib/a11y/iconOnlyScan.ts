@@ -68,14 +68,22 @@ function walkExpression(expr: ts.Expression, info: ChildInfo): void {
   if (ts.isJsxFragment(expr)) return scanChildren(expr.children, info);
   if (ts.isParenthesizedExpression(expr)) return walkExpression(expr.expression, info);
   if (ts.isConditionalExpression(expr)) { walkExpression(expr.whenTrue, info); walkExpression(expr.whenFalse, info); return; }
-  if (ts.isBinaryExpression(expr) && (expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken || expr.operatorToken.kind === ts.SyntaxKind.BarBarToken || expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)) {
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    // `cond && <X />` renders only the right side.
     walkExpression(expr.right, info);
     return;
   }
-  if (ts.isIdentifier(expr) || ts.isPropertyAccessExpression(expr) || ts.isCallExpression(expr) || ts.isTemplateExpression(expr) || ts.isStringLiteral(expr)) {
-    // `{children}`, `{label}`, `{fn()}`: unknown content that may well be text.
-    info.text = true;
+  if (ts.isBinaryExpression(expr) && (expr.operatorToken.kind === ts.SyntaxKind.BarBarToken || expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)) {
+    // `label || <X />` / `label ?? <X />` renders the LEFT side whenever it is set.
+    walkExpression(expr.left, info);
+    walkExpression(expr.right, info);
+    return;
   }
+  if (expr.kind === ts.SyntaxKind.NullKeyword || expr.kind === ts.SyntaxKind.TrueKeyword || expr.kind === ts.SyntaxKind.FalseKeyword) return;
+  if (ts.isIdentifier(expr) && expr.text === 'undefined') return;
+  // `{children}`, `{label}`, `{fn()}`, `{labels[i]}`, `{label!}`, `{`Close`}`:
+  // unknown content that may well be text.
+  info.text = true;
 }
 
 /** Returns one finding per icon-only pressable that has no accessibility label. */

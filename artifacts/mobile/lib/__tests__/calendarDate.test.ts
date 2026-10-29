@@ -3,7 +3,12 @@ import { formatCalendarDate, isCalendarDate } from '@/lib/calendarDate';
 
 const originalTz = process.env.TZ;
 beforeAll(() => { process.env.TZ = 'America/Los_Angeles'; });
-afterAll(() => { process.env.TZ = originalTz; });
+// Assigning undefined to process.env stores the string "undefined" (an
+// invalid zone Node treats as UTC), so delete the key when it was unset.
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
+});
 
 describe('formatCalendarDate', () => {
   it('shows the stored day west of UTC (date-only string)', () => {

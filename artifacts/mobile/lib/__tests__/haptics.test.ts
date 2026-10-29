@@ -67,11 +67,13 @@ describe('haptics map (Apple HIG "Playing haptics")', () => {
     spy.mockRestore();
   });
 
-  it('keeps the tab-bar legacy names on their original feel', async () => {
+  // Tab switches are a selection tick (HAPTIC_MAP.tabChange, and
+  // docs/polish/design-rules.md: "Tab switch … → hapticSelection").
+  it('keeps the tab-bar legacy names on the design-rules feel', async () => {
     const { hapticTabChange, hapticLight } = await load();
     hapticTabChange();
     vi.advanceTimersByTime(250);
     hapticLight();
-    expect(calls).toEqual(['impact:medium', 'impact:light']);
+    expect(calls).toEqual(['selection', 'impact:light']);
   });
 });
