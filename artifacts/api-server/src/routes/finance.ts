@@ -10,9 +10,9 @@
  *                               body.method 'standard' (default) | 'instant'
  * GET  /payout-schedule         current schedule, instant eligibility + fee quote, next payout
  * PATCH /payout-schedule        set daily | weekly(+anchor) | manual
- * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds)
- * GET  /payouts/:id/statement.pdf  the same payout as a PDF statement
  * GET  /payouts/:id             per-payout breakdown (sales, fees, refunds, holds) + its orders
+ * GET  /payouts/:id/statement.pdf  the same payout as a PDF statement
+ * GET  /first-payout            whether the first payout waits on identity verification
  * GET  /summary                 held vs releasing vs available vs paid out
  * GET  /recoveries              lost-chargeback recoveries the seller owes (and their history)
  *
@@ -489,17 +489,29 @@ router.get("/summary", requirePayoutsRead(), async (req, res) => {
     const accountId = await getStripeAccount(sellerId);
     if (stripe && accountId) {
       try {
-        const [balance, reservationRows, paidToBank] = await Promise.all([
+        const [balance, reservationRows, processingRows, paidToBank] = await Promise.all([
           stripe.balance.retrieve({}, { stripeAccount: accountId }),
           db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
             .from(orderFundReservations)
             .where(and(eq(orderFundReservations.ownerId, sellerId), eq(orderFundReservations.status, "reserved"))),
+          // A cash-out still in flight is already spoken for — same rule as
+          // GET /balance, GET /payout-schedule and POST /payout.
+          db.select({ amountCents: sellerCashoutAttempts.amountCents, currency: sellerCashoutAttempts.currency })
+            .from(sellerCashoutAttempts)
+            .where(and(
+              eq(sellerCashoutAttempts.ownerId, sellerId),
+              eq(sellerCashoutAttempts.status, "processing"),
+              eq(sellerCashoutAttempts.currency, PAYOUT_CURRENCY),
+            )),
           syncedPaidToBankCents({ stripe, stripeAccountId: accountId, sellerId, currency: PAYOUT_CURRENCY }),
         ]);
         const avail = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
         const pend = balance.pending.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
+        const processingReserved = processingRows
+          .filter((row) => row.currency === PAYOUT_CURRENCY)
+          .reduce((total, row) => total + row.amountCents, 0);
         stripeBalance = {
-          available: cashOutableAmount(avail, Number(reservationRows[0]?.reserved ?? 0)),
+          available: cashOutableAmount(avail, Number(reservationRows[0]?.reserved ?? 0) + processingReserved),
           pending: pend,
         };
         paidToBankCents = paidToBank;
@@ -593,9 +605,15 @@ router.get("/recoveries", requirePayoutsRead(), async (req, res) => {
 
 // ─── GET /api/finance/payouts ─────────────────────────────────────────────────
 
+/** ?limit= as an integer in 1..100 (Stripe rejects anything else with a 400). */
+function listLimit(raw: unknown, fallback: number): number {
+  const n = Math.trunc(Number(raw));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 100) : fallback;
+}
+
 router.get("/payouts", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
-  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  const limit = listLimit(req.query.limit, 20);
   try {
     const accountId = await getStripeAccount(sellerId);
 
@@ -639,8 +657,9 @@ router.get("/payouts", requirePayoutsRead(), async (req, res) => {
 
 router.get("/transactions", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
-  const limit = Math.min(Number(req.query.limit) || 50, 100);
-  const type  = req.query.type as string | undefined; // e.g. 'charge', 'payout', 'refund'
+  const limit = listLimit(req.query.limit, 50);
+  // e.g. 'charge', 'payout', 'refund'; a repeated ?type= (an array) is ignored.
+  const type = typeof req.query.type === "string" && req.query.type ? req.query.type.slice(0, 64) : undefined;
   try {
     const accountId = await getStripeAccount(sellerId);
 

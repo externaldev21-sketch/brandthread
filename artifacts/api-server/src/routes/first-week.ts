@@ -18,6 +18,7 @@ import {
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
 import { assertThreadCashNotFrozen, isFeatureEnabled, ThreadCashError } from "../lib/threadCash/wallet";
+import { assertThreadCashEarnAllowed, reserveRewardsBudget } from "../lib/threadCash/earnGate";
 import {
   allDone, firstWeekIdempotencyKey, firstWeekSteps, firstWeekVisible,
   FIRST_WEEK_REWARD_CENTS, FIRST_WEEK_REWARD_FLAG, type FirstWeekFacts,
@@ -61,11 +62,24 @@ async function loadFacts(userId: string): Promise<FirstWeekFacts | null> {
   };
 }
 
-/** Credits the reward once. Returns true when it is (now or already) granted. */
+/**
+ * Credits the reward once. Returns true when it is (now or already) granted.
+ * Like every Thread Cash reward it passes lib/threadCash/earnGate.ts first:
+ * the earn kill switch (before the transaction) and the monthly rewards
+ * budget (the last lock taken). A paused earn or spent budget just leaves it
+ * ungranted; a later read inside the first week tries again.
+ */
 async function grantReward(userId: string): Promise<boolean> {
+  try {
+    await assertThreadCashEarnAllowed();
+  } catch (err) {
+    if (err instanceof ThreadCashError) return false;
+    throw err;
+  }
   return db.transaction(async (tx) => {
     try {
       await assertThreadCashNotFrozen(tx, userId);
+      await reserveRewardsBudget(tx, FIRST_WEEK_REWARD_CENTS);
     } catch (err) {
       if (err instanceof ThreadCashError) return false;
       throw err;
