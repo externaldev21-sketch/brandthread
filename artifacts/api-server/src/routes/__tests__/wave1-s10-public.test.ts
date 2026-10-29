@@ -117,12 +117,12 @@ describe("availability checks with a repeated query key", () => {
   it("username-check answers instead of crashing", async () => {
     const res = await get("/username-check?username=abc&username=def");
     expect(res.status).toBe(200);
-    expect((await res.json()).available).toBe(false);
+    expect(((await res.json()) as { available: boolean }).available).toBe(false);
   });
 
   it("email-check answers instead of crashing", async () => {
     const res = await get("/email-check?email=a@b.co&email=c@d.co");
     expect(res.status).toBe(200);
-    expect((await res.json()).available).toBe(false);
+    expect(((await res.json()) as { available: boolean }).available).toBe(false);
   });
 });

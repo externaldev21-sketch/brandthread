@@ -105,7 +105,7 @@ describe("POST /api/orders/:id/ship", () => {
 
     const shipped = publishNotification.mock.calls.filter(([n]: any[]) => n.type === "order_shipped");
     expect(shipped).toHaveLength(1);
-    expect(shipped[0][0]).toMatchObject({
+    expect((shipped[0] as any[])[0]).toMatchObject({
       userId: buyerId, pushCategory: "order", targetId: id, targetType: "buyer_order",
       title: "Your order has shipped",
       body: expect.stringContaining("via UPS. Tracking number: 1Z999AA10123456784."),

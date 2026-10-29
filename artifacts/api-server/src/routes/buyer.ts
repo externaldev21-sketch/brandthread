@@ -1728,7 +1728,7 @@ router.get("/orders/:id", validateRequest({ params: uuidParamsSchema }), async (
       })
       .from(orders)
       .leftJoin(users, eq(users.clerkId, orders.ownerId))
-      .where(and(eq(orders.id, req.params.id), eq(orders.buyerId, buyerId)))
+      .where(and(eq(orders.id, req.params.id as string), eq(orders.buyerId, buyerId)))
       .limit(1);
 
     if (!row) {

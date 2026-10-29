@@ -98,6 +98,6 @@ describe("returns (wave1 s11)", () => {
       method: "POST", headers: { "content-type": "image/png", "x-test-user": buyer }, body: Buffer.alloc(0),
     });
     expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain("20 MB");
+    expect(((await response.json()) as { error: string }).error).toContain("20 MB");
   });
 });
