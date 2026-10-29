@@ -103,6 +103,9 @@ export default function PayoutScheduleScreen() {
   }, []);
 
   const load = useCallback(async () => {
+    // Clerk still restoring the session: stay on the skeleton instead of
+    // flashing "Connect Stripe" before the real fetch runs.
+    if (!isPreviewMode && !authLoaded) return;
     if (isPreview) {
       // Signed-out preview never calls the API. Fake data only with &demo=1.
       if (isPreviewDemoMode()) applyInfo(DEMO_INFO);
@@ -119,7 +122,7 @@ export default function PayoutScheduleScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, [api, applyInfo, isPreview]);
+  }, [api, applyInfo, authLoaded, isPreview, isPreviewMode]);
 
   useEffect(() => { void load(); }, [load]);
 

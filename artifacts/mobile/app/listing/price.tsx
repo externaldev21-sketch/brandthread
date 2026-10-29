@@ -39,7 +39,7 @@ export default function ListingPriceScreen() {
             <Text style={s.currency}>$</Text>
             <TextInput
               value={form.priceStr}
-              onChangeText={t => updateListing({ priceStr: t.replace(/[^0-9.]/g, '') })}
+              onChangeText={t => updateListing({ priceStr: t.replace(/,/g, '.').replace(/[^0-9.]/g, '') })}
               placeholder="0.00"
               placeholderTextColor={theme.subtle}
               selectionColor={theme.text}

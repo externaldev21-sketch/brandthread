@@ -582,7 +582,11 @@ export default function ProductStoreScreen() {
           </AccordionSection>
 
           <AccordionSection title="Reviews" styles={s} theme={theme}>
-          <Text style={s.accordionText}>No reviews yet — be the first to rate this piece.</Text>
+          <Text style={s.accordionText}>
+            {reviewSummary && reviewSummary.totalCount > 0
+              ? `${reviewSummary.avgRating.toFixed(1)} out of 5 from ${reviewSummary.totalCount} ${reviewSummary.totalCount === 1 ? 'review' : 'reviews'}.`
+              : 'No reviews yet — be the first to rate this piece.'}
+          </Text>
           </AccordionSection>
         </View>
 

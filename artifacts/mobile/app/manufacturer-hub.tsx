@@ -647,7 +647,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 req={req}
                 manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => Alert.alert("Couldn't withdraw request", 'Refresh and try again.'))}
+                onWithdraw={() => handleWithdraw(req)}
               />
             ))}
           </>
@@ -804,7 +804,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
         icon="package"
         title="Your samples will appear here"
         description="Message a manufacturer about your design. When they send a sample card in chat, pay it there and track it here."
-        action={{ label: 'Find a manufacturer', onPress: () => router.setParams({ tab: 'discover' } as never), icon: 'search' }}
+        action={{ label: 'Find a manufacturer', onPress: () => router.push('/manufacturer-find' as never), icon: 'search' }}
         style={s.emptyState}
       />
     );

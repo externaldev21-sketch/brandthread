@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
@@ -16,6 +16,7 @@ import type { ProductDrawEntry } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 import { hapticSuccess } from '@/lib/haptics';
+import { friendlyError } from '@/lib/friendlyError';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { CardEntry, PaymentController, StripePaymentProvider, stripePaymentAvailable } from '@/components/checkout/StripePayment';
@@ -36,6 +37,7 @@ export default function DrawEntryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const controllerRef = useRef<PaymentControllerApi>(null);
+  const enteringRef = useRef(false);
 
   const [name, setName] = useState('');
   const [image, setImage] = useState<string | null>(null);
@@ -84,7 +86,9 @@ export default function DrawEntryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Reload on focus too: "Add address" pushes /buyer-addresses, and the new
+  // address must be here when the buyer comes back.
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const variant = variants.find((v) => v.id === variantId) ?? null;
   const address = addresses.find((a) => a.id === addressId) ?? null;
@@ -105,9 +109,11 @@ export default function DrawEntryScreen() {
   const canEnter = !!variant && !!address && (cardId === NEW_CARD ? cardComplete : !!card) && !busy && stripePaymentAvailable();
 
   async function enter() {
-    if (!productId || !variant || !address || !canEnter) return;
+    if (!productId || !variant || !address || !canEnter || enteringRef.current) return;
     const controller = controllerRef.current;
     if (!controller) return;
+    // Synchronous guard: a second tap can land before `busy` re-renders.
+    enteringRef.current = true;
     setBusy(true);
     setError(null);
     const getClientSecret = async () => {
@@ -116,7 +122,7 @@ export default function DrawEntryScreen() {
         setTotalCents(r.amountCents);
         return r.clientSecret;
       } catch (e: any) {
-        setError(e?.message ?? 'Couldn’t enter. Try again.');
+        setError(friendlyError(e, 'Couldn’t enter. Try again.'));
         return null;
       }
     };
@@ -135,8 +141,9 @@ export default function DrawEntryScreen() {
       const mine = await api.productDraws.entry(productId).catch(() => null);
       setEntry(mine?.entry ?? null);
     } catch (e: any) {
-      setError(e?.message ?? 'Couldn’t enter. Try again.');
+      setError(friendlyError(e, 'Couldn’t enter. Try again.'));
     } finally {
+      enteringRef.current = false;
       setBusy(false);
     }
   }
@@ -149,7 +156,7 @@ export default function DrawEntryScreen() {
       await api.productDraws.withdraw(productId);
       setEntry(null);
     } catch (e: any) {
-      setError(e?.message ?? 'Couldn’t withdraw. Try again.');
+      setError(friendlyError(e, 'Couldn’t withdraw. Try again.'));
     } finally {
       setBusy(false);
     }

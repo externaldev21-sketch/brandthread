@@ -352,10 +352,13 @@ export default function FulfillOrderScreen() {
   }, [order, parcelDims, orderId, isPartial, partialItemIds]);
 
   useEffect(() => {
-    if (step === 3 && !hasValidLabel && rates.length === 0 && !loadingRates && !manualMode) {
+    // `!ratesError`: a ship-from error leaves rates empty and manualMode off, so
+    // without it this effect re-fired on every loadingRates flip — an endless
+    // rates request loop. After an error the card's Retry button reloads.
+    if (step === 3 && !hasValidLabel && rates.length === 0 && !loadingRates && !manualMode && !ratesError) {
       handleLoadRates();
     }
-  }, [step, label, rates.length, loadingRates, manualMode, handleLoadRates]);
+  }, [step, label, rates.length, loadingRates, manualMode, ratesError, handleLoadRates]);
 
   async function handleBuyLabel(rate: ShippingRate) {
     if (!orderId) return;

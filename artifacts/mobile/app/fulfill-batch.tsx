@@ -191,6 +191,17 @@ export default function FulfillBatchScreen() {
     }
   }
 
+  // Re-read one order after a server-side change so the list (and a re-run of
+  // "Fulfill orders" / "Print labels") reflects it instead of the stale copy.
+  function refreshOrder(id: string) {
+    if (isLocalPreviewSellerOrderId(id)) return;
+    api.orders.get(id).then((raw) => {
+      if (!raw) return;
+      setRaws(prev => ({ ...prev, [id]: raw }));
+      setOrders(prev => prev.map(o => (o.id === id ? adaptApiOrder(raw) : o)));
+    }).catch(() => {});
+  }
+
   // Step 2: buy exactly the quoted labels after the seller saw the total.
   async function handleBuyQuoted() {
     setRunning('labels');
@@ -199,6 +210,7 @@ export default function FulfillBatchScreen() {
       try {
         const label = await purchaseShippingLabel(order.id, rate, `fulfill-batch-${order.id}`);
         rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: `${label.carrier} ${label.service} purchased`, labelUrl: label.labelUrl });
+        refreshOrder(order.id);
       } catch (err: any) {
         rows.push({ orderId: order.id, orderNumber: order.orderNumber, ok: false, message: err?.message ?? 'Label purchase failed' });
       }
@@ -282,6 +294,7 @@ export default function FulfillBatchScreen() {
       } catch (err: any) {
         throw new Error(sellerOrderConflictMessage(err?.code) ?? err?.message ?? 'Couldn’t fulfill this order.');
       }
+      refreshOrder(order.id);
     }
     record({ orderId: order.id, orderNumber: order.orderNumber, ok: true, message: 'Fulfilled' });
     haptic('orderShipped');

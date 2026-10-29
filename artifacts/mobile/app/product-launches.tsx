@@ -275,8 +275,11 @@ function LaunchEditor({
     try {
       await api.productLaunches.schedule(target.productId, { launchAt: launchAt.toISOString(), notifyFollowers });
       // Re-sent only when it changed: once people have entered, the window is fixed.
-      if (drawsEnabled && release === 'draw' && !(hadDraw && drawWindowMin === initialWindowMin && existing && Date.parse(existing.launchAt) === launchAt.getTime())) {
-        await api.productDraws.set(target.productId, new Date(launchAt.getTime() + drawWindowMin * 60_000).toISOString());
+      if (drawsEnabled && release === 'draw') {
+        // Unchanged draw: leave it alone (falling through to cancel would release every entrant's hold).
+        if (!(hadDraw && drawWindowMin === initialWindowMin && existing && Date.parse(existing.launchAt) === launchAt.getTime())) {
+          await api.productDraws.set(target.productId, new Date(launchAt.getTime() + drawWindowMin * 60_000).toISOString());
+        }
       } else if (hadDraw) {
         await api.productDraws.cancel(target.productId);
       }

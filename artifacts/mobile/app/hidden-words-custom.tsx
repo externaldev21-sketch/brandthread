@@ -55,12 +55,16 @@ export default function HiddenWordsCustomScreen() {
   }
 
   async function add() {
+    // Each save sends the whole list; one built while another is in flight
+    // would undo it.
+    if (saving) return;
     const added = splitWords(draft);
     if (added.length === 0) return;
     if (await save([...added, ...words])) setDraft('');
   }
 
   function remove(word: string) {
+    if (saving) return;
     hapticLight();
     void save(words.filter((w) => w !== word));
   }

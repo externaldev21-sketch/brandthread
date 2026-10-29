@@ -204,6 +204,8 @@ export default function MetaAdsSetupScreen() {
       setCountry(c.targetingSpec.countries?.[0] ?? 'US');
       setAgeMin(c.targetingSpec.ageMin ?? 18);
       setAgeMax(c.targetingSpec.ageMax ?? 65);
+      const savedGender = c.targetingSpec.genders?.[0];
+      setGender(savedGender === 'male' ? 'Men' : savedGender === 'female' ? 'Women' : 'All');
       setInterests(c.targetingSpec.interests ?? []);
     }
     setRejectionReason(c.rejectionReason);
@@ -318,7 +320,8 @@ export default function MetaAdsSetupScreen() {
       targetingSpec: advantageAudience ? undefined : {
         countries: [country || 'US'],
         ageMin, ageMax,
-        genders: gender === 'All' ? undefined : [gender],
+        // Server (lib/metaAdsLaunch.ts buildTargeting) maps 'male' / 'female'.
+        genders: gender === 'All' ? undefined : [gender === 'Men' ? 'male' : 'female'],
         interests: interests.length ? interests : undefined,
       },
     };
@@ -327,6 +330,8 @@ export default function MetaAdsSetupScreen() {
   // ── Debounced draft save — keeps a live estimated-reach line and a live
   // preview without saving on every keystroke. ────────────────────────────
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const createdCampaign = useRef<Promise<string> | null>(null);
+  const launchInFlight = useRef(false);
   useEffect(() => {
     if (!requiredValid || loadingExisting) return;
     if (saveDebounce.current) clearTimeout(saveDebounce.current);
@@ -356,17 +361,23 @@ export default function MetaAdsSetupScreen() {
     setSaving(true);
     try {
       const body = buildBody();
-      if (!campaignId) {
-        const res = await api.metaAds.createCampaign(body);
-        setCampaignId(res.campaign.id);
-        void refreshPreview(res.campaign.id);
-        void refreshReachEstimate(res.campaign.id);
-        return res.campaign.id;
+      // A create still in flight (or just finished, before campaignId state
+      // lands) is reused so an autosave + Launch never create two campaigns.
+      const existingId = campaignId ?? (createdCampaign.current ? await createdCampaign.current : null);
+      if (!existingId) {
+        const creating = api.metaAds.createCampaign(body).then((res) => res.campaign.id);
+        createdCampaign.current = creating;
+        creating.catch(() => { if (createdCampaign.current === creating) createdCampaign.current = null; });
+        const newId = await creating;
+        setCampaignId(newId);
+        void refreshPreview(newId);
+        void refreshReachEstimate(newId);
+        return newId;
       }
-      await api.metaAds.updateCampaign(campaignId, body);
-      void refreshPreview(campaignId);
-      void refreshReachEstimate(campaignId);
-      return campaignId;
+      await api.metaAds.updateCampaign(existingId, body);
+      void refreshPreview(existingId);
+      void refreshReachEstimate(existingId);
+      return existingId;
     } catch (e) {
       // Silent for the background autosave; Launch saves with throwOnError
       // so a real failure shows with a retry when the seller actually acts.
@@ -386,6 +397,17 @@ export default function MetaAdsSetupScreen() {
   }
 
   async function handleLaunch() {
+    // A second tap while the pre-launch save runs would launch twice.
+    if (launchInFlight.current) return;
+    launchInFlight.current = true;
+    try {
+      await launchOnce();
+    } finally {
+      launchInFlight.current = false;
+    }
+  }
+
+  async function launchOnce() {
     setLaunchError(null);
     if (!scheduleValid) return;
     // Save the latest edits first (a debounced autosave may still be pending).

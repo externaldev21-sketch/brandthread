@@ -193,6 +193,11 @@ vi.mock('@/components/ScreenHeader', () => ({
   ),
 }));
 
+// The first-visit explainer needs FirstRunTipsProvider; it is not under test here.
+vi.mock('@/components/first-run-tips/ScreenExplainer', () => ({
+  ScreenExplainer: () => null,
+}));
+
 vi.mock('@/components/Badge', () => ({
   Badge: ({ label }: { label: string }) => React.createElement('Text', null, label),
 }));

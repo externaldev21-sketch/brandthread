@@ -193,6 +193,9 @@ function PayoutsScreenContent() {
   }, []);
 
   const refreshConnectStatus = useCallback(async () => {
+    // Clerk still restoring the session: keep the skeleton rather than
+    // painting the signed-out "Set up payouts" fixture over a live account.
+    if (!isPreviewMode && !authLoaded) return;
     if (isPreview) {
       // The local preview data layer answers this endpoint (a new seller: not
       // started), or a pinned state for review. Never the network.
@@ -217,9 +220,10 @@ function PayoutsScreenContent() {
       connectRequestRef.current = false;
       setRefreshingStatus(false);
     }
-  }, [api, isPreview, forcedState, applyStatus]);
+  }, [api, authLoaded, isPreview, isPreviewMode, forcedState, applyStatus]);
 
   const load = useCallback(async () => {
+    if (!isPreviewMode && !authLoaded) return;
     if (isPreview) {
       // Fresh: zero balance, no history. With demo=1: local illustration only.
       // Only the current web URL may enable demo data, never a native route param.
@@ -259,7 +263,7 @@ function PayoutsScreenContent() {
     }
     setLoading(false);
     void refreshConnectStatus();
-  }, [api, isPreview, params.demo, refreshConnectStatus]);
+  }, [api, authLoaded, isPreview, isPreviewMode, params.demo, refreshConnectStatus]);
 
 
   function handleCashedOut(result: { threadCashCents: number; payoutCents: number; feeCents: number }) {

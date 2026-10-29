@@ -305,7 +305,7 @@ export default function HelpScreen() {
 
         {/* Contact shortcuts */}
         <View style={s.contactRow}>
-          <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} activeOpacity={0.8}>
+          <TouchableOpacity style={s.contactBtn} onPress={() => { Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => Alert.alert('Email us', SUPPORT_EMAIL)); }} activeOpacity={0.8}>
             <Icon name="mail" size={ICON.md} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
