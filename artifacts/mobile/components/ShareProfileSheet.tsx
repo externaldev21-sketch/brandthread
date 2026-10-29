@@ -145,7 +145,12 @@ export function ShareProfileSheet({
   const storyCardRef = useRef<View | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Each load takes a sequence number so an older auth.me() still in flight
+  // (opened before the caller's profile — and its username — had loaded)
+  // can't land afterwards and replace the newer result with its error.
+  const loadSeqRef = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setError(false);
     setLoading(true);
     // The caller already knows the username (both own-profile screens pass
@@ -170,6 +175,7 @@ export function ShareProfileSheet({
     }
     try {
       const data = await api.auth.me();
+      if (seq !== loadSeqRef.current) return;
       setIdentity({
         username: data.username ?? null,
         displayName: data.displayName ?? data.name ?? null,
@@ -177,9 +183,9 @@ export function ShareProfileSheet({
         accountType: data.accountType ?? null,
       });
     } catch {
-      setError(true);
+      if (seq === loadSeqRef.current) setError(true);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [api, authLoaded, isSignedIn, profileUsername, profileDisplayName, profileBrandName]);
 
@@ -576,12 +582,12 @@ function ShareTile({
   textColor: string;
 }) {
   return (
-    // The flex:1 that makes the three tiles divide the row evenly has to
+    // The flex:1 that makes the four tiles divide the row evenly has to
     // live on this wrapping View, not on PressableScale's own `style` prop:
     // when that prop is a plain object (not a function) PressableScale
     // applies it to its *inner* Animated.View, not the outer Pressable that
     // actually participates in tilesRow's flex layout — so a bare `flex: 1`
-    // there silently did nothing and the three labels ran together with no
+    // there silently did nothing and the tile labels ran together with no
     // spacing between them.
     <View style={styles.tileFlex}>
       <PressableScale

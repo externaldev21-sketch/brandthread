@@ -361,8 +361,8 @@ export function ShopProductSheet({
   const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
 
-  // Gallery aspect (photo audit follow-up): always a full-width 3:4
-  // portrait frame now, never a capped near-square crop — see
+  // Gallery aspect (photo audit follow-up): always a full-width 4:5
+  // portrait frame now (constants/media.ts productPhotoHeight), never a capped near-square crop — see
   // ProductImageCarousel below, which shows the whole image
   // (`contentFit="contain"`, letterboxed on `theme.cardElevated` rather
   // than cropped) instead of the old `cover`-fit-into-a-45%-height-cap
@@ -567,6 +567,9 @@ export function ShopProductSheet({
   function showCartSuccess(newCount: number) {
     onCartUpdated?.(newCount);
     setShowAddedConfirmation(true);
+    // A second add inside the window restarts it; the first add's timer
+    // must not hide the second confirmation early.
+    if (addedConfirmationTimer.current) clearTimeout(addedConfirmationTimer.current);
     addedConfirmationTimer.current = setTimeout(() => {
       setShowAddedConfirmation(false);
       addedConfirmationTimer.current = null;
@@ -611,8 +614,13 @@ export function ShopProductSheet({
   // `panGesture` (Reanimated + react-native-gesture-handler, UI-thread) —
   // see the `GestureDetector` wrapping the sheet below.
 
-  // Hydrate product when active tag changes
+  // Hydrate product when active tag changes. Each call takes a sequence
+  // number; a slower response for a tag the buyer already switched away from
+  // is dropped instead of overwriting the active tag's product (whose
+  // attribution, price and Add to bag would then disagree).
+  const loadSeqRef = useRef(0);
   const loadProduct = useCallback(async (tagIdx: number) => {
+    const seq = ++loadSeqRef.current;
     const tag = selection.tags[tagIdx];
     if (!tag?.productId) {
       setPhase('error');
@@ -648,6 +656,7 @@ export function ShopProductSheet({
     }
     try {
       const p = await getBuyerProduct(tag.productId);
+      if (seq !== loadSeqRef.current) return;
       if (!p) {
         setPhase('error');
         setErrorMsg('Product not found.');
@@ -676,6 +685,7 @@ export function ShopProductSheet({
       const hasAnyStock = p.variants.some(v => v.isAvailable && !isJustSoldOut(v.id));
       setPhase(hasAnyStock ? 'ready' : 'sold_out');
     } catch {
+      if (seq !== loadSeqRef.current) return;
       setPhase('error');
       setErrorMsg("Couldn't load this product. Tap to retry.");
     }
@@ -1173,9 +1183,9 @@ export function ShopProductSheet({
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
-            {/* Swipeable image gallery — capped near-square (item 1), never
-                more than ~45% of the sheet's own height, so price/size/
-                details sit above the fold without scrolling. */}
+            {/* Swipeable image gallery — the full sheet-width 4:5 frame (see
+                ProductImageCarousel); taller content scrolls under the
+                sticky Add to bag / Buy now bar. */}
             {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
             <View ref={productPhotoRef} collapsable={false}>
               <ProductImageCarousel imageUris={product.imageUris} brand={product.sellerName} name={product.name} />

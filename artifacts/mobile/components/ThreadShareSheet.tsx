@@ -130,6 +130,12 @@ function AccountThreadShareSheet({
   const [remixAllowed, setRemixAllowed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
+  // Hides the save progress bar shortly after a save settles; cleared on
+  // unmount (an account switch remounts this sheet mid-save).
+  const progressResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (progressResetTimerRef.current) clearTimeout(progressResetTimerRef.current);
+  }, []);
 
   // Records a persisted share interaction (see POST /api/posts/:id/interact,
   // type "share") whenever the person actually completes a share out of the
@@ -458,7 +464,11 @@ function AccountThreadShareSheet({
         }
       }
       abortRef.current = null;
-      setTimeout(() => setSavingProgress(null), 450);
+      if (progressResetTimerRef.current) clearTimeout(progressResetTimerRef.current);
+      progressResetTimerRef.current = setTimeout(() => {
+        progressResetTimerRef.current = null;
+        setSavingProgress(null);
+      }, 450);
     }
   }
 
@@ -543,6 +553,9 @@ function AccountThreadShareSheet({
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
               <ShareAction label="Report" icon="flag" onPress={() => { onClose(); onReport(); }} />
+              {onBlock ? (
+                <ShareAction label="Block" icon="slash" onPress={() => { onClose(); onBlock(); }} />
+              ) : null}
               {isVideo && mediaUri && downloadAllowed === true ? (
                 <ShareAction label="Save video" icon="download" onPress={() => void saveVideo()} />
               ) : null}

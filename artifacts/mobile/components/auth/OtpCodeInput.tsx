@@ -82,7 +82,9 @@ export function OtpCodeInput({
         keyboardType="number-pad"
         textContentType="oneTimeCode"
         autoComplete="one-time-code"
-        maxLength={length}
+        // No maxLength: it truncates a paste before handleChangeText sees it,
+        // so a formatted code ("123 456", "123-456") lost its last digit.
+        // handleChangeText already keeps only the first `length` digits.
         autoFocus={autoFocus}
         editable={!disabled}
         style={styles.hiddenInput}

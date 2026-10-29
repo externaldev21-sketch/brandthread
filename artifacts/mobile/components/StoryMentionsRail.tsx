@@ -13,9 +13,8 @@ const RING_SIZE = 64;
 const RING_WIDTH = 2.5;
 const ITEM_MAX_WIDTH = 104;
 // "See all" is a ~16pt-tall text link: pad to 44 tall without changing
-// layout. Slightly less below so the slop stops short of the rings.
-// ~41×16pt link; less slop upward (the screen's scroll edge sits ~10pt above
-// it and would clip more), the rest below — 44×44 total.
+// layout. ~41×16pt link; less slop upward (the screen's scroll edge sits ~10pt above
+// it and would clip more), the rest below — 44pt tall in total.
 const SEE_ALL_HIT_SLOP = { top: 10, bottom: 18, left: 8, right: 8 };
 
 function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles: ReturnType<typeof makeStyles>; theme: AppThemePreset }) {
@@ -48,7 +47,8 @@ function MentionRingAvatar({ ring, styles, theme }: { ring: MentionRing; styles:
 
 /**
  * "Story mentions" rail at the top of Activity: one ring per person who
- * tagged me in a story (white = unseen, dim silver = seen), newest first.
+ * tagged me in a story (white ring = unseen; once seen the ring is dropped
+ * and the photo stands alone), newest first.
  * Renders nothing when there are no mentions.
  */
 export default function StoryMentionsRail({ items, onOpen, onSeeAll }: {
