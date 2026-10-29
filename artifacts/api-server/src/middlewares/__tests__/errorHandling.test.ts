@@ -48,6 +48,13 @@ beforeAll(async () => {
   app.get("/unexpected", async () => {
     throw new Error("select * from private_table password=secret");
   });
+  app.get("/bad-uuid", async () => {
+    throw Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" });
+  });
+  app.get("/bad-uuid-wrapped", async () => {
+    const cause = Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" });
+    throw Object.assign(new Error("Failed query: select ... from orders"), { cause });
+  });
   app.use(jsonNotFound);
   app.use(apiErrorHandler);
 
@@ -120,6 +127,17 @@ describe("API error handling", () => {
     expect(body.error.code).toBe("INTERNAL_ERROR");
     expect(JSON.stringify(body)).not.toContain("private_table");
     expect(logError).toHaveBeenCalled();
+  });
+
+  it("answers a Postgres invalid-text-representation (malformed uuid) as 400, not 500", async () => {
+    for (const path of ["/bad-uuid", "/bad-uuid-wrapped"]) {
+      const response = await fetch(`${base}${path}`);
+      expect(response.status).toBe(400);
+      const body = await response.json() as { error: { code: string; message: string } };
+      expect(body.error.code).toBe("INVALID_INPUT");
+      expect(JSON.stringify(body)).not.toContain("orders");
+      expect(JSON.stringify(body)).not.toContain("uuid");
+    }
   });
 
   it("returns JSON for unknown routes", async () => {

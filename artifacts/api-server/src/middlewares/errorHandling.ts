@@ -42,6 +42,20 @@ export const jsonNotFound: RequestHandler = (req, res) => {
   });
 };
 
+/**
+ * Postgres 22P02 (invalid_text_representation): a malformed uuid, integer or
+ * enum value reached a typed column. That is the caller's bad input, not a
+ * server fault, so it answers 400 instead of 500. Drizzle wraps driver errors
+ * in DrizzleQueryError, so the code may sit on `cause`.
+ */
+function isInvalidTextRepresentation(err: unknown): boolean {
+  for (let e: unknown = err, depth = 0; e && typeof e === "object" && depth < 3; depth++) {
+    if ((e as { code?: unknown }).code === "22P02") return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const parserErrorType =
     typeof err === "object" &&
@@ -53,14 +67,17 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const parseFailure = parserErrorType === "entity.parse.failed";
   const payloadTooLarge = parserErrorType === "entity.too.large";
   const known = err instanceof ApiError;
-  const status = known ? err.status : payloadTooLarge ? 413 : parseFailure ? 400 : 500;
+  const invalidInput = !known && isInvalidTextRepresentation(err);
+  const status = known ? err.status : payloadTooLarge ? 413 : parseFailure || invalidInput ? 400 : 500;
   const errorCode = known
     ? err.code
     : payloadTooLarge
       ? "PAYLOAD_TOO_LARGE"
       : parseFailure
         ? "INVALID_JSON"
-        : "INTERNAL_ERROR";
+        : invalidInput
+          ? "INVALID_INPUT"
+          : "INTERNAL_ERROR";
 
   if (isClerkKeyInvalidError(err)) logClerkKeyInvalid(`${req.method} ${req.path}`);
 
@@ -89,6 +106,8 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
         ? { code: "PAYLOAD_TOO_LARGE", message: "The request is too large." }
       : parseFailure
         ? { code: "INVALID_JSON", message: "The request body is not valid JSON." }
+      : invalidInput
+        ? { code: "INVALID_INPUT", message: "A value in the request is not in a valid format." }
       : { code: "INTERNAL_ERROR", message: "An unexpected error occurred." },
   );
 };
