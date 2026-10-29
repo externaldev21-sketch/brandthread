@@ -27,7 +27,7 @@ describe('seller profile action layout', () => {
   // reachable from the top-bar share icon) and Contact was folded into the
   // new Messages button. Settings stays in the top-right gear; Go Live and
   // Create Post live in the Studio control center.
-  it('shows the Edit profile + Share profile row with no Professional dashboard row above it', () => {
+  it('shows the Edit profile + Messages row with no Professional dashboard row above it', () => {
     // Dev: the dashboard row was removed from the own profile; the
     // Dashboard stays one tap away as the first tab.
     expect(profileSource).not.toContain('Professional dashboard');
@@ -39,7 +39,12 @@ describe('seller profile action layout', () => {
     // replaces the old unlabelled top-bar share icon.
     expect(profileSource).not.toContain('<ProfileEditMessagesRow');
     expect(profileSource).toContain('label="Edit profile"');
-    expect(profileSource).toContain('label="Share profile"');
+    // TestFlight polish (Dev): the row is Edit profile + a white primary
+    // Messages button; Share profile moved into the ••• menu.
+    expect(profileSource).not.toContain('label="Share profile"');
+    expect(profileSource).not.toContain('testID="seller-share-profile-btn"');
+    expect(profileSource).toMatch(/label="Messages"\s+variant="primary"/);
+    expect(profileSource).toContain("key: 'share-profile', icon: 'share', label: 'Share profile'");
     expect(profileSource).toContain("onPress={() => nav('/edit-profile')}");
     expect(profileSource).not.toContain('name="share-2"\n');
     expect(profileSource).not.toContain('testID="profile-share-btn"');

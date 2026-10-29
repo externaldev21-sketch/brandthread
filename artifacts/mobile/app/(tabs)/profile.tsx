@@ -681,8 +681,10 @@ export default function ProfileScreen() {
                 main thing to do on your own profile; buyer messages stay
                 one tap away in the Studio menu. The labelled Share button
                 replaces the unlabelled top-bar share icon. Messages is back
-                as a third equal secondary button (Dev: one tap to the inbox
-                from Profile too), with the unread-thread count. */}
+                (Dev: one tap to the inbox from Profile too), with the
+                unread-thread count. Dev's TestFlight polish: two buttons —
+                Edit profile + a white primary Messages — and Share profile
+                moved into the ••• menu. */}
             <View style={s.actionRow}>
               <View style={s.actionFlex}>
                 <Button
@@ -698,30 +700,19 @@ export default function ProfileScreen() {
               </View>
               <View style={s.actionFlex}>
                 <Button
-                  label="Share profile"
-                  variant="secondary"
-                  size="compact"
-                  fullWidth
-                  onPress={() => { haptics.light(); setShareSheetVisible(true); }}
-                  accessibilityHint="Opens a shareable profile card, QR code, and link"
-                  style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
-                  testID="seller-share-profile-btn"
-                />
-              </View>
-              <View style={s.actionFlex}>
-                <Button
                   label="Messages"
-                  variant="secondary"
+                  variant="primary"
                   size="compact"
                   fullWidth
                   onPress={() => { haptics.light(); nav('/seller-inbox'); }}
                   accessibilityLabel={unreadThreads > 0 ? `Messages, ${unreadThreads} unread` : 'Messages'}
-                  style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+                  style={s.actionButton}
                   testID="seller-profile-messages-btn"
                 />
                 {unreadThreads > 0 && (
-                  <View pointerEvents="none" style={[s.messagesBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} testID="seller-profile-messages-badge">
-                    <Text style={[s.messagesBadgeText, { color: theme.onAccent }]} allowFontScaling={false}>
+                  // Inverted on the white button so the count stays readable.
+                  <View pointerEvents="none" style={[s.messagesBadge, { backgroundColor: theme.background, borderColor: theme.accent }]} testID="seller-profile-messages-badge">
+                    <Text style={[s.messagesBadgeText, { color: theme.text }]} allowFontScaling={false}>
                       {unreadThreads > 99 ? '99+' : unreadThreads}
                     </Text>
                   </View>
@@ -783,8 +774,13 @@ export default function ProfileScreen() {
         onClose={() => setMenuOpen(false)}
         items={[
           // Only what has no other home on this page: Activity is the bell,
-          // Edit profile / Share profile are the action row, and Share store
+          // Edit profile / Messages are the action row, and Share store
           // lives on the Dashboard and My store.
+          // Share profile moved here from the action row (same share sheet).
+          {
+            key: 'share-profile', icon: 'share', label: 'Share profile',
+            onPress: () => { haptics.light(); setShareSheetVisible(true); },
+          },
           // One menu (polish #98): Settings moved here from its own gear icon.
           { key: 'settings', icon: 'settings', label: 'Settings', onPress: () => nav('/settings') },
           caps.showViewAsVisitor && userId && {

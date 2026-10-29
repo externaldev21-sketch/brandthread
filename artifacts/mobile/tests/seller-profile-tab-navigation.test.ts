@@ -44,7 +44,7 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).toContain('<ProfileAccountSwitcher');
     expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
     // De-clutter (Dev): every action has one home. Activity is the bell, so
-    // the ••• menu doesn't repeat it; Edit profile / Share profile are the
+    // the ••• menu doesn't repeat it; Edit profile / Messages are the
     // action row only (no top-bar pencil, no "Edit name and bio" quick
     // sheet, no "Share store" — that lives on the Dashboard and My store).
     expect(sellerProfile).not.toContain("key: 'activity'");
@@ -54,13 +54,14 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).not.toContain('profile-edit-sheet');
     expect(sellerProfile).not.toContain("key: 'share-store'");
     expect(sellerProfile).toContain("key: 'view-as-visitor'");
-    // Share profile is the labelled button under the bio only — the ••• menu
-    // no longer repeats it (audit: "Share profile" was offered twice).
+    // Share profile lives in the ••• menu only (TestFlight polish, Dev) —
+    // offered once, never also as a row button (audit: it was offered twice).
     expect(sellerProfile).not.toContain("key: 'share', icon: 'share-2'");
-    expect(sellerProfile).toContain('label="Share profile"');
+    expect(sellerProfile).not.toContain('label="Share profile"');
+    expect(sellerProfile.match(/label: 'Share profile'/g)?.length).toBe(1);
     expect(sellerProfile).toContain('<ProfileTopBarIcon name="bell"');
-    // Polish #86/#98: one menu — Settings lives in the ••• sheet and Share is
-    // the labelled "Share profile" button, so neither has its own icon.
+    // Polish #86/#98: one menu — Settings and Share profile live in the •••
+    // sheet, so neither has its own top-bar icon.
     expect(sellerProfile).not.toContain('<ProfileTopBarIcon name="settings"');
     expect(sellerProfile).toContain("{ key: 'settings', icon: 'settings', label: 'Settings', onPress: () => nav('/settings') }");
     expect(sellerProfile).toContain('name="more-horizontal"');

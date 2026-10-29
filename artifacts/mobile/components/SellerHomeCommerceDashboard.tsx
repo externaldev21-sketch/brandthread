@@ -39,6 +39,7 @@ import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 import { Avatar } from '@/components/ui/Avatar';
 import { useMyIdentity } from '@/hooks/useMyIdentity';
 import SellerMessagesButton from '@/components/SellerMessagesButton';
+import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
@@ -909,7 +910,8 @@ export default function SellerHomeCommerceDashboard({
               accessibilityLabel="Share store"
               testID="seller-dashboard-share-store"
             >
-              <Icon name="share" size={22} color={theme.text ?? FG} />
+              {/* Same line-icon family as the tab bar (BuyerNavIcon), paired with Messages. */}
+              <BuyerNavIcon name="share" size={22} color={theme.text ?? FG} />
             </TouchableOpacity>
             {/* Messages — one tap to the inbox, unread-thread badge. */}
             <SellerMessagesButton
