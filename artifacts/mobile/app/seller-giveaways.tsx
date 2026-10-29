@@ -49,7 +49,7 @@ export default function SellerGiveaways() {
             </View>
           ) : rows.map((g) => (
             <ListRow key={g.id} title={g.title}
-              subtitle={`${phaseLabel(g.phase)} · ${g.entryCount === 1 ? '1 entry' : `${g.entryCount} entries`} · ${g.phase === 'live' ? `ends ${formatDay(g.endsAt)}` : g.phase === 'upcoming' ? `starts ${formatDay(g.startsAt)}` : `ended ${formatDay(g.endsAt)}`}`}
+              subtitle={`${phaseLabel(g.phase)} · ${g.entryCount === 1 ? '1 entry' : `${g.entryCount} entries`} · ${g.phase === 'live' ? `ends ${formatDay(g.endsAt)}` : g.phase === 'upcoming' ? `starts ${formatDay(g.startsAt)}` : g.phase === 'cancelled' ? 'not drawn' : `ended ${formatDay(g.endsAt)}`}`}
               chevron subtitleNumberOfLines={2} onPress={() => router.push(`/seller-giveaway-detail?id=${encodeURIComponent(g.id)}` as never)} />
           ))}
       </ScrollView>

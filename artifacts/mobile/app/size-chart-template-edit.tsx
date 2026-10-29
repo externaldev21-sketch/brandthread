@@ -8,7 +8,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  *   ?fromProductId=<uuid>  start from that product's current chart (unsaved)
  *   ?productId=<uuid>  save, then copy the chart onto this product and return to it
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View, useWindowDimensions,
@@ -49,6 +49,8 @@ export default function SizeChartTemplateEditScreen() {
   const [productCount, setProductCount] = useState(0);
   const [newColumn, setNewColumn] = useState('');
   const [newSize, setNewSize] = useState('');
+  // Set once a new chart is created, so a retry after a failed apply updates it instead of re-creating (409).
+  const createdIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     let live = true;
@@ -109,12 +111,13 @@ export default function SizeChartTemplateEditScreen() {
     if (!name.trim()) { Alert.alert('Name this size chart'); return; }
     setSaving(true);
     try {
-      let templateId = id;
-      if (id) {
-        await api.sizeChartTemplates.update(id, { name: name.trim(), chart });
+      let templateId = id ?? createdIdRef.current;
+      if (templateId) {
+        await api.sizeChartTemplates.update(templateId, { name: name.trim(), chart });
       } else {
         const created = await api.sizeChartTemplates.create({ name: name.trim(), chart });
         templateId = created.id;
+        createdIdRef.current = created.id;
       }
       if (productId && templateId) {
         await api.sizeChartTemplates.apply(templateId, [productId]);

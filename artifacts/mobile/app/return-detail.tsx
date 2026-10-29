@@ -51,7 +51,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/hooks/useApi';
-import { ReturnLabelCard } from '@/components/returns/ReturnLabelCard';
+import { ReturnLabelCard, isOpenableLabelUrl } from '@/components/returns/ReturnLabelCard';
 import { PhotoViewer } from '@/components/media/PhotoViewer';
 import { orderRef } from '@/lib/orderRef';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -470,7 +470,8 @@ export default function ReturnDetailScreen() {
           </BrandthreadCard>
         ) : null}
 
-        {view.returnLabelUrl ? (
+        {/* The buyer already gets ReturnLabelCard above; only https label links are opened. */}
+        {viewer === 'seller' && isOpenableLabelUrl(view.returnLabelUrl) ? (
           <BrandthreadCard>
             <Text style={s.cardTitle}>Return label</Text>
             <Text style={s.cardBody}>{[view.returnCarrier, view.returnTrackingNumber].filter(Boolean).join(' · ') || 'Prepaid label'}</Text>
@@ -480,7 +481,7 @@ export default function ReturnDetailScreen() {
                 variant="secondary"
                 icon="external-link"
                 fullWidth
-                onPress={() => { void Linking.openURL(view.returnLabelUrl!); }}
+                onPress={() => { void Linking.openURL(view.returnLabelUrl!.trim()).catch(() => {}); }}
                 testID="return-open-label"
               />
             </View>

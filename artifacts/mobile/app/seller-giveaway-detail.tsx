@@ -75,7 +75,7 @@ export default function SellerGiveawayDetail() {
         <Text style={[styles.title, { color: c.foreground }]}>{g.title}</Text>
         <Text style={[styles.note, { color: c.mutedForeground }]}>{g.prizeText}</Text>
         <Text style={[styles.meta, { color: c.mutedForeground }]}>
-          {phaseLabel(g.phase)}{g.phase === 'live' ? ` · ${timeLeft(g.endsAt)}` : g.phase === 'upcoming' ? ` · starts ${formatDay(g.startsAt)}` : ` · ended ${formatDay(g.endsAt)}`}
+          {phaseLabel(g.phase)}{g.phase === 'live' ? ` · ${timeLeft(g.endsAt)}` : g.phase === 'upcoming' ? ` · starts ${formatDay(g.startsAt)}` : g.phase === 'cancelled' ? '' : ` · ended ${formatDay(g.endsAt)}`}
         </Text>
 
         <View style={[styles.grid, { borderColor: c.border }]}>

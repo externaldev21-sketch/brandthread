@@ -191,6 +191,8 @@ export default function SignInScreen() {
 
   // ─── One-time code ────────────────────────────────────────────────────────────
   async function sendCode(isResend: boolean) {
+    // The keyboard "go" key calls this directly, bypassing the button's disabled state.
+    if (sendingCode) return;
     if (identifierKind === 'invalid') { setError('Enter a valid email address or phone number.'); return; }
     if (identifierKind === 'phone' && !phoneSupported) {
       setError("Phone sign-in isn't available yet — try your email instead.");

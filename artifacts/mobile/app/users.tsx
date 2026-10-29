@@ -70,7 +70,7 @@ export default function UsersScreen() {
       }
     } catch { /* no-op if not connected */ }
     setLoading(false);
-  }, [id, role]);
+  }, [api, id, role]);
 
   useEffect(() => { setLoading(true); load(); }, [load]);
 

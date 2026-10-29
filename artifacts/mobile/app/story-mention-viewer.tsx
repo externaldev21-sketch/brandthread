@@ -216,8 +216,16 @@ export default function StoryMentionViewerScreen() {
     return () => setFocused(false);
   }, []));
 
+  const refetchedForMissing = useRef(false);
   useEffect(() => {
     if (queue !== null || loading || retrying) return;
+    // Cached (sticky) items can predate the mention a push just opened: fetch once before calling it unavailable.
+    if (storyId && !refetchedForMissing.current && !items.some((item) => item.storyId === storyId)) {
+      refetchedForMissing.current = true;
+      setRetrying(true);
+      void reload().finally(() => setRetrying(false));
+      return;
+    }
     const ordered = orderMentions(items);
     setQueue(ordered);
     setStoryIdx(startIndexFor(ordered.map((item) => item.storyId), storyId));

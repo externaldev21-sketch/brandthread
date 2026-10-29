@@ -129,6 +129,9 @@ export default function RfqPostScreen() {
     const qty = parseInt(quantity, 10);
     if (!Number.isInteger(qty) || qty < 1) { Alert.alert('Invalid quantity', 'Enter the total quantity you need.'); return; }
     if (selected.size === 0) { Alert.alert('Pick manufacturers', 'Select at least one manufacturer to send this RFQ to.'); return; }
+    // The placeholder shows "$6.50", so accept a leading $; never drop a typed price silently.
+    const targetPriceCents = targetPrice.trim() ? parseDecimalToCents(targetPrice.trim().replace(/^\$\s*/, '')) : undefined;
+    if (targetPriceCents === null) { Alert.alert('Invalid target price', 'Enter a price like 6.50.'); return; }
 
     setSubmitting(true);
     try {
@@ -137,8 +140,9 @@ export default function RfqPostScreen() {
         category: category.trim() || undefined,
         description: description.trim() || undefined,
         quantity: qty,
-        targetPriceCents: targetPrice ? (parseDecimalToCents(targetPrice) ?? undefined) : undefined,
-        deadline: deadline.trim() ? new Date(deadline.trim()).toISOString() : undefined,
+        targetPriceCents,
+        // Local midnight: new Date('yyyy-mm-dd') is UTC and shows a day early west of UTC.
+        deadline: ymdToDate(deadline)?.toISOString(),
         manufacturerIds: [...selected],
       });
       router.replace(`/rfq-compare?rfqId=${rfq.id}` as never);
@@ -219,7 +223,7 @@ export default function RfqPostScreen() {
       </ScrollView>
       <View style={[s.footer, { paddingBottom: (tabBarInset || insets.bottom) + SP.sm }]}>
         <PrimaryButton
-          label={submitting ? 'Sending…' : `Send RFQ to ${selected.size || ''} ${selected.size === 1 ? 'manufacturer' : 'manufacturers'}`.trim()}
+          label={submitting ? 'Sending…' : `Send RFQ to ${selected.size ? `${selected.size} ` : ''}${selected.size === 1 ? 'manufacturer' : 'manufacturers'}`}
           onPress={handleSubmit}
           disabled={submitting || selected.size === 0}
           icon={submitting ? undefined : 'send'}

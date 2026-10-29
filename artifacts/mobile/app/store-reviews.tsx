@@ -45,7 +45,7 @@ export default function StoreReviewsScreen() {
   useEffect(() => () => { activeRef.current = false; }, []);
 
   const load = useCallback(async () => {
-    if (!sellerId) return;
+    if (!sellerId) { setLoading(false); setLoadFailed(true); return; }
     try {
       const data = await api.reviews.forSeller(sellerId);
       if (!activeRef.current) return;
@@ -107,7 +107,7 @@ export default function StoreReviewsScreen() {
           </Pressable>
         </View>
       ) : null}
-      <Text style={s.showing}>Showing {visible.length} of {totalCount} reviews</Text>
+      <Text style={s.showing}>Showing {visible.length} of {totalCount} {totalCount === 1 ? 'review' : 'reviews'}</Text>
     </View>
   );
 

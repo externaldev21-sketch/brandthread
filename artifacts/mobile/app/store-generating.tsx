@@ -46,6 +46,7 @@ export default function StoreGeneratingScreen() {
   const stepsCompleteRef = useRef(false);
   const serviceCompleteRef = useRef(false);
   const navigatedRef = useRef(false);
+  const runIdRef = useRef(0);
 
   // Spinner rotation loop
   useEffect(() => {
@@ -84,6 +85,9 @@ export default function StoreGeneratingScreen() {
   };
 
   const runGeneration = async () => {
+    // A retry or leaving the screen supersedes this run: its timers and result must not touch state or navigate.
+    const runId = ++runIdRef.current;
+    const live = () => runIdRef.current === runId;
     setError(null);
     stepsCompleteRef.current = false;
     serviceCompleteRef.current = false;
@@ -100,6 +104,7 @@ export default function StoreGeneratingScreen() {
     } catch {
       answers = null;
     }
+    if (!live()) return;
     if (!answers) {
       router.replace(('/store-generate?toast=' + encodeURIComponent('Choose a style first')) as never);
       return;
@@ -111,10 +116,11 @@ export default function StoreGeneratingScreen() {
         const result = await generateStoreFromAnswers(answers);
         await applyGenerationResult(result);
         await clearDraftAnswers();
+        if (!live()) return;
         serviceCompleteRef.current = true;
         tryNavigate();
       } catch (err) {
-        setError("Couldn't build your store. Try again.");
+        if (live()) setError("Couldn't build your store. Try again.");
       }
     })();
 
@@ -123,6 +129,7 @@ export default function StoreGeneratingScreen() {
       for (let i = 0; i < GEN_STEPS.length; i++) {
         setCurrentStep(i);
         await new Promise<void>(resolve => setTimeout(resolve, GEN_STEPS[i].duration));
+        if (!live()) return;
         setCompletedSteps(prev => [...prev, i]);
       }
       stepsCompleteRef.current = true;
@@ -134,6 +141,7 @@ export default function StoreGeneratingScreen() {
 
   useEffect(() => {
     runGeneration();
+    return () => { runIdRef.current++; };
   }, [retryCount]);
 
   const handleRetry = () => {

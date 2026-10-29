@@ -95,7 +95,8 @@ export default function SellerDropPreview() {
   // instead of a misleading LIVE NOW.
   const isEnded = drop?.status === 'closed' || drop?.status === 'fulfilled';
   const products = drop?.products ?? [];
-  const heroUri = drop?.heroVideoUrl || drop?.heroImageUrl || products.flatMap(p => p.images ?? []).find(Boolean);
+  // Image can't render a video file, so a video-only hero falls back to a product photo.
+  const heroUri = drop?.heroImageUrl || products.flatMap(p => p.images ?? []).find(Boolean);
 
   if (loading) {
     return (

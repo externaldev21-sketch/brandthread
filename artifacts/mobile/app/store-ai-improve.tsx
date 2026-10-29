@@ -1,5 +1,5 @@
 import { haptic } from '@/lib/haptics';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
@@ -72,7 +72,11 @@ export default function StoreAiImproveScreen() {
     return s.aiSuggestions;
   };
 
+  // Each refresh is a paid AI generation; the button stays tappable while one runs.
+  const refreshing = useRef(false);
   const handleRefresh = async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     setLoading(true);
     setLoadError(null);
     try {
@@ -84,6 +88,7 @@ export default function StoreAiImproveScreen() {
     } finally {
       await load().catch(() => {});
       setLoading(false);
+      refreshing.current = false;
     }
   };
 

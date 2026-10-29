@@ -146,7 +146,7 @@ export default function StoreSettingsScreen() {
           if (active) setLoadError(apiErrorMessage(e, "Couldn't load your saved settings. Showing this device's copy."));
         }
       })
-      .catch(() => {})
+      .catch((e) => { if (active) setLoadError(apiErrorMessage(e, "Couldn't load your saved settings.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []));

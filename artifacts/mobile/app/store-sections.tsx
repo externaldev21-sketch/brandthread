@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useColors } from '@/hooks/useColors';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -93,9 +93,11 @@ export default function StoreSectionsScreen() {
   const insets = useSafeAreaInsets();
   const tabBarInset = useSellerTabBarInset();
   const [adding, setAdding] = useState<string | null>(null);
+  const addingRef = useRef(false);
 
   async function handleAdd(sectionType: string) {
-    if (adding) return;
+    if (addingRef.current) return;
+    addingRef.current = true;
     setAdding(sectionType);
     try {
       await createSection(sectionType as StoreSectionType);
@@ -104,6 +106,7 @@ export default function StoreSectionsScreen() {
     } catch (e) {
       Alert.alert('Error', 'Failed to add section. Please try again.');
     } finally {
+      addingRef.current = false;
       setAdding(null);
     }
   }

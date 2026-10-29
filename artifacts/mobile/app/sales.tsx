@@ -214,7 +214,11 @@ export default function SalesScreen() {
   async function togglePause(x: Sale) {
     const nextActive = !x.active;
     setSales(prev => prev.map(r => r.id === x.id ? { ...r, active: nextActive, status: nextActive ? 'live' : 'paused' } : r));
-    try { await api.sales.update(x.id, { active: nextActive }); }
+    try {
+      // The server decides live vs scheduled/ended; the optimistic 'live' is only a guess.
+      const updated = await api.sales.update(x.id, { active: nextActive });
+      if (updated?.id) setSales(prev => prev.map(r => r.id === x.id ? normalizeSale(updated) : r));
+    }
     catch { void load(); }
   }
 
@@ -250,7 +254,7 @@ export default function SalesScreen() {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
           {loadError ? (
-            <EmptyState icon="alert-circle" title="Couldn't load your sales" message="Pull to refresh." actionLabel="Try again" onAction={() => { void load(); }} variant="error" />
+            <EmptyState icon="alert-circle" title="Couldn't load your sales" message="Check your connection and try again." actionLabel="Try again" onAction={() => { void load(); }} variant="error" />
           ) : sales.length === 0 && (
             <EmptyState
               icon="percent"

@@ -160,6 +160,7 @@ export default function QuoteRequestScreen() {
   const [customPackaging, setCustomPackaging] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submittedRef = useRef(false);
 
   // Load manufacturer (either the one passed in, or the one picked in step 1)
   useEffect(() => {
@@ -206,7 +207,8 @@ export default function QuoteRequestScreen() {
         }
         setProductName(qr.productName);
         setQuantity(qr.quantity.toString());
-        setTargetUnitPrice(qr.targetUnitPriceCents === undefined ? '' : formatCents(qr.targetUnitPriceCents).slice(1));
+        // Plain decimal: formatCents adds grouping/locale symbols parseDecimalToCents rejects.
+        setTargetUnitPrice(qr.targetUnitPriceCents === undefined ? '' : (qr.targetUnitPriceCents / 100).toFixed(2));
         setNeededByDate(qr.neededByDate ?? '');
         setProductionType(qr.productionType ?? 'Standard');
         setSampleRequired(qr.sampleRequired);
@@ -221,7 +223,8 @@ export default function QuoteRequestScreen() {
         setHasHardware(qr.hasHardware);
         setHasLabels(qr.hasLabels);
         setCustomPackaging(qr.customPackaging);
-        setStep(qr.currentStep);
+        // Saved steps exclude the picker step, which a resumed draft never shows.
+        setStep(Math.min(Math.max(1, qr.currentStep || 1), TOTAL_STEPS));
       }).catch(() => {});
       return () => { active = false; };
     }
@@ -260,8 +263,8 @@ export default function QuoteRequestScreen() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (!effectiveManufacturerId) return;
-      saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, step))
+      if (!effectiveManufacturerId || submittedRef.current) return;
+      saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, Math.max(1, step - (needsPicker ? 1 : 0))))
         .then(qr => { draftId.current = qr.id; }).catch(() => {});
     }, 2000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -272,15 +275,34 @@ export default function QuoteRequestScreen() {
     hasEmbroidery, hasWash, hasHardware, hasLabels, customPackaging, step,
   ]);
 
+  // Write the draft now: the 2s autosave timer is cleared on unmount, so
+  // leaving straight after an edit would otherwise drop it.
+  async function flushDraft(): Promise<boolean> {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!effectiveManufacturerId) return false;
+    const qr = await saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, Math.max(1, step - (needsPicker ? 1 : 0))));
+    draftId.current = qr.id;
+    return true;
+  }
+
   function handleExit() {
     Alert.alert('Exit quote request?', 'Your progress will be auto-saved as a draft.', [
-      { text: 'Save & Exit', onPress: () => goBackOr(router) },
+      { text: 'Save & Exit', onPress: () => { flushDraft().catch(() => {}).finally(() => goBackOr(router)); } },
       { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
-  function handleSaveDraft() {
+  async function handleSaveDraft() {
+    try {
+      if (!(await flushDraft())) {
+        Alert.alert('Choose a manufacturer', 'Pick who this quote request is for before saving a draft.');
+        return;
+      }
+    } catch (e) {
+      Alert.alert("Couldn't save draft", e instanceof Error ? e.message : 'Try again.');
+      return;
+    }
     Alert.alert('Draft saved', 'You can resume this quote request from the Manufacturer Hub.');
     goBackOr(router);
   }
@@ -316,6 +338,7 @@ export default function QuoteRequestScreen() {
   function addColorway() {
     const c = colorwayInput.trim();
     if (!c) return;
+    if (colorways.includes(c)) { setColorwayInput(''); return; }
     setColorways(prev => [...prev, c]);
     setColorwayInput('');
   }
@@ -341,8 +364,11 @@ export default function QuoteRequestScreen() {
       }
       // Ensure draft exists first — same complete payload autosave builds, so
       // Submit never silently drops fields the seller actually filled in.
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       const qr = await saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, TOTAL_STEPS));
       await submitQuoteRequest(qr.id);
+      // A later autosave would recreate the just-submitted request as a draft.
+      submittedRef.current = true;
       Alert.alert(
         'Quote request sent',
         'Your request has been submitted. The manufacturer will respond within their stated response time.',

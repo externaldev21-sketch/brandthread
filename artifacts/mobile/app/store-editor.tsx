@@ -495,7 +495,7 @@ export default function StoreEditor() {
               </FieldRow>
               <FieldRow>
                 <FieldLabel>Overlay Strength (0–100)</FieldLabel>
-                <StyledInput value={String(field('overlayStrength', 40))} onChange={v => handleLocalChange('overlayStrength', parseInt(v) || 0)} placeholder="40" />
+                <StyledInput value={String(field('overlayStrength', 40))} onChange={v => handleLocalChange('overlayStrength', Math.min(100, Math.max(0, parseInt(v) || 0)))} placeholder="40" />
               </FieldRow>
               {s.type === 'hero_video' && (
                 <>
@@ -1030,7 +1030,6 @@ export default function StoreEditor() {
                   value={inlineHeadingDraft}
                   onChangeText={setInlineHeadingDraft}
                   onBlur={() => commitInlineHeading(section.id, inlineHeadingDraft)}
-                  onSubmitEditing={() => commitInlineHeading(section.id, inlineHeadingDraft)}
                   placeholder={section.label}
                   placeholderTextColor={SUBTLE}
                   style={sectionStyles.inlineInput}

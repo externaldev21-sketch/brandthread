@@ -179,7 +179,7 @@ export default function SellerLiveScreen() {
       if (params.facing === 'front') {
         try { engine.switchCamera(); } catch { /* single camera */ }
       }
-      if (params.mic === 'off') {
+      if (!micOn) {
         try { engine.muteLocalAudioStream(true); } catch { /* older SDK */ }
       }
       engine.startPreview();
@@ -338,6 +338,7 @@ export default function SellerLiveScreen() {
     setProductTags(updated);
     if (preview) return;
     try { await (api as any).live.updateProducts(params.streamId, updated); } catch {
+      setProductTags(productTags);
       setNotice("Couldn't add that item. Try again.");
     }
   }
@@ -395,6 +396,7 @@ export default function SellerLiveScreen() {
   }
 
   function confirmEnd() {
+    if (ending) return;
     showActionSheet('End show?', 'Buyers will see that your show has ended.', [
       { text: 'End show', style: 'destructive', onPress: () => { void endShow(); } },
       { text: 'Keep going', style: 'cancel' },

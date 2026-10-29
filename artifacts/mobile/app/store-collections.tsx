@@ -32,6 +32,7 @@ import {
 } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { plural } from '@/lib/plural';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
   StoreCollection, CollectionType, CollectionStatus,
@@ -222,6 +223,7 @@ export default function StoreCollectionsScreen() {
       Alert.alert('Name required', 'Give the collection a name.');
       return;
     }
+    if (saving) return;
     setSaving(true);
     try {
       const data: Partial<StoreCollection> = {
@@ -257,7 +259,8 @@ export default function StoreCollectionsScreen() {
   function setFormField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === 'name' && !prev.handle) {
+      // Keep a new collection's handle in step with its name until the seller edits the handle.
+      if (key === 'name' && (!prev.handle || (mode === 'new' && prev.handle === toHandle(prev.name)))) {
         (next as any).handle = toHandle(value as string);
       }
       return next;
@@ -332,7 +335,7 @@ export default function StoreCollectionsScreen() {
                       />
                     </View>
                     <Text style={styles.colMeta}>
-                      {item.productIds.length} products · /{item.handle}
+                      {plural(item.productIds?.length ?? 0, 'product')} · /{item.handle}
                     </Text>
                   </View>
                 </View>

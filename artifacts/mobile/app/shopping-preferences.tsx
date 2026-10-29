@@ -205,11 +205,12 @@ export default function ShoppingPreferences() {
   function saveCategories(next: Set<string>, prev: Set<string>) {
     const cats = Array.from(next);
     catSaveChain.current = catSaveChain.current.then(async () => {
-      if (!signedIn) {
-        await patchBuyerSettings({ styleCategories: cats });
-        return;
-      }
+      // A rejection here would leave the chain rejected and skip every later save.
       try {
+        if (!signedIn) {
+          await patchBuyerSettings({ styleCategories: cats });
+          return;
+        }
         await updatePreferences({ styleInterests: mergeStyleInterests(preferencesRef.current.styleInterests, cats, CATEGORIES) });
       } catch (error) {
         // Roll back only if nothing newer was picked meanwhile.

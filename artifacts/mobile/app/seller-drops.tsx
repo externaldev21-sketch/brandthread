@@ -170,7 +170,7 @@ export default function SellerDrops() {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{row.name}</Text>
                 <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 }}>
-                  {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No drop date set'}
+                  {row.releaseAt ? formatLaunch(row.releaseAt) : 'No drop date set'}
                 </Text>
                 {row.totalUnits != null && row.preOrderedUnits != null ? (
                   <Text style={{ color: theme.text, fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 3 }} testID="drop-preorder-progress">
@@ -178,7 +178,7 @@ export default function SellerDrops() {
                   </Text>
                 ) : null}
               </View>
-              <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
+              <StatusBadge label={statusLabel(row.status)} variant={statusVariant(row.status)} small />
               <Icon name="chevron-right" size={18} color={theme.muted} />
             </TouchableOpacity>
             {isUpcomingDrop(row) && (

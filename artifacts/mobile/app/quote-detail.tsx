@@ -107,6 +107,10 @@ function CounterOfferForm({
     setForm(prev => ({ ...prev, [field]: val }));
 
   const handleSubmit = async () => {
+    if (!Object.values(form).some(v => v.trim())) {
+      Alert.alert('Add your counteroffer', 'Fill in at least one field before sending.');
+      return;
+    }
     setSubmitting(true);
     try {
       await submitCounteroffer(quoteId, {
@@ -204,7 +208,8 @@ export default function QuoteDetailScreen() {
       if (q && generation === loadGeneration.current) {
         setQuote(q);
         setCounteroffers(cos);
-        const mfg = await getManufacturer(q.manufacturerId);
+        // A missing/legacy manufacturer profile must not hide a quote that loaded.
+        const mfg = await getManufacturer(q.manufacturerId).catch(() => undefined);
         if (generation === loadGeneration.current) setManufacturerName(mfg?.name ?? 'Manufacturer');
       } else if (generation === loadGeneration.current) setQuote(null);
     } catch {
@@ -415,7 +420,7 @@ export default function QuoteDetailScreen() {
             <InfoRow label="Lead Time" value={plural(quote.leadTimeDays, 'day')} />
             <InfoRow label="Production Time" value={plural(quote.productionDays, 'day')} />
             <InfoRow label="Payment Terms" value={quote.paymentTerms} />
-            {quote.notes && (
+            {!!quote.notes && (
               <>
                 <View style={s.separator} />
                 <Text style={s.notesLabel}>Notes from Manufacturer</Text>
@@ -447,10 +452,10 @@ export default function QuoteDetailScreen() {
                   {co.desiredProductionDays !== undefined && (
                     <InfoRow label="Desired Production Days" value={plural(co.desiredProductionDays, 'day')} />
                   )}
-                  {co.desiredPaymentTerms && (
+                  {!!co.desiredPaymentTerms && (
                     <InfoRow label="Desired Payment Terms" value={co.desiredPaymentTerms} />
                   )}
-                  {co.notes && (
+                  {!!co.notes && (
                     <Text style={s.coNotes}>{co.notes}</Text>
                   )}
                 </BrandthreadCard>

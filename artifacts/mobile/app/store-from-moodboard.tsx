@@ -218,7 +218,7 @@ export default function StoreFromMoodboardScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      selectionLimit: MAX_IMAGES,
+      selectionLimit: Math.max(1, MAX_IMAGES - imageUris.length),
       quality: 1,
     });
     if (!res.canceled && res.assets.length > 0) {

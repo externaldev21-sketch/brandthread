@@ -364,7 +364,7 @@ export default function SubscriptionScreen() {
     } catch (e: any) {
       externalSessionOpenedRef.current = null;
       if (parseRoleError(e)) { Alert.alert('Only the store owner can do this'); return; }
-      Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+      Alert.alert('Could not cancel', friendlyError(e, 'Please try again.'));
     }
   }
 
@@ -382,7 +382,7 @@ export default function SubscriptionScreen() {
       externalSessionOpenedRef.current = null;
       if (e?.code === 'RESUBSCRIBE_REQUIRED') { router.push('/plans' as never); return; }
       if (parseRoleError(e)) { Alert.alert('Only the store owner can do this'); return; }
-      Alert.alert('Could not resubscribe', e?.message ?? 'Please try again.');
+      Alert.alert('Could not resubscribe', friendlyError(e, 'Please try again.'));
     }
   }
 

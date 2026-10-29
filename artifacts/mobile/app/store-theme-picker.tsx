@@ -52,7 +52,7 @@ export default function StoreThemePicker() {
       setThemes(loaded);
       getStorefront().then(store => {
         setCurrentThemeId(store.themeSettings.themeId);
-      });
+      }).catch(() => {});
     }, [])
   );
 
@@ -61,6 +61,7 @@ export default function StoreThemePicker() {
     : null;
 
   function handleApply(themeId: string, presetId?: string, andNavigate = false) {
+    if (applying) return;
     const theme = themes.find(t => t.id === themeId);
     if (!theme) return;
     Alert.alert(

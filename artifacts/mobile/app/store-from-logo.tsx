@@ -229,7 +229,7 @@ export default function StoreFromLogoScreen() {
   };
 
   const handleAnalyze = async () => {
-    if (!logoUri || restoringAnalysis || preparingLogo) return;
+    if (!logoUri || analyzing || restoringAnalysis || preparingLogo) return;
     setAnalyzing(true);
     setAnalysisFailure(null);
     try {
@@ -254,7 +254,7 @@ export default function StoreFromLogoScreen() {
   };
 
   const handleApply = async () => {
-    if (!logoUri || restoringAnalysis || preparingLogo) return;
+    if (!logoUri || applying || restoringAnalysis || preparingLogo) return;
     setApplying(true);
     setApplyFailure(null);
     try {
@@ -303,7 +303,7 @@ export default function StoreFromLogoScreen() {
             <>
               <Icon name="upload" size={ICON.xxl} color={PURPLE} />
               <Text style={fl.uploadLabel}>Tap to upload logo</Text>
-              <Text style={fl.uploadSub}>PNG, JPG, or SVG</Text>
+              <Text style={fl.uploadSub}>PNG or JPG</Text>
             </>
           )}
         </TouchableOpacity>

@@ -159,7 +159,9 @@ export default function SellerVerificationScreen() {
       // After the URL opens, update local state optimistically
       setState(prev => prev ? { ...prev, verificationStatus: 'pending' } : prev);
     } catch (err: any) {
-      const code = err?.response?.data?.error ?? err?.message ?? '';
+      // ApiError keeps the raw JSON body; the server's code is its `error` string.
+      let code = '';
+      try { code = JSON.parse(err?.body ?? '')?.error ?? ''; } catch { code = err?.message ?? ''; }
       if (code === 'ALREADY_VERIFIED') {
         Alert.alert('Already verified', 'Your account is already verified.');
         loadStatus();
