@@ -12,9 +12,10 @@
  * `preview-seller-02` = Maison Vela) so a LIVE tray circle here is the exact
  * same creator whose ring lights up everywhere else in the preview.
  *
- * Gated by `isPreviewInboxEnabled()` (same gate as lib/previewInbox.ts) —
- * only used when the real `storiesFollowing()` call fails outright, never
- * for a real signed-in account.
+ * Gated by `isPreviewStoriesEnabled()` (= previewCatalog.ts's
+ * `isPreviewCatalogEnabled()`), and the seeded tray/stories only under
+ * `isPreviewDemoMode()` — only used when the real `storiesFollowing()` call
+ * fails outright, never for a real signed-in account.
  */
 import { posterUri } from './previewInbox';
 import { isPreviewCatalogEnabled } from './previewCatalog';

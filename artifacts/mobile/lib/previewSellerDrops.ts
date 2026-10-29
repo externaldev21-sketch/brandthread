@@ -5,8 +5,6 @@
  */
 import type { DropHype } from '@/lib/dropHype';
 
-const DAY_MS = 86_400_000;
-
 export interface PreviewSellerDrop {
   id: string;
   name: string;
@@ -45,7 +43,8 @@ export function previewDropHype(dropId: string, mode: 'demo' | 'fresh', now: Dat
   let running = 0;
   const series = daily.map((count, i) => {
     running += count;
-    const day = new Date(now.getTime() - (daily.length - 1 - i) * DAY_MS);
+    // Calendar days back (not 24h steps), so a DST change never skips or repeats a date.
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (daily.length - 1 - i));
     return { date: dayKey(day), cumulative: running };
   });
   // Followers: a steady share of the list, so the split reads like real data.

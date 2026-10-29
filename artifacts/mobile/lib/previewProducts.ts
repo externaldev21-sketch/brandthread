@@ -154,7 +154,7 @@ export function previewBuyerProductFromCatalog(row: PreviewCatalogProduct): Buye
     // (lib/previewCatalog.ts) — every seeded boutique is treated as
     // verified so the dev-web preview exercises the same seller-row badge
     // a real verified seller's product would show. Placeholder for preview
-    // data only; the real path (adaptApiProduct above) reads the actual
+    // data only; the real path (services/cartService.ts adaptApiProduct) reads the actual
     // `sellerVerified` the API already computes.
     sellerVerified: true,
     // Real per-product seed value (lib/previewCatalog.ts row.claimedUnits),
