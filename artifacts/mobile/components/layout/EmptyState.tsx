@@ -31,8 +31,9 @@ export function EmptyState({
   variant = 'empty',
   style,
   testID,
-  /** Shrinks the icon circle and vertical padding — for a screen tight on
-   * height (e.g. the buyer profile's grid, above a floating tab bar). */
+  /** Tightens the vertical padding and drops the message line (the badge
+   * stays the same size) — for a screen tight on height (e.g. the buyer
+   * profile's grid, above a floating tab bar). */
   compact,
   /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
   illustration,

@@ -15,9 +15,10 @@ import { radius as ControlRadius } from '@/constants/radii';
  * those swaps — with variant "buyer" the screen renders and behaves exactly
  * as the buyer tab always did:
  *  - data: the seller list drops buyer↔buyer threads; seller preview/demo
- *    data and preview ids; the counterpart is "not me" (the API includes
- *    the viewer in `participants` in no fixed order); "You:" previews use
- *    the real user id; search also matches order number / product;
+ *    data and preview ids; "You:" previews also match the real user id;
+ *    search also matches order number / product. (The counterpart is "not
+ *    me" in BOTH variants — see inboxCounterpart: the API includes the
+ *    viewer in `participants`, creator first);
  *  - routes: rows open /seller-conversation; request delete/block go
  *    through lib/sellerRequestActions;
  *  - chrome: a back arrow on the header (a pushed screen, not a tab), no
@@ -256,8 +257,14 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function getParticipant(conv: Conversation) {
-  return conv.participants[0];
+/** The other person in a DM row. GET /api/conversations lists EVERY
+ *  participant, the viewer included, in insertion order — and the creator is
+ *  inserted first (api-server routes/conversations.ts) — so `participants[0]`
+ *  is the viewer themself on every thread they started. Skip the viewer
+ *  (real id, or the legacy local 'me' id seeded preview threads use); fall
+ *  back to the first entry for one-participant preview rows. */
+export function inboxCounterpart(conv: Pick<Conversation, 'participants'>, viewerId: string | null | undefined) {
+  return conv.participants.find(p => p.userId !== MY_USER_ID && (!viewerId || p.userId !== viewerId)) ?? conv.participants[0];
 }
 
 function previewText(lastMessage: string | undefined, fallback: string): string {
@@ -366,10 +373,11 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   /** Seeded people/stories/notes in a seller preview only with &demo=1
    *  (Dev: no fake data in the default fresh preview). */
   const sellerFreshPreview = isSeller && !userId && isSellerDevPreview() && !isPreviewDemoMode();
-  /** The other person in the thread. */
+  /** The other person in the thread (both variants are "not me" — see
+   *  inboxCounterpart; the buyer variant also skips the legacy 'me' id). */
   const participantOf = (conv: Conversation) => (isSeller
     ? (conv.participants.find(p => p.userId !== userId) ?? conv.participants[0])
-    : getParticipant(conv));
+    : inboxCounterpart(conv, userId));
 
   // Real content on the very first frame, not a skeleton: seed from whatever
   // `warmBuyerTabs` (or a previous visit this session) already cached for
@@ -605,6 +613,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
     setSnackbarMessage(message);
     snackbarTimer.current = setTimeout(() => setSnackbarMessage(null), 2500);
   }, []);
+  useEffect(() => () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); }, []);
 
   const loadData = useCallback(async () => {
     // isBuyerDevPreview() (not just !userId): a stubbed/fake-signed-in Clerk
@@ -790,7 +799,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
   const requestConvs = allRequestConvs
     .filter(conv => {
       if (!messagesSearchLower) return true;
-      const participant = getParticipant(conv);
+      const participant = participantOf(conv);
       return [participant?.name, participant?.handle, conv.lastMessage]
         .filter(Boolean).join(' ').toLowerCase().includes(messagesSearchLower);
     })
@@ -990,7 +999,7 @@ export function MessagesInbox({ variant = 'buyer' }: { variant?: MessagesInboxVa
       ]);
       return;
     }
-    const other = getParticipant(conv);
+    const other = participantOf(conv);
     const opened = other ? openContextMenu({
       preview: {
         title: other.name || other.handle,
