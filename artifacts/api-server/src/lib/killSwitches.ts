@@ -16,6 +16,7 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { pool } from "@workspace/db";
+import { normalizeGatePath } from "./gatePath";
 
 export const KILL_SWITCHES = {
   liveEnabled: {
@@ -63,8 +64,11 @@ const ROUTES: Record<KillSwitchKey, RegExp[]> = {
 const AI_EXEMPT = [/^\/ai\/credits(\/.*)?$/];
 
 /** Which switch, if any, guards this request. Pure; exported for tests. */
-export function switchFor(method: string, path: string): KillSwitchKey | null {
+export function switchFor(method: string, rawPath: string): KillSwitchKey | null {
   if (!WRITE.has(method.toUpperCase())) return null;
+  // Express routing is case-insensitive and non-strict, so "/Buyer/Checkout/Session"
+  // or "/buyer//checkout/session/" still reach the handler: match the canonical form.
+  const path = normalizeGatePath(rawPath);
   for (const key of KILL_SWITCH_KEYS) {
     if (key === "aiEnabled" && AI_EXEMPT.some((re) => re.test(path))) continue;
     if (ROUTES[key].some((re) => re.test(path))) return key;

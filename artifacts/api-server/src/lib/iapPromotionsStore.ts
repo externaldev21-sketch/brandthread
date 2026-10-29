@@ -3,7 +3,7 @@
  * Kept apart from iapPromotions.ts so the rules there stay DB-free.
  */
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { adCampaigns, boosts, db, featuredSlots, iapPromotionPurchases, posts } from "@workspace/db";
 import { checkPostMediaEligibility } from "../routes/boosts";
 import { confirmFeaturedSlotPaidById } from "../routes/featured-slots";
@@ -183,6 +183,18 @@ export const drizzlePromoStore: PromoStore = {
     await db.update(iapPromotionPurchases)
       .set({ targetId: null, grantedAt: null })
       .where(eq(iapPromotionPurchases.transactionId, transactionId));
+  },
+
+  async grantedPurchaseFor(kind, targetId) {
+    const [row] = await db.select({ transactionId: iapPromotionPurchases.transactionId })
+      .from(iapPromotionPurchases)
+      .where(and(
+        eq(iapPromotionPurchases.kind, kind),
+        eq(iapPromotionPurchases.targetId, targetId),
+        isNotNull(iapPromotionPurchases.grantedAt),
+      ))
+      .limit(1);
+    return row?.transactionId ?? null;
   },
 };
 

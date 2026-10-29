@@ -259,12 +259,14 @@ export async function reserveDiscountCapacity(
   `);
   const code = ((locked as unknown as { rows?: Array<{ max_uses: number | null; uses_count: number }> }).rows ?? [])[0];
   if (!code || code.max_uses == null) return;
+  // Holder keys use the same shape as customerKey: the buyer id, or
+  // "guest:<email>" for a guest checkout (customerKeyOf in checkout-intent.ts).
   const open = await tx.execute(sql`
-    SELECT count(DISTINCT coalesce(cs.buyer_id, cs.guest_email))::int AS holders
+    SELECT count(DISTINCT coalesce(cs.buyer_id, 'guest:' || cs.guest_email))::int AS holders
     FROM checkout_sessions cs
     WHERE cs.discount_code_id = ${input.discountCodeId}
       AND cs.created_at > now() - make_interval(hours => ${OPEN_CHECKOUT_WINDOW_HOURS})
-      AND coalesce(cs.buyer_id, cs.guest_email, '') <> ${input.customerKey}
+      AND coalesce(cs.buyer_id, 'guest:' || cs.guest_email, '') <> ${input.customerKey}
       AND NOT EXISTS (
         SELECT 1 FROM orders o
         WHERE o.stripe_checkout_session_id = cs.stripe_session_id
