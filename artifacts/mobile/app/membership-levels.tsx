@@ -5,7 +5,6 @@
  * Server: routes/brand-membership.ts.
  */
 import React, { useEffect, useState } from 'react';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,7 +126,6 @@ export default function MembershipLevelsScreen() {
           <PrimaryButton label="Save" onPress={save} loading={saving} disabled={saving || !!problem} />
         </ScrollView>
       )}
-      <ScreenExplainer id="explain-membership-levels" />
     </View>
   );
 }

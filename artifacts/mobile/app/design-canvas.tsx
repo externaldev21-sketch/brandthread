@@ -1,5 +1,4 @@
 import { MEDIA } from '@/lib/theme';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 /**
  * Brandthread Design Studio — Main Canvas Editor
  * Route: /design-canvas?id=<projectId>
@@ -5594,7 +5593,6 @@ export default function DesignCanvasScreen() {
         </View>
       </Modal>
 
-      <ScreenExplainer id="explain-design-canvas" />
     </View>
   );
 }

@@ -8,7 +8,6 @@
  * recipients) next to the follower push's 24 hours.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -274,7 +273,6 @@ export default function SellerPushBroadcastScreen() {
         selectedId={link.id}
         onSelect={(id) => { const o = linkOptions.find((x) => x.id === id); if (o) setLink(o); setSheet(false); }}
       />
-      <ScreenExplainer id="explain-follower-push" />
     </View>
   );
 }

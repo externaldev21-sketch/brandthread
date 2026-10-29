@@ -5,8 +5,9 @@
  *
  * Handles every must-have rule in one place so individual screens don't have
  * to reimplement them:
- *  - Only the first time this account sees this tip id (or forced via Dev's
- *    `&tips=1` preview override).
+ *  - Only the first time this account sees this tip id. In the dev preview,
+ *    Dev's `&tips=1` turns tips on (the plain preview shows none) but the
+ *    seen-state still holds: dismiss, leave, come back — nothing.
  *  - Never on an auth-flow route.
  *  - Never stacks with another tip (global claim/release lock).
  *  - Only once `contentReady` is true (screen has real content, not a
@@ -58,13 +59,16 @@ export function useFirstRunTip(tipId: string, options: UseFirstRunTipOptions): U
 
   const eligible = useMemo(() => {
     if (!canShow) return false;
-    if (forceShow) return true; // Dev's &tips=1: always eligible, ignoring seen-state
     // Never decide before the saved seen-state has loaded (and auth settled).
+    // `&tips=1` included: it only lifts the plain preview's suppression. The
+    // preview has no server session, so its seen-state is the local cache
+    // (written on dismiss), and that has to hold across navigations and
+    // reloads like it does for a real account. Settings > Replay tips resets it.
     if (!controller.ready) return false;
     return !controller.hasSeen(tipId);
     // controller.hasSeen closes over state that changes identity each render when relevant —
     // depending on the primitives it reads keeps this from re-running needlessly.
-  }, [canShow, forceShow, controller, tipId]);
+  }, [canShow, controller, tipId]);
 
   useEffect(() => {
     if (claimed) {
@@ -76,7 +80,7 @@ export function useFirstRunTip(tipId: string, options: UseFirstRunTipOptions): U
       setClaimed(true);
       // Seen the moment it shows: swiping away, switching tabs or killing
       // the app all count, so no first-run tip ever repeats.
-      if (!forceShow) controller.markSeen(tipId);
+      controller.markSeen(tipId);
     }
     // Intentionally does not retry on every render if the claim fails (another
     // tip is showing) — this screen simply doesn't show its tip this visit,

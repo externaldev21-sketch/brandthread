@@ -1,47 +1,80 @@
 import { hexToRgba as mediaAlpha } from '@/lib/backgroundPalette';
 import { MEDIA } from '@/lib/theme';
 /**
- * `explainer` variant — the one-time "what is this screen" sheet. A short
- * card pinned to the bottom of the screen: the screen's name, 2–4 plain
- * lines on what it is and what to do there, and one Got it button. Got it,
- * the X, or a tap anywhere outside the card all dismiss it.
+ * `explainer` variant — the one-time "what is this screen" sheet. A card
+ * pinned to the bottom of the screen: the screen's name and an X, then a
+ * small swipeable carousel of 2–3 mini-cards (one idea each: icon, short
+ * title, one line) with the dashboard tour's "1 / 3" count and dots. Swipe
+ * or tap a card (or Next) to advance; Got it on the last card. The X or a
+ * tap anywhere outside the sheet bails from any card.
  *
  * Same card language as the anchored variant (solid elevated fill, hairline
  * border, white pill button) so every first-run surface reads as one
  * system. Rendered in a transparent Modal so it sits above the tab bars and
  * headers instead of being clipped by the screen it explains.
  */
-import React, { useEffect, useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, SP, RADIUS, TEXT_SECONDARY, TEXT_TERTIARY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRegisterCoach } from '@/lib/coachPresence';
+
+export interface ExplainerStep {
+  icon: IconName;
+  title: string;
+  body: string;
+}
 
 export interface ExplainerSheetProps {
   visible: boolean;
   onDismiss: () => void;
   /** The screen's name, as the screen itself titles it. */
   title: string;
-  /** 2–4 short lines: what the screen is, then the main things to do there. */
-  lines: string[];
+  /** 2–3 mini-cards, one idea each. */
+  steps: ExplainerStep[];
   reduceMotion?: boolean;
   testID?: string;
 }
 
-export function ExplainerSheet({ visible, onDismiss, title, lines, reduceMotion = false, testID }: ExplainerSheetProps) {
+export function ExplainerSheet({ visible, onDismiss, title, steps, reduceMotion = false, testID }: ExplainerSheetProps) {
   const insets = useSafeAreaInsets();
   const rise = useRef(new Animated.Value(0)).current;
+  const pager = useRef<ScrollView>(null);
+  const [pageWidth, setPageWidth] = useState(0);
+  const [index, setIndex] = useState(0);
   // The cookie-consent card waits while this is up.
   useRegisterCoach(testID ?? 'first-run-tip-explainer', visible);
 
   useEffect(() => {
-    if (!visible) { rise.setValue(0); return; }
+    if (!visible) { rise.setValue(0); setIndex(0); return; }
     Animated.timing(rise, { toValue: 1, duration: reduceMotion ? 1 : 220, useNativeDriver: true }).start();
   }, [visible, rise, reduceMotion]);
 
-  if (!visible) return null;
+  if (!visible || steps.length === 0) return null;
+
+  const isLast = index === steps.length - 1;
+
+  function goTo(next: number) {
+    const clamped = Math.max(0, Math.min(steps.length - 1, next));
+    setIndex(clamped);
+    pager.current?.scrollTo({ x: clamped * pageWidth, animated: !reduceMotion });
+  }
+
+  function advance() {
+    if (isLast) onDismiss();
+    else goTo(index + 1);
+  }
+
+  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (!pageWidth) return;
+    const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+    if (next !== index && next >= 0 && next < steps.length) setIndex(next);
+  }
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onDismiss} statusBarTranslucent>
@@ -74,20 +107,58 @@ export function ExplainerSheet({ visible, onDismiss, title, lines, reduceMotion 
                 <Icon name="x" size={18} color={mediaAlpha(MEDIA.foreground, 0.7)} />
               </Pressable>
             </View>
-            {lines.map((line, i) => (
-              <View key={i} style={styles.lineRow}>
-                <View style={styles.bullet} />
-                <Text style={[styles.line, i === 0 && styles.lead]}>{line}</Text>
+
+            <View onLayout={(e: LayoutChangeEvent) => setPageWidth(e.nativeEvent.layout.width)}>
+              <ScrollView
+                ref={pager}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                testID="first-run-tip-explainer-pager"
+              >
+                {steps.map((step, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={advance}
+                    style={[styles.page, pageWidth ? { width: pageWidth } : null]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${step.title}. ${step.body}`}
+                    accessibilityHint={i === steps.length - 1 ? 'Closes the tip' : 'Shows the next tip'}
+                    testID={`first-run-tip-explainer-step-${i}`}
+                  >
+                    <View style={styles.miniCard}>
+                      <View style={styles.iconWell}>
+                        <Icon name={step.icon} size={20} color={MEDIA.foreground} />
+                      </View>
+                      <View style={styles.miniText}>
+                        <Text style={styles.stepTitle}>{step.title}</Text>
+                        <Text style={styles.stepBody}>{step.body}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.footerRow}>
+              <View style={styles.dots} testID="first-run-tip-explainer-dots">
+                {steps.map((_, i) => (
+                  <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
+                ))}
               </View>
-            ))}
+              <Text style={styles.stepCount} testID="first-run-tip-explainer-count">{index + 1} / {steps.length}</Text>
+            </View>
+
             <PressableScale
-              onPress={onDismiss}
+              onPress={advance}
               style={styles.button}
               accessibilityRole="button"
-              accessibilityLabel="Got it"
-              testID="first-run-tip-explainer-ok"
+              accessibilityLabel={isLast ? 'Got it' : 'Next'}
+              testID={isLast ? 'first-run-tip-explainer-ok' : 'first-run-tip-explainer-next'}
             >
-              <Text style={styles.buttonText}>Got it</Text>
+              <Text style={styles.buttonText}>{isLast ? 'Got it' : 'Next'}</Text>
             </PressableScale>
           </View>
         </Animated.View>
@@ -110,10 +181,28 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
   title: { flex: 1, color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg },
   close: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm },
-  lineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  bullet: { width: 4, height: 4, borderRadius: 2, marginTop: 8, backgroundColor: TEXT_SECONDARY },
-  line: { flex: 1, color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  lead: { color: MEDIA.foreground, fontFamily: FONT.medium },
-  button: { backgroundColor: MEDIA.foreground, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center', marginTop: SP.sm },
+  page: { width: '100%' },
+  miniCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
+    minHeight: 92,
+    padding: SP.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.1),
+    backgroundColor: mediaAlpha(MEDIA.foreground, 0.04),
+  },
+  iconWell: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: mediaAlpha(MEDIA.foreground, 0.08),
+  },
+  miniText: { flex: 1 },
+  stepTitle: { color: MEDIA.foreground, fontFamily: FONT.semibold, fontSize: FS.base },
+  stepBody: { color: TEXT_SECONDARY, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: 4 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 14 },
+  dots: { flexDirection: 'row', gap: 5 },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: mediaAlpha(MEDIA.foreground, 0.3) },
+  dotActive: { backgroundColor: MEDIA.foreground, width: 14 },
+  stepCount: { fontVariant: ['tabular-nums'], color: TEXT_TERTIARY, fontFamily: FONT.medium, fontSize: FS.xs },
+  button: { backgroundColor: MEDIA.foreground, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center' },
   buttonText: { color: MEDIA.background, fontFamily: FONT.bold, fontSize: FS.sm },
 });

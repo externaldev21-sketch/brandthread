@@ -18,7 +18,6 @@
  * still works but Start show explains that (preview `demo=1` excepted).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -67,7 +66,7 @@ function toLiveProduct(p: CatalogProduct): LiveProduct {
 export default function SellerGoLiveScreen() {
   const age = useAgeStatus();
   if (age.status !== 'ok') return <AgeRestrictedScreen title="Go live" status={age.status} onResolved={age.setBand} />;
-  return <><SellerGoLiveFlow /><ScreenExplainer id="explain-go-live" /></>;
+  return <SellerGoLiveFlow />;
 }
 
 function SellerGoLiveFlow() {

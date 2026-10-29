@@ -68,7 +68,6 @@ import { queryKeys } from '@/lib/queryClient';
 
 import { prefetchOnPressIn } from '@/lib/prefetch';
 
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 
 import { DEFAULT_PRODUCT_SORT, PRODUCT_SORT_OPTIONS, productSortLabel, productSortQuery, type ProductSortKey } from '@/lib/sellerLists/productSort';
 
@@ -1080,7 +1079,6 @@ export default function ProductsScreen() {
         onClose={() => setStockEditVisible(false)}
         onChanged={handleStockChanged}
       />
-      <ScreenExplainer id="seller-products" contentReady={!loading} />
     </View>
   );
 }

@@ -1,5 +1,4 @@
 import { radius as ControlRadius } from '@/constants/radii';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 /**
  * Link in bio editor with live preview.
  * Mobbin reference: Linktree "Links" editor (link cards with drag handle,
@@ -265,7 +264,6 @@ export default function LinkInBioScreen() {
           </>
         )}
       </ScrollView>
-      <ScreenExplainer id="explain-link-in-bio" />
     </View>
   );
 }

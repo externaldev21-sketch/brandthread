@@ -32,14 +32,14 @@ export function ScreenExplainer({ id, contentReady = true, suppressed = false }:
   // slot; this one waits and shows as soon as the slot frees, rather than
   // skipping the visit.
   const slotFree = activeTipId === null || activeTipId === id;
-  const { title, lines } = SCREEN_EXPLAINERS[id];
+  const { title, steps } = SCREEN_EXPLAINERS[id];
   return (
     <FirstRunTip
       id={id}
       variant="explainer"
       contentReady={contentReady && focused && slotFree}
       suppressed={suppressed}
-      explainer={{ title, lines, testID: `first-run-tip-explainer-${id}` }}
+      explainer={{ title, steps, testID: `first-run-tip-explainer-${id}` }}
     />
   );
 }

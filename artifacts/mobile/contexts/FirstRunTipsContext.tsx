@@ -47,8 +47,15 @@ interface FirstRunTipsContextValue {
 const FirstRunTipsContext = createContext<FirstRunTipsContextValue | null>(null);
 
 export function FirstRunTipsProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isLoaded: authLoaded } = useAuth();
+  const { userId: authUserId, isLoaded: authLoaded } = useAuth();
   const api = useApi();
+  // The dev preview has no server session (its seen-state writes never land)
+  // and its account id can resolve after the first decision, so it keeps its
+  // seen-state under one stable local key and never waits on the server.
+  // That way a dismissed tip stays dismissed across navigations and reloads.
+  const inPreview = isSellerDevPreview() || isBuyerDevPreview();
+  const userId = inPreview ? null : authUserId;
+  const writeApi = inPreview ? undefined : api;
 
   const [state, setState] = useState<FirstRunTipsLocalState>({ seenIds: new Set(), skipAll: false });
   const [ready, setReady] = useState(false);
@@ -62,7 +69,7 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
     // which renders without waiting for Clerk), and `ready` only flips once
     // the saved seen-state is loaded, so a tip can't flash on a stale or empty
     // state or show twice across a null → real userId switch.
-    const settled = authLoaded || isSellerDevPreview() || isBuyerDevPreview();
+    const settled = authLoaded || inPreview;
     if (!settled) return;
     let active = true;
     setReady(false);
@@ -89,7 +96,7 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
       });
     }
     return () => { active = false; };
-  }, [authLoaded, userId, api]);
+  }, [authLoaded, userId, api, inPreview]);
 
   // Pure account state only — the preview/&tips=1 override lives in
   // useFirstRunTip itself (see that file for why: it needs to react to
@@ -115,12 +122,12 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const markSeen = useCallback((tipId: string) => {
-    setState((current) => markTipSeen(userId, tipId, current, api));
-  }, [userId, api]);
+    setState((current) => markTipSeen(userId, tipId, current, writeApi));
+  }, [userId, writeApi]);
 
   const doSkipAll = useCallback(() => {
-    setState((current) => setSkipAllTips(userId, current, api));
-  }, [userId, api]);
+    setState((current) => setSkipAllTips(userId, current, writeApi));
+  }, [userId, writeApi]);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -130,17 +137,17 @@ export function FirstRunTipsProvider({ children }: { children: React.ReactNode }
     // Optimistic flip so the switch responds instantly; reverted on failure.
     setState((current) => ({ ...current, skipAll: value }));
     try {
-      await updateSkipAllTips(userId, value, previous, api);
+      await updateSkipAllTips(userId, value, previous, writeApi);
     } catch (error) {
       setState((current) => ({ ...current, skipAll: previous.skipAll }));
       throw error;
     }
-  }, [userId, api]);
+  }, [userId, writeApi]);
 
   const replayTips = useCallback(async () => {
-    const reset = await replayAllTips(userId, api);
+    const reset = await replayAllTips(userId, writeApi);
     setState(reset);
-  }, [userId, api]);
+  }, [userId, writeApi]);
 
   const value = useMemo<FirstRunTipsContextValue>(() => ({
     ready,

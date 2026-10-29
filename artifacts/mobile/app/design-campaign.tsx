@@ -45,6 +45,7 @@ import {
   Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -257,7 +258,13 @@ const sec = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+// Mounted once around every state (loading, results, the creator): a
+// per-branch mount would unmount mid-show and count as seen.
 export default function CreateAdScreen() {
+  return <><CreateAdScreenContent /><ScreenExplainer id="explain-create-ad" /></>;
+}
+
+function CreateAdScreenContent() {
   useHideTabBar();
   const router    = useRouter();
   const params    = useLocalSearchParams<{ id?: string; campaignId?: string; paymentReturn?: string }>();

@@ -5,7 +5,6 @@
  * useCommunityClient (live / demo / readonly), never the API directly.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { ActivityIndicator, FlatList, Keyboard, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -342,7 +341,6 @@ export default function CommunityScreen() {
           />
         ) : null}
       </BottomSheet>
-      <ScreenExplainer id="explain-community" />
     </View>
   );
 }
