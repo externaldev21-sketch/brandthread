@@ -393,11 +393,16 @@ export function toBrandthreadProduct(product: ShopifyProduct, collectionTitle?: 
       // A product without options carries Shopify's placeholder
       // "Title: Default Title" variant — that is not a size.
       .filter((option) => option.value && !(option.name === "title" && option.value === "Default Title"));
-    const size = options.find((option) => /size|dimension|fit/.test(option.name))?.value
-      ?? options[0]?.value ?? undefined;
-    const color = options.find((option) => /color|colour/.test(option.name))?.value
-      ?? options[1]?.value ?? undefined;
-    const other = options.filter((option) => option.value !== size && option.value !== color)
+    // Named options win; otherwise fall back by position (1st = size, 2nd =
+    // color), but never reuse an option already claimed by the other field —
+    // a lone "Color" option must not also become the size.
+    const sizeNamed = options.find((option) => /size|dimension|fit/.test(option.name));
+    const colorNamed = options.find((option) => /color|colour/.test(option.name));
+    const sizeOption = sizeNamed ?? (options[0] !== colorNamed ? options[0] : undefined);
+    const colorOption = colorNamed ?? (options[1] !== sizeOption ? options[1] : undefined);
+    const size = sizeOption?.value;
+    const color = colorOption?.value;
+    const other = options.filter((option) => option !== sizeOption && option !== colorOption)
       .map((option) => `${option.name || "option"}: ${option.value}`);
     return {
       size: [size, ...other].filter(Boolean).join(" / ") || undefined,

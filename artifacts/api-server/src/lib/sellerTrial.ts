@@ -125,12 +125,19 @@ export async function checkStripeTrial(stripe: StripeLike, sub: any, clerkId: st
   });
   const installId = typeof sub.metadata?.installId === "string" ? sub.metadata.installId : null;
   const reused = fingerprint ? await cardTrialedByAnotherAccount(fingerprint, clerkId) : false;
+  if (!reused) {
+    await recordTrialClaim({ clerkId, provider: "stripe", subscriptionRef: sub.id, installId, cardFingerprint: fingerprint });
+    return "recorded";
+  }
+
+  // Cancel BEFORE recording the claim: the claim is what makes a later event
+  // for this subscription return "already_recorded", so recording first and
+  // then failing to cancel (Stripe error, timeout) would let the reused-card
+  // trial run to its first charge with nothing ever retrying the cancel.
+  await stripe.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
   // A refused trial still counts for this person and device, but the card stays
   // tied only to the account that actually trialed with it.
-  await recordTrialClaim({ clerkId, provider: "stripe", subscriptionRef: sub.id, installId, cardFingerprint: reused ? null : fingerprint });
-  if (!reused) return "recorded";
-
-  await stripe.subscriptions.cancel(sub.id, { invoice_now: false, prorate: false });
+  await recordTrialClaim({ clerkId, provider: "stripe", subscriptionRef: sub.id, installId, cardFingerprint: null });
   logger.info({ subscriptionId: sub.id, clerkId }, "Cancelled a trial on a card another account already trialed with");
   try {
     const { publishNotification } = await import("../routes/notifications-feed");
