@@ -68,8 +68,11 @@ export default function ClosetOutfitScreen() {
       if (prev.length >= MAX_OUTFIT_PIECES) return prev;
       return [...prev, piece.id];
     });
+    // An outfit already saved from this picker (Post as a Fit, then back) no
+    // longer matches the picks: drop it so the board and Save/Post use them.
+    if (!outfitId) setOutfit(null);
     hapticSelection();
-  }, []);
+  }, [outfitId]);
 
   const save = useCallback(async (): Promise<ClosetOutfit | null> => {
     if (outfit) return outfit;

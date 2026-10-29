@@ -226,6 +226,9 @@ export default function BuyerStoryViewer() {
 
   const currentStory: Story | undefined = stories[storyIdx];
   const currentSlide: StoryMedia | undefined = currentStory?.media[slideIdx];
+  // The story on screen, read by loadStories() on a background reload.
+  const currentStoryIdRef = useRef<string | undefined>(undefined);
+  currentStoryIdRef.current = currentStory?.id;
 
   const loadStories = useCallback(async () => {
     const generation = ++loadGeneration.current;
@@ -268,8 +271,12 @@ export default function BuyerStoryViewer() {
         filtered = fetched.filter((st): st is Story => !!st && st.expiresAt > now);
       }
       setStories(filtered);
-      if (storyId) {
-        const idx = filtered.findIndex(s => s.id === storyId);
+      // A reload (subscribeSocial fires on every incoming DM) keeps the story
+      // being watched; jumping back to the one that opened the viewer left
+      // slideIdx pointing past its slides ("no longer available").
+      const keepId = currentStoryIdRef.current ?? storyId;
+      if (keepId) {
+        const idx = filtered.findIndex(s => s.id === keepId);
         if (idx >= 0) setStoryIdx(idx);
       }
     } catch {
@@ -725,7 +732,8 @@ export default function BuyerStoryViewer() {
                 ]}
                 onPress={() => {
                   const url = overlay.linkUrl ?? '';
-                  if (url) Linking.openURL(url).catch(() => {});
+                  // The API stores any string; only open web links (no javascript:, intent:, …).
+                  if (/^https?:\/\//i.test(url)) Linking.openURL(url).catch(() => {});
                 }}
                 accessibilityRole="link"
                 accessibilityLabel={overlay.linkText || overlay.linkUrl || 'Open link'}
