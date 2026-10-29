@@ -239,11 +239,16 @@ export default function BillingScreen() {
       router.push(`/plans?highlight=${planId}&source=billing` as never);
       return;
     }
+    // A second tap while the first Checkout Session is being created would open two.
+    if (busy) return;
+    setBusy(true);
     try {
       const { url } = await api.seller.subscription.checkout(planId);
       await Linking.openURL(url);
     } catch (error) {
       showActionError(error, 'Could not start checkout');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -479,6 +484,7 @@ export default function BillingScreen() {
                 actionLabel={`Try ${option.name}`}
                 actionVariant={option.highlight ? 'primary' : 'secondary'}
                 onAction={canManage ? () => startPlan(option.id) : undefined}
+                disabled={busy}
                 testID={`billing-start-${option.id}`}
               />
             ))}

@@ -38,6 +38,7 @@ import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { formatCompactCount } from '@/lib/compactFormat';
 
 import { formatMoney } from '@/lib/format';
+import { plural } from '@/lib/plural';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -46,15 +47,30 @@ type KlaviyoStatus = {
   smsSubscriberCount?: number;
 };
 
+// Shape of GET /api/discount-codes rows: `value` is a numeric column (a
+// string of dollars for 'fixed', a percent for 'percentage'), and usage is
+// usesCount / maxUses — same as app/discounts.tsx's normalizeDiscount.
 type DiscountCode = {
   id: string;
   code: string;
-  type: 'percentage' | 'fixed';
+  type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
   value: number;
-  usageCount: number;
-  usageLimit?: number;
-  expiresAt?: string;
+  usesCount: number;
+  maxUses?: number | null;
+  expiresAt?: string | null;
 };
+
+function normalizeDiscount(raw: any): DiscountCode {
+  return {
+    id: String(raw.id),
+    code: raw.code,
+    type: raw.type,
+    value: Number(raw.value) || 0,
+    usesCount: raw.usesCount ?? 0,
+    maxUses: raw.maxUses ?? null,
+    expiresAt: raw.expiresAt ?? null,
+  };
+}
 
 type ReferralStats = {
   total: number;
@@ -82,7 +98,10 @@ function campaignHasResults(s: AdCampaign['status']) {
 }
 
 function discountValueLabel(d: DiscountCode) {
-  return d.type === 'percentage' ? `${d.value}% off` : `${formatMoney(d.value)} off`;
+  if (d.type === 'percentage') return `${d.value}% off`;
+  if (d.type === 'fixed') return `${formatMoney(Math.round(d.value * 100))} off`;
+  if (d.type === 'free_shipping') return 'Free shipping';
+  return 'Free item';
 }
 
 function discountExpiryLabel(d: DiscountCode) {
@@ -129,7 +148,7 @@ export default function MarketingScreen() {
           setCampaignsError(!isSellerDevPreview());
         });
       api.discountCodes.list()
-        .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
+        .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? res.map(normalizeDiscount) : []); setDiscountsError(false); } })
         .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
         .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0, earnedCents: res.earnedCents ?? 0 }); })
@@ -285,7 +304,7 @@ export default function MarketingScreen() {
               <View style={styles.discountInfo}>
                 <Text style={[styles.discountType, { color: colors.foreground }]}>{discountValueLabel(d)}</Text>
                 <Text style={[styles.discountMeta, { color: colors.mutedForeground }]}>
-                  {d.usageCount} uses{d.usageLimit != null ? ` / ${d.usageLimit}` : ''} · {discountExpiryLabel(d)}
+                  {plural(d.usesCount, 'use')}{d.maxUses != null ? ` / ${d.maxUses}` : ''} · {discountExpiryLabel(d)}
                 </Text>
               </View>
               <TouchableOpacity

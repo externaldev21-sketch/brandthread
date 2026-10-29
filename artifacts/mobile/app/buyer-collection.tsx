@@ -114,19 +114,21 @@ export default function BuyerCollection() {
     void load(silent);
   }, [load, collectionId]));
 
-  async function togglePublic(value: boolean) {
-    if (!collection) return;
+  async function togglePublic(value: boolean): Promise<boolean> {
+    if (!collection) return false;
     setCollection({ ...collection, isPublic: value });
     try {
       await updateCollection(collection.id, { isPublic: value });
+      return true;
     } catch {
       setCollection({ ...collection, isPublic: !value });
       Alert.alert('Couldn’t update', 'Try again.');
+      return false;
     }
   }
 
   async function handleRename() {
-    if (!collection || !renameValue.trim()) return;
+    if (!collection || !renameValue.trim() || saving) return;
     setSaving(true);
     try {
       const updated = await updateCollection(collection.id, { name: renameValue.trim() });
@@ -148,7 +150,7 @@ export default function BuyerCollection() {
         'This collection is currently private. Turn it public so anyone with the link can view it.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Make public & share', onPress: async () => { await togglePublic(true); shareLink(link); } },
+          { text: 'Make public & share', onPress: async () => { if (await togglePublic(true)) shareLink(link); } },
         ],
       );
       return;
@@ -277,7 +279,7 @@ export default function BuyerCollection() {
           </View>
           <HapticSwitch
             value={collection.isPublic}
-            onValueChange={togglePublic}
+            onValueChange={(v) => { void togglePublic(v); }}
           />
         </View>
       )}

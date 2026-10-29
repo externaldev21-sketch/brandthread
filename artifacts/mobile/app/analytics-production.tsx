@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
 import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -44,7 +45,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.mfrName}>{mfr.name}</Text>
-          <Text style={s.mfrSub}>{mfr.productsProduced} order{mfr.productsProduced !== 1 ? 's' : ''} · {mfr.totalUnits.toLocaleString()} units</Text>
+          <Text style={s.mfrSub}>{mfr.productsProduced} order{mfr.productsProduced !== 1 ? 's' : ''} · {plural(mfr.totalUnits, 'unit')}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={s.mfrSpend}>{formatCents(mfr.totalSpendCents)}</Text>

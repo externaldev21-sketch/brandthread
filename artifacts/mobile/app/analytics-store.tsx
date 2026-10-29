@@ -24,6 +24,7 @@ import {
   ProgressBar, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
 import { metricTiles } from '@/lib/analyticsMetricTiles';
+import { plural } from '@/lib/plural';
 
 function FunnelStepRow({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }) {
   const colors = useColors();
@@ -169,9 +170,9 @@ export default function AnalyticsStoreScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.secLabel}>{sec.label}</Text>
                     <View style={s.secMeta}>
-                      <Text style={s.secStat}>{sec.views.toLocaleString()} views</Text>
+                      <Text style={s.secStat}>{plural(sec.views, 'view')}</Text>
                       <Text style={s.dotSep}>·</Text>
-                      <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
+                      <Text style={s.secStat}>{plural(sec.clicks, 'click')}</Text>
                       <Text style={s.dotSep}>·</Text>
                       <Text style={[s.secStat, { color: sec.ctr > 20 ? colors.success : sec.ctr > 10 ? colors.warning : colors.destructive }]}>{sec.ctr.toFixed(1)}% click rate</Text>
                     </View>

@@ -969,6 +969,7 @@ export default function BuyerOrderDetailScreen() {
       Alert.alert('Reviews unavailable', 'Reviews can only be submitted for completed purchases.');
       return;
     }
+    if (submittingReview) return;
     setSubmittingReview(true);
     try {
       // Photos upload first; the review carries only the returned private paths.
@@ -1017,8 +1018,12 @@ export default function BuyerOrderDetailScreen() {
     router.push(('/buyer-problem-report?orderId=' + order.id) as never);
   }
 
+  // A quick double tap on "Yes, cancel" lands before the modal closes; the
+  // second request would fail and show an error over the success alert.
+  const cancelInFlightRef = useRef(false);
   async function handleCancelOrder() {
-    if (!order) return;
+    if (!order || cancelInFlightRef.current) return;
+    cancelInFlightRef.current = true;
     setCancelling(true);
     setShowCancelModal(false);
     try {
@@ -1034,6 +1039,7 @@ export default function BuyerOrderDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Couldn't cancel this order", "This order can't be cancelled now. Message the seller for help.");
     } finally {
+      cancelInFlightRef.current = false;
       setCancelling(false);
     }
   }

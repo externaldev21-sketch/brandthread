@@ -135,6 +135,7 @@ export default function AnalyticsScreen() {
         });
       }
       loadedRef.current = true;
+      setLoadError(false);
       if (preview || !userId) {
         setLives([]);
       } else {

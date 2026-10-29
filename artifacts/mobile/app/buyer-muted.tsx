@@ -92,8 +92,8 @@ export default function MutedAccountsScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="volume-x"
-            title="No muted accounts"
-            description="Muted accounts will appear here."
+            title={muted.length === 0 ? 'No muted accounts' : 'No results'}
+            description={muted.length === 0 ? 'Muted accounts will appear here.' : 'Try a different search term.'}
             style={{ marginTop: SPACING.lg }}
           />
         }

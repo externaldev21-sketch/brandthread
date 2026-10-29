@@ -157,7 +157,8 @@ export default function AIPhotographyChatScreen() {
     } else if (mode === 'outfitSwap') {
       if (!heroPhoto && picked.length > 0) {
         setHeroPhoto(picked[0]);
-        setGarments((prev) => [...prev, ...picked.slice(1, MAX_GARMENTS + 1)]);
+        // Garments can remain from a removed (unlocked) hero; keep the cap.
+        setGarments((prev) => [...prev, ...picked.slice(1)].slice(0, MAX_GARMENTS));
       } else {
         setGarments((prev) => [...prev, ...picked].slice(0, MAX_GARMENTS));
       }

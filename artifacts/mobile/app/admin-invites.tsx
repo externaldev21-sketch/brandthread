@@ -8,7 +8,7 @@ import { radius as ControlRadius } from '@/constants/radii';
  * Backed by /api/admin/invites, /api/admin/access/waitlist and
  * /api/config/features (moderators only: users.role = 'admin').
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -86,6 +86,19 @@ export default function AdminInvitesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // Set synchronously so a fast double tap can't fire a second request
+  // before `busy` re-renders (two batches of codes, two invites).
+  const busyRef = useRef(false);
+  function start(key: string) {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(key);
+    return true;
+  }
+  function finish() {
+    busyRef.current = false;
+    setBusy(null);
+  }
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -131,14 +144,14 @@ export default function AdminInvitesScreen() {
 
   async function toggleInviteOnly(next: boolean) {
     if (demo) { setInviteOnly(next); return; }
-    setBusy('flag');
+    if (!start('flag')) return;
     try {
       await api.access.admin.setInviteOnly(next);
       setInviteOnly(next);
       say(next ? 'Invite-only is on' : 'Invite-only is off');
     } catch (err) {
       say(apiErrorMessage(err, 'Couldn’t change the setting.'));
-    } finally { setBusy(null); }
+    } finally { finish(); }
   }
 
   async function generate() {
@@ -146,32 +159,29 @@ export default function AdminInvitesScreen() {
     const perCode = parseInt(uses, 10);
     if (!Number.isInteger(qty) || qty < 1 || qty > 50) { say('Codes must be between 1 and 50'); return; }
     if (!Number.isInteger(perCode) || perCode < 1) { say('Uses each must be at least 1'); return; }
-    if (demo || busy) return;
-    setBusy('generate');
+    if (demo || !start('generate')) return;
     try {
       const made = await api.access.admin.createInvites({ count: qty, maxUses: perCode });
       say(`${made.codes.length} ${made.codes.length === 1 ? 'code' : 'codes'} generated`);
       await load(true);
     } catch (err) {
       say(apiErrorMessage(err, 'Couldn’t generate codes.'));
-    } finally { setBusy(null); }
+    } finally { finish(); }
   }
 
   async function revoke(item: AccessInviteCode) {
-    if (demo || busy) return;
-    setBusy(item.id);
+    if (demo || !start(item.id)) return;
     try {
       await api.access.admin.revokeInvite(item.id);
       setCodes((prev) => prev.map((c) => (c.id === item.id ? { ...c, disabled: true, status: 'disabled' } : c)));
       say('Code revoked');
     } catch (err) {
       say(apiErrorMessage(err, 'Couldn’t revoke this code.'));
-    } finally { setBusy(null); }
+    } finally { finish(); }
   }
 
   async function invite(item: WaitlistItem) {
-    if (demo || busy) return;
-    setBusy(item.id);
+    if (demo || !start(item.id)) return;
     try {
       const res = await api.access.admin.inviteFromWaitlist(item.id);
       await Clipboard.setStringAsync(res.code).catch(() => {});
@@ -179,7 +189,7 @@ export default function AdminInvitesScreen() {
       await load(true);
     } catch (err) {
       say(apiErrorMessage(err, 'Couldn’t invite this person.'));
-    } finally { setBusy(null); }
+    } finally { finish(); }
   }
 
   const header = (
@@ -249,7 +259,7 @@ export default function AdminInvitesScreen() {
             })}
           </View>
 
-          {loading || access === 'checking' ? (
+          {loading || (access === 'checking' && !error) ? (
             <View style={s.center}><ActivityIndicator color={theme.text} /></View>
           ) : error ? (
             <EmptyState icon="wifi-off" title="Invites unavailable" description={error} action={{ label: 'Try again', onPress: () => load() }} style={{ marginTop: SP.xl }} />

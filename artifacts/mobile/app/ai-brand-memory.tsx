@@ -47,7 +47,10 @@ export default function AiBrandMemoryScreen() {
   }, []);
 
   const handleToggle = (key: keyof BrandMemory) => {
-    toggleMemoryField(key).then(setLocalMemory);
+    // Only take the toggled flag from storage so unsaved text edits survive.
+    toggleMemoryField(key).then(m =>
+      setLocalMemory(prev => (prev ? { ...prev, [key]: { ...prev[key], enabled: m[key].enabled } } : m)),
+    );
   };
 
   const handleTextChange = (key: keyof BrandMemory, newText: string) => {
@@ -76,7 +79,13 @@ export default function AiBrandMemoryScreen() {
   const handleSave = async () => {
     if (!localMemory) return;
     setSaving(true);
-    await saveBrandMemory(localMemory);
+    try {
+      await saveBrandMemory(localMemory);
+    } catch {
+      setSaving(false);
+      Alert.alert('Could not save', 'Your brand memory was not saved. Try again.');
+      return;
+    }
     setSaving(false);
     goBackOr(router);
   };

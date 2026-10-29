@@ -1105,7 +1105,7 @@ function AuthGate() {
     // A team invite was pending when the user signed in/up — bring them back
     // to the accept screen once onboarding is finished.
     if (onboardingDone && pendingInvite && !inInvite) {
-      router.replace(`/team-invite?token=${pendingInvite}` as never);
+      router.replace(`/team-invite?token=${encodeURIComponent(pendingInvite)}` as never);
       return;
     }
 

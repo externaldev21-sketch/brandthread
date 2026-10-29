@@ -392,8 +392,13 @@ export default function FriendsScreen() {
       accentColor: post.authorColor,
     }, {
       onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
-    });
-    showSnackbar('Saved');
+    })
+      .then(() => showSnackbar('Saved'))
+      .catch(() => {
+        // A real account's failed save throws (socialService.saveItem) — roll back.
+        setSavedIds(prev => { const next = new Set(prev); next.delete(post.id); return next; });
+        showSnackbar('Could not save. Try again.');
+      });
   }
 
   function handleNotInterested(post: BuyerPost) {
@@ -486,7 +491,8 @@ export default function FriendsScreen() {
 
         {/* Friend stories */}
         {stories.map(story => {
-          const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
+          // Server rows carry the real viewer id; MY_USER_ID covers local-only stories.
+          const viewed = story.viewers.some(v => v.userId === MY_USER_ID || (!!userId && v.userId === userId));
           return (
             <PressableScale
               key={story.id}
@@ -584,7 +590,7 @@ export default function FriendsScreen() {
       )}
     </>
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, compactEmpty, allStoryIds.join(',')]);
+  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, compactEmpty, allStoryIds.join(','), userId]);
 
   const ListFooter = useMemo(() => (
     friends.length > 0 ? (

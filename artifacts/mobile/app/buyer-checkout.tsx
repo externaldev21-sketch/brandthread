@@ -231,6 +231,8 @@ export default function BuyerCheckoutScreen() {
   const [nothingToCheckout, setNothingToCheckout] = useState(false);
   const { role } = useRole();
   const [placing, setPlacing] = useState(false);
+  /** Synchronous guard: two taps in the same frame both still see placing === false. */
+  const payTapRef = useRef(false);
   const [error, setError] = useState<CheckoutError | null>(null);
   /** Every line in this checkout was claimed by another buyer first. */
   const [allSoldOut, setAllSoldOut] = useState<SoldOutInfo | null>(null);
@@ -1263,7 +1265,12 @@ export default function BuyerCheckoutScreen() {
   const ctaLabel = canRetryPayment
     ? t('Try again · {amount}', { amount: formatCents(totals.totalCents) })
     : t('Pay {amount}', { amount: formatCents(totals.totalCents) });
-  const onCta = () => void (canRetryPayment ? retryPayment() : handlePlaceOrder());
+  const onCta = () => {
+    if (payTapRef.current) return;
+    payTapRef.current = true;
+    void (canRetryPayment ? retryPayment() : handlePlaceOrder())
+      .finally(() => { payTapRef.current = false; });
+  };
 
   if (!isConfirmation && checkoutLive.status === 'checking') return <CheckoutSkeleton />;
   if (!isConfirmation && checkoutLive.status === 'off') {

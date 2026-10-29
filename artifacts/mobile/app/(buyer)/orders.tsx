@@ -873,7 +873,7 @@ export default function BuyerOrdersScreen() {
               <EmptyState
                 icon="alert-triangle"
                 title="Couldn't load your orders"
-                description="Pull to refresh, or tap try again."
+                description="Check your connection and try again."
                 action={{
                   label: 'Try again',
                   icon: 'refresh-cw',

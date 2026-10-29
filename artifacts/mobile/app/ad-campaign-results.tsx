@@ -16,7 +16,7 @@
  * campaign is running the screen re-polls every 20s, so the paced delivery is
  * seen trickling in. Demo preview reads lib/demoAdCampaign.ts instead.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -107,6 +107,9 @@ export default function AdCampaignResultsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<null | 'pause' | 'resume' | 'stop'>(null);
+  // Held from the first tap (before the Stop confirm) so a second tap on
+  // Stop/Pause can't send another request while one is pending.
+  const busyRef = useRef(false);
   const [metric, setMetric] = useState<ChartMetric>('impressions');
   const [range, setRange] = useState<ChartRange>('hourly');
   const [focused, setFocused] = useState(false);
@@ -150,11 +153,12 @@ export default function AdCampaignResultsScreen() {
   }, [focused, live, load, demo]);
 
   const runAction = useCallback(async (action: 'pause' | 'resume' | 'stop') => {
-    if (!campaign || busy) return;
+    if (!campaign || busy || busyRef.current) return;
     if (demo) return;
-    if (action === 'stop' && !(await confirmStop())) return;
-    setBusy(action);
+    busyRef.current = true;
     try {
+      if (action === 'stop' && !(await confirmStop())) return;
+      setBusy(action);
       const res = await api.adCampaigns[action](campaign.id);
       setCampaign(res.campaign);
       const refund = action === 'stop' ? (res as { refund?: AdRefundOutcome | null }).refund : null;
@@ -167,6 +171,7 @@ export default function AdCampaignResultsScreen() {
       const msg = err instanceof Error ? err.message : "Couldn't update the campaign.";
       if (Platform.OS === 'web') { if (typeof window !== 'undefined') window.alert?.(msg); } else Alert.alert('Campaign', msg);
     } finally {
+      busyRef.current = false;
       setBusy(null);
     }
   }, [api, busy, campaign, demo, load]);

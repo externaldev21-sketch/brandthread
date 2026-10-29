@@ -19,6 +19,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { campaignDetailHref } from '@/lib/campaignDetailHref';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState, PushNotificationResults } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
+import { plural } from '@/lib/plural';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -59,19 +60,19 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
       style={s.rowItem}
       activeOpacity={0.8}
       accessibilityRole={detailHref ? 'button' : undefined}
-      accessibilityLabel={`${c.name}, ${c.recipients.toLocaleString()} recipients`}
+      accessibilityLabel={`${c.name}, ${plural(c.recipients, 'recipient')}`}
     >
       <View style={[s.rowIcon, { backgroundColor: typeColor + '22' }]}>
         <Feather name={typeIcon} size={14} color={typeColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle} numberOfLines={1}>{c.name}</Text>
-        <Text style={s.rowMeta}>{c.recipients.toLocaleString()} recipients · {c.delivered.toLocaleString()} delivered</Text>
+        <Text style={s.rowMeta}>{plural(c.recipients, 'recipient')} · {c.delivered.toLocaleString()} delivered</Text>
       </View>
       {(c.opens !== null || c.clicks !== null) && (
         <View style={{ alignItems: 'flex-end' }}>
-          {c.opens !== null && <Text style={s.rowValue}>{c.opens.toLocaleString()} opens</Text>}
-          {c.clicks !== null && <Text style={[s.rowSub, { color: colors.mutedForeground }]}>{c.clicks.toLocaleString()} clicks</Text>}
+          {c.opens !== null && <Text style={s.rowValue}>{plural(c.opens, 'open')}</Text>}
+          {c.clicks !== null && <Text style={[s.rowSub, { color: colors.mutedForeground }]}>{plural(c.clicks, 'click')}</Text>}
         </View>
       )}
     </TouchableOpacity>
@@ -88,7 +89,7 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle}>{inf.name}</Text>
-        <Text style={s.rowMeta}>{inf.orders} orders · {inf.clicks.toLocaleString()} clicks</Text>
+        <Text style={s.rowMeta}>{plural(inf.orders, 'order')} · {plural(inf.clicks, 'click')}</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.rowValue}>{formatCents(inf.revenueCents)}</Text>
