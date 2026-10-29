@@ -88,6 +88,16 @@ export const Easing = {
   bezier: (..._points: number[]) => (t: number) => t,
 };
 
+// Layout animation builders (`FadeIn.duration(160)` etc.): chainable no-ops,
+// since layout animations never run under the test renderer.
+type LayoutBuilder = { [method: string]: (..._args: unknown[]) => LayoutBuilder };
+function layoutBuilder(): LayoutBuilder {
+  const builder: LayoutBuilder = new Proxy({} as LayoutBuilder, { get: () => () => builder });
+  return builder;
+}
+export const FadeIn = layoutBuilder();
+export const FadeOut = layoutBuilder();
+
 function makeComponent(name: string) {
   return React.forwardRef<unknown, Record<string, unknown>>((props, ref) =>
     React.createElement(name, { ...props, ref }, props.children as React.ReactNode));

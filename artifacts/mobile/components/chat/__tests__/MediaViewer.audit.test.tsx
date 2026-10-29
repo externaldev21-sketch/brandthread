@@ -35,7 +35,8 @@ vi.mock('@/lib/actionSheet', () => ({ showAlert: vi.fn() }));
 import MediaViewer from '../MediaViewer';
 
 function transform(renderer: ReactTestRenderer) {
-  const image = renderer.root.find((n) => (n.type as unknown) === 'Image');
+  // The drag layer (follows the finger, shrinks, rounds) — the photo sits inside it.
+  const image = renderer.root.find((n) => n.props.testID === 'media-viewer-drag' && Array.isArray(n.props.style));
   const style = (image.props.style as Array<{ transform?: Array<Record<string, { value: number }>> }>)[1];
   const backdrop = renderer.root.find((n) => (n.type as unknown) === 'View' && Array.isArray(n.props.style) && n.props.style[1]?.opacity);
   return {

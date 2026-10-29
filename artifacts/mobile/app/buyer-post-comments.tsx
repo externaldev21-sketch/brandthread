@@ -62,7 +62,7 @@ import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 
 import { CachedImage } from '@/components/CachedImage';
 
-import { Sheet } from '@/components/ui/BottomSheet';
+import { Sheet, type SheetDetent } from '@/components/ui/BottomSheet';
 
 import { MenuBlocks } from '@/components/ui/MenuSheet';
 
@@ -690,10 +690,17 @@ export interface ThreadCommentsSheetProps {
  * route uses — no media box, no second video player. Nothing mounts or
  * loads until `visible` first turns true; the thread unmounts shortly after
  * close so a reopen refetches fresh.
+ *
+ * Instagram's comment-sheet physics on the shared engine's detents
+ * (useSheetTransition): it rests at the same 70% height as before; dragging
+ * the handle up past the top expands it to full screen, a flick down from
+ * full drops back to 70%, and a flick / long drag down from 70% dismisses.
+ * Opening the keyboard at 70% expands it so the composer stays in view.
  */
 export function ThreadCommentsSheet({ visible, postId, postAuthorId, postAuthorName, postCaption, onClose }: ThreadCommentsSheetProps) {
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
+  const [detent, setDetent] = useState<SheetDetent>('half');
   useEffect(() => {
     if (visible) { setMounted(true); return; }
     const t = setTimeout(() => setMounted(false), 400);
@@ -712,15 +719,24 @@ export function ThreadCommentsSheet({ visible, postId, postAuthorId, postAuthorN
       padded={false}
       headerRight="none"
       maxHeightRatio={0.92}
+      detents
+      halfContentHeight={Math.round(height * COMMENTS_HALF_RATIO)}
+      expandOnKeyboard
+      onDetentChange={setDetent}
+      fullHeight
       accessibilityLabel="Comments"
       testID="thread-comments-sheet"
     >
-      <View style={{ height: Math.round(height * 0.7) }}>
+      {/* Half: the familiar 70% block. Full: fills the sheet down to the keyboard. */}
+      <View style={detent === 'full' ? { flex: 1 } : { height: Math.round(height * COMMENTS_HALF_RATIO) }} testID={`thread-comments-detent-${detent}`}>
         <CommentsThread input={input} embedded onClose={onClose} />
       </View>
     </Sheet>
   );
 }
+
+/** The comments sheet's resting (half) detent — the 70% height it always had. */
+const COMMENTS_HALF_RATIO = 0.7;
 
 function CommentsThread({ input, embedded = false, onClose }: { input: CommentsThreadInput; embedded?: boolean; onClose?: () => void }) {
   const { goToSignIn, requireSignIn } = useSignInGate();

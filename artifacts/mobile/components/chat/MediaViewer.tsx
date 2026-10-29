@@ -8,11 +8,14 @@ import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { TEXT_TERTIARY } from '@/lib/theme';
 import { showAlert } from '@/lib/actionSheet';
+import { DISMISS_DISTANCE, DISMISS_MAX_RADIUS, DISMISS_MIN_SCALE } from '@/lib/mediaDismiss';
 
 /**
  * Full-screen photo viewer: pinch-to-zoom (two-finger, same touch-distance
  * technique used by the product gallery in buyer-product-detail.tsx) and
- * swipe-down-to-close, with save-to-library and share actions.
+ * swipe-down-to-close, with save-to-library and share actions. While
+ * dragging down the photo follows the finger, shrinks and rounds its corners
+ * (Instagram's viewer pull-down; same curve as lib/mediaDismiss).
  */
 export default function MediaViewer({
   visible, uri, onClose,
@@ -25,6 +28,8 @@ export default function MediaViewer({
   const headerTopInset = useHeaderTopInset();
   const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [aspect, setAspect] = useState<number | null>(null);
   const backdropOpacity = useRef(new Animated.Value(1)).current;
   const currentScale = useRef(1);
   const pinchStartDistance = useRef(0);
@@ -50,16 +55,20 @@ export default function MediaViewer({
     currentScale.current = 1;
     scale.setValue(1);
     translateY.setValue(0);
+    translateX.setValue(0);
     backdropOpacity.setValue(1);
     onCloseRef.current();
   };
 
+  // JS driver throughout: the drag already writes these values from the
+  // responder, and the corner radius (not native-animatable) reads them too.
   const resetTransform = () => {
     currentScale.current = 1;
     Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 4 }),
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: false, speed: 20, bounciness: 4 }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: false, speed: 20, bounciness: 4 }),
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: false, speed: 20, bounciness: 4 }),
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 150, useNativeDriver: false }),
     ]).start();
   };
 
@@ -84,6 +93,7 @@ export default function MediaViewer({
       } else if (currentScale.current <= 1.01) {
         // Single-finger drag while unzoomed: swipe down to dismiss.
         translateY.setValue(gesture.dy > 0 ? gesture.dy : gesture.dy * 0.25);
+        translateX.setValue(gesture.dx);
         backdropOpacity.setValue(Math.max(0.4, 1 - gesture.dy / (height * 0.6)));
       }
     },
@@ -125,6 +135,22 @@ export default function MediaViewer({
     }
   }
 
+  // Same shrink / corner curve as lib/mediaDismiss (dragScaleFor / dragRadiusFor).
+  const dragScale = translateY.interpolate({
+    inputRange: [-DISMISS_DISTANCE * 2.5, 0, DISMISS_DISTANCE * 2.5],
+    outputRange: [DISMISS_MIN_SCALE, 1, DISMISS_MIN_SCALE],
+    extrapolate: 'clamp',
+  });
+  const dragRadius = translateY.interpolate({
+    inputRange: [-60, 0, 60],
+    outputRange: [DISMISS_MAX_RADIUS, 0, DISMISS_MAX_RADIUS],
+    extrapolate: 'clamp',
+  });
+  // The rounded clip is the photo's contain rect, so the corners are the image's.
+  const frame = aspect
+    ? (width / height > aspect ? { width: height * aspect, height } : { width, height: width / aspect })
+    : { width, height };
+
   if (!uri) return null;
 
   return (
@@ -144,14 +170,27 @@ export default function MediaViewer({
           </View>
         </View>
         <View style={[s.imageWrap, { width, height }]} {...responder.panHandlers}>
-          <Animated.Image
-            source={{ uri }}
-            resizeMode="contain"
-            style={[
-              StyleSheet.absoluteFill,
-              { transform: [{ translateY }, { scale }] },
-            ]}
-          />
+          {/* Pinch scale outside, drag (follow + shrink + rounded clip) inside:
+              a zoomed photo is never clipped, a dragged one rounds its corners. */}
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Animated.View
+              testID="media-viewer-drag"
+              style={[
+                { ...frame, overflow: 'hidden', borderRadius: dragRadius },
+                { transform: [{ translateY }, { translateX }, { scale: dragScale }] },
+              ]}
+            >
+              <Animated.Image
+                source={{ uri }}
+                resizeMode="contain"
+                style={frame}
+                onLoad={(e) => {
+                  const src = (e.nativeEvent as { source?: { width?: number; height?: number } }).source;
+                  if (src?.width && src?.height) setAspect(src.width / src.height);
+                }}
+              />
+            </Animated.View>
+          </Animated.View>
         </View>
         <Text style={s.hint}>Pinch to zoom · Swipe down to close</Text>
       </Animated.View>
