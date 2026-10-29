@@ -48,7 +48,7 @@ export default function StoreSEOScreen() {
     getStorefront().then(s => {
       setStore(s);
       setSeo(s.seo);
-    });
+    }).catch(() => {});
   }, []));
 
   const patch = (partial: Partial<StoreSEO>) => setSeo(s => ({ ...s, ...partial }));
@@ -118,7 +118,7 @@ export default function StoreSEOScreen() {
             />
           </View>
           <View style={se.divider} />
-          {seo.socialImageUri && (
+          {!!seo.socialImageUri && (
             <Image cachePolicy="memory-disk" source={{ uri: seo.socialImageUri }} style={se.socialImagePreview} contentFit="cover" />
           )}
           <TouchableOpacity

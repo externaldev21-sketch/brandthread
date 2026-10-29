@@ -667,11 +667,15 @@ export default function SampleDetailScreen() {
 
   const handleMessage = async () => {
     if (!sample) return;
-    const threadId = sample.threadId ?? (await getOrCreateConversation(sample.manufacturerId, {
-      sampleId: sample.id,
-      contextLabel: `Sample: ${sample.productName}`,
-    })).id;
-    router.push({ pathname: '/manufacturer-messages', params: { threadId } } as any);
+    try {
+      const threadId = sample.threadId ?? (await getOrCreateConversation(sample.manufacturerId, {
+        sampleId: sample.id,
+        contextLabel: `Sample: ${sample.productName}`,
+      })).id;
+      router.push({ pathname: '/manufacturer-messages', params: { threadId } } as any);
+    } catch (error) {
+      Alert.alert("Couldn't open messages", error instanceof Error ? error.message : 'Try again.');
+    }
   };
 
   if (loading) {
@@ -690,7 +694,7 @@ export default function SampleDetailScreen() {
   if (!sample && loadError) {
     return (
       <BrandthreadScreen noSafeTop>
-        <ScreenHeader title="Sample Details" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Sample details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="alert-circle"

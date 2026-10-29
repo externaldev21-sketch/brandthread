@@ -7,7 +7,7 @@
  * dashboard row, so the numbers never drift.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
@@ -103,6 +103,7 @@ export default function ThreadCashHistoryScreen() {
           message="Live gifts and message payments from buyers will show up here."
         />
       ) : (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.list} testID="thread-cash-history-list">
           {rows.map(({ entry, balanceAfter }, index) => {
             const glyph = historyGlyph(entry, theme);
@@ -134,6 +135,7 @@ export default function ThreadCashHistoryScreen() {
             );
           })}
         </View>
+        </ScrollView>
       )}
     </View>
   );

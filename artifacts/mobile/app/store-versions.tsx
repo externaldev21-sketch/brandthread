@@ -27,6 +27,7 @@ function triggerVariant(trigger: StoreVersion['trigger']): { label: string; vari
 function formatDate(iso: string): string {
   try {
     const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
       ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   } catch { return iso; }
@@ -49,14 +50,14 @@ export default function StoreVersionsScreen() {
     setVersions(v);
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { load().catch(() => {}); }, [load]));
 
   const handleSaveVersion = async () => {
     if (!newLabel.trim()) return;
     setSaving(true);
     try {
       await createVersion(newLabel.trim());
-      await load();
+      await load().catch(() => {});
       setCreating(false);
       setNewLabel('');
       Alert.alert('Saved', 'Version saved successfully.');
@@ -75,8 +76,13 @@ export default function StoreVersionsScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Restore', onPress: async () => {
-            await restoreVersion(ver.id);
-            await load();
+            try {
+              await restoreVersion(ver.id);
+            } catch {
+              Alert.alert('Restore failed', 'Could not restore this version. Check your connection and try again.');
+              return;
+            }
+            await load().catch(() => {});
             Alert.alert('Restored', 'Version restored.');
           },
         },

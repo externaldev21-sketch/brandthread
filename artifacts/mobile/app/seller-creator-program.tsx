@@ -69,12 +69,12 @@ export default function SellerCreatorProgramScreen() {
     setInviting(true);
     setInviteNote(null);
     try {
-      if (previewOnly) { flash('Sign in to invite'); return; }
+      if (previewOnly) { setInviteNote('Sign in to invite'); return; }
       await api.affiliate.seller.invite(username.trim().replace(/^@/, ''));
       setUsername('');
       setInviteNote('Invite sent.');
       await load();
-    } catch (e: any) { flash(e?.message ?? "Couldn't send the invite. Try again."); }
+    } catch (e) { setInviteNote(friendlyError(e, "Couldn't send the invite. Try again.")); }
     finally { setInviting(false); }
   };
 

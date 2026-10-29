@@ -72,7 +72,7 @@ export default function ThreadExplainerScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
 
   // Called unconditionally (it is a hook) — it used to be called inline in
   // the JSX after the `!checked` early return, which changed the hook count
@@ -102,6 +102,8 @@ export default function ThreadExplainerScreen() {
       router.replace('/(tabs)/' as never);
       return;
     }
+    // Clerk hasn't resolved yet (cold load / refresh): wait instead of bouncing a signed-in buyer to onboarding.
+    if (!isLoaded) return;
     if (!isSignedIn || !userId) {
       // Not signed in — redirect to onboarding
       router.replace('/onboarding' as never);
@@ -138,7 +140,7 @@ export default function ThreadExplainerScreen() {
         ]).start();
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, userId]);
+  }, [isLoaded, isSignedIn, userId]);
 
   async function handleEnterThread() {
     if (userId) {

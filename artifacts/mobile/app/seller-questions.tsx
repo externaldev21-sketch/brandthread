@@ -136,7 +136,7 @@ export default function SellerQuestionsScreen() {
       <ScreenHeader title="Questions" />
       {items === null ? (
         <View style={s.center}><ActivityIndicator color={theme.muted} /></View>
-      ) : failed ? (
+      ) : failed && items.length === 0 ? (
         <View style={s.center}>
           <EmptyState icon="alert-circle" title="Couldn’t load questions" description="Check your connection and try again." action={{ label: 'Try again', onPress: () => { setItems(null); load(); } }} />
         </View>

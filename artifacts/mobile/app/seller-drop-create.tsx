@@ -58,7 +58,7 @@ import { Sheet, SHEET_GUTTER } from '@/components/ui/BottomSheet';
 
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
-import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
+import { zonedTimeToUtc, listSupportedTimeZones, getTimeZoneOffsetMinutes } from '@/lib/dropSchedule';
 
 import { radius } from '@/constants/radii';
 import { HelpLink } from '@/components/help/HelpLink';
@@ -78,17 +78,27 @@ interface SellerProductRow {
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-function isoToDateStr(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// Wall clock of `iso` in `timeZone` (device zone when absent), read with the
+// UTC getters. Save converts the fields back with that same zone, so an
+// untouched edit must not shift the drop when device zone != launch zone.
+function wallClockIn(iso: string | null | undefined, timeZone?: string | null): Date | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  if (Number.isNaN(ms)) return null;
+  if (timeZone) {
+    try { return new Date(ms + getTimeZoneOffsetMinutes(ms, timeZone) * 60000); } catch { /* unknown zone: device clock */ }
+  }
+  return new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
 }
-function isoToTimeStr(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function isoToDateStr(iso?: string | null, timeZone?: string | null): string {
+  const d = wallClockIn(iso, timeZone);
+  if (!d) return '';
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+function isoToTimeStr(iso?: string | null, timeZone?: string | null): string {
+  const d = wallClockIn(iso, timeZone);
+  if (!d) return '';
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 function parseDateAndTime(dateStr: string, timeStr: string): { year: number; month: number; day: number; hour: number; minute: number } | null {
@@ -249,6 +259,9 @@ export default function SellerDropCreate() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  // Create mode: the drop made by a save whose product assignment then failed,
+  // so the retry updates it instead of creating a duplicate drop.
+  const createdDropIdRef = useRef<string | undefined>(undefined);
 
   const [name, setName] = useState('');
   const [type, setType] = useState<'pre-order' | 'pre-made'>('pre-order');
@@ -298,13 +311,13 @@ export default function SellerDropCreate() {
         setType(data.type === 'pre-made' ? 'pre-made' : 'pre-order');
         setHeroImageUrl(data.heroImageUrl ?? null);
         setHeroVideoUrl(data.heroVideoUrl ?? null);
-        setReleaseDate(isoToDateStr(data.releaseAt));
-        setReleaseTime(isoToTimeStr(data.releaseAt));
+        setReleaseDate(isoToDateStr(data.releaseAt, data.launchTimezone));
+        setReleaseTime(isoToTimeStr(data.releaseAt, data.launchTimezone));
         if (data.launchTimezone) setTimezone(data.launchTimezone);
         if (data.endsAt) {
           setHasEndDate(true);
-          setEndDate(isoToDateStr(data.endsAt));
-          setEndTime(isoToTimeStr(data.endsAt));
+          setEndDate(isoToDateStr(data.endsAt, data.launchTimezone));
+          setEndTime(isoToTimeStr(data.endsAt, data.launchTimezone));
         }
         if (data.earlyAccessMinutes) {
           setEarlyAccessEnabled(true);
@@ -432,12 +445,13 @@ export default function SellerDropCreate() {
         membersOnly,
       };
 
-      let effectiveDropId = dropId as string | undefined;
-      if (isEdit && effectiveDropId) {
+      let effectiveDropId = (dropId as string | undefined) ?? createdDropIdRef.current;
+      if (effectiveDropId) {
         await api.drops.update(effectiveDropId, body);
       } else {
         const created: any = await api.drops.create({ ...body, type });
         effectiveDropId = created?.id;
+        createdDropIdRef.current = effectiveDropId;
       }
 
       if (effectiveDropId) {

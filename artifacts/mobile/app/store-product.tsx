@@ -13,7 +13,7 @@
  * Checkout Page tabs) and "How to collect information from customers at
  * checkout", reskinned black / white / silver.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
@@ -78,6 +78,7 @@ export default function StoreProductScreen() {
   const [showErrors, setShowErrors] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [toast, flash] = useToast();
+  const leaving = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -103,7 +104,7 @@ export default function StoreProductScreen() {
 
   // Leaving with unsaved edits asks first.
   useEffect(() => navigation.addListener('beforeRemove', (e) => {
-    if (!dirty || busy) return;
+    if (!dirty || busy || leaving.current) return;
     e.preventDefault();
     Alert.alert('Discard changes?', undefined, [
       { text: 'Keep editing', style: 'cancel' },
@@ -142,6 +143,8 @@ export default function StoreProductScreen() {
           imagePath: thumbRef ?? null, priceCents: priceCents!, compareAtPriceCents,
           stock: Number(draft.stock) || 0, shipBy: draft.shipBy,
         });
+        // Keep the created block so a retry after a later failure doesn't create a duplicate.
+        setSaved(block);
       }
       const patch = draftPatch(draft, block, {
         ...(thumbRef !== undefined ? { thumbImage: thumbRef } : {}),
@@ -167,7 +170,7 @@ export default function StoreProductScreen() {
       {
         text: 'Remove', style: 'destructive', onPress: () => {
           void (async () => {
-            try { await removeBlock(saved.id); setDirty(false); router.back(); } catch { flash("Couldn't remove it. Try again."); }
+            try { await removeBlock(saved.id); setDirty(false); leaving.current = true; router.back(); } catch { flash("Couldn't remove it. Try again."); }
           })();
         },
       },

@@ -74,7 +74,7 @@ export default function StoreFromSocialScreen() {
 
   // Load real seller posts — no fake fallback posts if this fails or is empty.
   useEffect(() => {
-    (api as any).content?.myPosts?.().then((posts: any[]) => {
+    api.sellerGiveaways.myPosts().then((posts: any[]) => {
       if (Array.isArray(posts)) {
         setSellerPosts(posts.map((p: any) => ({
           id: String(p.id ?? p.postId ?? Math.random()),

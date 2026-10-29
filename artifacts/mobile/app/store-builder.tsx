@@ -174,7 +174,7 @@ export default function StoreBuilderScreen() {
     setSubmittingImport(true);
     setImportError('');
     try {
-      const job = await startShopifyImport(shopifyUrl);
+      const job = await startShopifyImport(shopifyUrl.trim());
       setImportJob(job);
     } catch (error) {
       setImportError(error instanceof Error
@@ -548,7 +548,7 @@ export default function StoreBuilderScreen() {
                 {(importJob.status === 'complete' || importJob.status === 'needs_continuation') && (
                   <>
                     <View style={[s.resultIcon, { backgroundColor: SUCCESS_DIM }]}><Icon name="check" size={ICON.lg} color={SUCCESS} /></View>
-                    <Text style={s.progressTitle}>{importJob.importedCount} products transferred</Text>
+                    <Text style={s.progressTitle}>{plural(importJob.importedCount, 'product')} transferred</Text>
                     <Text style={s.progressDesc}>
                       {importJob.failedCount > 0 ? `${plural(importJob.failedCount, 'product')} could not be converted. ` : ''}
                       Your catalog and Thread Theme storefront are ready.

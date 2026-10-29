@@ -109,7 +109,8 @@ export default function StoreDomainScreen() {
       );
     } catch {
       // Device-only entries were never DNS-checked by the server: never show them as verified.
-      const s = await getStorefront();
+      const s = await getStorefront().catch(() => null);
+      if (!s) return;
       setDomains(s.domains
         .filter(d => d.type === 'custom')
         .map(d => ({ ...d, verificationStatus: 'pending' as const, sslStatus: 'pending' as const })));
@@ -222,7 +223,9 @@ export default function StoreDomainScreen() {
         text: 'Remove domain', style: 'destructive', onPress: async () => {
           try {
             await (api as any).store.deleteDomain(domainId);
-          } catch { /* best-effort */ }
+          } catch {
+            Alert.alert("Couldn't remove domain", 'Check your connection and try again.');
+          }
           await load();
         },
       },

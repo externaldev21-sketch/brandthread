@@ -141,7 +141,7 @@ export default function TeamScreen() {
       setLoadError(true);
     }
     setLoading(false);
-  }, []);
+  }, [api]);
 
   useEffect(() => { load(); }, [load]);
 

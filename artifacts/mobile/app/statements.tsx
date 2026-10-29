@@ -139,7 +139,7 @@ export default function StatementsScreen() {
               <View style={styles.hero}>
                 <Text style={styles.heroLabel}>{detail.period.label}</Text>
                 <Text style={[styles.heroAmount, TABULAR_NUMS]}>{formatSignedCents(t.netCents)}</Text>
-                <Text style={styles.heroSub}>Net earnings · {detail.counts.lines} transactions</Text>
+                <Text style={styles.heroSub}>Net earnings · {detail.counts.lines} transaction{detail.counts.lines === 1 ? '' : 's'}</Text>
               </View>
 
               <View style={styles.card}>
@@ -224,7 +224,7 @@ export default function StatementsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.monthLabel}>{m.label}</Text>
                   {m.transactionCount !== null && (
-                    <Text style={styles.monthSub}>{m.transactionCount} transactions</Text>
+                    <Text style={styles.monthSub}>{m.transactionCount} transaction{m.transactionCount === 1 ? '' : 's'}</Text>
                   )}
                 </View>
                 {m.netCents !== null && (

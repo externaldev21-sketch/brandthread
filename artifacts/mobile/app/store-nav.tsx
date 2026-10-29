@@ -75,6 +75,7 @@ export default function StoreNavScreen() {
   const [isNewItem, setIsNewItem] = useState(false);
   const [itemForm, setItemForm] = useState<ItemFormState>(defaultItemForm());
   const [modalVisible, setModalVisible] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,7 +125,12 @@ export default function StoreNavScreen() {
       Alert.alert('Label required', 'Please enter a menu item label.');
       return;
     }
-    if (!activeMenu) return;
+    // The public store drops external links that aren't http(s), so the item would silently go nowhere.
+    if (itemForm.target === 'external' && !/^https?:\/\/\S+/i.test(itemForm.url.trim())) {
+      Alert.alert('Enter a full URL', 'External links need to start with https://');
+      return;
+    }
+    if (!activeMenu || savingItem) return;
 
     const updatedItems = deepCloneItems(activeMenu.items);
 
@@ -133,7 +139,7 @@ export default function StoreNavScreen() {
         id: uid(),
         label: itemForm.label.trim(),
         target: itemForm.target,
-        url: itemForm.url || undefined,
+        url: itemForm.url.trim() || undefined,
         targetId: itemForm.targetId || undefined,
         visible: itemForm.visible,
         order: 0,
@@ -154,12 +160,13 @@ export default function StoreNavScreen() {
       if (found) {
         found.label = itemForm.label.trim();
         found.target = itemForm.target;
-        found.url = itemForm.url || undefined;
+        found.url = itemForm.url.trim() || undefined;
         found.targetId = itemForm.targetId || undefined;
         found.visible = itemForm.visible;
       }
     }
 
+    setSavingItem(true);
     try {
       await updateMenu(activeMenu.id, updatedItems);
       await loadMenus();
@@ -167,6 +174,8 @@ export default function StoreNavScreen() {
     } catch (e) {
       // Keep the sheet open so the edit isn't lost; nothing was saved.
       Alert.alert("Couldn't save menu item", e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSavingItem(false);
     }
   }
 
@@ -271,7 +280,7 @@ export default function StoreNavScreen() {
           <View style={styles.itemLabelWrap}>
             <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
             <Text style={styles.itemTarget} numberOfLines={1}>
-              {item.target === 'none' ? 'no link' : `link:${item.target}`}
+              {item.target === 'none' ? 'No link' : (LINK_TARGETS.find((t) => t.value === item.target)?.label ?? item.target)}
             </Text>
           </View>
           <View style={styles.itemActions}>
@@ -491,6 +500,7 @@ export default function StoreNavScreen() {
               <PrimaryButton
                 label="Save Item"
                 onPress={handleSaveItem}
+                loading={savingItem}
                 style={{ marginTop: SP.md }}
               />
             </ScrollView>

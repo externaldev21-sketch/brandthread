@@ -176,6 +176,11 @@ export default function StorePagesScreen() {
       Alert.alert('Title required', 'Please enter a page title.');
       return;
     }
+    if (form.status === 'scheduled' && !form.scheduledAt.trim()) {
+      Alert.alert('Date required', 'Enter the date this page should go live.');
+      return;
+    }
+    if (saving) return;
     setSaving(true);
     try {
       const data: Partial<StorePage> = {
@@ -186,7 +191,7 @@ export default function StorePagesScreen() {
         seoDescription: form.seoDescription || undefined,
         slug: form.slug || toSlug(form.title),
         status: form.status,
-        scheduledAt: form.status === 'scheduled' ? form.scheduledAt : undefined,
+        scheduledAt: form.status === 'scheduled' ? form.scheduledAt.trim() : undefined,
       };
       if (mode === 'edit' && selectedPage) {
         await updatePage(selectedPage.id, data);
@@ -206,7 +211,8 @@ export default function StorePagesScreen() {
   function setFormField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === 'title' && !prev.slug) {
+      // Keep a new page's slug following its title until the seller edits the slug by hand.
+      if (key === 'title' && mode === 'new' && prev.slug === toSlug(prev.title)) {
         (next as any).slug = toSlug(value as string);
       }
       return next;

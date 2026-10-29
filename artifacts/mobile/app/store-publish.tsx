@@ -192,10 +192,11 @@ export default function StorePublishScreen() {
             try {
               await unpublishStore();
               setPublished(false);
-              await doValidate();
             } catch (error) {
               Alert.alert("Couldn't unpublish your store", apiErrorMessage(error, 'Check your connection and try again.'));
+              return;
             }
+            await doValidate().catch(() => {});
           },
         },
       ],
@@ -295,7 +296,7 @@ export default function StorePublishScreen() {
         </BrandthreadCard>
 
         {!validating && (
-        <TouchableOpacity style={pub.revalidateBtn} onPress={doValidate} hitSlop={REVALIDATE_HIT_SLOP} accessibilityRole="button">
+        <TouchableOpacity style={pub.revalidateBtn} onPress={() => { doValidate().catch(() => {}); }} hitSlop={REVALIDATE_HIT_SLOP} accessibilityRole="button">
           <Icon name="refresh-cw" size={ICON.xs} color={MUTED} />
           <Text style={pub.revalidateText}>Validate again</Text>
         </TouchableOpacity>

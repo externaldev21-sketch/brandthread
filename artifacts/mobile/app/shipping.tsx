@@ -217,7 +217,7 @@ export default function ShippingScreen() {
   }, [api]);
 
   useEffect(() => {
-    api.returns.listSeller().then(data => { setSellerReturns(data ?? []); setReturnsLoaded(true); }).catch(() => {});
+    api.returns.listSeller().then(data => { setSellerReturns(Array.isArray(data) ? data : []); setReturnsLoaded(true); }).catch(() => {});
     api.orders.list().then(data => { setOrders(Array.isArray(data) ? data : []); setOrdersLoaded(true); }).catch(() => {});
   }, []);
 
@@ -341,10 +341,11 @@ export default function ShippingScreen() {
       return Alert.alert('Countries required', 'Enter at least one 2-letter country code, separated by commas (e.g. CA, MX).');
     }
 
-    const flatRateCents = parseDecimalToCents(zoneForm.flatRate || '0');
+    // sanitizePriceInput keeps a trailing "." ("5."), which parseDecimalToCents rejects.
+    const flatRateCents = parseDecimalToCents(zoneForm.flatRate.replace(/\.$/, '') || '0');
     if (flatRateCents == null) return Alert.alert('Invalid rate', 'Enter a valid flat rate, like 4.99.');
 
-    const freeAboveCents = zoneForm.freeAbove.trim() ? parseDecimalToCents(zoneForm.freeAbove) : null;
+    const freeAboveCents = zoneForm.freeAbove.trim() ? parseDecimalToCents(zoneForm.freeAbove.replace(/\.$/, '')) : null;
     if (zoneForm.freeAbove.trim() && freeAboveCents == null) {
       return Alert.alert('Invalid threshold', 'Enter a valid free-shipping threshold, like 75.00.');
     }
@@ -357,7 +358,8 @@ export default function ShippingScreen() {
     let tiersPayload: WeightTier[] = [];
     if (zoneForm.pricingModel === 'weight_tiered') {
       for (const t of zoneForm.weightTiers) {
-        if (!Number.isInteger(t.minWeightGrams) || t.minWeightGrams < 0 || !Number.isInteger(t.rateCents) || t.rateCents < 0) {
+        if (!Number.isInteger(t.minWeightGrams) || t.minWeightGrams < 0 || !Number.isInteger(t.rateCents) || t.rateCents < 0
+          || (t.maxWeightGrams != null && t.maxWeightGrams < t.minWeightGrams)) {
           return Alert.alert('Invalid tier', 'Each weight tier needs a valid starting weight and rate.');
         }
       }
@@ -383,6 +385,10 @@ export default function ShippingScreen() {
         saved = await completeSetupTaskAfter('shipping_rates', () => api.shippingZones.update(zoneForm.id!, payload));
       } else {
         saved = await completeSetupTaskAfter('shipping_rates', () => api.shippingZones.create(payload));
+        // If a follow-up call below fails, a retry must update this zone, not create a duplicate.
+        const createdId = saved.id;
+        setZoneForm(f => ({ ...f, id: createdId }));
+        setZones(prev => (prev.some(z => z.id === createdId) ? prev : [...prev, { ...saved, weightTiers: [] }]));
       }
       if (zoneForm.pricingModel === 'calculated' && shipFromPostalDraft.trim().toUpperCase() !== shipFromPostal) {
         const postalRes = await api.shippingZones.updateShipFromPostalCode(shipFromPostalDraft.trim());
@@ -513,10 +519,10 @@ export default function ShippingScreen() {
         {[
           // Monochrome values (black/white/silver palette) — the label, not a
           // per-tile accent colour, says what each count is.
-          { label: 'Pending', value: String(pendingCount), color: colors.foreground },
-          { label: 'In transit', value: String(inTransitCount), color: colors.foreground },
-          { label: 'Delivered', value: String(deliveredCount), color: colors.foreground },
-          { label: 'Returns', value: String(sellerReturns.length), color: colors.foreground },
+          { label: 'Pending', value: ordersLoaded ? String(pendingCount) : '—', color: colors.foreground },
+          { label: 'In transit', value: ordersLoaded ? String(inTransitCount) : '—', color: colors.foreground },
+          { label: 'Delivered', value: ordersLoaded ? String(deliveredCount) : '—', color: colors.foreground },
+          { label: 'Returns', value: returnsLoaded ? String(sellerReturns.length) : '—', color: colors.foreground },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
@@ -890,7 +896,7 @@ export default function ShippingScreen() {
             {(['domestic', 'country', 'rest_of_world'] as ZoneType[]).map(t => (
               <TouchableOpacity
                 key={t}
-                onPress={() => setZoneForm(f => ({ ...f, zoneType: t, shipsInternationally: t !== 'domestic' }))}
+                onPress={() => setZoneForm(f => ({ ...f, zoneType: t, shipsInternationally: t !== 'domestic', pricingModel: t === 'domestic' && f.pricingModel === 'calculated' ? 'flat' : f.pricingModel }))}
                 style={[styles.segment, { borderColor: colors.border }, zoneForm.zoneType === t && { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
                 <Text style={[styles.segmentText, { color: zoneForm.zoneType === t ? colors.primaryForeground : colors.foreground }]}>
@@ -1005,7 +1011,7 @@ export default function ShippingScreen() {
                       onChangeText={t => {
                         const raw = sanitizePriceInput(t);
                         setTierRateDraft({ index: i, text: raw });
-                        updateTier(i, { rateCents: parseDecimalToCents(raw || '0') ?? 0 });
+                        updateTier(i, { rateCents: parseDecimalToCents(raw.replace(/\.$/, '') || '0') ?? 0 });
                       }}
                       onBlur={() => setTierRateDraft(null)}
                       placeholder="$0.00"

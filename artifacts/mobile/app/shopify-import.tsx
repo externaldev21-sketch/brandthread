@@ -68,6 +68,9 @@ export default function ShopifyImportScreen() {
   const [inlineError, setInlineError] = useState<string | null>(params.shopify === 'error' ? 'Shopify didn\'t finish connecting. Try again.' : null);
   const mounted = useRef(true);
   const connectDeadline = useRef(0);
+  // The poll, the AppState listener and connect() all call checkConsent; only
+  // the first to see the connection may start the import (and none after Cancel).
+  const consentSettled = useRef(false);
   useEffect(() => () => { mounted.current = false; }, []);
 
   const startImport = useCallback(async () => {
@@ -107,6 +110,8 @@ export default function ShopifyImportScreen() {
       const status = await readStatus();
       if (!mounted.current) return true;
       if (status.connected) {
+        if (consentSettled.current) return true;
+        consentSettled.current = true;
         haptic('productListed');
         await startImport();
         return true;
@@ -170,6 +175,7 @@ export default function ShopifyImportScreen() {
     try {
       const { authorizeUrl } = await api.shopify.connectStart(handle, 'import');
       connectDeadline.current = Date.now() + CONNECT_WAIT_MS;
+      consentSettled.current = false;
       setPhase({ kind: 'consent', shopDomain: `${handle}.myshopify.com` });
       setBusy(false);
       // Shopify's own sign-in and consent page; it closes itself when the
@@ -284,7 +290,7 @@ export default function ShopifyImportScreen() {
       );
       action = (
         <View style={[s.footer, { paddingBottom: SP.md + insets.bottom }]}>
-          <Pressable onPress={() => setPhase({ kind: 'connect' })} style={s.secondary} accessibilityRole="button" testID="shopify-import-cancel">
+          <Pressable onPress={() => { consentSettled.current = true; setPhase({ kind: 'connect' }); }} style={s.secondary} accessibilityRole="button" testID="shopify-import-cancel">
             <Text style={s.secondaryText}>Cancel</Text>
           </Pressable>
         </View>

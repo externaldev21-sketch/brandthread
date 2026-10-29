@@ -145,7 +145,7 @@ export default function SellerReferScreen() {
               <View key={r.id} style={[styles.refRow, { borderBottomColor: c.border }]}>
                 <Text style={[styles.refName, { color: c.foreground }]} numberOfLines={1}>{r.name}</Text>
                 <Text style={[styles.refStatus, { color: c.mutedForeground }]}>
-                  {r.status === 'rewarded' ? 'Free month earned' : r.status === 'capped' ? 'Limit reached' : 'Waiting for first paid month'}
+                  {r.status === 'rewarded' ? (data.freeMonths === 1 ? 'Free month earned' : `${data.freeMonths} free months earned`) : r.status === 'capped' ? 'Limit reached' : 'Waiting for first paid month'}
                 </Text>
               </View>
             ))}

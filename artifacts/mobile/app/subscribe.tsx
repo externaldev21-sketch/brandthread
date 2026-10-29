@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { parseWebCheckoutParams } from '@/lib/webSubscribeLink';
+import { apiErrorMessage } from '@/lib/safety';
 
 import { FONT } from '@/lib/theme';
 export default function SubscribeScreen() {
@@ -37,7 +38,7 @@ export default function SubscribeScreen() {
         : await api.seller.subscription.checkout(params.planId);
       window.location.assign(url);
     } catch (e: any) {
-      setError(e?.message ?? 'Check your connection and try again.');
+      setError(apiErrorMessage(e, 'Check your connection and try again.'));
     }
   }, [api, params?.planId, params?.billing, preview]); // eslint-disable-line react-hooks/exhaustive-deps
 

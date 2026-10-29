@@ -53,6 +53,8 @@ export default function RequestSampleScreen() {
   // A failed request is not the same as a delisted manufacturer: show a
   // retry instead of "no longer listed".
   const [loadError, setLoadError] = useState(false);
+  // Reuse the local draft on retry so a failed send doesn't leave a stray draft each time.
+  const draftIdRef = React.useRef<string | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -86,6 +88,7 @@ export default function RequestSampleScreen() {
     setSending(true);
     try {
       const draft = await saveQuoteRequestDraft({
+        id: draftIdRef.current,
         manufacturerId,
         productName: `${productType} sample`,
         productionType: productType,
@@ -93,9 +96,11 @@ export default function RequestSampleScreen() {
         sampleRequired: true,
         colorways: colorway.trim() ? [colorway.trim()] : [],
         sizes: size.trim() ? [size.trim()] : [],
-        notes: [notes.trim(), `Reply contact: ${replyContact}`].filter(Boolean).join('\n'),
+        // The submit payload has no sizes field, so the size travels in the notes.
+        notes: [notes.trim(), size.trim() ? `Size: ${size.trim()}` : '', `Reply contact: ${replyContact}`].filter(Boolean).join('\n'),
         currentStep: 5,
       });
+      draftIdRef.current = draft.id;
       await submitQuoteRequest(draft.id);
       showToast('Sample request sent', `Your request is now visible to ${manufacturer.name}.`);
       goBackOr(router);

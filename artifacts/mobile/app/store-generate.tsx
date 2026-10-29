@@ -124,14 +124,17 @@ export default function StoreGenerateScreen() {
   const [draftData, setDraftData] = useState<Partial<StoreGenerationAnswers> | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [colorPresetIdx, setColorPresetIdx] = useState(0);
+  const generatingRef = useRef(false);
 
   useEffect(() => {
     (async () => {
-      const draft = await loadDraftAnswers();
-      if (draft && draft.primaryStyle) {
-        setDraftData(draft);
-        setShowContinueDraft(true);
-      }
+      try {
+        const draft = await loadDraftAnswers();
+        if (draft && draft.primaryStyle) {
+          setDraftData(draft);
+          setShowContinueDraft(true);
+        }
+      } catch {}
       setDraftLoaded(true);
     })();
   }, []);
@@ -143,7 +146,8 @@ export default function StoreGenerateScreen() {
   }, [params.toast]);
 
   useEffect(() => {
-    if (!draftLoaded) return;
+    // While "Continue where you left off?" is open, `answers` are still the defaults: saving them would wipe the draft.
+    if (!draftLoaded || showContinueDraft) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaving(false);
     setSaveFailed(false);
@@ -158,7 +162,7 @@ export default function StoreGenerateScreen() {
       }
     }, 800);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [answers, draftLoaded]);
+  }, [answers, draftLoaded, showContinueDraft]);
 
   const updateAnswers = (patch: Partial<StoreGenerationAnswers>) => {
     setAnswers(prev => ({ ...prev, ...patch }));
@@ -168,13 +172,13 @@ export default function StoreGenerateScreen() {
     if (step > 1) {
       setStep(s => s - 1);
     } else {
-      await saveDraftAnswers(answers);
+      if (!showContinueDraft) await saveDraftAnswers(answers).catch(() => {});
       goBackOr(router);
     }
   };
 
   const handleSaveAndExit = async () => {
-    await saveDraftAnswers(answers);
+    if (!showContinueDraft) await saveDraftAnswers(answers).catch(() => {});
     goBackOr(router);
   };
 
@@ -185,8 +189,18 @@ export default function StoreGenerateScreen() {
   };
 
   const handleGenerate = async () => {
-    await saveDraftAnswers(answers);
-    router.push('/store-generating' as never);
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    // A pending autosave firing after store-generating clears the draft would resurrect it.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    try {
+      await saveDraftAnswers(answers);
+      router.push('/store-generating' as never);
+    } catch {
+      Alert.alert("Couldn't save your answers", 'Try again.');
+    } finally {
+      generatingRef.current = false;
+    }
   };
 
   const continueEnabled = isStepComplete(step, answers);
@@ -701,8 +715,8 @@ export default function StoreGenerateScreen() {
                         if (value === 'logo') {
                           updateAnswers({ logoUri: remoteUri });
                         } else {
-                          const existing = answers.contentUploads?.[value] ?? [];
-                          updateAnswers({ contentUploads: { ...(answers.contentUploads ?? {}), [value]: [...existing, remoteUri] } });
+                          // Functional update: another category's upload may have finished while this one was in flight.
+                          setAnswers(prev => ({ ...prev, contentUploads: { ...(prev.contentUploads ?? {}), [value]: [...(prev.contentUploads?.[value] ?? []), remoteUri] } }));
                         }
                       } catch {
                         Alert.alert("Couldn't upload photo", 'Try again.');
@@ -791,12 +805,12 @@ export default function StoreGenerateScreen() {
         {[
           {
             label: 'Brand Style',
-            content: [answers.primaryStyle, ...(answers.secondaryStyles ?? [])].filter(Boolean).join(', ') || 'Not set',
+            content: [answers.primaryStyle, ...(answers.secondaryStyles ?? [])].filter(Boolean).map(v => BRAND_STYLES.find(b => b.value === v)?.label ?? v).join(', ') || 'Not set',
             step: 1,
           },
           {
             label: 'Mood',
-            content: (answers.moods ?? []).join(', ') || 'Not set',
+            content: (answers.moods ?? []).map(v => BRAND_MOODS.find(m => m.value === v)?.label ?? v).join(', ') || 'Not set',
             step: 2,
           },
           {
@@ -814,13 +828,13 @@ export default function StoreGenerateScreen() {
           {
             label: 'Target Customers',
             content: (answers.targetCustomers ?? []).length > 0
-              ? (answers.targetCustomers ?? []).join(', ')
+              ? (answers.targetCustomers ?? []).map(v => TARGET_CUSTOMERS.find(c => c.value === v)?.label ?? v).join(', ')
               : 'Not set',
             step: 7,
           },
           {
             label: 'Features',
-            content: `${(answers.features ?? []).length} feature(s) selected`,
+            content: `${(answers.features ?? []).length} ${(answers.features ?? []).length === 1 ? 'feature' : 'features'} selected`,
             step: 9,
           },
         ].map(({ label, content, step: reviewStep }) => (

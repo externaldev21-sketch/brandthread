@@ -138,7 +138,7 @@ export default function SellerGiveawayCreate() {
   useEffect(() => {
     if (!post || post.label !== 'Selected post') return;
     const p = posts.find((x) => x.id === post.id);
-    if (p) setPost({ id: p.id, label: (p.caption || 'Untitled post').slice(0, 24) });
+    if (p) setPost({ id: p.id, label: clip(p.caption || 'Untitled post', 24) });
   }, [posts, post]);
   useEffect(() => {
     if (!product || product.label !== 'Selected product') return;

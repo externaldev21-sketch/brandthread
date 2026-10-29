@@ -88,12 +88,16 @@ export default function TeamActivityScreen() {
   const loadMore = async () => {
     if (loadingMore) return;
     setLoadingMore(true);
+    const req = requestRef.current;
     try {
       const a = await api.team.activity({ limit: PAGE, offset: logs.length, resourceType: activityResourceType(filter) });
-      setLogs(prev => [...prev, ...(a?.logs ?? [])]);
-      setHasMore(!!a?.hasMore);
+      // A filter switch or refresh during the fetch makes this page stale.
+      if (req === requestRef.current) {
+        setLogs(prev => [...prev, ...(a?.logs ?? [])]);
+        setHasMore(!!a?.hasMore);
+      }
     } catch {
-      setLogsError(true);
+      if (req === requestRef.current) setLogsError(true);
     }
     setLoadingMore(false);
   };

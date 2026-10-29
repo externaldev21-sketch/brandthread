@@ -73,10 +73,14 @@ export default function StorePoliciesScreen() {
   const load = async () => {
     setLoading(true);
     try {
-      // Try real API first
-      if (inDevPreview()) throw new Error('preview');
-      const data = await (api.seller as any).getPolicies() as any;
-      setPolicies(Array.isArray(data.policies) ? data.policies : []);
+      if (inDevPreview()) {
+        // Preview saves go to the local storeService copy, so read from it too.
+        const { getPolicies } = await import('@/services/storeService');
+        setPolicies(await getPolicies());
+      } else {
+        const data = await (api.seller as any).getPolicies() as any;
+        setPolicies(Array.isArray(data?.policies) ? data.policies : []);
+      }
       setLoadError(null);
     } catch (e) {
       setPolicies([]);
@@ -242,7 +246,7 @@ export default function StorePoliciesScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[s.policyLabel, { color: FG }]}>{pt.label}</Text>
                     {hasContent ? (
-                      <Text style={[s.policySub, { color: MUTED }]} numberOfLines={1}>{existing!.content.slice(0, 60)}…</Text>
+                      <Text style={[s.policySub, { color: MUTED }]} numberOfLines={1}>{existing!.content.length > 60 ? `${existing!.content.slice(0, 60)}…` : existing!.content}</Text>
                     ) : (
                       <Text style={[s.policySub, { color: SUBTLE }]}>Not added yet</Text>
                     )}

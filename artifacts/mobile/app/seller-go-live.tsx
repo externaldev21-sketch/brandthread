@@ -17,7 +17,7 @@
  * anything in. Broadcasting needs the native app; on web the camera check
  * still works but Start show explains that (preview `demo=1` excepted).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -124,13 +124,18 @@ function SellerGoLiveFlow() {
     });
   }, [catalog]);
 
+  // Bumped on every pick/remove so a slower, superseded upload can't overwrite the current thumbnail.
+  const coverToken = useRef(0);
   const uploadCover = useCallback(async (uri: string, mimeType?: string | null) => {
+    const token = ++coverToken.current;
     setCover({ localUri: uri, remoteUrl: null, uploading: true });
     try {
       const res = await (api as any).products.uploadImage({ uri, mimeType });
       const url = res?.objectPath ?? res?.url ?? null;
+      if (token !== coverToken.current) return;
       setCover({ localUri: uri, remoteUrl: url, uploading: false });
     } catch {
+      if (token !== coverToken.current) return;
       setCover(null);
       setNotice("Couldn't upload that photo. Try again.");
     }
@@ -154,7 +159,7 @@ function SellerGoLiveFlow() {
           if (!result.canceled && result.assets[0]) void uploadCover(result.assets[0].uri, result.assets[0].mimeType);
         },
       },
-      ...(cover ? [{ text: 'Remove thumbnail', style: 'destructive' as const, onPress: () => setCover(null) }] : []),
+      ...(cover ? [{ text: 'Remove thumbnail', style: 'destructive' as const, onPress: () => { coverToken.current += 1; setCover(null); } }] : []),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
   }, [cover, uploadCover]);

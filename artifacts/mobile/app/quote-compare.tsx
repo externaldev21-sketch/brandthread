@@ -143,9 +143,13 @@ export default function QuoteCompareScreen() {
       { text: 'Not yet', style: 'cancel' },
       {
         text: 'Accept quote', onPress: async () => {
-          await acceptQuote(quoteId);
-          haptics.success();
-          goBackOr(router);
+          try {
+            await acceptQuote(quoteId);
+            haptics.success();
+            goBackOr(router);
+          } catch (error) {
+            Alert.alert("Couldn't accept quote", error instanceof Error ? error.message : 'Refresh and try again.');
+          }
         },
       },
     ]);

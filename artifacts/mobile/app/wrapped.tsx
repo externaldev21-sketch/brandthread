@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Platform, Pressable, Share, StyleSheet, Text, View, useWindowDimensions,
+  ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions,
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { Button } from '@/components/ui/Button';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { hapticSuccess } from '@/lib/haptics';
-import { captureShareCard } from '@/lib/shareCard';
+import { captureShareCard, shareStoryCardImage } from '@/lib/shareCard';
 import { FONT, FS, SP } from '@/lib/theme';
 import { monthName, piecesLine, wrappedCards, type WrappedCard } from '@/lib/wrapped';
 import { getWrapped, type Wrapped } from '@/services/wrappedService';
@@ -91,7 +91,8 @@ export default function WrappedScreen() {
     setShareState('busy');
     try {
       const uri = await captureShareCard(shareRef);
-      await Share.share(Platform.OS === 'ios' ? { url: uri } : { message: uri });
+      // Android's Share.share({ message }) sent the tmp file path as text, not the image.
+      await shareStoryCardImage(uri, 'brandthread-wrapped.png');
       hapticSuccess();
     } catch { /* dismissed or unavailable */ }
     setShareState('idle');
