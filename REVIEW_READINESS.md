@@ -76,4 +76,4 @@ Legend: PASS (already compliant) · FIXED (open PR) · RISK (decision needed) ·
 - `/manufacturer-messages` error state: "Try again" has 1px padding.
 - Buyer inbox filter pill is still a "coming soon" snackbar (an existing test pins it).
 - "Additional tools are coming soon" (`app/buyer-story-create.tsx`) and "Sound library coming soon." (`app/create-post.tsx`) — owned by the create-flow session.
-- Instagram Stories appId in `lib/shareCard.ts` is `com.brandthread.app`, which does not match the bundle id.
+- Direct Instagram Stories integration removed: story cards use the system share sheet via `expo-sharing` (PNG download on web), with no Facebook/Meta App ID required.

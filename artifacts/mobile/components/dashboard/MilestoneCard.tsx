@@ -1,8 +1,8 @@
 /**
  * MilestoneCard: a compact version of the milestone story card for the
  * dashboard's top slot. One tap on "Share to Stories" renders the 1080x1920
- * story image offscreen, captures it and hands it to Instagram Stories (the
- * system share sheet when Instagram isn't there; a PNG download on web).
+ * story image offscreen, captures it and opens the system share sheet
+ * (a PNG download on web).
  * Sharing or X marks the milestone seen, so the card never comes back.
  * One success haptic on a completed share; no confetti, no count-up.
  */
@@ -76,7 +76,7 @@ export default function MilestoneCard({
         onPress={() => { void share(); }}
         disabled={sharing}
         accessibilityRole="button"
-        accessibilityLabel="Share to Instagram Stories"
+        accessibilityLabel="Share to story"
         style={s.action}
         testID="milestone-share"
       >

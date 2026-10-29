@@ -41,9 +41,6 @@
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
-        ],
-        "LSApplicationQueriesSchemes": [
-          "instagram-stories"
         ]
       },
       "config": {

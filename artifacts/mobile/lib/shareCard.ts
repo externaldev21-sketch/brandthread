@@ -1,12 +1,12 @@
 /**
  * Helpers for rendering a profile to a shareable 1080x1920 (9:16) image and
- * getting that image into Instagram Stories, the Photos library, or the
+ * getting that image into the Photos library or the
  * system share sheet.
  *
  * Kept separate from lib/shareProfile.ts (canonical URL construction) so the
  * pure URL logic stays testable without touching native modules.
  */
-import { Linking, Platform, Share } from 'react-native';
+import { Platform, Share } from 'react-native';
 import { getMediaLibrary } from '@/lib/mediaLibraryCompat';
 
 export const STORY_CARD_WIDTH = 1080;
@@ -93,8 +93,7 @@ export async function captureShareCard(ref: React.RefObject<any>): Promise<strin
 
 /**
  * Hands a captured story card PNG to the person: the system share sheet with
- * the image on iOS/Android (expo-sharing, so Instagram/Snapchat "Add to
- * story" targets appear), a file download on web.
+ * the image on iOS/Android (expo-sharing), a file download on web.
  */
 export async function shareStoryCardImage(imageUri: string, fileName: string): Promise<'shared' | 'downloaded'> {
   if (Platform.OS === 'web') {
@@ -111,30 +110,13 @@ export async function shareStoryCardImage(imageUri: string, fileName: string): P
 }
 
 /**
- * Shares an already-rendered card image straight to Instagram Stories when
- * the Instagram app is installed and a native share module is available;
- * otherwise falls back to the system share sheet.
+ * Legacy entry point for story-card buttons. Uses only the system share sheet
+ * (or a PNG download on web); no social-app SDK or app ID is required.
  */
-export async function shareCardToInstagramStories(imageUri: string): Promise<'stories' | 'system' | 'cancelled'> {
-  if (Platform.OS !== 'web') {
-    try {
-      const canOpenStories = await Linking.canOpenURL('instagram-stories://share');
-      if (canOpenStories) {
-        const RNShare = (await import('react-native-share')).default;
-        await RNShare.shareSingle({
-          social: RNShare.Social.INSTAGRAM_STORIES,
-          backgroundImage: imageUri,
-          appId: 'com.brandthread.app',
-        } as never);
-        return 'stories';
-      }
-    } catch {
-      // Instagram Stories share unavailable or dismissed — fall back below.
-    }
-  }
+export async function shareCardToInstagramStories(imageUri: string): Promise<'system' | 'downloaded' | 'cancelled'> {
   try {
-    await Share.share(Platform.OS === 'ios' ? { url: imageUri } : { message: imageUri });
-    return 'system';
+    const result = await shareStoryCardImage(imageUri, 'brandthread-story.png');
+    return result === 'downloaded' ? 'downloaded' : 'system';
   } catch {
     return 'cancelled';
   }

@@ -123,3 +123,4 @@
 - [Pre-launch public entry](prelaunch-public-entry.md) — Instagram visitors see the existing branded landing and launch email form, not account entry; dev previews stay separate.
 - [First-run tip scope](first-run-tip-scope.md) — spotlight work preserves copy/triggers/persistence; only invisible measurement on exact existing targets is approved.
 - [Apple API credentials](apple-api-credential-handling.md) — normalize valid PEM payloads before rejecting keys; local preflight success is not remote Apple authentication.
+- [System story sharing](system-story-sharing.md) — story cards use the OS share sheet, not direct Instagram/Facebook Stories integrations or Meta app IDs.

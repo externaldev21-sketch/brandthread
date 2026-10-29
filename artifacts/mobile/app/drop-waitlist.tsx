@@ -4,8 +4,8 @@
  *
  *   Public page link    copy / share the page that collects phone numbers
  *   Text blast          one-tap "drop is live" SMS to the waitlist (once per drop)
- *   Countdown Story     9:16 card → Instagram Stories (link copied for the
- *                       Link sticker), share sheet (TikTok, …), or PNG on web
+ *   Countdown Story     9:16 card → system share sheet (link copied for a
+ *                       link sticker), or PNG download on web
  *
  * Flow references (Mobbin):
  *   Text blast — Partiful "Creating a text blast": To (audience + count) →
@@ -35,7 +35,7 @@ import { CenteredToast } from '@/components/social/CenteredToast';
 import { DropCountdownShareCard } from '@/components/share-cards/DropCountdownShareCard';
 import { isPreviewDemoMode } from '@/lib/devPreview';
 import {
-  STORY_CARD_HEIGHT, STORY_CARD_WIDTH, captureShareCard, shareCardToInstagramStories, triggerWebImageDownload,
+  STORY_CARD_HEIGHT, STORY_CARD_WIDTH, captureShareCard, shareCardToInstagramStories, shareStoryCardImage, triggerWebImageDownload,
 } from '@/lib/shareCard';
 import {
   displayUrl, dropCountdownLabel, dropLaunchLabel, peopleLabel, smsBlastBlockReason,
@@ -209,8 +209,7 @@ export default function DropWaitlistScreen() {
         showToast('Image downloaded');
       } else {
         if (publicUrl) await Clipboard.setStringAsync(publicUrl);
-        const RNShare = (await import('react-native-share')).default;
-        await RNShare.open({ url: uri, type: 'image/png', failOnCancel: false } as never);
+        await shareStoryCardImage(uri, `${preview?.handle ?? 'brandthread'}-drop-countdown.png`);
       }
     } catch {
       showToast('Could not create the Story image');

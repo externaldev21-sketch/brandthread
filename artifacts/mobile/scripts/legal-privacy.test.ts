@@ -158,8 +158,8 @@ describe('native permission, encryption and Android config', () => {
     expect(entries[0][1].faceIDPermission).toContain('App Lock');
   });
 
-  it('whitelists Instagram Stories so canOpenURL can detect it on iOS', () => {
-    expect(appConfig.ios.infoPlist.LSApplicationQueriesSchemes).toContain('instagram-stories');
+  it('does not require a direct Instagram Stories URL scheme', () => {
+    expect((appConfig.ios.infoPlist as Record<string, unknown>).LSApplicationQueriesSchemes ?? []).not.toContain('instagram-stories');
   });
 
   it('does not depend on ATT or location and keeps explicit opt-in contact matching', () => {
