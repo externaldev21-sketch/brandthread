@@ -2,7 +2,7 @@
  * Draws the native Skia globe's zoomed-in draw list
  * (components/globe/GlobeSurface.tsx: the finer coastline, borders clipped
  * to the land with the even-odd rule, labels recorded into an SkPicture with
- * drawText in Inter SemiBold, dots on top) on CanvasKit, Skia's own WASM
+ * drawText in Inter Bold, dots on top) on CanvasKit, Skia's own WASM
  * build, in Node, at several zooms over the US. Checks every path string
  * parses and the picture draws, and writes one PNG per zoom.
  *
@@ -16,6 +16,7 @@ import {
   countryBorderLines,
   countryLabelTable,
   detailLevels,
+  fadeLabels,
   hasDetail,
   LAND_HI_ZOOM,
   landHiRings,
@@ -35,7 +36,7 @@ const OUT = process.argv[2];
 const SIZE = 358;
 const SCALE = 2;
 const CK = await CanvasKitInit({ locateFile: (f: string) => require.resolve(`canvaskit-wasm/bin/full/${f}`) });
-const inter = fs.readFileSync(require.resolve('@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf'));
+const inter = fs.readFileSync(require.resolve('@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf'));
 const typeface = CK.Typeface.MakeFreeTypeFaceFromData(inter.buffer.slice(inter.byteOffset, inter.byteOffset + inter.byteLength))!;
 const countryFont = new CK.Font(typeface, COUNTRY_FONT);
 const regionFont = new CK.Font(typeface, REGION_FONT);
@@ -111,21 +112,15 @@ for (const zoom of [1, 1.8, 4.5, 9]) {
   // <Picture picture={detail.labels} />: recorded like createPicture does.
   const recorder = new CK.PictureRecorder();
   const pc = recorder.beginRecording(CK.XYWHRect(0, 0, SIZE, SIZE));
-  const items = labelLayout(countryLabelTable(), regionLabelTable(), view, SIZE);
-  const haloPaint = new CK.Paint();
-  haloPaint.setAntiAlias(true);
-  haloPaint.setStyle(CK.PaintStyle.Stroke);
-  haloPaint.setStrokeWidth(2.5);
-  haloPaint.setStrokeJoin(CK.StrokeJoin.Round);
+  // At rest (fade settled): what GlobeSurface.tsx's picture draws.
+  const items = fadeLabels(labelLayout(countryLabelTable(), regionLabelTable(), view, SIZE), {}, 0, true).draw;
   const inkPaint = new CK.Paint();
   inkPaint.setAntiAlias(true);
   for (const l of items) {
     const font = l.font >= COUNTRY_FONT ? countryFont : regionFont;
-    const x = l.x - l.width / 2;
-    const y = l.y + l.font * 0.36;
-    haloPaint.setColor(color(`rgba(${GLOBE_COLORS.labelHaloRgb},${(0.55 * l.alpha).toFixed(3)})`));
-    pc.drawText(l.text, x, y, haloPaint, font);
-    inkPaint.setColor(color(`rgba(${GLOBE_COLORS.labelInkRgb},${(0.9 * l.alpha).toFixed(3)})`));
+    const x = Math.round((l.x - l.width / 2) * SCALE) / SCALE;
+    const y = Math.round((l.y + l.font * 0.36) * SCALE) / SCALE;
+    inkPaint.setColor(color(`rgba(${GLOBE_COLORS.labelInkRgb},${l.alpha.toFixed(3)})`));
     pc.drawText(l.text, x, y, inkPaint, font);
   }
   const picture = recorder.finishRecordingAsPicture();

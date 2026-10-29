@@ -4,152 +4,248 @@
    "step": "default",
    "zoom": 1,
    "labels": [],
+   "alphas": [],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "1-borders",
    "zoom": 1.73,
    "labels": [
     "Canada",
-    "United States",
-    "Mexico"
+    "United States"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "2-country-labels",
-   "zoom": 2.27,
+   "zoom": 2.42,
    "labels": [
     "Canada",
     "United States",
-    "Mexico",
-    "Cuba"
+    "Mexico"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "3-states",
-   "zoom": 4.16,
+   "zoom": 4.15,
    "labels": [
-    "Québec",
-    "Ontario",
-    "Texas",
-    "Manitoba",
+    "QC",
+    "ON",
+    "TX",
+    "MB",
     "SK",
-    "Montana",
+    "MT",
     "NM",
-    "Colorado",
-    "Wyoming",
-    "Michigan",
-    "Minnesota",
-    "Kansas",
-    "Nebraska",
+    "CO",
+    "WY",
+    "MI",
+    "MN",
+    "KS",
+    "NE",
     "SD",
     "ND",
-    "Oklahoma",
-    "Georgia",
-    "Florida",
-    "Iowa",
+    "MO",
+    "OK",
+    "WI",
+    "GA",
+    "IL",
+    "FL",
+    "IA",
     "AR",
-    "New York",
-    "North Carolina",
+    "NY",
+    "AL",
+    "NC",
     "MS",
+    "LA",
     "PA",
-    "Ohio",
+    "OH",
     "TN",
-    "Virginia",
+    "VA",
     "IN",
-    "BHS"
+    "SC"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": [],
+   "dots": {
+    "checked": 5,
+    "white": 5,
+    "sample": [
+     {
+      "city": "New York",
+      "rgb": [
+       239,
+       240,
+       244
+      ]
+     },
+     {
+      "city": "Miami",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     },
+     {
+      "city": "Austin",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     },
+     {
+      "city": "Toronto",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     }
+    ]
+   }
   },
   {
    "step": "4-states-close",
-   "zoom": 7.89,
+   "zoom": 7.88,
    "labels": [
-    "Michigan",
-    "Minnesota",
-    "Kansas",
-    "Missouri",
-    "Oklahoma",
-    "Wisconsin",
-    "Georgia",
-    "Illinois",
-    "Iowa",
-    "Arkansas",
-    "Alabama",
+    "MI",
+    "MN",
+    "KS",
+    "NE",
+    "SD",
+    "ND",
+    "MO",
+    "OK",
+    "WI",
+    "IL",
+    "IA",
+    "AR",
+    "AL",
     "MS",
-    "Ohio",
-    "Tennessee",
-    "Kentucky",
-    "Indiana"
+    "OH",
+    "TN",
+    "KY",
+    "IN",
+    "SC",
+    "WV"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "5-northeast",
    "zoom": 15.83,
    "labels": [
-    "New York",
-    "Maine",
-    "Vermont",
+    "NY",
+    "PA",
+    "VA",
+    "ME",
+    "MD",
+    "VT",
     "NH",
-    "Massachusetts",
+    "MA",
     "NJ",
-    "CT",
-    "DE"
+    "CT"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
+  },
+  {
+   "step": "6-zoom-out",
+   "zoom": 3.05,
+   "labels": [
+    "Mexico",
+    "Colombia"
+   ],
+   "alphas": [
+    1
+   ],
+   "overlaps": [],
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
+  },
+  {
+   "step": "7-central-america",
+   "zoom": 10.85,
+   "labels": [
+    "Guatemala",
+    "Nicaragua",
+    "Honduras"
+   ],
+   "alphas": [
+    1
+   ],
+   "overlaps": [],
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   }
  ],
- "cardDots": {
-  "checked": 2,
-  "white": 2,
-  "sample": [
-   {
-    "city": "New York",
-    "rgb": [
-     238,
-     240,
-     244
-    ]
-   },
-   {
-    "city": "Brooklyn",
-    "rgb": [
-     239,
-     241,
-     245
-    ]
-   }
-  ]
- },
  "verticalDrag": {
-  "pitchChange": 0.031,
+  "pitchChange": 0.046,
   "pageScrolled": false
  },
  "fps": {
-  "frames": 150,
-  "avgFps": 60,
-  "p95FrameMs": 16.7
+  "frames": 147,
+  "avgFps": 58.8,
+  "p95FrameMs": 16.8
  },
  "fpsCountryLevel": {
   "zoom": 1.48,
   "rotatingRad": 0.074,
-  "avgFps": 59.3,
-  "p95FrameMs": 16.8
+  "avgFps": 60,
+  "p95FrameMs": 16.7
  },
  "backOut": {
   "zoom": 1,
   "labels": [],
+  "alphas": [],
   "overlaps": [],
-  "cut": []
+  "cut": [],
+  "overSea": [],
+  "codes": [],
+  "ellipsized": []
  },
  "pinch": {
   "from": 1,
@@ -160,143 +256,218 @@
    "step": "default",
    "zoom": 1,
    "labels": [],
+   "alphas": [],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "1-borders",
    "zoom": 1.73,
    "labels": [
     "Canada",
-    "United States",
-    "Mexico"
+    "United States"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "2-country-labels",
-   "zoom": 2.27,
+   "zoom": 2.42,
    "labels": [
     "Canada",
     "United States",
-    "Mexico",
-    "CRI",
-    "Cuba"
+    "Mexico"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "3-states",
-   "zoom": 4.16,
+   "zoom": 4.15,
    "labels": [
-    "Québec",
-    "Ontario",
-    "Texas",
-    "Manitoba",
+    "QC",
+    "ON",
+    "TX",
+    "MB",
     "SK",
-    "Montana",
+    "MT",
     "NM",
-    "Colorado",
-    "Wyoming",
-    "Michigan",
-    "Minnesota",
-    "Utah",
-    "Kansas",
-    "Nebraska",
+    "CO",
+    "WY",
+    "MI",
+    "MN",
+    "KS",
+    "NE",
     "SD",
     "ND",
-    "Oklahoma",
-    "Georgia",
-    "Florida",
-    "Iowa",
+    "MO",
+    "OK",
+    "WI",
+    "GA",
+    "IL",
+    "FL",
+    "IA",
     "AR",
-    "New York",
-    "North Carolina",
+    "NY",
+    "AL",
+    "NC",
     "MS",
+    "LA",
     "PA",
-    "Ohio",
+    "OH",
     "TN",
-    "Virginia",
+    "VA",
     "IN",
-    "BHS"
+    "ME",
+    "SC"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": [],
+   "dots": {
+    "checked": 5,
+    "white": 5,
+    "sample": [
+     {
+      "city": "New York",
+      "rgb": [
+       241,
+       243,
+       247
+      ]
+     },
+     {
+      "city": "Miami",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     },
+     {
+      "city": "Austin",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     },
+     {
+      "city": "Toronto",
+      "rgb": [
+       255,
+       255,
+       255
+      ]
+     }
+    ]
+   }
   },
   {
    "step": "4-states-close",
-   "zoom": 7.89,
+   "zoom": 7.88,
    "labels": [
-    "Michigan",
-    "Minnesota",
-    "Kansas",
-    "Missouri",
-    "Oklahoma",
-    "Wisconsin",
-    "Georgia",
-    "Illinois",
-    "Iowa",
-    "Arkansas",
-    "Alabama",
+    "MI",
+    "MN",
+    "KS",
+    "MO",
+    "OK",
+    "WI",
+    "IL",
+    "IA",
+    "AR",
+    "AL",
     "MS",
-    "Ohio",
-    "Tennessee",
-    "Kentucky",
-    "Indiana"
+    "OH",
+    "TN",
+    "KY",
+    "IN",
+    "SC",
+    "WV"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   },
   {
    "step": "5-northeast",
    "zoom": 15.83,
    "labels": [
-    "New York",
-    "Pennsylvania",
-    "Virginia",
-    "Maryland",
-    "Vermont",
+    "NY",
+    "ME",
+    "VT",
     "NH",
-    "Massachusetts",
+    "MA",
     "NJ",
-    "CT",
-    "DE"
+    "CT"
+   ],
+   "alphas": [
+    1
    ],
    "overlaps": [],
-   "cut": []
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
+  },
+  {
+   "step": "6-zoom-out",
+   "zoom": 3.05,
+   "labels": [
+    "Mexico",
+    "Colombia"
+   ],
+   "alphas": [
+    1
+   ],
+   "overlaps": [],
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
+  },
+  {
+   "step": "7-central-america",
+   "zoom": 10.85,
+   "labels": [
+    "Guatemala",
+    "Nicaragua",
+    "Honduras"
+   ],
+   "alphas": [
+    1
+   ],
+   "overlaps": [],
+   "cut": [],
+   "overSea": [],
+   "codes": [],
+   "ellipsized": []
   }
  ],
- "fullDots": {
-  "checked": 3,
-  "white": 3,
-  "sample": [
-   {
-    "city": "New York",
-    "rgb": [
-     242,
-     243,
-     246
-    ]
-   },
-   {
-    "city": "Toronto",
-    "rgb": [
-     255,
-     255,
-     255
-    ]
-   },
-   {
-    "city": "Brooklyn",
-    "rgb": [
-     245,
-     246,
-     248
-    ]
-   }
-  ]
- },
  "errors": []
 }

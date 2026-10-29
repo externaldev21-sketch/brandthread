@@ -35,10 +35,13 @@ const US = { lat: 39, lng: -96 };
 const MIDWEST = { lat: 40.5, lng: -89 };
 
 /** Visible labels (alpha > 0.15): count by kind, overlaps, edge cuts. */
-async function labelAudit() {
-  return page.evaluate(() => {
+async function labelAudit(testId = 'seller-order-globe') {
+  return page.evaluate((id) => {
     const g = globalThis.__btOrderGlobe;
-    const items = g.labels().filter((l) => l.alpha > 0.15);
+    // What the canvas actually drew this frame (after the label fade).
+    const drawnOn = document.querySelector(`[data-testid="${id}"] [data-testid="seller-globe-canvas"]`);
+    const items = drawnOn.__btLabels ?? [];
+    const alphas = [...new Set(items.map((l) => +l.alpha.toFixed(3)))];
     const boxes = items.map((l) => ({ t: l.text, x0: l.x - l.width / 2, x1: l.x + l.width / 2, y0: l.y - l.font * 0.5, y1: l.y + l.font * 0.5 }));
     const overlaps = [];
     for (let i = 0; i < boxes.length; i += 1) {
@@ -49,8 +52,25 @@ async function labelAudit() {
       }
     }
     const cut = boxes.filter((b) => b.x0 < 0 || b.y0 < 0 || b.x1 > g.size || b.y1 > g.size).map((b) => b.t);
-    return { zoom: +g.view().zoom.toFixed(2), labels: items.map((l) => l.text), overlaps, cut };
-  });
+    // Black text must sit on silver land: the canvas at the label box's
+    // corners (beside the glyphs) should be land, not the near-black sea.
+    const c = document.querySelector(`[data-testid="${id}"] [data-testid="seller-globe-canvas"]`);
+    const ctx = c.getContext('2d');
+    const k = c.width / g.size;
+    const overSea = [];
+    for (const b of boxes) {
+      for (const [x, y] of [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1]]) {
+        const d = ctx.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+        if (d[0] < 45) { overSea.push(b.t); break; }
+      }
+    }
+    // Country labels are full names: no 2–3 letter codes except state ones.
+    const states = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+      'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT','QLD','NSW','VIC','TAS','ACT','AC','AP','AM','PA','RO','RR','TO','BA','CE','DF','ES','GO','MA','MT','MS','MG','PB','PR','PE','PI','RJ','RN','RS','SC','SE','SP']);
+    const codes = items.map((l) => l.text).filter((t) => /^[A-Z]{2,3}$/.test(t) && !states.has(t));
+    const ellipsized = items.map((l) => l.text).filter((t) => /\.|…/.test(t));
+    return { zoom: +g.view().zoom.toFixed(2), labels: items.map((l) => l.text), alphas, overlaps, cut, overSea, codes, ellipsized };
+  }, testId);
 }
 
 async function zoomOver(testId, prefix) {
@@ -65,14 +85,17 @@ async function zoomOver(testId, prefix) {
     await page.waitForTimeout(500);
   }
   await card.screenshot({ path: `${OUT}-${prefix}-0-default.png` });
-  steps.push({ step: 'default', ...(await labelAudit()) });
+  steps.push({ step: 'default', ...(await labelAudit(testId)) });
   // Wheel deltas per step; zoom ×exp(-Δ·0.0015) about the cursor.
   const plan = [
     { name: '1-borders', target: 1.75, at: US },
-    { name: '2-country-labels', target: 2.3, at: US },
+    { name: '2-country-labels', target: 2.45, at: US },
     { name: '3-states', target: 4.2, at: MIDWEST },
     { name: '4-states-close', target: 8, at: MIDWEST },
     { name: '5-northeast', target: 16, at: { lat: 41.6, lng: -72.5 } },
+    // Back out and over to Central America: small countries, full names only.
+    { name: '6-zoom-out', target: 3, at: { lat: 20, lng: -90 } },
+    { name: '7-central-america', target: 11, at: { lat: 14.6, lng: -88.6 } },
   ];
   /** Drags `at` to the middle of the box (a few strokes when it starts off screen). */
   async function centerOn(at) {
@@ -100,20 +123,22 @@ async function zoomOver(testId, prefix) {
     const box = await canvas.boundingBox();
     for (let k = 0; k < 40; k += 1) {
       const zoom = await page.evaluate(() => globalThis.__btOrderGlobe.view().zoom);
-      if (zoom >= s.target * 0.98) break;
+      if (Math.abs(Math.log(zoom / s.target)) < 0.02) break;
       const p = await page.evaluate(({ lat, lng }) => globalThis.__btOrderGlobe.projectLatLng(lat, lng), s.at);
       // Steer toward the target place: cursor on it (clamped into the box).
       const x = box.x + Math.min(box.width - 10, Math.max(10, p[0]));
       const y = box.y + Math.min(box.height - 10, Math.max(10, p[1]));
       await page.mouse.move(x, y);
-      const dy = Math.max(-120, Math.log(zoom / s.target) / 0.0015);
+      const dy = Math.max(-120, Math.min(120, Math.log(zoom / s.target) / 0.0015));
       await page.mouse.wheel(0, dy);
       await page.waitForTimeout(40);
     }
     await centerOn(s.at);
     await page.waitForTimeout(3200); // fades settle; rotation is off when zoomed
     await card.screenshot({ path: `${OUT}-${prefix}-${s.name}.png` });
-    steps.push({ step: s.name, ...(await labelAudit()) });
+    steps.push({ step: s.name, ...(await labelAudit(testId)) });
+    // Dots on top of the state lines and labels, at the state-level view.
+    if (s.name === '3-states') steps[steps.length - 1].dots = await dotOnTop(testId);
   }
   return steps;
 }
@@ -140,7 +165,6 @@ async function dotOnTop(testId) {
 const scroll = () => page.evaluate(() => document.querySelector('[data-testid="seller-dashboard-scroll"]')?.scrollTop ?? 0);
 
 const cardSteps = await zoomOver('seller-order-globe', 'card');
-const cardDots = await dotOnTop('seller-order-globe');
 
 // Zoomed: a vertical drag tilts the globe, the page doesn't scroll.
 const canvasBox = await page.getByTestId('seller-order-globe').getByTestId('seller-globe-canvas').boundingBox();
@@ -211,9 +235,8 @@ await page.getByTestId('seller-live-map-expand').first().click();
 await page.getByTestId('seller-live-map-full-map').waitFor({ timeout: 10000 });
 await page.waitForTimeout(1200);
 const fullSteps = await zoomOver('seller-live-map-full-map', 'full');
-const fullDots = await dotOnTop('seller-live-map-full-map');
 await page.screenshot({ path: `${OUT}-full-screen-390x844.png` });
 
 await ctx.close();
 await browser.close();
-console.log(JSON.stringify({ cardSteps, cardDots, verticalDrag, fps, fpsCountryLevel, backOut, pinch, fullSteps, fullDots, errors }, null, 1));
+console.log(JSON.stringify({ cardSteps, verticalDrag, fps, fpsCountryLevel, backOut, pinch, fullSteps, errors }, null, 1));

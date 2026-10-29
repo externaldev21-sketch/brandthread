@@ -8,7 +8,7 @@
  *
  * Zoomed in, the zoom-detail layers (lib/liveMap/globeDetail.ts) draw
  * between the land and the dots: borders clipped to the land, then labels
- * in Inter (the web build's own @font-face). Paths and label layout are
+ * in Inter Bold, solid black (the web build's own @font-face). Paths and label layout are
  * rebuilt only when the view moves, not on every pulse frame.
  */
 import React, { useEffect, useRef } from 'react';
@@ -20,6 +20,7 @@ import {
   countryBorderLines,
   countryLabelTable,
   detailLevels,
+  fadeLabels,
   hasDetail,
   LAND_HI_ZOOM,
   landHiRings,
@@ -35,7 +36,7 @@ import { GLOBE_COLORS } from './globeColors';
 
 export type GlobeSurfaceMode = 'globe' | 'flat';
 
-const LABEL_FONT = (px: number) => `600 ${px}px Inter, system-ui, -apple-system, sans-serif`;
+const LABEL_FONT = (px: number) => `700 ${px}px Inter, system-ui, -apple-system, sans-serif`;
 
 export function globeSurfaceMode(): GlobeSurfaceMode {
   if (typeof document === 'undefined') return 'flat';
@@ -99,9 +100,12 @@ export function GlobeSurface({ size, view, clock, arcs, activities, selectedId, 
       shapes = { v, land, country, region, labels };
       return shapes;
     };
+    // Label fade state (lib/liveMap/globeDetail.ts fadeLabels), by label key.
+    let fade: Record<string, number> = {};
+    let fadeAt = 0;
     // Labels use the web build's Inter face; ask for it so the canvas has it.
     try {
-      void document.fonts?.load(LABEL_FONT(11));
+      void document.fonts?.load(LABEL_FONT(10));
     } catch {
       // Canvas falls back to the system font until Inter is there.
     }
@@ -181,19 +185,20 @@ export function GlobeSurface({ size, view, clock, arcs, activities, selectedId, 
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Country and state names, under the dots and arcs.
-      if (shape.labels.length > 0) {
+      // Country and state names, under the dots and arcs: one style, solid
+      // black Inter Bold, no outline, origin snapped to the device pixel grid.
+      const faded = fadeLabels(shape.labels, fade, now - fadeAt, still);
+      fade = faded.state;
+      fadeAt = now;
+      if (__DEV__) (canvas as unknown as { __btLabels?: PlacedLabel[] }).__btLabels = faded.draw;
+      if (faded.draw.length > 0) {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 2.5;
-        for (const l of shape.labels) {
-          const x = l.x - l.width / 2;
-          const y = l.y + l.font * 0.36;
+        for (const l of faded.draw) {
+          const x = Math.round((l.x - l.width / 2) * dpr) / dpr;
+          const y = Math.round((l.y + l.font * 0.36) * dpr) / dpr;
           ctx.font = LABEL_FONT(l.font);
-          ctx.strokeStyle = `rgba(${GLOBE_COLORS.labelHaloRgb},${(0.55 * l.alpha).toFixed(3)})`;
-          ctx.strokeText(l.text, x, y);
-          ctx.fillStyle = `rgba(${GLOBE_COLORS.labelInkRgb},${(0.9 * l.alpha).toFixed(3)})`;
+          ctx.fillStyle = `rgba(${GLOBE_COLORS.labelInkRgb},${l.alpha.toFixed(3)})`;
           ctx.fillText(l.text, x, y);
         }
       }

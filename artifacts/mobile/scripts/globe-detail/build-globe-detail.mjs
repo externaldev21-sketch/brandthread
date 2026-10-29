@@ -10,7 +10,9 @@
  *   ne_50m_admin_0_countries.geojson
  *   ne_50m_admin_1_states_provinces.geojson
  *     from https://github.com/nvkelso/natural-earth-vector/tree/master/geojson
- *   Inter_600SemiBold.ttf (from @expo-google-fonts/inter) for label widths
+ *   Inter_700Bold.ttf (from @expo-google-fonts/inter) for label widths
+ *   land-110m.json (from world-atlas@2, the coastline the globe draws below
+ *     zoom 2.8) so labels only show over land
  *
  * Tooling (not app dependencies; install anywhere and point NODE_PATH at it):
  *   npm i topojson-server topojson-simplify topojson-client d3-geo opentype.js
@@ -23,9 +25,12 @@
  *
  * Labels carry the label radius (globe radius in screen points, see
  * lib/liveMap/globeDetail.ts) at which each one fades in, worked out here so
- * the app never has to: a label appears once its text fits its region and
- * it clears every higher-priority label already showing at that radius, and
- * its full name replaces the abbreviation once the name fits the same way.
+ * the app never has to: a label appears once its text fits its region, its
+ * whole box sits over land (black text never lands on the dark sea), and it
+ * clears every higher-priority label already showing at that radius.
+ * Countries are always their full name (never a code, never shortened: a
+ * name that doesn't fit yet simply waits for a closer zoom); states and
+ * provinces are always their abbreviation.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +40,7 @@ const require = createRequire(import.meta.url);
 const { topology } = require('topojson-server');
 const { presimplify, simplify, sphericalTriangleArea } = require('topojson-simplify');
 const { mesh, merge, feature } = require('topojson-client');
-const { geoArea, geoBounds } = require('d3-geo');
+const { geoArea, geoBounds, geoContains } = require('d3-geo');
 const opentype = require('opentype.js');
 
 const DIR = process.argv[2];
@@ -45,11 +50,11 @@ if (!DIR) {
 }
 const OUT = path.resolve(import.meta.dirname, '../../lib/liveMap/globeDetailData.ts');
 const read = (f) => JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
-const font = opentype.parse(fs.readFileSync(path.join(DIR, 'Inter_600SemiBold.ttf')).buffer);
+const font = opentype.parse(fs.readFileSync(path.join(DIR, 'Inter_700Bold.ttf')).buffer);
 
 // Label type sizes; must match COUNTRY_FONT / REGION_FONT in globeDetail.ts.
-const COUNTRY_FONT = 11;
-const REGION_FONT = 10;
+const COUNTRY_FONT = 10;
+const REGION_FONT = 9;
 /** Countries whose first-level divisions are drawn when zoomed in close. */
 const ADMIN1 = {
   'United States of America': 'USA',
@@ -62,10 +67,13 @@ const AU_ABBR = {
   'Western Australia': 'WA', 'Northern Territory': 'NT', 'South Australia': 'SA', Queensland: 'QLD',
   Tasmania: 'TAS', Victoria: 'VIC', 'Australian Capital Territory': 'ACT', 'New South Wales': 'NSW',
 };
-const NAME_OVERRIDE = {
-  USA: 'United States', CAF: 'Central African Rep.', COD: 'DR Congo', BIH: 'Bosnia & Herz.',
-  DOM: 'Dominican Rep.', SSD: 'South Sudan', GNQ: 'Eq. Guinea',
-};
+/**
+ * Country names are always written out in full. Natural Earth's short NAME
+ * abbreviates some ("Dem. Rep. Congo", "Bosnia and Herz."); those use the
+ * full English name instead, with these few set by hand.
+ */
+const NAME_OVERRIDE = { USA: 'United States', CYN: 'Northern Cyprus', FLK: 'Falkland Islands' };
+const fullName = (p) => NAME_OVERRIDE[p.ADM0_A3] ?? (p.NAME.includes('.') ? p.NAME_EN : p.NAME);
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 const admin0 = read('ne_50m_admin_0_countries.geojson');
@@ -88,6 +96,31 @@ const countryBorders = mesh(countriesTopo, countriesTopo.objects.countries, (a, 
 const stateBorders = mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b && a.properties.admin === b.properties.admin);
 // The finer coastline for close zoom: every country merged, small islets dropped.
 const landHi = merge(countriesTopo, countriesTopo.objects.countries.geometries);
+const land110Topo = read('land-110m.json');
+const land110 = feature(land110Topo, land110Topo.objects.land);
+
+/**
+ * Point-in-land against both coastlines the globe draws (1:110m below zoom
+ * 2.8, the finer one above), polygons pre-boxed so the test stays cheap.
+ */
+function landIndex(multi) {
+  const polys = (multi.type === 'MultiPolygon' ? multi.coordinates : multi.features.flatMap((f) => (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)));
+  return polys.map((coordinates) => {
+    const g = { type: 'Polygon', coordinates };
+    const [[w, s], [e, n]] = geoBounds(g);
+    return { g, w, s, e, n, wraps: e < w };
+  });
+}
+const LAND_A = landIndex(landHi);
+const LAND_B = landIndex(land110);
+const inIndex = (index, lng, lat) =>
+  index.some((p) => lat >= p.s - 0.01 && lat <= p.n + 0.01 && (p.wraps || (lng >= p.w - 0.01 && lng <= p.e + 0.01)) && geoContains(p.g, [lng, lat]));
+/**
+ * Globe radius (points) past which only the finer coastline is ever drawn:
+ * LAND_HI_ZOOM (2.8) at the largest globe box (560 pt, the expanded view).
+ */
+const LAND_HI_R = 0.42 * 560 * 2.8;
+const onLand = (lng, lat, r) => inIndex(LAND_A, lng, lat) && (r >= LAND_HI_R || inIndex(LAND_B, lng, lat));
 
 /** Google polyline encoding of [lng, lat] points at 0.01°. */
 function encode(points) {
@@ -158,12 +191,13 @@ const countryLabels = admin0.features
   .map((f) => {
     const p = f.properties;
     const iso = p.ADM0_A3;
-    const name = NAME_OVERRIDE[iso] ?? p.NAME;
+    const name = fullName(p);
     const [[w, s], [e, n]] = geoBounds(f);
     const wide = (((e - w) + 360) % 360 || 360) * Math.cos(((s + n) / 2) * DEG) * DEG;
     return {
-      kind: 'country', iso, abbr: iso, name, lat: p.LABEL_Y, lng: p.LABEL_X,
-      span: regionSpan(f), wide: Math.min(wide, regionSpan(f) * 2.2), rank: p.MIN_LABEL, area: geoArea(f), font: COUNTRY_FONT,
+      // Countries always show their full name, never a code.
+      kind: 'country', iso, abbr: name, name, lat: p.LABEL_Y, lng: p.LABEL_X,
+      f, span: regionSpan(f), wide: Math.min(wide, regionSpan(f) * 2.2), rank: p.MIN_LABEL, area: geoArea(f), font: COUNTRY_FONT,
     };
   })
   .filter((l) => Number.isFinite(l.lat) && l.area > 2e-6);
@@ -177,7 +211,7 @@ const regionLabels = admin1.features
     const wide = (((e - w) + 360) % 360) * Math.cos(((s + n) / 2) * DEG) * DEG;
     return {
       kind: 'region', iso: ADMIN1[p.admin], abbr, name: p.name, lat: p.latitude, lng: p.longitude,
-      span: regionSpan(f), wide: Math.min(wide, regionSpan(f) * 2.2), rank: 0, area: geoArea(f), font: REGION_FONT,
+      f, span: regionSpan(f), wide: Math.min(wide, regionSpan(f) * 2.2), rank: 0, area: geoArea(f), font: REGION_FONT,
     };
   });
 
@@ -198,33 +232,10 @@ function place(labels, minR, maxR) {
   labels.sort((a, b) => a.rank - b.rank || b.area - a.area);
   const placed = [];
   for (const l of labels) {
-    l.u = unit(l.lat, l.lng);
     l.wAbbr = textWidth(l.abbr, l.font);
     l.wName = textWidth(l.name, l.font);
     const h = l.font + PAD_Y;
     const fits = (r, w) => w <= l.wide * r * 1.05 && h <= l.span * r * 1.6;
-    const clear = (r, w) => {
-      for (const o of placed) {
-        const or = o.minR;
-        if (r < or) continue;
-        const ow = r >= o.nameR ? o.wName : o.wAbbr;
-        // Offset of o from l on the tangent plane at their midpoint, in points.
-        const m = [l.u[0] + o.u[0], l.u[1] + o.u[1], l.u[2] + o.u[2]];
-        const ml = Math.hypot(...m);
-        if (ml < 1e-6) return false;
-        const zc = m.map((x) => x / ml);
-        // East and north at the midpoint.
-        const east = [zc[2], 0, -zc[0]];
-        const el = Math.hypot(...east) || 1;
-        const e = east.map((x) => x / el);
-        const nrt = [zc[1] * e[2] - zc[2] * e[1], zc[2] * e[0] - zc[0] * e[2], zc[0] * e[1] - zc[1] * e[0]];
-        const d = [o.u[0] - l.u[0], o.u[1] - l.u[1], o.u[2] - l.u[2]];
-        const dx = Math.abs(d[0] * e[0] + d[1] * e[1] + d[2] * e[2]) * r;
-        const dy = Math.abs(d[0] * nrt[0] + d[1] * nrt[1] + d[2] * nrt[2]) * r;
-        if (dx < (w + ow) / 2 + PAD_X && dy < (h + o.font + PAD_Y) / 2 + 2) return false;
-      }
-      return true;
-    };
     /** Smallest ladder radius from which `ok` holds on every step above it. */
     const lowest = (ok) => {
       let best = Infinity;
@@ -235,8 +246,85 @@ function place(labels, minR, maxR) {
       }
       return best;
     };
-    l.minR = lowest((r) => fits(r, l.wAbbr) && clear(r, l.wAbbr));
-    l.nameR = l.name === l.abbr ? l.minR : Math.max(l.minR, lowest((r) => fits(r, l.wName) && clear(r, l.wName)));
+    /** Fade-in radius with the label anchored at unit vector u (0 checks skip the land test). */
+    const radiusAt = (u, land = true) => {
+      // East and north at the anchor, for walking the text box over the sphere.
+      const el0 = Math.hypot(u[2], u[0]) || 1;
+      const e0 = [u[2] / el0, 0, -u[0] / el0];
+      const n0 = [u[1] * e0[2] - u[2] * e0[1], u[2] * e0[0] - u[0] * e0[2], u[0] * e0[1] - u[1] * e0[0]];
+      /**
+       * The whole text box sits inside the label's own country/state and over
+       * land: black text never lands on the dark sea or reads as a neighbour's.
+       */
+      const overLand = (r, w) => {
+        for (const fx of [-0.5, -0.25, 0, 0.25, 0.5]) {
+          for (const fy of [-0.5, 0, 0.5]) {
+            const dx = (fx * (w + 2)) / r;
+            const dy = (fy * (l.font + 2)) / r;
+            const q = [u[0] + e0[0] * dx + n0[0] * dy, u[1] + e0[1] * dx + n0[1] * dy, u[2] + e0[2] * dx + n0[2] * dy];
+            const ql = Math.hypot(...q);
+            const lng = Math.atan2(q[0], q[2]) / DEG;
+            const lat = Math.asin(q[1] / ql) / DEG;
+            if (!geoContains(l.f, [lng, lat]) || !onLand(lng, lat, r)) return false;
+          }
+        }
+        return true;
+      };
+      const clear = (r, w) => {
+        for (const o of placed) {
+          if (r < o.minR) continue;
+          const ow = r >= o.nameR ? o.wName : o.wAbbr;
+          // Offset of o from the anchor on the tangent plane at their midpoint, in points.
+          const m = [u[0] + o.u[0], u[1] + o.u[1], u[2] + o.u[2]];
+          const ml = Math.hypot(...m);
+          if (ml < 1e-6) return false;
+          const zc = m.map((x) => x / ml);
+          const east = [zc[2], 0, -zc[0]];
+          const el = Math.hypot(...east) || 1;
+          const e = east.map((x) => x / el);
+          const nrt = [zc[1] * e[2] - zc[2] * e[1], zc[2] * e[0] - zc[0] * e[2], zc[0] * e[1] - zc[1] * e[0]];
+          const d = [o.u[0] - u[0], o.u[1] - u[1], o.u[2] - u[2]];
+          const dx = Math.abs(d[0] * e[0] + d[1] * e[1] + d[2] * e[2]) * r;
+          const dy = Math.abs(d[0] * nrt[0] + d[1] * nrt[1] + d[2] * nrt[2]) * r;
+          if (dx < (w + ow) / 2 + PAD_X && dy < (h + o.font + PAD_Y) / 2 + 2) return false;
+        }
+        return true;
+      };
+      return lowest((r) => fits(r, l.wAbbr) && clear(r, l.wAbbr) && (!land || overLand(r, l.wAbbr)));
+    };
+    l.u = unit(l.lat, l.lng);
+    l.minR = radiusAt(l.u);
+    // Anchored on a coast, a bay or a narrow stretch, a label could wait far
+    // longer than its room says (or never show): try other points inside its
+    // own region and keep the one that shows earliest, preferring points
+    // near the original label point.
+    const roomR = radiusAt(l.u, false);
+    const home = l.u;
+    const score = (r, u) => r * (1 + Math.acos(Math.min(1, u[0] * home[0] + u[1] * home[1] + u[2] * home[2])) / l.span);
+    let best = score(l.minR, l.u);
+    if (l.minR > roomR * 1.3) {
+      const [[w, s], [e, n]] = geoBounds(l.f);
+      const span = (((e - w) + 360) % 360) || 360;
+      for (let i = 1; i < 6; i += 1) {
+        for (let j = 1; j < 6; j += 1) {
+          const lng = w + (span * i) / 6;
+          const lat = s + ((n - s) * j) / 6;
+          const lngN = lng > 180 ? lng - 360 : lng;
+          if (!geoContains(l.f, [lngN, lat])) continue;
+          const u = unit(lat, lngN);
+          const r = radiusAt(u);
+          if (Number.isFinite(r) && score(r, u) < best * 0.98) {
+            best = score(r, u);
+            l.minR = r;
+            l.u = u;
+            l.lat = lat;
+            l.lng = lngN;
+          }
+        }
+      }
+    }
+    // States keep their abbreviation at every zoom; countries are already full names.
+    l.nameR = l.name === l.abbr ? l.minR : Infinity;
     if (l.minR <= maxR) placed.push(l);
   }
   return placed;
@@ -258,10 +346,11 @@ const header = `/**
  * sphere and quantised to 0.01°. Strings are Google polyline encodings
  * (lat, lng at 1e2), one ring or line per space-separated chunk.
  *
- * Labels: [abbreviation, name, lat, lng, fade-in radius, name radius,
- * abbreviation width, name width, country]; radii are the globe radius in
- * screen points, widths are Inter SemiBold at the label's size. Listed in
- * priority order.
+ * Labels: [shown text, full name, lat, lng, fade-in radius, name radius,
+ * shown-text width, name width, country]; radii are the globe radius in
+ * screen points, widths are Inter Bold at the label's size. Countries show
+ * their full name (both texts are the name); states show their abbreviation
+ * (name radius 99999: never). Listed in priority order.
  */
 `;
 

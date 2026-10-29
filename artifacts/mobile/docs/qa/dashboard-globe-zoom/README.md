@@ -11,20 +11,25 @@ dashboard card and in the expanded (full-screen) Live view.
 |---|---|
 | 1 (default) | Exactly the existing globe: solid silver continents on black, dots, arcs. No detail layer draws, and the land path is byte-identical to `dev` (checked over 1,224 views). |
 | from 1.3 | Country borders fade in as fine graphite hairlines etched into the silver land (clipped to the land). |
-| from 1.45 | Country codes, then full names, fade in at Natural Earth's label points, biggest/most important countries first. |
-| from 2.3 | State/province borders fade in (US, Canada, Australia, Brazil). The country's own name steps aside, then its states' abbreviations fade in, turning into full names as they get room. |
+| from 1.45 | Country names fade in, biggest/most important countries first. Always the full name ("Guatemala", "Democratic Republic of the Congo"), never a code or a shortened form; a name that doesn't fit yet waits for a closer zoom. |
+| from 2.3 | State/province borders fade in (US, Canada, Australia, Brazil). The country's own name steps aside, then its states' abbreviations (TX, ON, NSW…) fade in; states stay abbreviations at every zoom. |
 | from 2.8 | The finer 1:50m coastline takes over from the 1:110m one. |
 | up to 18 | Small northeastern states (CT, RI, DE, NJ, NH) get their labels. |
 
-- Labels are Inter SemiBold (11 pt countries, 10 pt states), near-black ink
-  with a soft silver halo. Borders and labels are black/white/silver only.
+- One label style everywhere: Inter Bold, solid black, no outline or halo,
+  origins snapped to the device pixel grid. Country names 10 pt, state
+  abbreviations 9 pt; every country label matches every other, every state
+  label matches every other.
+- A label only shows where its whole box sits over land inside its own
+  country/state (black on silver). Over the dark sea, or straddling a
+  neighbour, it waits for a closer zoom instead of changing style.
+- At rest a label is either fully shown or hidden, never half-faded grey; a
+  label switching on or off fades over 160 ms.
 - No label ever overlaps another: the generator picked each label's fade-in
   radius so labels clear the ones placed before them, and at draw time a
   label that would still overlap one already shown (near the limb) fades out.
   A label also fades before it reaches the globe box's edge, so nothing is cut.
-- Every transition is a ramp on zoom (layers) or on the globe's radius
-  (each label); an abbreviation fades out before its full name fades in, so
-  the two never sit on top of each other.
+- Layers (borders) fade on a ramp of zoom.
 - Dots and arcs draw after (above) the border and label layers, unchanged.
 
 Gestures (card and expanded view): pinch (native, and two-finger touch on
@@ -44,28 +49,33 @@ Bundled; nothing is fetched at runtime.
 | Check | Card | Expanded view |
 |---|---|---|
 | Default zoom (1) | 0 labels, no borders | 0 labels, no borders |
-| Zoom 1.73 over the US | borders + Canada, United States, Mexico | same |
-| Zoom 2.27 | + Cuba | + Costa Rica (CRI), Cuba |
-| Zoom 4.16 (Midwest) | 29 state/province labels (Texas, ND, SD, Ohio, IN, Québec…) | 30 |
-| Zoom 7.89 | 16 (Wisconsin, Illinois, Indiana, Kentucky…) | 16 |
-| Zoom 15.83 (Northeast) | 8 (CT, NJ, DE, NH, Vermont, Massachusetts…) | 10 |
+| Zoom 1.73 over the US | borders + Canada, United States | same |
+| Zoom 2.42 (countries level) | Canada, United States, Mexico | same |
+| Zoom 4.15 (states level) | 34 state/province codes (TX, ND, OH, QC…) | 35 |
+| Zoom 7.88 | 20 | 17 |
+| Zoom 15.83 (Northeast) | 10 (CT, NJ, NH, VT, MA, MD…) | 7 |
+| Zoom 10.85 (Central America) | Guatemala, Honduras, Nicaragua | same |
+| Every drawn label at full strength (alpha 1) at rest, every step | yes | yes |
+| Country codes / shortened or ellipsized names, every step | 0 / 0 | 0 / 0 |
+| Labels over the dark sea (canvas at each label box's corners) | 0 | 0 |
 | Overlapping labels / labels cut by the box edge, every step | 0 / 0 | 0 / 0 |
-| Order dots on top (core pixel near-white at a zoomed view) | 2/2 | 3/3 |
+| Order dots on top at the state level (core pixel near-white) | 5/5 | 5/5 |
 | Zoomed back out | 0 labels (the plain globe) | n/a |
 | Two-finger touch pinch | zoom 1 → 2 | n/a |
 | Vertical drag when zoomed | tilts the globe; page doesn't scroll | n/a |
-| Frame pacing dragging at state level (2.5 s) | 60 fps avg, p95 16.7 ms | n/a |
-| Frame pacing at country level while auto-rotating (zoom 1.48, 3 s) | 59.3 fps avg, p95 16.8 ms | n/a |
+| Frame pacing dragging at state level (2.5 s) | 58.8 fps avg, p95 16.8 ms | n/a |
+| Frame pacing at country level while auto-rotating (zoom 1.48, 3 s) | 60 fps avg, p95 16.7 ms | n/a |
 | Page errors | none | none |
 
 Unit tests (`lib/liveMap/globeDetail.test.ts`) cover the layer order, the zoom-1
-no-op, no overlap or edge cut across 7 regions × ~17 zooms × 3 rotations,
+no-op, full country names / state codes at every zoom, the show-or-hide label
+fade, no overlap or edge cut across 7 regions × ~17 zooms × 3 rotations,
 clipping, and focal-point zoom.
 
 Native (Skia) renderer: `skia-canvaskit-z*.png` draw the native draw list
 (`components/globe/GlobeSurface.tsx`: the finer coastline, borders clipped to
 the land with the even-odd rule, labels recorded into an SkPicture with
-`drawText` in Inter SemiBold) on CanvasKit, Skia's own WASM build; all path
+`drawText` in Inter Bold, solid black) on CanvasKit, Skia's own WASM build; all path
 strings parse. Not run on a device or simulator in this environment.
 
 ## Screenshots
@@ -74,10 +84,11 @@ Dashboard card, zooming in over the US:
 `card-0-default.png` → `card-1-borders.png` → `card-2-country-labels.png` →
 `card-3-states.png` → `card-4-states-close.png` → `card-5-northeast.png`, then
 `card-6b-country-level-rotating.png`, `card-6-back-out.png` (zoomed back out:
-the plain globe again) and `card-7-after-pinch.png` (two-finger touch pinch).
+the plain globe again), `card-7-after-pinch.png` (two-finger touch pinch) and
+`card-7-central-america.png` (small countries: full names only).
 
-Expanded view: `full-0-default.png` … `full-5-northeast.png` and
-`full-screen-390x844.png`.
+Expanded view: `full-0-default.png` … `full-5-northeast.png`,
+`full-7-central-america.png` and `full-screen-390x844.png`.
 
 ## Re-running
 

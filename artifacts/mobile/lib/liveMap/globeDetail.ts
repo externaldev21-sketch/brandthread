@@ -3,17 +3,19 @@
  * (web) renderers: the closer the seller zooms, the more the map says.
  *
  *   zoom 1 (default)   exactly the plain globe: nothing here draws;
- *   zoom ≳ 1.3         country borders fade in as hairlines; country codes,
- *                      then names, fade in at their label points, biggest
- *                      countries first;
+ *   zoom ≳ 1.3         country borders fade in as hairlines; country names
+ *                      (always the full name, never a code) fade in at their
+ *                      label points, biggest countries first, each once the
+ *                      whole name has room;
  *   zoom ≳ 2.3         state/province borders fade in (US, Canada, Australia,
- *                      Brazil) with their abbreviations, then full names, so
- *                      an order dot reads to the state; from 2.8 the finer
- *                      coastline takes over.
+ *                      Brazil) with their abbreviations, so an order dot reads
+ *                      to the state; from 2.8 the finer coastline takes over.
  *
  * Every layer fades on a smooth ramp of zoom (and each label on a ramp of
  * the globe's radius in points, from the generator's precomputed fade-in
- * radius), so nothing pops. Labels never overlap: the generator picked
+ * radius), so nothing pops. A label only shows where its whole box sits
+ * over land, so the black text never lands on the dark sea (it waits for a
+ * closer zoom instead of changing style). Labels never overlap: the generator picked
  * fade-in radii so labels clear each other face-on, and at draw time a label
  * that would still overlap one placed before it (near the limb, where the
  * sphere squeezes them together) fades by how much it overlaps. Labels on
@@ -35,9 +37,13 @@ import {
 
 const DEG = Math.PI / 180;
 
-/** Label type sizes in points (the generator measured widths at these). */
-export const COUNTRY_FONT = 11;
-export const REGION_FONT = 10;
+/**
+ * Label type: one style for every label, Inter Bold in solid black, no
+ * outline; country names one step up from state abbreviations. The
+ * generator measured widths at these sizes.
+ */
+export const COUNTRY_FONT = 10;
+export const REGION_FONT = 9;
 
 /** Smoothstep from 0 at `a` to 1 at `b`. */
 export function ramp(x: number, a: number, b: number): number {
@@ -297,6 +303,8 @@ export function regionLabelTable(): LabelTable {
 
 /** One piece of text to draw, centred on (x, y). */
 export interface PlacedLabel {
+  /** Stable per label (and per text), for fade state across frames. */
+  key: string;
   text: string;
   x: number;
   y: number;
@@ -305,6 +313,8 @@ export interface PlacedLabel {
   width: number;
 }
 
+/** A label shows once its layout weight passes this; below it, it's hidden (fadeLabels). */
+const SHOW_AT = 0.5;
 /** Fade-in span of one label, as a factor on its fade-in radius. */
 const LABEL_RAMP = 1.2;
 /**
@@ -339,6 +349,7 @@ export function labelLayout(countries: LabelTable, regions: LabelTable, view: Gl
   const boxes: number[] = [];
 
   const run = (t: LabelTable, gate: number, isCountry: boolean) => {
+    const kind = isCountry ? 'c' : 'r';
     if (gate <= 0.001) return;
     const h = t.font + BOX_PAD_Y * 2;
     for (let i = 0; i < t.abbr.length; i += 1) {
@@ -379,14 +390,54 @@ export function labelLayout(countries: LabelTable, regions: LabelTable, view: Gl
         a *= 1 - Math.min(1, cover * 40) * Math.min(1, boxes[b + 4] * 8);
       }
       if (a <= 0.01) continue;
-      // Its weight against later labels follows what is visible, so the box's
-      // switch from abbreviation to name width (where both are faded out) is seamless.
-      boxes.push(bx0, by0, bx1, by1, a * Math.max(abbrA, nameA));
-      if (abbrA > 0) out.push({ text: t.abbr[i], x: px, y: py, alpha: a * abbrA, font: t.font, width: t.wAbbr[i] });
-      if (nameA > 0) out.push({ text: t.name[i], x: px, y: py, alpha: a * nameA, font: t.font, width: t.wName[i] });
+      // Only a label that will show keeps later ones out of its box.
+      if (a * Math.max(abbrA, nameA) >= SHOW_AT) boxes.push(bx0, by0, bx1, by1, 1);
+      if (abbrA > 0) out.push({ key: `${kind}${i}a`, text: t.abbr[i], x: px, y: py, alpha: a * abbrA, font: t.font, width: t.wAbbr[i] });
+      if (nameA > 0) out.push({ key: `${kind}${i}n`, text: t.name[i], x: px, y: py, alpha: a * nameA, font: t.font, width: t.wName[i] });
     }
   };
   run(regions, levels.regionLabels, false);
   run(countries, levels.countryLabels, true);
   return out;
 }
+
+/** How long a label takes to fade fully in or out, in ms. */
+export const LABEL_FADE_MS = 160;
+
+export interface LabelFadeResult {
+  /** What to draw now: every resting label at full strength (alpha 1). */
+  draw: PlacedLabel[];
+  /** Current strength per label key, for the next frame. */
+  state: Record<string, number>;
+  /** Nothing is mid-fade: the same layout draws the same picture. */
+  settled: boolean;
+}
+
+/**
+ * One label style everywhere: a label is either shown in full (solid black)
+ * or hidden, never left half-faded at rest. labelLayout's weights decide
+ * which (shown once past SHOW_AT), and a label switching on or off fades
+ * over LABEL_FADE_MS of wall time, so nothing pops while zooming or turning.
+ * `dt` is the time since the previous call (ms); `instant` (Reduce Motion)
+ * skips the fade.
+ */
+export function fadeLabels(items: readonly PlacedLabel[], prev: Record<string, number>, dt: number, instant: boolean): LabelFadeResult {
+  'worklet';
+  const step = instant ? 1 : Math.max(0, dt) / LABEL_FADE_MS;
+  const state: Record<string, number> = {};
+  const draw: PlacedLabel[] = [];
+  let settled = true;
+  for (let i = 0; i < items.length; i += 1) {
+    const l = items[i];
+    const target = l.alpha >= SHOW_AT ? 1 : 0;
+    const was = prev[l.key] ?? 0;
+    const now = target > was ? Math.min(target, was + step) : Math.max(target, was - step);
+    if (now !== target) settled = false;
+    if (now > 0) {
+      state[l.key] = now;
+      draw.push({ key: l.key, text: l.text, x: l.x, y: l.y, alpha: now, font: l.font, width: l.width });
+    }
+  }
+  return { draw, state, settled };
+}
+
