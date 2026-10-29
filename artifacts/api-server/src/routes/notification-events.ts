@@ -16,6 +16,7 @@ const notificationEventBody = looseBody({
 router.use(requireAuth);
 
 const EVENT_TYPES = new Set<NotificationEventType>(["receipt", "open", "tap"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST /api/notifications/events
 // Client event IDs are deliberately not trusted as ownership identifiers. The
@@ -40,11 +41,16 @@ router.post("/events", validateBody(notificationEventBody), async (req, res) => 
 
   // A notification can be an in-app-only row or a push delivery. Either way,
   // an authenticated user may record events only for their own notifications.
+  // Feed ids are uuids, but push-only notifications carry other ids (e.g.
+  // "new-login/<session>", "stable:subscription-trial-ending:..."); comparing
+  // those against the uuid column would throw instead of matching nothing.
   const [ownedFeed, ownedDelivery] = await Promise.all([
-    db.select({ id: notificationsFeed.id })
-      .from(notificationsFeed)
-      .where(and(eq(notificationsFeed.id, notificationId), eq(notificationsFeed.userId, userId)))
-      .limit(1),
+    UUID_RE.test(notificationId)
+      ? db.select({ id: notificationsFeed.id })
+        .from(notificationsFeed)
+        .where(and(eq(notificationsFeed.id, notificationId), eq(notificationsFeed.userId, userId)))
+        .limit(1)
+      : Promise.resolve([] as { id: string }[]),
     db.select({ id: notificationDeliveries.id, ownerId: notificationDeliveries.ownerId })
       .from(notificationDeliveries)
       .where(and(eq(notificationDeliveries.notificationId, notificationId), eq(notificationDeliveries.userId, userId)))

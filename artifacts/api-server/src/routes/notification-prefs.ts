@@ -57,6 +57,7 @@ const BUYER_DEFAULTS = {
 };
 const SELLER_DEFAULTS = {
   new_orders: true,
+  /** Settings › Sounds & haptics › New order sound (see lib/push.ts resolvePushSound). */
   new_order_sound: true,
   production_milestones: true,
   payout_confirmations: true,
@@ -69,7 +70,7 @@ const SELLER_DEFAULTS = {
   subscription_trial: true,
   inventory_alerts: true,
   seller_announcements: true,
-  /** Settings › Sounds & haptics › New order sound (see lib/push.ts resolvePushSound). */
+  // New-device sign-in alerts (lib/security/signInAlerts.ts).
   login_alerts: true,
 };
 

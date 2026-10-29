@@ -8,9 +8,14 @@
  * GET    /api/buyer/notifications/actors?ids=   — the people behind one merged Activity row
  * GET    /api/buyer/notifications/unread-count  — { count } for bell badges
  * PATCH  /api/buyer/notifications/read-all      — mark all as read
+ * DELETE /api/buyer/notifications/read          — clear read rows (?category=)
+ * POST   /api/buyer/notifications/mute-category — { category, muted? }
+ * PATCH  /api/buyer/notifications/:id/unread    — mark one as unread
  * PATCH  /api/buyer/notifications/:id/read      — mark one as read
  * DELETE /api/buyer/notifications/:id           — delete one
- * POST   /api/internal/notifications            — publish a notification (server-to-user)
+ *
+ * Other routes publish through the exported publishNotification(); there is
+ * no HTTP publish endpoint.
  */
 import { notifySmsForNotification, smsEnabled } from "../lib/sms";
 import { Router } from "express";
@@ -39,6 +44,8 @@ const buyerRouter = Router();
 buyerRouter.use(requireAuth);
 
 const objectStorage = new ObjectStorageService();
+/** Feed ids are uuids; anything else matches no row (and must not reach the uuid column). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Signed thumbnail URLs outlive a normal browsing session. */
 const THUMBNAIL_URL_TTL_SEC = 60 * 60;
 
@@ -279,6 +286,7 @@ buyerRouter.get("/actors", async (req, res) => {
     .filter(Boolean))]
     .slice(0, GROUP_ACTORS_MAX_IDS);
   if (ids.length === 0) return res.status(400).json({ error: "ids required" });
+  if (!ids.every((id) => UUID_RE.test(id))) return res.status(400).json({ error: "ids must be notification ids" });
 
   const blockedIds = await blockedCounterpartIds(userId);
   const conditions = [eq(notificationsFeed.userId, userId), inArray(notificationsFeed.id, ids)];
@@ -444,6 +452,7 @@ buyerRouter.post("/mute-category", async (req, res) => {
 
 buyerRouter.patch("/:id/unread", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Notification not found" });
   await db.update(notificationsFeed).set({ isRead: false })
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
   return res.json({ ok: true });
@@ -451,6 +460,7 @@ buyerRouter.patch("/:id/unread", async (req, res) => {
 
 buyerRouter.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Notification not found" });
   await db.update(notificationsFeed).set({ isRead: true })
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
   emitToUsers([userId], { type: "badges.changed" });
@@ -459,6 +469,7 @@ buyerRouter.patch("/:id/read", async (req, res) => {
 
 buyerRouter.delete("/:id", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Notification not found" });
   await db.delete(notificationsFeed)
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
   emitToUsers([userId], { type: "badges.changed" });

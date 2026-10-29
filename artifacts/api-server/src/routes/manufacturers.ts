@@ -37,7 +37,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
-import { findCountry, isValidTimeZone, manufacturerNetCents, validateTransition } from "@workspace/manufacturer-flow";
+import { findCountry, isTerminalStatus, isValidTimeZone, manufacturerNetCents, validateTransition } from "@workspace/manufacturer-flow";
 import { afterStageChange, attachOrderSnapshots, postThreadSystemMessage } from "../lib/manufacturerOrders";
 import { acceptUploadSession } from "../lib/uploadSessions";
 import { recordLegalAcceptance } from "../lib/legalAcceptance";
@@ -661,6 +661,8 @@ router.patch("/me/quote-requests/:id", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 type PriceTierInput = { minQuantity: number; maxQuantity?: number | null; unitPriceCents: number };
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+const MAX_INT4 = 2_147_483_647;
 
 function validatePriceTiers(input: unknown): PriceTierInput[] | null {
   if (!Array.isArray(input) || input.length === 0) return null;
@@ -670,9 +672,10 @@ function validatePriceTiers(input: unknown): PriceTierInput[] | null {
     const maxQuantityRaw = (raw as any)?.maxQuantity;
     const maxQuantity = maxQuantityRaw === null || maxQuantityRaw === undefined ? null : Number(maxQuantityRaw);
     const unitPriceCents = Number((raw as any)?.unitPriceCents);
-    if (!Number.isInteger(minQuantity) || minQuantity < 1) return null;
-    if (maxQuantity !== null && (!Number.isInteger(maxQuantity) || maxQuantity < minQuantity)) return null;
-    if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) return null;
+    // Columns are int4: anything larger would fail the insert with a 500.
+    if (!Number.isInteger(minQuantity) || minQuantity < 1 || minQuantity > MAX_INT4) return null;
+    if (maxQuantity !== null && (!Number.isInteger(maxQuantity) || maxQuantity < minQuantity || maxQuantity > MAX_INT4)) return null;
+    if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0 || unitPriceCents > MAX_INT4) return null;
     tiers.push({ minQuantity, maxQuantity, unitPriceCents });
   }
   return tiers.sort((a, b) => a.minQuantity - b.minQuantity);
@@ -713,9 +716,11 @@ function serializeProduct(
   };
 }
 
-async function replaceProductTiers(productId: string, tiers: PriceTierInput[]) {
-  await db.delete(manufacturerProductPriceTiers).where(eq(manufacturerProductPriceTiers.productId, productId));
-  await db.insert(manufacturerProductPriceTiers).values(
+// Runs inside the caller's transaction so a failed tier insert can't leave the
+// product with its old tiers deleted and no new ones.
+async function replaceProductTiers(tx: Tx, productId: string, tiers: PriceTierInput[]) {
+  await tx.delete(manufacturerProductPriceTiers).where(eq(manufacturerProductPriceTiers.productId, productId));
+  await tx.insert(manufacturerProductPriceTiers).values(
     tiers.map((tier, index) => ({
       productId,
       minQuantity: tier.minQuantity,
@@ -800,6 +805,7 @@ router.patch("/me/products/:id", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Product not found" });
   const [existing] = await db.select().from(manufacturerProducts).where(and(
     eq(manufacturerProducts.id, req.params.id),
     eq(manufacturerProducts.manufacturerId, mfr.id),
@@ -835,7 +841,7 @@ router.patch("/me/products/:id", async (req, res) => {
       status: typeof status === "string" ? status : existing.status,
       updatedAt: new Date(),
     }).where(eq(manufacturerProducts.id, existing.id)).returning();
-    if (tiers) await replaceProductTiers(existing.id, tiers);
+    if (tiers) await replaceProductTiers(tx, existing.id, tiers);
     return row;
   });
 
@@ -850,6 +856,7 @@ router.delete("/me/products/:id", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Product not found" });
   const deleted = await db.delete(manufacturerProducts).where(and(
     eq(manufacturerProducts.id, req.params.id),
     eq(manufacturerProducts.manufacturerId, mfr.id),
@@ -1396,9 +1403,13 @@ router.get("/me/dashboard", async (req, res) => {
   const sharedOrders = await db.select().from(sampleOrders)
     .where(eq(sampleOrders.manufacturerId, mfr.id))
     .orderBy(desc(sampleOrders.updatedAt));
-  const terminalStatuses = ["delivered", "approved", "rejected", "cancelled", "complete"];
-  const active = sharedOrders.filter((o) => !terminalStatuses.includes(o.status));
-  const completed = sharedOrders.filter((o) => terminalStatuses.includes(o.status));
+  // Same terminal set as the shared state machine (and the portal), so
+  // "completed"/"refunded" orders are no longer counted as active work.
+  const active = sharedOrders.filter((o) => !isTerminalStatus(o.status));
+  const completed = sharedOrders.filter((o) => isTerminalStatus(o.status));
+  // Cancelled orders were never paid (only pending_payment can be cancelled)
+  // and refunded ones were paid back, so neither is completed value.
+  const unpaidOrReturned = new Set(["cancelled", "refunded"]);
   const activeSellers = new Map(threads.map((thread) => [thread.buyerClerkId, {
     sellerId: thread.buyerClerkId,
     sellerName: thread.buyerName,
@@ -1408,7 +1419,9 @@ router.get("/me/dashboard", async (req, res) => {
   const activeOrders    = active.length;
   const completedOrders = completed.length;
   const pendingMessages = threads.reduce((sum, t) => sum + t.manufacturerUnreadCount, 0);
-  const totalRevenue    = completed.reduce((s, o) => s + o.priceCents, 0);
+  const totalRevenue    = completed
+    .filter((o) => !unpaidOrReturned.has(o.status))
+    .reduce((s, o) => s + o.priceCents, 0);
 
   const named = new Map((await withSellerNames(sharedOrders.map(serializeSampleOrder))).map((order) => [order.id, order]));
   const withName = (order: typeof sampleOrders.$inferSelect) => named.get(order.id)!;
@@ -1526,6 +1539,7 @@ router.get("/threads", ...requireGrowthSeller, async (req, res) => {
 router.get("/threads/:threadId/messages", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const threadId = req.params.threadId as string;
+  if (!isUuid(threadId)) { res.status(404).json({ error: "Thread not found" }); return; }
   const [thread] = await db
     .select({ id: manufacturerThreads.id })
     .from(manufacturerThreads)
@@ -1555,6 +1569,7 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
   const threadId = req.params.threadId as string;
   const { content, messageType = "text", mediaUrls, cardData, clientRequestId } = parsed.data;
   const sellerId = (req as any).clerkUserId as string;
+  if (!isUuid(threadId)) { res.status(404).json({ error: "Thread not found" }); return; }
 
   const [thread] = await db
     .select({ id: manufacturerThreads.id, manufacturerId: manufacturerThreads.manufacturerId })
@@ -1695,6 +1710,7 @@ router.get("/me/threads/:threadId/messages", async (req, res) => {
 
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
+  if (!isUuid(req.params.threadId)) return res.status(404).json({ error: "Thread not found" });
   const [thread] = await db.select({ id: manufacturerThreads.id }).from(manufacturerThreads)
     .where(and(
       eq(manufacturerThreads.id, req.params.threadId),
@@ -1726,6 +1742,7 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
   const { content, messageType, mediaUrls, cardData, clientRequestId } = parsed.data;
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
+  if (!isUuid(threadId)) return res.status(404).json({ error: "Thread not found" });
   const [thread] = await db.select({
     id: manufacturerThreads.id,
     buyerClerkId: manufacturerThreads.buyerClerkId,
@@ -1822,6 +1839,7 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
 async function uploadThreadAttachment(req: express.Request, res: express.Response, role: "seller" | "manufacturer") {
   const clerkId = (req as any).clerkUserId as string;
   const threadId = req.params.threadId as string;
+  if (!isUuid(threadId)) { res.status(404).json({ error: "Thread not found" }); return; }
   const mfr = role === "manufacturer" ? await resolveManufacturer(clerkId) : null;
   const condition = role === "seller"
     ? eq(manufacturerThreads.buyerClerkId, clerkId)
@@ -1884,6 +1902,7 @@ router.get("/me/sample-orders/:orderId", async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
+  if (!isUuid(req.params.orderId)) return res.status(404).json({ error: "Order not found" });
   const [order] = await db.select().from(sampleOrders).where(and(
     eq(sampleOrders.id, req.params.orderId),
     eq(sampleOrders.manufacturerId, mfr.id),
@@ -1910,6 +1929,7 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
   )) {
     return res.status(400).json({ error: "carrier and trackingNumber are required when shipping an order" });
   }
+  if (!isUuid(req.params.orderId)) return res.status(404).json({ error: "Order not found" });
   const [current] = await db.select().from(sampleOrders).where(and(
     eq(sampleOrders.id, req.params.orderId),
     eq(sampleOrders.manufacturerId, mfr.id),

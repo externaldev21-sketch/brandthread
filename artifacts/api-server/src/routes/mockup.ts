@@ -56,7 +56,9 @@ function decodeReferenceImage(input: unknown): Buffer | null {
 
 // POST /api/mockup/generate
 router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+  // requireAuth sets clerkUserId. Clerk's `req.auth` is a function, so reading
+  // `.userId` off it put every caller in one shared "anon" bucket.
+  const userId = ((req as any).clerkUserId as string | undefined) ?? "anon";
   if (!checkRateLimit(userId)) {
     res.status(429).json({ error: "Too many mockup generations. Please wait a minute and try again." });
     return;

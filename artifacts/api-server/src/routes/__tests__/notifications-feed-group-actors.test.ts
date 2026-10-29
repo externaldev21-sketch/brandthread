@@ -64,6 +64,9 @@ async function startServer() {
   return { server, base };
 }
 
+// Feed ids are uuids (the route rejects anything else before querying).
+const N = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002", "00000000-0000-4000-8000-000000000003", "00000000-0000-4000-8000-000000000004"] as const;
+
 const like = (id: string, actorId: string | null, name: string, minutesAgo: number) => ({
   id, userId: "me-1", category: "social", type: "post_like", title: `${name} liked your post`, body: "",
   isRead: true, isMuted: false, actorId, actorName: name, actorHandle: `@${name.toLowerCase()}`,
@@ -87,17 +90,17 @@ describe("GET /api/buyer/notifications/actors", () => {
     state.rows = {
       blocks: [],
       notificationsFeed: [
-        like("n1", "u-jay", "Jay", 1),
-        like("n2", "u-mina", "Mina", 5),
-        like("n3", "u-jay", "Jay", 9), // repeat actor collapses
-        like("n4", null, "System", 12), // no actor → not a person
+        like(N[0], "u-jay", "Jay", 1),
+        like(N[1], "u-mina", "Mina", 5),
+        like(N[2], "u-jay", "Jay", 9), // repeat actor collapses
+        like(N[3], null, "System", 12), // no actor → not a person
       ],
       users: [{ clerkId: "u-mina", profileImageUrl: "https://img.test/mina.jpg", avatarUrl: null }],
       follows: [{ followingId: "u-mina" }],
     };
     const { server, base } = await startServer();
     try {
-      const res = await fetch(`${base}/api/buyer/notifications/actors?ids=n1,n2,n3,n4`);
+      const res = await fetch(`${base}/api/buyer/notifications/actors?ids=${N.join(",")}`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as { actors: any[] };
       expect(body.actors.map((a: any) => a.id)).toEqual(["u-jay", "u-mina"]);
@@ -109,11 +112,11 @@ describe("GET /api/buyer/notifications/actors", () => {
   });
 
   it("skips the follows lookup when no row has an actor", async () => {
-    state.rows = { blocks: [], notificationsFeed: [like("n1", null, "System", 1)] };
+    state.rows = { blocks: [], notificationsFeed: [like(N[0], null, "System", 1)] };
     state.whereCalls = {};
     const { server, base } = await startServer();
     try {
-      const res = await fetch(`${base}/api/buyer/notifications/actors?ids=n1`);
+      const res = await fetch(`${base}/api/buyer/notifications/actors?ids=${N[0]}`);
       expect(res.status).toBe(200);
       expect(((await res.json()) as { actors: unknown[] }).actors).toEqual([]);
       expect(state.whereCalls.follows ?? 0).toBe(0);

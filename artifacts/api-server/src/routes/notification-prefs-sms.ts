@@ -117,20 +117,30 @@ router.post("/verify", async (req, res) => {
   if (code.length !== 6) { res.status(400).json({ error: "Enter the 6-digit code." }); return; }
   if (!smsEnabled()) { res.status(409).json({ error: "Text messages aren't available" }); return; }
   try {
-    const [pending] = await db.select().from(smsPhoneVerifications)
-      .where(eq(smsPhoneVerifications.userId, clerkId)).limit(1);
-    if (!pending || pending.expiresAt.getTime() < Date.now() || pending.attempts >= MAX_ATTEMPTS) {
+    // Claim an attempt atomically before checking the code. Reading `attempts`
+    // and incrementing it afterwards let parallel guesses all pass the
+    // MAX_ATTEMPTS check, so the 6-digit code could be brute-forced in a burst.
+    const [pending] = await db.update(smsPhoneVerifications)
+      .set({ attempts: sql`${smsPhoneVerifications.attempts} + 1` })
+      .where(and(
+        eq(smsPhoneVerifications.userId, clerkId),
+        sql`${smsPhoneVerifications.attempts} < ${MAX_ATTEMPTS}`,
+        sql`${smsPhoneVerifications.expiresAt} >= now()`,
+      ))
+      .returning();
+    if (!pending) {
       res.status(410).json({ error: "That code expired. Send a new code." });
       return;
     }
     if (hashVerificationCode(clerkId, pending.phone, code) !== pending.codeHash) {
-      await db.update(smsPhoneVerifications).set({ attempts: sql`${smsPhoneVerifications.attempts} + 1` })
-        .where(eq(smsPhoneVerifications.userId, clerkId));
       res.status(400).json({ error: "That code isn't right. Check it and try again." });
       return;
     }
-    await db.delete(smsPhoneVerifications).where(eq(smsPhoneVerifications.userId, clerkId));
-    await optIn(clerkId, pending.phone);
+    // Only the request that deletes the pending row opts in (one confirmation text).
+    const consumed = await db.delete(smsPhoneVerifications)
+      .where(and(eq(smsPhoneVerifications.userId, clerkId), eq(smsPhoneVerifications.codeHash, pending.codeHash)))
+      .returning({ userId: smsPhoneVerifications.userId });
+    if (consumed.length > 0) await optIn(clerkId, pending.phone);
     res.json(await state(clerkId));
   } catch (err) {
     req.log.error({ err }, "Failed to verify SMS phone");
