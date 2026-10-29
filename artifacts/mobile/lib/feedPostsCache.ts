@@ -68,7 +68,10 @@ export function getCachedFeedPosts<T>(tab: string): T[] | undefined {
  * synchronous. Resolves to undefined when there is nothing cached.
  */
 export async function hydrateFeedPostsCache<T>(tab: string): Promise<T[] | undefined> {
-  const scoped = scopedTab(tab);
+  return readFeedPostsCache<T>(scopedTab(tab));
+}
+
+async function readFeedPostsCache<T>(scoped: string): Promise<T[] | undefined> {
   const inMemory = memoryCache.get(scoped);
   if (inMemory) return inMemory as T[];
   try {
@@ -106,13 +109,16 @@ export async function purgeAuthorFromFeedPostsCache(authorId: string): Promise<v
   const tabs = new Set<string>(['for-you', 'following']);
   for (const key of memoryCache.keys()) if (key.startsWith(prefix)) tabs.add(key.slice(prefix.length));
   await Promise.all([...tabs].map(async (tab) => {
-    const posts = await hydrateFeedPostsCache<{ sellerId?: string }>(tab);
+    // Keyed by the account that blocked, captured now: an account switch while
+    // storage is read must not write this account's list under the next one.
+    const scoped = prefix + tab;
+    const posts = await readFeedPostsCache<{ sellerId?: string }>(scoped);
     if (!posts) return;
     const filtered = posts.filter((post) => post?.sellerId !== authorId);
     if (filtered.length === posts.length) return;
-    memoryCache.set(scopedTab(tab), filtered);
+    memoryCache.set(scoped, filtered);
     try {
-      await AsyncStorage.setItem(STORAGE_PREFIX + scopedTab(tab), JSON.stringify(filtered.slice(0, MAX_CACHED_POSTS)));
+      await AsyncStorage.setItem(STORAGE_PREFIX + scoped, JSON.stringify(filtered.slice(0, MAX_CACHED_POSTS)));
     } catch {
       // The memory copy is already clean; the next feed load rewrites the disk copy.
     }

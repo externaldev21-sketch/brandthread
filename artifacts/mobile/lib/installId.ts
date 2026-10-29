@@ -12,6 +12,8 @@ import { randomUUID } from 'expo-crypto';
  */
 const INSTALL_ID_KEY = 'bt_install_id';
 let cached: string | null = null;
+/** One in-flight read/create, so concurrent first calls agree on a single id. */
+let pending: Promise<string> | null = null;
 
 async function readSecure(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
@@ -23,8 +25,13 @@ async function writeSecure(value: string): Promise<void> {
   try { await SecureStore.setItemAsync(INSTALL_ID_KEY, value); } catch { /* fall back to AsyncStorage */ }
 }
 
-export async function getInstallId(): Promise<string> {
-  if (cached) return cached;
+export function getInstallId(): Promise<string> {
+  if (cached) return Promise.resolve(cached);
+  pending ??= resolveInstallId().finally(() => { pending = null; });
+  return pending;
+}
+
+async function resolveInstallId(): Promise<string> {
   const secure = await readSecure();
   if (secure) { cached = secure; return secure; }
   let local: string | null = null;

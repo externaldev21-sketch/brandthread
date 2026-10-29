@@ -44,7 +44,7 @@ export const IMAGE_UPLOAD_PRESETS: Record<UploadImageKind, ImageUploadPreset> = 
   default: { maxEdge: MAX_UPLOAD_EDGE, quality: UPLOAD_QUALITY },
 };
 
-/** Which preset an API upload route gets. Unknown routes keep the 2048 default. */
+/** Which preset an API upload route gets. Unknown routes get the default preset (4096px edge). */
 export function presetForUploadPath(path: string): UploadImageKind {
   const p = path.split('?')[0].toLowerCase();
   if (/\/avatar(\/|$)/.test(p)) return 'avatar';

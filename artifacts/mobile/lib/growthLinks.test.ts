@@ -6,18 +6,21 @@ import { buildLiveUrl, parseShareLink } from './shareLinks';
 
 const appDir = path.resolve(__dirname, '..', 'app');
 
-describe('growth links open for signed-out visitors (BT-303/319/321)', () => {
-  it('lets a guest through every share-link entry point', () => {
+// Account wall (a7c64de9 "remove guest browsing, require an account for every
+// app screen"): share links no longer open signed out; they route through
+// sign-in with returnTo (lib/guestSignIn.ts). The links themselves still parse.
+describe('growth links sit behind the account wall', () => {
+  it('requires an account for every share-link entry point', () => {
     for (const segs of [
       ['p', '[postId]'], ['tag', '[tag]'], ['place', '[placeId]'], ['invite', '[code]'],
       ['live', '[streamId]'], ['g', '[code]'], ['giveaway'],
     ]) {
-      expect(isGuestBrowseRoute(segs)).toBe(true);
+      expect(isGuestBrowseRoute(segs)).toBe(false);
     }
   });
 
-  it('opens both the live directory and shared-live viewer to guests', () => {
-    expect(isGuestBrowseRoute(['live'])).toBe(true);
+  it('requires an account for the live directory and the shared-live viewer', () => {
+    expect(isGuestBrowseRoute(['live'])).toBe(false);
   });
 });
 
