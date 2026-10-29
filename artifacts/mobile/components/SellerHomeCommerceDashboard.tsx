@@ -328,6 +328,12 @@ export default function SellerHomeCommerceDashboard({
   useEffect(() => subscribeStoreContext(() => {
     // Drop the previous store's numbers immediately rather than leaving them
     // on screen until the refetch (triggered by storeContextTick below) resolves.
+    // That includes the To do counts ("N orders to ship"), the activity feed
+    // and the new-seller flag — if the refetch fails they would otherwise stay
+    // on screen under the new store.
+    setActionInputs(null);
+    setActivityItems([]);
+    setEverSoldCount(null);
     setSnapshot(null);
     setTopProducts(null);
     setRecentOrders(null);

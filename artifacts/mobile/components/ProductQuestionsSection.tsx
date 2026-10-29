@@ -23,26 +23,32 @@ export function ProductQuestionsSection({ productId, productName }: { productId:
   const router = useRouter();
   const { theme } = useAppTheme();
   const [data, setData] = useState<{ questions: ProductQuestion[]; totalCount: number } | null>(null);
+  // A failed read is not "0 questions": the section keeps the Ask entry point
+  // but makes no claim about the count or that nobody has asked yet.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setData(null);
+    setFailed(false);
     api.productQa.list(productId, 3)
       .then(result => { if (active) setData(result); })
-      .catch(() => { if (active) setData({ questions: [], totalCount: 0 }); });
+      .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [productId, api]);
 
-  if (!data) return null;
+  if (!data && !failed) return null;
   const open = () => router.push(
     `/product-questions?productId=${encodeURIComponent(productId)}&productName=${encodeURIComponent(productName ?? '')}` as never,
   );
-  const featured = data.questions.find(q => q.answer) ?? data.questions[0];
+  const featured = data ? data.questions.find(q => q.answer) ?? data.questions[0] : undefined;
+  const totalCount = data?.totalCount ?? 0;
 
   return (
     <View style={[s.wrap, { borderTopColor: theme.borderSubtle }]}>
       <View style={s.headerRow}>
-        <Text style={[s.title, { color: theme.text }]}>Questions ({data.totalCount})</Text>
-        {data.totalCount > 0 && (
+        <Text style={[s.title, { color: theme.text }]}>{data ? `Questions (${totalCount})` : 'Questions'}</Text>
+        {(failed || totalCount > 0) && (
           <PressableScale onPress={open} noMinHeight hitSlop={12} accessibilityRole="button" accessibilityLabel="See all questions">
             <Text style={[s.seeAll, { color: theme.muted }]}>See all</Text>
           </PressableScale>
@@ -58,9 +64,9 @@ export function ProductQuestionsSection({ productId, productName }: { productId:
             <Text style={[s.a, { color: theme.muted }]}>Waiting for the seller to answer</Text>
           )}
         </View>
-      ) : (
+      ) : data ? (
         <Text style={[s.empty, { color: theme.muted }]}>No questions yet. Ask the seller about fit, fabric or shipping.</Text>
-      )}
+      ) : null}
 
       <View style={s.askWrap}>
         <Button
@@ -68,7 +74,7 @@ export function ProductQuestionsSection({ productId, productName }: { productId:
           variant="secondary"
           fullWidth
           onPress={open}
-          accessibilityLabel={data.totalCount > 0 ? `Ask a question, ${questionCountLabel(data.totalCount)} so far` : 'Ask a question'}
+          accessibilityLabel={totalCount > 0 ? `Ask a question, ${questionCountLabel(totalCount)} so far` : 'Ask a question'}
         />
       </View>
     </View>
