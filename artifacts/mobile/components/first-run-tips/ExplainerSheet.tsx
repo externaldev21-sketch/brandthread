@@ -181,13 +181,12 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
   title: { flex: 1, color: MEDIA.foreground, fontFamily: FONT.bold, fontSize: FS.lg },
   close: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm },
-  // Every card stretches to the tallest one, so a short line doesn't leave
-  // a short card.
-  page: { width: '100%', alignSelf: 'stretch' },
+  page: { width: '100%' },
+  // Tall enough for a title and a three-line body, so every card (and the
+  // sheet) is the same size whichever card is showing.
   miniCard: {
-    flex: 1,
     flexDirection: 'row', alignItems: 'flex-start', gap: 14,
-    minHeight: 92,
+    minHeight: 118,
     padding: SP.md,
     borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: mediaAlpha(MEDIA.foreground, 0.1),
