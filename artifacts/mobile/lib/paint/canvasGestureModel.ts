@@ -6,6 +6,8 @@
  *   two-finger tap            → undo
  *   three-finger tap          → redo
  *   two fingers, moving       → pinch zoom + rotate + pan the canvas
+ *   three fingers, swipe down → Copy & Paste menu
+ *   four-finger tap           → full-screen (hide the interface)
  *
  * A stroke begins the moment the first finger lands (no lag), and is
  * cancelled — leaving no mark — if a second finger joins shortly after,
@@ -26,6 +28,10 @@ export interface GestureCallbacks {
   /** Pinch/rotate/pan delta relative to gesture start, in stage px / radians. */
   viewport(v: { scale: number; rotation: number; dx: number; dy: number; cx: number; cy: number; phase: 'start' | 'move' | 'end' }): void;
   hold(pt: GesturePoint, phase: 'start' | 'move' | 'end'): void;
+  /** Three-finger swipe down (Procreate's Copy & Paste menu). */
+  copyPasteMenu?(): void;
+  /** Four-finger tap toggles full-screen. */
+  fullScreen?(): void;
 }
 
 export const MULTI_TOUCH_GRACE_MS = 220;   // 2nd finger within this cancels the stroke
@@ -33,6 +39,7 @@ export const TAP_MAX_MS = 350;
 export const TAP_MAX_MOVE = 14;
 export const HOLD_MS = 520;
 export const HOLD_SLOP = 7;
+export const THREE_FINGER_SWIPE = 48;   // px all three fingers travel down
 
 type Mode = 'idle' | 'stroke' | 'multi' | 'pinch' | 'hold' | 'ignore';
 
@@ -98,6 +105,15 @@ export class CanvasGestureModel {
         break;
       }
       case 'multi': {
+        if (this.maxPointers >= 3) {
+          // Three fingers never pinch: a downward swipe opens Copy & Paste.
+          const ps = [...this.ptrs.values()];
+          if (ps.length >= 3 && ps.every(q => q.y - q.y0 >= THREE_FINGER_SWIPE)) {
+            this.mode = 'ignore';
+            this.cb.copyPasteMenu?.();
+          }
+          break;
+        }
         const moved = [...this.ptrs.values()].some(q => Math.hypot(q.x - q.x0, q.y - q.y0) > TAP_MAX_MOVE);
         if (moved && this.ptrs.size >= 2) {
           this.mode = 'pinch';
@@ -138,7 +154,8 @@ export class CanvasGestureModel {
         if (this.ptrs.size === 0) {
           if (t - this.firstDownT <= TAP_MAX_MS + MULTI_TOUCH_GRACE_MS) {
             if (this.maxPointers === 2) this.cb.undo();
-            else if (this.maxPointers >= 3) this.cb.redo();
+            else if (this.maxPointers === 3) this.cb.redo();
+            else if (this.maxPointers >= 4) this.cb.fullScreen?.();
           }
           this.mode = 'idle';
         }
@@ -230,4 +247,63 @@ export function settleViewport(v: Viewport): Viewport {
   const r = snapRot === 0 ? 0 : v.rotation;
   if (Math.abs(v.scale - 1) < 0.06 && r === 0) return { scale: 1, rotation: 0, tx: v.tx, ty: v.ty };
   return { ...v, rotation: r };
+}
+
+// ─── Momentum + quick pinch ───────────────────────────────────────────────────
+
+/** A pinch quicker than this that closes the fingers to ≤ QUICK_PINCH_RATIO fits the canvas (Procreate's "quick pinch"). */
+export const QUICK_PINCH_MS = 350;
+export const QUICK_PINCH_RATIO = 0.8;
+/** How far the canvas keeps gliding after release, as seconds of release velocity. */
+export const GLIDE_SECONDS = 0.16;
+/** Glide duration (decelerating ease-out). Short and damped — never floaty. */
+export const GLIDE_MS = 280;
+
+export interface ViewportSample { t: number; v: Viewport }
+
+export function isQuickPinch(durationMs: number, scaleRatio: number): boolean {
+  return durationMs <= QUICK_PINCH_MS && scaleRatio <= QUICK_PINCH_RATIO;
+}
+
+/** Release velocity per second (translation px/s, log-scale/s, rad/s) from the last ~80ms of samples. */
+export function viewportVelocity(samples: ViewportSample[], windowMs = 80): { tx: number; ty: number; logScale: number; rotation: number } {
+  const zero = { tx: 0, ty: 0, logScale: 0, rotation: 0 };
+  if (samples.length < 2) return zero;
+  const last = samples[samples.length - 1];
+  let first = samples[samples.length - 2];
+  for (let i = samples.length - 2; i >= 0; i--) {
+    if (last.t - samples[i].t > windowMs) break;
+    first = samples[i];
+  }
+  const dt = (last.t - first.t) / 1000;
+  if (dt <= 0) return zero;
+  return {
+    tx: (last.v.tx - first.v.tx) / dt,
+    ty: (last.v.ty - first.v.ty) / dt,
+    logScale: (Math.log(last.v.scale) - Math.log(first.v.scale)) / dt,
+    rotation: (last.v.rotation - first.v.rotation) / dt,
+  };
+}
+
+/** Where the canvas comes to rest after a release at `vel` (then snapped like Procreate: ~0° / ~100%). */
+export function projectGlide(v: Viewport, vel: ReturnType<typeof viewportVelocity>, limits = { min: 0.2, max: 12 }): Viewport {
+  const cap = (x: number, m: number) => Math.max(-m, Math.min(m, x));
+  const scale = Math.max(limits.min, Math.min(limits.max, v.scale * Math.exp(cap(vel.logScale * GLIDE_SECONDS, 0.5))));
+  return settleViewport({
+    scale,
+    rotation: v.rotation + cap(vel.rotation * GLIDE_SECONDS, Math.PI / 4),
+    tx: v.tx + cap(vel.tx * GLIDE_SECONDS, 600),
+    ty: v.ty + cap(vel.ty * GLIDE_SECONDS, 600),
+  });
+}
+
+/** Viewport part-way through a glide (ease-out cubic; rotation and log-scale interpolated). */
+export function lerpViewport(a: Viewport, b: Viewport, t: number): Viewport {
+  const k = 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+  return {
+    scale: Math.exp(Math.log(a.scale) + (Math.log(b.scale) - Math.log(a.scale)) * k),
+    rotation: a.rotation + (b.rotation - a.rotation) * k,
+    tx: a.tx + (b.tx - a.tx) * k,
+    ty: a.ty + (b.ty - a.ty) * k,
+  };
 }

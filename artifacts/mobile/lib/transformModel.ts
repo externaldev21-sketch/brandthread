@@ -438,3 +438,43 @@ export interface DistortWarpTransformData {
   /** Serialized WarpMeshPoint[] (JSON string) — for warp mode. */
   warpMesh?: string;
 }
+
+// ─── Live size readout ────────────────────────────────────────────────────────
+
+/**
+ * The Width × Height (logical px) Procreate shows beside the box while a
+ * transform handle is dragged: the box itself for Freeform/Uniform, the
+ * bounds of the corner quad / warp mesh for Distort / Warp.
+ */
+export function transformReadout(
+  t: DesignTransform,
+  mode: 'freeform' | 'uniform' | 'distort' | 'warp',
+  quad: DistortQuad | null,
+  mesh: WarpMeshPoint[] | null,
+): { x: number; y: number; width: number; height: number } {
+  const pts = mode === 'distort' && quad ? [quad.tl, quad.tr, quad.bl, quad.br]
+    : mode === 'warp' && mesh ? mesh
+    : null;
+  if (pts) {
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return { x, y, width: Math.round(Math.max(...xs) - x), height: Math.round(Math.max(...ys) - y) };
+  }
+  const w = Math.abs(t.width * (t.scaleX ?? 1));
+  const h = Math.abs(t.height * (t.scaleY ?? 1));
+  return { x: t.x, y: t.y, width: Math.round(w), height: Math.round(h) };
+}
+
+/**
+ * Box for a newly inserted photo/file: its own aspect ratio, as large as fits
+ * within `frac` of the canvas on both axes, centred — Procreate's Insert a
+ * photo always lands the whole image on the canvas, ready to transform.
+ */
+export function fitInsertBox(canvasW: number, canvasH: number, imgW?: number | null, imgH?: number | null, frac = 0.8): { x: number; y: number; width: number; height: number } {
+  const aspect = imgW && imgH && imgW > 0 && imgH > 0 ? imgW / imgH : 1;
+  let width = canvasW * frac;
+  let height = width / aspect;
+  if (height > canvasH * frac) { height = canvasH * frac; width = height * aspect; }
+  width = Math.round(width); height = Math.round(height);
+  return { x: Math.round((canvasW - width) / 2), y: Math.round((canvasH - height) / 2), width, height };
+}

@@ -7,7 +7,7 @@
 export type DesignExportFormat = 'png' | 'jpg' | 'tpng' | 'pdf' | 'project';
 export type DesignExportSize = 'original' | 'web' | 'product' | 'story' | 'thread' | 'print';
 
-/** Hard ceiling on either side of an export, to keep native memory sane. */
+/** Ceiling for upscaled exports (Print), to keep native memory sane. Never shrinks below the canvas size. */
 export const MAX_EXPORT_SIDE = 4096;
 
 /**
@@ -35,8 +35,10 @@ export function resolveExportDimensions(
   let factor = 1;
   if (rule.box) factor = Math.min(rule.box[0] / cw, rule.box[1] / ch);
   else if (rule.scale) factor = rule.scale;
-  // Never exceed the hard ceiling, whatever the preset asked for.
-  factor = Math.min(factor, MAX_EXPORT_SIDE / cw, MAX_EXPORT_SIDE / ch);
+  // Upscaling presets stop at the hard ceiling — but never below the canvas
+  // itself: Original is always the canvas's own pixels (a 4500×5400 print
+  // canvas exports 4500×5400, like Procreate).
+  factor = Math.min(factor, Math.max(1, Math.min(MAX_EXPORT_SIDE / cw, MAX_EXPORT_SIDE / ch)));
   return {
     width: Math.max(1, Math.round(cw * factor)),
     height: Math.max(1, Math.round(ch * factor)),

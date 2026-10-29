@@ -11,7 +11,7 @@
  * this file is safe in Expo Go / web, but constructing it there is not.
  */
 
-import type { CompositeMode, IRect, RasterBackend, SurfaceDab } from './backend';
+import type { CompositeMode, DrawFlip, IRect, RasterBackend, SurfaceDab } from './backend';
 import { getGrainMask, getTipMask, type AlphaMask, type GrainKind, type TipShape } from './tips';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -49,7 +49,7 @@ export class SkiaBackend implements RasterBackend<SkSurface> {
     s.flush();
   }
 
-  draw(dst: SkSurface, src: SkSurface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode) {
+  draw(dst: SkSurface, src: SkSurface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode, flip?: DrawFlip) {
     const c = dst.getCanvas();
     const img = src.makeImageSnapshot();
     const paint = this.Skia.Paint();
@@ -57,6 +57,12 @@ export class SkiaBackend implements RasterBackend<SkSurface> {
     paint.setBlendMode(this.blend(mode));
     c.save();
     c.clipRect(this.rect(dr), this.sk.ClipOp.Intersect, false);
+    if (flip?.x || flip?.y) {
+      const cx = dr.x + dr.w / 2, cy = dr.y + dr.h / 2;
+      c.translate(cx, cy);
+      c.scale(flip.x ? -1 : 1, flip.y ? -1 : 1);
+      c.translate(-cx, -cy);
+    }
     if (mode === 'copy') c.clear(this.Skia.Color('transparent'));
     c.drawImageRectOptions(img, this.rect(sr), this.rect(dr), this.sk.FilterMode.Linear, this.sk.MipmapMode.None, paint);
     c.restore();

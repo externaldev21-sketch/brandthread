@@ -28,7 +28,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
-  Dimensions, Pressable, Linking, } from 'react-native';
+  Dimensions, Pressable, Linking, Platform, } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1799,8 +1799,8 @@ export default function DesignGalleryScreen() {
     // ── Brandthread project JSON → a new, fully restored project ──────────
     if (mime === 'application/json' || asset.name.toLowerCase().endsWith('.json')) {
       try {
-        const fileObj = new File(uri);
-        const raw = await fileObj.text();
+        // expo-file-system's File is native-only; the web picker hands back a blob/data URI.
+        const raw = Platform.OS === 'web' ? await (await fetch(uri)).text() : await new File(uri).text();
         const sizeResult = validateJsonByteLength(raw);
         if (!sizeResult.ok) { Alert.alert('File too large', sizeResult.reason); return; }
         const jsonResult = validateBtJson(raw);
@@ -1826,8 +1826,7 @@ export default function DesignGalleryScreen() {
 
     // ── Image file → a new canvas with it as the first layer ───────────────
     try {
-      const fileObj = new File(uri);
-      const buf = await fileObj.arrayBuffer();
+      const buf = Platform.OS === 'web' ? await (await fetch(uri)).arrayBuffer() : await new File(uri).arrayBuffer();
       const bytes = new Uint8Array(buf, 0, Math.min(buf.byteLength, 16));
       const magicResult = validateMagicBytes(bytes, mime);
       if (!magicResult.ok) { Alert.alert('Rejected', magicResult.reason); return; }

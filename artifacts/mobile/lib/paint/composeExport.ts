@@ -26,6 +26,9 @@ export type ExportItem =
       blendMode?: BlendModeKind;
       /** Layer box in logical px (drawing layers default to the full canvas). */
       box: IRect;
+      /** The layer's Flip (Actions → Canvas → Flip, or a flipped transform), mirrored within its box. */
+      flipX?: boolean;
+      flipY?: boolean;
     }
   | {
       kind: 'image';
@@ -72,7 +75,7 @@ export async function composeExport<S>(backend: RasterBackend<S>, opts: ComposeO
         w: engine.width * sx,
         h: engine.height * sy,
       };
-      backend.draw(out, src, full, dst, item.opacity, blendToComposite(item.blendMode));
+      backend.draw(out, src, full, dst, item.opacity, blendToComposite(item.blendMode), { x: !!item.flipX, y: !!item.flipY });
     } finally {
       engine.removeLayer(item.id);
     }

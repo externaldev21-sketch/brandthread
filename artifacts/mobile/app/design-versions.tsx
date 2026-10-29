@@ -12,7 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, useWindowDimensions,
+  ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +30,8 @@ import {
 import { createVersion, getVersions, restoreVersion, duplicateVersion } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { showAlert } from '@/lib/actionSheet';
+import { markDesignRestored } from '@/lib/designHandoff';
 import { UnavailableScreen, isMissingParam } from '@/components/ui/UnavailableScreen';
 
 const ACTION_HIT = { top: 13, bottom: 13, left: 8, right: 8 };
@@ -51,7 +53,7 @@ export default function DesignVersionsScreen() {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const styles = createStyles(theme);
   const router = useRouter();
-  const { projectId } = useLocalSearchParams<{ projectId?: string }>();
+  const { projectId, from } = useLocalSearchParams<{ projectId?: string; from?: string }>();
 
   const [versions, setVersions]   = useState<DesignVersion[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -81,7 +83,7 @@ export default function DesignVersionsScreen() {
   }, []);
 
   const handleRestore = useCallback((version: DesignVersion) => {
-    Alert.alert(
+    showAlert(
       'Restore version',
       `Replace the current project with "${version.label}"? Its current state is saved as a version first, so you can undo this.`,
       [
@@ -93,11 +95,16 @@ export default function DesignVersionsScreen() {
             try {
               await createVersion(version.projectId, 'Before restore', true);
               const restored = await restoreVersion(version.id);
-              Alert.alert('Version restored', 'Your project now matches this version.');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.replace(`/design-canvas?id=${restored.id}` as never);
+              if (from === 'canvas') {
+                // Back to the open canvas, which reloads the restored project.
+                markDesignRestored(restored.id);
+                goBackOr(router);
+              } else {
+                router.replace(`/design-canvas?id=${restored.id}` as never);
+              }
             } catch {
-              Alert.alert('Could not restore', 'The project was not changed. Please try again.');
+              showAlert('Could not restore', 'The project was not changed. Please try again.');
               void loadVersions();
             } finally {
               setRestoring(null);
@@ -106,7 +113,7 @@ export default function DesignVersionsScreen() {
         },
       ]
     );
-  }, [router, loadVersions]);
+  }, [router, loadVersions, from]);
 
   const handleDuplicate = useCallback(async (version: DesignVersion) => {
     if (duplicating) return;
@@ -116,7 +123,7 @@ export default function DesignVersionsScreen() {
       const newProject = await duplicateVersion(version.id);
       router.push(`/design-canvas?id=${newProject.id}` as never);
     } catch {
-      Alert.alert('Could not duplicate', 'No new project was created. Please try again.');
+      showAlert('Could not duplicate', 'No new project was created. Please try again.');
     } finally {
       setDuplicating(null);
     }

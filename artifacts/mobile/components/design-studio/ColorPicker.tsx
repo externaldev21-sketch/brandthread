@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, PanResponder, ScrollView, Platform, type GestureResponderEvent } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { confirmAlert } from '@/lib/actionSheet';
@@ -22,6 +22,24 @@ import {
   BrandPalette,
 } from '@/lib/colorModel';
 import { radius } from '@/constants/radii';
+
+/**
+ * Touch point inside the control that owns the gesture. Native's locationX/Y
+ * are reliable; react-native-web's can be undefined or relative to a child,
+ * so on web the point is measured against the responder's own element.
+ */
+function localPoint(e: GestureResponderEvent): { x: number; y: number } {
+  const ne = e.nativeEvent;
+  const el = e.currentTarget as unknown as { getBoundingClientRect?: () => { left: number; top: number } } | null;
+  if (Platform.OS === 'web' && el?.getBoundingClientRect) {
+    const r = el.getBoundingClientRect();
+    const sx = typeof window !== 'undefined' ? window.scrollX : 0;
+    const sy = typeof window !== 'undefined' ? window.scrollY : 0;
+    return { x: ne.pageX - sx - r.left, y: ne.pageY - sy - r.top };
+  }
+  return { x: ne.locationX, y: ne.locationY };
+}
+
 
 export type ColorPickerTab = 'disc' | 'classic' | 'harmony' | 'value' | 'palettes';
 const TABS: { key: ColorPickerTab; label: string; icon: IconName }[] = [
@@ -136,28 +154,34 @@ export default function ColorPicker(props: ColorPickerProps) {
     onChange(hex);
   }
 
-  const discResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (e) => {
-      const { locationX, locationY } = e.nativeEvent;
-      const nx = (locationX - DISC_RADIUS) / DISC_RADIUS;
-      const ny = (locationY - DISC_RADIUS) / DISC_RADIUS;
-      const { h, s } = discPointToHs({ x: nx, y: ny });
+  const discResponder = useMemo(() => {
+    // A tap picks too (Procreate), not only a drag.
+    const pick = (e: GestureResponderEvent) => {
+      const { x, y } = localPoint(e);
+      const { h, s } = discPointToHs({ x: (x - DISC_RADIUS) / DISC_RADIUS, y: (y - DISC_RADIUS) / DISC_RADIUS });
       commitHsv(h, s, hsv.v);
-    },
-  }), [hsv.v, color]);
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: pick,
+      onPanResponderMove: pick,
+    });
+  }, [hsv.v, color]);
 
-  const squareResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (e) => {
-      const { locationX, locationY } = e.nativeEvent;
-      const s = Math.max(0, Math.min(1, locationX / SQUARE_SIZE));
-      const v = Math.max(0, Math.min(1, 1 - locationY / SQUARE_SIZE));
-      commitHsv(hsv.h, s, v);
-    },
-  }), [hsv.h, color]);
+  const squareResponder = useMemo(() => {
+    // A tap picks too (Procreate), not only a drag.
+    const pick = (e: GestureResponderEvent) => {
+      const { x, y } = localPoint(e);
+      commitHsv(hsv.h, Math.max(0, Math.min(1, x / SQUARE_SIZE)), Math.max(0, Math.min(1, 1 - y / SQUARE_SIZE)));
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: pick,
+      onPanResponderMove: pick,
+    });
+  }, [hsv.h, color]);
 
   // The Value tab's channel tracks are flex: 1 (wider than the fixed 200pt
   // Disc/Classic tracks), so they report their real width here; dividing
@@ -167,11 +191,8 @@ export default function ColorPicker(props: ColorPickerProps) {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (e) => {
-        const width = widthRef?.current || 200;
-        const pct = Math.max(0, Math.min(1, e.nativeEvent.locationX / width));
-        onMove(pct);
-      },
+      onPanResponderGrant: (e) => onMove(Math.max(0, Math.min(1, localPoint(e).x / (widthRef?.current || 200)))),
+      onPanResponderMove: (e) => onMove(Math.max(0, Math.min(1, localPoint(e).x / (widthRef?.current || 200)))),
     });
   }
 
@@ -183,17 +204,20 @@ export default function ColorPicker(props: ColorPickerProps) {
   const rSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(pct * 255, rgb.g, rgb.b), valueTrackWidthRef), [rgb.g, rgb.b, color]);
   const gSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, pct * 255, rgb.b), valueTrackWidthRef), [rgb.r, rgb.b, color]);
   const bSliderResponder   = useMemo(() => makeDragResponder(pct => commitRgb(rgb.r, rgb.g, pct * 255), valueTrackWidthRef), [rgb.r, rgb.g, color]);
-  const harmonyDiscResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (e) => {
-      const { locationX, locationY } = e.nativeEvent;
-      const nx = (locationX - DISC_RADIUS) / DISC_RADIUS;
-      const ny = (locationY - DISC_RADIUS) / DISC_RADIUS;
-      const { h, s } = discPointToHs({ x: nx, y: ny });
+  const harmonyDiscResponder = useMemo(() => {
+    // A tap picks too (Procreate), not only a drag.
+    const pick = (e: GestureResponderEvent) => {
+      const { x, y } = localPoint(e);
+      const { h, s } = discPointToHs({ x: (x - DISC_RADIUS) / DISC_RADIUS, y: (y - DISC_RADIUS) / DISC_RADIUS });
       commitHsv(h, s, hsv.v);
-    },
-  }), [hsv.v, color]);
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: pick,
+      onPanResponderMove: pick,
+    });
+  }, [hsv.v, color]);
 
   function submitHex() {
     if (isValidHex(hexInput)) {

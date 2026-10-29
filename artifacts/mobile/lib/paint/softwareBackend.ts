@@ -6,7 +6,7 @@
  * moves paint, replay is identical) without a browser or Skia.
  */
 
-import type { CompositeMode, IRect, RasterBackend, SurfaceDab } from './backend';
+import type { CompositeMode, DrawFlip, IRect, RasterBackend, SurfaceDab } from './backend';
 import { getGrainMask, getTipMask, type GrainKind, type TipShape } from './tips';
 
 export interface SoftSurface { w: number; h: number; px: Float32Array }
@@ -65,12 +65,15 @@ export class SoftwareBackend implements RasterBackend<SoftSurface> {
     this.each(s, r, o => { s.px[o] = s.px[o + 1] = s.px[o + 2] = s.px[o + 3] = 0; });
   }
 
-  draw(dst: SoftSurface, src: SoftSurface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode) {
+  draw(dst: SoftSurface, src: SoftSurface, sr: IRect, dr: IRect, alpha: number, mode: CompositeMode, flip?: DrawFlip) {
     const kx = sr.w / dr.w, ky = sr.h / dr.h;
     // Snapshot the source rows we read (dst may equal src).
     const copy = dst === src ? new Float32Array(src.px) : src.px;
     this.each(dst, dr, (o, x, y) => {
-      const sx = Math.floor(sr.x + (x + 0.5 - dr.x) * kx), sy = Math.floor(sr.y + (y + 0.5 - dr.y) * ky);
+      // Mirrored draws read the source from the opposite side of the dst rect.
+      const fx = flip?.x ? 2 * dr.x + dr.w - (x + 1) : x;
+      const fy = flip?.y ? 2 * dr.y + dr.h - (y + 1) : y;
+      const sx = Math.floor(sr.x + (fx + 0.5 - dr.x) * kx), sy = Math.floor(sr.y + (fy + 0.5 - dr.y) * ky);
       let r = 0, g = 0, b = 0, a = 0;
       if (sx >= 0 && sy >= 0 && sx < src.w && sy < src.h) {
         const so = (sy * src.w + sx) * 4;
