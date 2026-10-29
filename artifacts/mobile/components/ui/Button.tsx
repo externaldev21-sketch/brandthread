@@ -140,9 +140,10 @@ export function Button({
 
   const isFilled = variant === 'primary';
   // Filled buttons darken on press; outline/ghost buttons pick up a faint
-  // theme-tinted fill. Never a separate translucent circle/pill layer, and
-  // no android_ripple — the ripple's spreading-circle wash is exactly the
-  // "translucent circle highlight" look the owner asked to remove.
+  // theme-tinted fill. Never a separate translucent circle/pill layer. On
+  // Android the Pressable also carries a bounded (borderless: false),
+  // theme-tinted android_ripple instead of the OS default one — see
+  // tests/no-outer-focus-ring.test.ts.
   const pressOverlayColor = isFilled ? '#00000026' : `${theme.accent}1F`;
   const overlayOpacity = pressed.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 

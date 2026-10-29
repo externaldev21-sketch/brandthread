@@ -9,9 +9,9 @@ import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
  * which app/_layout.tsx mounts over every root-stack seller screen that isn't
  * in its full-screen deny-list. Use it as `paddingBottom` on a scroll view's
  * content (or a pinned footer's offset) so the last row / CTA always clears
- * the bar. Returns 0 when no seller bar is on screen (buyer sessions, or a
- * screen that hid the bar with useHideTabBar), so buyer screens get no
- * dead gap.
+ * the bar. When no seller bar is on screen (buyer sessions, or a screen
+ * that hid the bar with useHideTabBar) it returns just the safe-area floor
+ * (useScreenBottomInset), so buyer screens get no dead gap.
  */
 export function useSellerTabBarInset(): number {
   const { isActiveSeller } = useSellerShell();

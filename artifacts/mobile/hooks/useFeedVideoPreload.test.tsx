@@ -14,12 +14,16 @@ vi.mock('expo-video', () => ({
 // Production keeps only the already-mounted next page warm. Give this hook
 // test an explicit extra-player plan so it can exercise creation/cancellation
 // without changing the app's existing decoder budget.
+// The hook warms upcoming videos by fetching their bytes
+// (preloadVideoBytes), never by allocating a player/decoder — so that fetch
+// is what this test counts.
 vi.mock('@/lib/videoPreload', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/videoPreload')>();
   return {
     ...actual,
     planVideoPreload: (items: readonly import('@/lib/videoPreload').PreloadCandidate[], index: number) =>
       actual.planVideoPreload(items, index, { ahead: 3, mountedAhead: 1 }),
+    preloadVideoBytes: async (uri: string) => { created.push(uri); },
   };
 });
 

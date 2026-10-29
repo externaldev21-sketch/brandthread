@@ -16,7 +16,8 @@
  *                   render the shared <RetryRow/> instead
  *
  * `loaded` vs `empty` is decided by an optional `isEmpty(data)` predicate
- * (defaults to "falsy or empty array/string"). Screens that need to keep a
+ * (defaults to "null/undefined or an empty array" — a `0`, `''` or `false`
+ * result is 'loaded' unless the caller's `isEmpty` says otherwise). Screens that need to keep a
  * genuine tracked `0` distinct from an untracked value (analytics counts)
  * should carry that distinction inside `T` itself (see post-analytics.tsx's
  * `{ tracked, count }` convention) rather than relying on `isEmpty`.

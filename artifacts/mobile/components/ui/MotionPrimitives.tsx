@@ -153,12 +153,16 @@ export interface CountUpNumberProps {
 export function CountUpNumber({ value, role = 'headline', color, durationMs = 400, formatter }: CountUpNumberProps) {
   const palette = useColors();
   const [display, setDisplay] = useState(value);
-  const fromRef = useRef(value);
+  // The number currently on screen. A new `value` that arrives mid-animation
+  // continues from here (not from the interrupted animation's start, which
+  // jumped the count backwards, or stuck it part-way when the new value
+  // equalled that start).
+  const shownRef = useRef(value);
   const startRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const from = fromRef.current;
+    const from = shownRef.current;
     const to = value;
     if (from === to) return;
     startRef.current = null;
@@ -167,12 +171,10 @@ export function CountUpNumber({ value, role = 'headline', color, durationMs = 40
       const elapsed = timestamp - startRef.current;
       const t = Math.min(1, elapsed / durationMs);
       const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(Math.round(from + (to - from) * eased));
-      if (t < 1) {
-        frameRef.current = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = to;
-      }
+      const next = Math.round(from + (to - from) * eased);
+      shownRef.current = next;
+      setDisplay(next);
+      if (t < 1) frameRef.current = requestAnimationFrame(tick);
     };
     frameRef.current = requestAnimationFrame(tick);
     return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };

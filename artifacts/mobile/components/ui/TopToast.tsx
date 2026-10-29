@@ -34,7 +34,7 @@ export interface TopToastProps {
   thumbnailUri?: string;
   actionLabel?: string;
   onAction?: () => void;
-  /** Called after the auto-hide delay or a swipe up. Without it the toast never hides itself. */
+  /** Called after the auto-hide delay or a swipe up. The toast hides itself either way; this tells the owner it's gone. */
   onDismiss?: () => void;
   /** Override the auto-hide delay. */
   durationMs?: number;

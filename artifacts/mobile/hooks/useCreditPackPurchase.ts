@@ -31,10 +31,12 @@ export function useCreditPackPurchase() {
     try {
       if (native) {
         await rc.purchaseCreditPack(STORE_PRODUCT_FOR_PACK[pack.id]!);
+        // The store charge has gone through: a failed balance read from here
+        // on is not a failed purchase (alerting one invites paying twice).
         for (let i = 0; i < 8; i += 1) {
           await new Promise((r) => setTimeout(r, 1500));
-          const o = await api.aiCredits.get();
-          if ((o.balance ?? 0) > balanceBefore) break;
+          const o = await api.aiCredits.get().catch(() => null);
+          if ((o?.balance ?? 0) > balanceBefore) break;
         }
         invalidateAiCredits();
         return 'purchased';

@@ -76,6 +76,10 @@ export function useVoiceRecorder(
   const cancelledRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoFinishRef = useRef<(() => void) | null>(null);
+  // Bumped by every start, cancel and finish. A start still waiting on the
+  // permission prompt / recorder prep when the person cancels or lets go
+  // sees a different value and never starts the mic.
+  const attemptRef = useRef(0);
 
   useEffect(() => {
     if (phase !== 'idle' && recorderState.isRecording) {
@@ -86,7 +90,9 @@ export function useVoiceRecorder(
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   const beginRecording = useCallback(async () => {
+    const attempt = ++attemptRef.current;
     cancelledRef.current = false;
+    startedAtRef.current = 0;
     setWaveform([]);
     setElapsedMs(0);
     dragX.setValue(0);
@@ -96,6 +102,11 @@ export function useVoiceRecorder(
       if (!permission.granted) throw new Error('Microphone permission denied');
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
+      if (attempt !== attemptRef.current) {
+        // Cancelled or released while we waited: don't open the mic.
+        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+        return false;
+      }
       recorder.record();
       startedAtRef.current = Date.now();
       setPhase('recording');
@@ -115,6 +126,7 @@ export function useVoiceRecorder(
   }, []);
 
   const cancel = useCallback(() => {
+    attemptRef.current += 1;
     cancelledRef.current = true;
     stopTimer();
     setPhase('idle');
@@ -132,7 +144,9 @@ export function useVoiceRecorder(
 
   const finish = useCallback(async () => {
     stopTimer();
-    const tooShort = Date.now() - startedAtRef.current < MIN_RECORDING_MS;
+    attemptRef.current += 1;
+    // startedAt 0: the recorder never started (released during the prompt).
+    const tooShort = startedAtRef.current === 0 || Date.now() - startedAtRef.current < MIN_RECORDING_MS;
     const wasCancelled = cancelledRef.current || tooShort;
     const waveformSnapshot = waveform;
     setPhase('idle');
