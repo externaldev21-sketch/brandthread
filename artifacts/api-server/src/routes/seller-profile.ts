@@ -538,6 +538,10 @@ router.put("/profile/store-layout", async (req, res): Promise<void> => {
     .set({ storeLayout: layout, updatedAt: new Date() })
     .where(eq(users.clerkId, clerkId))
     .returning({ storeLayout: users.storeLayout });
+  if (!profile) {
+    res.status(404).json({ error: "Seller profile not found" });
+    return;
+  }
   res.json(profile);
 });
 

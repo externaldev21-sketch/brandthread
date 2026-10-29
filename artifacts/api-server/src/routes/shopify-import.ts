@@ -14,6 +14,7 @@ import {
   ShopifyImportError,
   discoverShopifyCatalog, normalizeShopifyUrl, toBrandthreadProduct, deterministicSku,
 } from "../lib/shopifyImport";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -54,8 +55,11 @@ Respond ONLY as JSON with title, subtitle, description, tagline, mission, target
       prompt,
     );
     const clean = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    const parsed = JSON.parse(clean) as Record<string, unknown>;
-    return parsed;
+    const parsed: unknown = JSON.parse(clean);
+    // Valid JSON that isn't an object (null, a list, a string) would crash
+    // every later `ai.title` read and fail the whole import.
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("AI copy is not an object");
+    return parsed as Record<string, unknown>;
   } catch {
     return {
       title: sourceStoreName, subtitle: "The pieces in rotation.",
@@ -262,6 +266,8 @@ router.get("/latest", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  // Job ids are uuids; anything else would 500 in Postgres.
+  if (!isUuid(req.params.id)) { res.status(404).json({ error: "IMPORT_NOT_FOUND", message: "Import not found." }); return; }
   const [job] = await db.select().from(shopifyImportJobs)
     .where(and(eq(shopifyImportJobs.id, req.params.id), eq(shopifyImportJobs.ownerId, ownerId))).limit(1);
   if (!job) { res.status(404).json({ error: "IMPORT_NOT_FOUND", message: "Import not found." }); return; }
@@ -270,6 +276,7 @@ router.get("/:id", async (req, res) => {
 
 router.post("/:id/continue", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  if (!isUuid(req.params.id)) { res.status(404).json({ error: "IMPORT_NOT_FOUND", message: "Import not found." }); return; }
   const [job] = await db.update(shopifyImportJobs).set({
     status: "queued", stage: "validating", updatedAt: new Date(),
   }).where(and(

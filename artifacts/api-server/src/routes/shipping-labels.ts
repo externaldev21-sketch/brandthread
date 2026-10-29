@@ -24,10 +24,22 @@ import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
 import { publishNotification } from "./notifications-feed";
 import { resolveShipFrom } from "../lib/shipping/shipFrom";
 import { withOrderImage } from "../lib/orderItemImages";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+
+// Order and label ids are uuid columns: a malformed id would otherwise reach
+// Postgres ("invalid input syntax for type uuid") and surface as a 500/502.
+router.param("orderId", (req, res, next, value) => {
+  if (isUuid(value)) return next();
+  res.status(404).json({ error: "Order not found" });
+});
+router.param("labelId", (req, res, next, value) => {
+  if (isUuid(value)) return next();
+  res.status(404).json({ error: "Label not found" });
+});
 
 // ── Request schemas ──────────────────────────────────────────────────────────
 // Shape/size guards; parcelInputError / parseItemIds keep the range and item

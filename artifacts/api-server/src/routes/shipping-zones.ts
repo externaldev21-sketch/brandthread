@@ -336,17 +336,24 @@ router.put("/:id/weight-tiers", requireRole("staff"), validateInput({ params: zo
     if (!isNonNegInt(t?.rateCents)) return void res.status(400).json({ error: "each tier needs a non-negative integer rateCents" });
   }
 
-  await db.delete(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, id));
-  if (tiers.length > 0) {
-    await db.insert(shippingZoneWeightTiers).values(tiers.map((t: any, i: number) => ({
-      id: crypto.randomUUID(),
-      zoneId: id,
-      minWeightGrams: t.minWeightGrams,
-      maxWeightGrams: t.maxWeightGrams ?? null,
-      rateCents: t.rateCents,
-      sortOrder: i,
-    })));
-  }
+  // One replace at a time per zone (the zone row lock), all or nothing: two
+  // overlapping saves must not both insert, and a failed insert must not
+  // leave the zone with no tiers.
+  await db.transaction(async (tx) => {
+    await tx.select({ id: shippingZones.id }).from(shippingZones)
+      .where(eq(shippingZones.id, id)).for("update");
+    await tx.delete(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, id));
+    if (tiers.length > 0) {
+      await tx.insert(shippingZoneWeightTiers).values(tiers.map((t: any, i: number) => ({
+        id: crypto.randomUUID(),
+        zoneId: id,
+        minWeightGrams: t.minWeightGrams,
+        maxWeightGrams: t.maxWeightGrams ?? null,
+        rateCents: t.rateCents,
+        sortOrder: i,
+      })));
+    }
+  });
   const rows = await zoneWithTiers(id);
   res.json({ weightTiers: rows });
 });
