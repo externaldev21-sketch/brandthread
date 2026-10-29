@@ -8,7 +8,9 @@
 export function formatTimeUntil(iso?: string | null): string {
   if (!iso) return '';
   const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return '';
   if (ms <= 0) return 'Live now';
+  if (ms < 3_600_000) return `In ${Math.max(1, Math.round(ms / 60_000))}m`;
   const hours = Math.round(ms / 3_600_000);
   if (hours < 24) return `In ${hours}h`;
   return `In ${Math.round(hours / 24)}d`;
@@ -20,7 +22,7 @@ export function formatTimeUntil(iso?: string | null): string {
 export function formatTimeRemaining(iso?: string | null): string | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return null;
+  if (!Number.isFinite(ms) || ms <= 0) return null;
   const exactHours = ms / 3_600_000;
   if (exactHours < 1) return `Ends in ${Math.max(1, Math.round(ms / 60_000))}m`;
   const hours = Math.round(exactHours);

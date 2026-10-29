@@ -127,7 +127,7 @@ type FxApi = {
   };
 };
 
-/** Loads the saved choice and the rates once per app session. Safe to call often. */
+/** Loads the saved choice and the rates once per app session (again after a failed rates fetch). Safe to call often. */
 export function hydrateDisplayCurrency(api: FxApi): Promise<void> {
   if (hydrated) return hydrated;
   hydrated = (async () => {
@@ -142,6 +142,9 @@ export function hydrateDisplayCurrency(api: FxApi): Promise<void> {
       emit({ enabled: !!res?.enabled, rates: res?.enabled && res.available !== false ? res.rates ?? null : null });
     } catch {
       emit({ enabled: false, rates: null });
+      // Offline at launch must not hide conversions for the whole session:
+      // the next screen that asks loads again.
+      hydrated = null;
     }
   })();
   return hydrated;

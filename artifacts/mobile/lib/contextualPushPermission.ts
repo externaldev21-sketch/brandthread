@@ -227,11 +227,13 @@ export async function requestContextualPushPermission(
 
     if (await AsyncStorage.getItem(requestedKey(userId))) return;
     if (prompting) return;
+    // Claim the prompt before the next await: two actions succeeding together
+    // (a follow and a message) must not both pass the check and stack sheets.
+    prompting = true;
+    ownsPrompt = true;
     const declines = parseDeclines(await AsyncStorage.getItem(declinedKey(userId)));
     if (!prePromptAllowed(declines, Date.now())) return;
 
-    prompting = true;
-    ownsPrompt = true;
     const accepted = await showPushPrePrompt(reason);
     if (!accepted) {
       await AsyncStorage.setItem(declinedKey(userId), JSON.stringify({ count: declines.count + 1, lastAt: Date.now() }));
