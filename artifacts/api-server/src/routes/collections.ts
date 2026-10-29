@@ -21,6 +21,10 @@ const router = Router();
 router.use(requireAuth);
 
 const collectionIdParams = idParams("id");
+// Collection ids are uuids; anything else can't name one of mine, and would
+// otherwise reach the uuid cast and answer 500.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isCollectionId = (id: unknown): id is string => typeof id === "string" && UUID_RE.test(id);
 const createCollectionBody = bodyObject({ name: z.string().max(200).optional(), isPublic: z.boolean().optional() });
 const updateCollectionBody = bodyObject({
   name: z.string().max(200).nullish(),
@@ -88,6 +92,7 @@ router.get("/", async (req, res) => {
 
 router.get("/:id/items", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  if (!isCollectionId(req.params.id)) return res.status(404).json({ error: "Collection not found" });
   const [collection] = await db.select().from(savedCollections)
     .where(and(eq(savedCollections.id, req.params.id), eq(savedCollections.userId, userId)))
     .limit(1);
@@ -122,6 +127,7 @@ router.patch("/:id", validateInput({ params: collectionIdParams, body: updateCol
     coverImageUrl?: string | null;
     isPublic?: boolean;
   };
+  if (!isCollectionId(req.params.id)) return res.status(404).json({ error: "Collection not found" });
 
   const updates: Partial<typeof savedCollections.$inferInsert> = { updatedAt: new Date() };
   if (typeof name === "string" && name.trim()) updates.name = name.trim();
@@ -138,6 +144,8 @@ router.patch("/:id", validateInput({ params: collectionIdParams, body: updateCol
 
 router.delete("/:id", validateInput({ params: collectionIdParams }), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  // Nothing of mine has a non-uuid id: deleting it is a no-op.
+  if (!isCollectionId(req.params.id)) return res.json({ ok: true });
   // Items belonging to this collection fall back to unfiled ("All") — never deleted.
   await db.update(savedItems)
     .set({ collectionId: null })
@@ -154,7 +162,9 @@ router.post("/reorder", validateInput({ body: reorderCollectionsBody }), async (
     return res.status(400).json({ error: "orderedIds required" });
   }
 
-  await Promise.all(orderedIds.map((id, index) =>
+  // An id that isn't a uuid names none of my collections; skip it (keeping
+  // every other id's position) instead of failing the whole save with a 500.
+  await Promise.all(orderedIds.map((id, index) => !isCollectionId(id) ? undefined :
     db.update(savedCollections)
       .set({ sortOrder: index, updatedAt: new Date() })
       .where(and(eq(savedCollections.id, id), eq(savedCollections.userId, userId))),

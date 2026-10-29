@@ -195,7 +195,9 @@ async function requireAdmin(req: any, res: any): Promise<{ community: CommunityR
   const member = await loadMember(community.id, userId);
   if (isGroupAdmin(member) && community.kind !== "official") return { community, member, userId };
   if (await isPlatformAdmin(userId)) return { community, member, userId };
-  return res.status(403).json({ error: "Only group admins can do that.", code: "FORBIDDEN" });
+  // Must return null (not the sent response): callers treat any truthy value
+  // as an admin context and went on to read ctx.community after the 403.
+  res.status(403).json({ error: "Only group admins can do that.", code: "FORBIDDEN" });
   return null;
 }
 
@@ -618,7 +620,10 @@ router.patch("/:id/mute", validateBody(muteBody), async (req, res) => {
 router.patch("/:id/read", validateBody(readBody), async (req, res) => {
   const ctx = await requireMember(req, res);
   if (!ctx) return;
-  const seq = Number.isFinite(Number(req.body?.seq)) ? Number(req.body.seq) : Number(ctx.community.lastSeq);
+  // A seq is a whole number; a fraction or an out-of-range value would fail
+  // the ::bigint cast below (500), so it falls back to the head like a missing one.
+  const rawSeq = Number(req.body?.seq);
+  const seq = Number.isSafeInteger(rawSeq) ? rawSeq : Number(ctx.community.lastSeq);
   // Monotonic: the cursor only ever moves forward, and never past the head.
   await db.execute(sql`
     UPDATE community_members
@@ -811,7 +816,9 @@ router.get("/:id/messages", async (req, res) => {
   const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? 50), 10) || 50, 1), 100);
   const before = req.query.before !== undefined ? Number(req.query.before) : null;
   const after = req.query.after !== undefined ? Number(req.query.after) : null;
-  if ((before !== null && !Number.isFinite(before)) || (after !== null && !Number.isFinite(after))) {
+  // Cursors are message seqs (bigint): a fraction or an unsafe number would
+  // fail the bigint comparison in Postgres and answer 500.
+  if ((before !== null && !Number.isSafeInteger(before)) || (after !== null && !Number.isSafeInteger(after))) {
     return res.status(400).json({ error: "Invalid cursor", code: "VALIDATION_ERROR" });
   }
   const hidden = await blockedByMe(ctx.userId);

@@ -194,11 +194,16 @@ router.post("/token", validateBody(callTokenBody), async (req, res) => {
   const callerId = (req as any).clerkUserId as string;
   const { conversationId, threadId = conversationId, mode = "video" } = req.body ?? {};
 
-  if (!threadId) {
+  if (!threadId || typeof threadId !== "string") {
     return res.status(400).json({ error: "threadId is required" });
   }
   if (mode !== "voice" && mode !== "video") {
     return res.status(400).json({ error: "mode must be voice or video" });
+  }
+  // Both thread kinds are keyed by uuid; anything else can't name one (and
+  // would otherwise fail the uuid cast in the lookups below with a 500).
+  if (!UUID_RE.test(threadId)) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
   }
 
   // Manufacturer conversations use a two-sided thread model rather than the
@@ -282,7 +287,7 @@ router.post("/token/renew", validateBody(callRenewBody), async (req, res) => {
     });
   }
 
-  const thread = await getManufacturerCallThread(threadId);
+  const thread = UUID_RE.test(threadId) ? await getManufacturerCallThread(threadId) : undefined;
   if (!thread) {
     return res.status(403).json({ error: "Not a participant in this conversation" });
   }
@@ -781,6 +786,9 @@ router.post("/events", validateBody(callEventBody), async (req, res) => {
   const allowedTypes = new Set(["started", "ended", "declined", "failed", "missed"]);
   if (!threadId || !allowedTypes.has(type) || (mode !== "voice" && mode !== "video") || !isValidCallClientEventId(clientEventId)) {
     return res.status(400).json({ error: "threadId, valid type/mode, and an 8–128 character clientEventId are required" });
+  }
+  if (typeof threadId !== "string" || !UUID_RE.test(threadId)) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
   }
   const [thread] = await db.select({
     id: manufacturerThreads.id,

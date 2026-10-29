@@ -106,6 +106,12 @@ router.get("/jobs", requireAuth, async (req, res) => {
 // (the emailed token is never stored, so the app mints a new one on demand).
 router.post("/jobs/:id/link", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
+  // Job ids are uuids; anything else is simply not one of mine (it used to hit
+  // the uuid cast and answer 500).
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.params.id))) {
+    res.status(404).json({ error: "This export is no longer available.", code: "DATA_EXPORT_UNAVAILABLE" });
+    return;
+  }
   try {
     const [job] = await db.select().from(dataExportJobs)
       .where(and(eq(dataExportJobs.id, String(req.params.id)), eq(dataExportJobs.clerkId, clerkUserId)))
