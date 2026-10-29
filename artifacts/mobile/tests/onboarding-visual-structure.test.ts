@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DRAFT_VERSION } from '../lib/onboardingFlow';
+import { DRAFT_VERSION, prevProfileStep } from '../lib/onboardingFlow';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -49,5 +49,31 @@ describe('onboarding visual structure (launch rebuild)', () => {
   it('has no back button on the first signed-in step (no going back into sign-up)', () => {
     const flow = read('lib/onboardingFlow.ts');
     expect(flow).toContain('return i > 0 ? steps[i - 1].id : null;');
+  });
+
+  it('the buyer-or-seller step has a visible back control (it used to have none)', () => {
+    // Shop/Sell is the ROLE step; its header back walks to the step before it,
+    // and for sellers the store steps walk back to it.
+    expect(prevProfileStep('ROLE', null)).toBe('NOTIFICATIONS');
+    expect(prevProfileStep('ROLE', 'seller')).toBe('NOTIFICATIONS');
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain("case 'STORE': return 'ROLE';");
+    expect(onboarding).toMatch(/<RoleScreen [^\n]*onBack=\{onBack\}/);
+    expect(read('components/onboarding/launch/ProfileScreens.tsx')).toContain('testID="onboarding-role"\n      header={<OnbHeader progress={progress} onBack={onBack} />}');
+  });
+
+  it('pre-account answers survive a reload in the device-scoped pending draft', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('AsyncStorage.setItem(PENDING_DRAFT_KEY');
+    expect(onboarding).toContain('parsePendingSignUp(await AsyncStorage.getItem(PENDING_DRAFT_KEY))');
+    // Cleared on sign-out so it never reaches the next person on the device.
+    expect(read('app/_layout.tsx')).toContain("'onboarding_pending_draft'");
+  });
+
+  it('buyers see one welcome headline: the explainer\'s, never a second one in onboarding', () => {
+    expect(read('app/thread-explainer.tsx')).toContain("Welcome to{'\\n'}the Thread.");
+    for (const file of ['app/onboarding.tsx', 'components/onboarding/launch/ProfileScreens.tsx', 'components/onboarding/launch/AuthScreens.tsx']) {
+      expect(read(file)).not.toMatch(/>\s*Welcome to/);
+    }
   });
 });

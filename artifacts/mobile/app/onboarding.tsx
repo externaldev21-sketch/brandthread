@@ -26,7 +26,6 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { rememberPendingConsent } from '@/lib/legalConsent';
-import { confirmAlert } from '@/lib/actionSheet';
 import { checkDobInput, setPendingDob, submitPendingAge, type AgeBand } from '@/lib/ageGate';
 import { hydrateMyProfileFromAccount, setSellerFollowing, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
@@ -52,6 +51,7 @@ import {
   type Flow,
   type StepId,
 } from '@/lib/onboardingFlow';
+import { PENDING_DRAFT_KEY, isPendingDraftFresh, parsePendingSignUp, pendingDraftBelongsTo, resolveResumeStep } from '@/lib/onboardingDraft';
 import { isClerkKeyInvalid, mapClerkError } from '@/lib/onboarding/clerkErrors';
 import type { DiscoverBrand } from '@/services/discoverService';
 import { WelcomeScreen, type WelcomeMode } from '@/components/onboarding/launch/WelcomeScreen';
@@ -186,10 +186,48 @@ export default function OnboardingScreen() {
       return;
     }
     restored.current = true;
-    if (!isSignedIn || !user?.id) { setReady(true); return; }
+    if (!isSignedIn || !user?.id) {
+      // Signed out: pick up what was typed before a reload, so nothing is asked twice.
+      void (async () => {
+        try {
+          const pending = parsePendingSignUp(await AsyncStorage.getItem(PENDING_DRAFT_KEY));
+          if (!pending || !isPendingDraftFresh(pending)) return;
+          const dobCheck = pending.dobInput ? checkDobInput(pending.dobInput) : null;
+          setDob(pending.dobInput);
+          if (dobCheck?.ok) { setPendingDob(dobCheck.dob); setAgeBand(dobCheck.band); }
+          setAuthMethod(pending.authMethod);
+          setEmail(pending.email);
+          setCodeMode(pending.codeMode);
+          setFirstName(pending.firstName);
+          setLastName(pending.lastName);
+          // Clerk keeps the open sign-up/sign-in across reloads; if it's gone,
+          // the email screen (address kept) sends a fresh code in one tap.
+          const held = pending.codeMode === 'signin'
+            ? (signIn as { identifier?: string | null } | undefined)?.identifier
+            : (signUp as { emailAddress?: string | null } | undefined)?.emailAddress;
+          const signUpPending = pending.stepId === 'CODE' && !!pending.email && (held ?? '').toLowerCase() === pending.email;
+          const resume = resolveResumeStep(
+            { stepId: pending.stepId, authMethod: pending.authMethod, email: pending.email, dob: dobCheck?.ok ? dobCheck.dob : null },
+            { accountReady: false, signUpPending, emailVerified: false },
+          );
+          setStep(resume === 'DETAILS' ? 'EMAIL' : resume);
+        } catch {
+          // A missing or unreadable draft just starts at Welcome.
+        } finally {
+          setReady(true);
+        }
+      })();
+      return;
+    }
     void (async () => {
       try {
         await AsyncStorage.removeItem(LEGACY_DRAFT_KEY);
+        // The birthday typed before verification belongs to this account until /auth/age succeeds.
+        const pending = parsePendingSignUp(await AsyncStorage.getItem(PENDING_DRAFT_KEY));
+        if (pending?.dobInput && pendingDraftBelongsTo(pending, user.primaryEmailAddress?.emailAddress)) {
+          const dobCheck = checkDobInput(pending.dobInput);
+          if (dobCheck.ok) { setPendingDob(dobCheck.dob); setAgeBand(dobCheck.band); }
+        }
         const raw = await AsyncStorage.getItem(draftKeyForUser(user.id)!);
         const draft = raw ? JSON.parse(raw) : null;
         const owned = draft && draft.ownerId === user.id;
@@ -242,13 +280,27 @@ export default function OnboardingScreen() {
     return () => clearTimeout(t);
   }, [brands, department, followedIds, isAddAccount, photo, photoUploadedUri, ready, role, sizes, stage, step, storeName, user?.id, username]);
 
+  // ── Persist the answers typed before the account exists ─────────────────
+  // Device-scoped (no user id yet); cleared on sign-out by AuthGate and once
+  // the age is sent. Never the password or the code.
+  useEffect(() => {
+    if (!ready || isAddAccount || isDevWebPreviewUser || isSignedIn || !isAuthStep(step)) return;
+    const t = setTimeout(() => {
+      AsyncStorage.setItem(PENDING_DRAFT_KEY, JSON.stringify({
+        version: DRAFT_VERSION, stepId: step, authMethod: authMethod ?? 'email', email: email.trim().toLowerCase(),
+        codeMode, firstName, lastName, dobInput: dob, savedAt: Date.now(),
+      })).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [authMethod, codeMode, dob, email, firstName, isAddAccount, isDevWebPreviewUser, isSignedIn, lastName, ready, step]);
+
   // Android hardware back follows the on-screen back.
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const back = backTarget(step);
       if (!back) return false;
-      if (step === 'CODE') void leaveCode();
+      if (step === 'CODE') editEmail();
       else go(back);
       return true;
     });
@@ -268,16 +320,12 @@ export default function OnboardingScreen() {
     }
   }
 
-  /** Backing out of the code step drops the pending verification, so ask first. */
-  async function leaveCode() {
-    const ok = await confirmAlert({
-      title: 'Abandon verification?',
-      message: 'The code we sent won’t work once you leave. You can request a new one.',
-      confirmLabel: 'Leave',
-      cancelLabel: 'Keep verifying',
-      destructive: true,
-    });
-    if (ok && currentStep.current === 'CODE') go('EMAIL', -1);
+  /**
+   * Back and "Wrong email? Edit" on the code step both land on the email
+   * field with the address kept and editable; Continue there sends a new code.
+   */
+  function editEmail() {
+    if (currentStep.current === 'CODE') go('EMAIL', -1);
   }
 
   // ── Signed in → first profile step ───────────────────────────────────────
@@ -293,7 +341,12 @@ export default function OnboardingScreen() {
   function chooseMethod(method: AuthMethod) {
     setError('');
     if (welcomeMode === 'login') {
-      if (method === 'email') { router.push((isAddAccount ? '/sign-in?addAccount=1' : '/sign-in') as never); return; }
+      if (method === 'email') {
+        // Carry an address typed earlier in this attempt so it isn't asked again.
+        const query = [isAddAccount ? 'addAccount=1' : '', email.trim() ? `email=${encodeURIComponent(email.trim().toLowerCase())}` : ''].filter(Boolean).join('&');
+        router.push((query ? `/sign-in?${query}` : '/sign-in') as never);
+        return;
+      }
       void runSSO(method);
       return;
     }
@@ -595,6 +648,7 @@ export default function OnboardingScreen() {
       const profile = await api.auth.sync({ name });
       profileId = profile.clerkId;
       await submitPendingAge(api);
+      await AsyncStorage.removeItem(PENDING_DRAFT_KEY).catch(() => {});
       const updated = await api.auth.updateProfile({
         name, displayName: name, accountType: 'buyer', expectedClerkId: profile.clerkId, username,
       });
@@ -638,6 +692,7 @@ export default function OnboardingScreen() {
       const name = displayName();
       const profile = await api.auth.sync({ name });
       await submitPendingAge(api);
+      await AsyncStorage.removeItem(PENDING_DRAFT_KEY).catch(() => {});
       await api.auth.onboarding({ brandName: storeName.replace(/\s+/g, ' ').trim(), brandStage: stage, username });
       await api.auth.updateProfile({ name, displayName: name, accountType: 'seller', expectedClerkId: profile.clerkId });
       if (referralCode) await api.referrals.apply(referralCode, profile.clerkId).catch(() => {});
@@ -667,7 +722,7 @@ export default function OnboardingScreen() {
       ['user_role', accountType],
       ...(accountType === 'seller' ? [['onboarding_brand_name', storeName.trim()] as [string, string]] : []),
     ]);
-    await AsyncStorage.multiRemove([draftKeyForUser(clerkId)!, LEGACY_DRAFT_KEY, PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
+    await AsyncStorage.multiRemove([draftKeyForUser(clerkId)!, LEGACY_DRAFT_KEY, PENDING_FLOW_KEY, PENDING_USERNAME_KEY, PENDING_DRAFT_KEY]);
     void registerGrantedPushToken(clerkId, api);
   }
 
@@ -701,7 +756,7 @@ export default function OnboardingScreen() {
     case 'EMAIL':
       return <EmailScreen value={email} onChange={(v) => { setEmail(v); setError(''); }} error={error} onBack={() => go('BIRTHDAY')} onContinue={() => { void continueFromEmail(); }} busy={isBusy('email')} />;
     case 'CODE':
-      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={() => { void leaveCode(); }} onEditEmail={() => go('EMAIL', -1)} onResend={resendCode} busy={isBusy('code') || isBusy('email')} />;
+      return <CodeScreen email={email.trim().toLowerCase()} code={code} onChange={(v) => { setCode(v); setError(''); }} onComplete={(v) => { void verifyCode(v); }} error={error} onBack={editEmail} onEditEmail={editEmail} onResend={resendCode} busy={isBusy('code') || isBusy('email')} />;
     case 'DETAILS':
       return (
         <DetailsScreen
@@ -775,7 +830,8 @@ export default function OnboardingScreen() {
   }
 
   return (
-    // No edge-swipe back on the code step: leaving it asks first (header back / Android back).
+    // No edge-swipe back on the code step (mid-verification): the header back
+    // and "Wrong email? Edit" both return to the email field instead.
     <OnboardingStepTransition stepId={step} direction={direction} onBack={step === 'CODE' ? undefined : onBack}>
       {renderStep()}
     </OnboardingStepTransition>

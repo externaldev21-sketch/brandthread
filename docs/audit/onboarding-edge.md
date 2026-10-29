@@ -295,3 +295,39 @@ Plan / Success steps, `components/onboarding/WelcomeStep.tsx`, `BrandsToFollowSt
 **Left open (outside this area or a product call)**
 - Welcome pill `getOnAccentTextStyle` text-shadow: the old `WelcomeStep` isn't mounted, and the launch Welcome uses outline rows.
 - Verified badge green: an owner decision, so greens stay.
+
+---
+
+## Round 3: nothing asked twice, every back works, honest copy
+
+This round rechecks the six first-impression items against the live launch flow. Each was driven in the exported
+web build at 390×844 (`scripts/onboarding-walkthrough/capture.mjs`: buyer, seller and a log-in handoff, 30/30 steps).
+Proof frames are in `docs/audit/fixes/onboarding-round3/`. No layout, type or visual changes.
+
+- **Nothing asked twice across a reload (fixed).** There's no `postAuth` reload any more, but everything typed before
+  the account exists (birthday, email, a Clerk-required first/last name, sign-up vs log-in) lived only in memory. A
+  web reload (or the OS dropping the tab while the person fetched the code) went back to Welcome and asked again. It also
+  silently dropped the birthday, so `/auth/age` was never sent and the 13–17 sell block was skipped. Those answers now
+  live in the device-scoped `onboarding_pending_draft` (`lib/onboardingDraft.ts` `PendingSignUpDraft`), never with a
+  password or code. A reload resumes the code step while Clerk still holds the attempt, otherwise the email field with
+  the address kept. A name typed earlier comes back prefilled. Once signed in, the birthday is applied only to the
+  account whose email it was typed for (Apple/Google within 30 min). It's removed once `/auth/age` succeeds, at
+  completion, and on sign-out. The username already survived (per-user draft), and the walkthrough now proves it after
+  a reload.
+- **Buyer-or-seller back control (already present; now pinned).** Shop/Sell is the `ROLE` step, and its header back
+  returns to Notifications. Store name returns to Shop/Sell. Going "back to Welcome" from there would mean signing out
+  of the account just created, so the first signed-in step (Username) still has no back
+  (`tests/onboarding-visual-structure.test.ts`).
+- **Code step back (fixed).** Back and "Wrong email? Edit" now do the same thing on the header arrow and Android
+  back: they return to the email field with the address kept and editable. The "Abandon verification?" dialog is gone.
+  Edge-swipe back stays off on that step.
+- **Email carried to sign-in (fixed/verified).** An existing email logs in by code in place. The two-step handoff
+  passes `?email=`, and Welcome → Log in now carries an email typed earlier in the attempt (sign-in prefills it).
+- **Single buyer welcome (verified).** Onboarding has no welcome headline. Buyers see only the explainer's
+  "Welcome to the Thread."
+- **Notifications (fixed on web).** Native keeps Skip / Turn on, and Turn on really requests permission. Web has one
+  Continue, and the title no longer says "Turn on notifications": it reads "Get alerts in the app".
+
+Walkthrough harness fixes found along the way: the preview build defaults a fresh browser to the demo seller, so the
+run now pins the guest marker. The fake API records legal acceptance like the server does. The Clerk stub keeps the
+open sign-up across a reload and can require a name, as real Clerk can.

@@ -64,6 +64,8 @@ function makeReport(role, viewportId) {
 
 async function screenshot(page, dir, index, name) {
   mkdirSync(dir, { recursive: true });
+  // Let the step slide / fade settle so the frame shows the screen, not the transition.
+  await page.waitForTimeout(800);
   const file = path.join(dir, `${String(index).padStart(2, '0')}-${name}.png`);
   await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
 }
@@ -90,7 +92,7 @@ async function pressWithFeedback(page, testId) {
   }
 }
 
-async function openOnboardingContext(browser, { viewport, origin, api }) {
+async function openOnboardingContext(browser, { viewport, origin, api, requireName = false }) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     isMobile: viewport.isMobile,
@@ -100,6 +102,10 @@ async function openOnboardingContext(browser, { viewport, origin, api }) {
     // Exercise the real spring/press behavior, not just static end states.
     reducedMotion: 'no-preference',
   });
+  // Preview builds default a fresh browser to the demo seller; this run is a
+  // real signed-out person, so pin the explicit guest marker (lib/devPreview).
+  await context.addInitScript(() => localStorage.setItem('bt:previewRole:seller-review-v2', 'guest'));
+  if (requireName) await context.addInitScript(() => { window.__btRequireName = true; });
   await context.addInitScript(clerkOnboardingStubScript());
   await installFakeBackend(context, { origin, apiOrigin: DEMO_API, api });
   const page = await context.newPage();
@@ -138,7 +144,7 @@ function identity(role, viewportId) {
 }
 
 /** Welcome → birthday → email → code: the shared sign-up every run starts with. */
-async function signUp(page, id, shot, report) {
+async function signUp(page, id, shot, report, { requireName = false } = {}) {
   await report.step('welcome (TikTok sign up)', async () => {
     await page.getByTestId('onboarding-welcome').waitFor({ timeout: 20_000 });
     await dismissCookieBanner(page);
@@ -176,8 +182,53 @@ async function signUp(page, id, shot, report) {
     await page.getByTestId('onboarding-code-error').waitFor({ timeout: 5_000 });
     await shot('code-error');
     await input.fill('');
-    await input.fill('000000');
   });
+
+  await report.step('code: back and "Wrong email? Edit" both return to the editable email', async () => {
+    await liveBack(page);
+    await page.getByTestId('onboarding-email').waitFor({ timeout: 5_000 });
+    await expectValue(page, 'onboarding-email-input', id.email);
+    await shot('code-back-to-email');
+    await page.getByTestId('onboarding-email-continue').click();
+    await page.getByTestId('onboarding-code').waitFor({ timeout: 10_000 });
+    await page.getByTestId('onboarding-code-edit-email').click();
+    await page.getByTestId('onboarding-email').waitFor({ timeout: 5_000 });
+    await expectValue(page, 'onboarding-email-input', id.email);
+    await shot('code-edit-email');
+    await page.getByTestId('onboarding-email-continue').click();
+    await page.getByTestId('onboarding-code').waitFor({ timeout: 10_000 });
+  });
+
+  await report.step('reload on the code step resumes it (birthday + email kept)', async () => {
+    await page.waitForTimeout(500); // debounced draft save
+    await page.reload();
+    await page.getByTestId('onboarding-code').waitFor({ timeout: 20_000 });
+    await page.getByText(id.email, { exact: false }).waitFor({ timeout: 5_000 });
+    await shot('code-after-reload');
+    await page.getByTestId('onboarding-code-input').locator('input').fill('000000');
+  });
+
+  if (requireName) {
+    await report.step('name (Clerk requires it): typed once, survives a reload', async () => {
+      await page.getByTestId('onboarding-details').waitFor({ timeout: 15_000 });
+      await page.getByTestId('onboarding-first-name').fill(id.firstName);
+      await page.getByTestId('onboarding-last-name').fill(id.lastName);
+      await shot('details-name');
+      await page.waitForTimeout(500);
+      await page.reload();
+      // The code isn't stored, so a new one is sent; nothing typed is asked again.
+      await page.getByTestId('onboarding-email').waitFor({ timeout: 20_000 });
+      await expectValue(page, 'onboarding-email-input', id.email);
+      await page.getByTestId('onboarding-email-continue').click();
+      await page.getByTestId('onboarding-code').waitFor({ timeout: 10_000 });
+      await page.getByTestId('onboarding-code-input').locator('input').fill('000000');
+      await page.getByTestId('onboarding-details').waitFor({ timeout: 15_000 });
+      await expectValue(page, 'onboarding-first-name', id.firstName);
+      await expectValue(page, 'onboarding-last-name', id.lastName);
+      await shot('details-after-reload-prefilled');
+      await page.getByTestId('onboarding-details-continue').click();
+    });
+  }
 
   await report.step('username (Depop) with taken + available', async () => {
     await page.getByTestId('onboarding-username').waitFor({ timeout: 15_000 });
@@ -190,11 +241,42 @@ async function signUp(page, id, shot, report) {
     await shot('username-available');
     await pressWithFeedback(page, 'onboarding-username-continue');
   });
+
+  await report.step('reload after verification keeps the username', async () => {
+    await page.getByTestId('onboarding-photo').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await page.reload();
+    await page.getByTestId('onboarding-photo').waitFor({ timeout: 20_000 });
+    await liveBack(page);
+    await page.getByTestId('onboarding-username').waitFor({ timeout: 5_000 });
+    await expectValue(page, 'onboarding-username-input', id.username);
+    await shot('username-after-reload');
+    await page.getByText('is available', { exact: false }).waitFor({ timeout: 5_000 });
+    await page.getByTestId('onboarding-username-continue').click();
+  });
+}
+
+/** The live header back (the outgoing layer stays mounted briefly, aria-hidden). */
+async function liveBack(page) {
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+}
+
+async function expectValue(page, testId, expected) {
+  const field = page.getByTestId(testId);
+  const input = (await field.evaluate((el) => el.tagName)) === 'INPUT' ? field : field.locator('input');
+  const value = await input.first().inputValue();
+  if (value !== expected) throw new Error(`${testId} = ${JSON.stringify(value)}, expected ${JSON.stringify(expected)}`);
+}
+
+/** Proves the birthday typed before verification reached /auth/age (it survived both reloads). */
+function expectAgeSent(api) {
+  const user = api.getUser();
+  if (user?.ageBand !== '18_plus') throw new Error(`birthday never reached /auth/age: ${JSON.stringify(user)}`);
 }
 
 async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
   const api = createFakeOnboardingApi();
-  const { context, page } = await openOnboardingContext(browser, { viewport, origin, api });
+  const { context, page } = await openOnboardingContext(browser, { viewport, origin, api, requireName: true });
   const report = makeReport('buyer', viewport.id);
   const id = identity('buyer', viewport.id);
   let index = 0;
@@ -203,7 +285,7 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
   try {
     await page.goto(`${origin}/onboarding`);
     await waitClerkLoaded(page);
-    await signUp(page, id, shot, report);
+    await signUp(page, id, shot, report, { requireName: true });
 
     await report.step('photo (Instagram): add, then continue', async () => {
       await page.getByTestId('onboarding-photo').waitFor({ timeout: 10_000 });
@@ -247,15 +329,25 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-sizes-ok').click();
     });
 
-    await report.step('notifications (Cash App)', async () => {
+    await report.step('notifications: web shows one honest Continue', async () => {
       await page.getByTestId('onboarding-notifications').waitFor({ timeout: 10_000 });
+      await page.getByText('Get alerts in the app', { exact: true }).waitFor({ timeout: 5_000 });
+      if (await page.getByTestId('onboarding-notifications-skip').count()) throw new Error('web shows a second, meaningless button');
       await shot('notifications');
+      await page.getByTestId('onboarding-notifications-continue').click();
+    });
+
+    await report.step('Shop or Sell has a working back control', async () => {
+      await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
+      await shot('role');
+      await liveBack(page);
+      await page.getByTestId('onboarding-notifications').waitFor({ timeout: 5_000 });
+      await shot('role-back-to-notifications');
       await page.getByTestId('onboarding-notifications-continue').click();
     });
 
     await report.step('Shop or Sell (Etsy) → finish as buyer', async () => {
       await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
-      await shot('role');
       await pressWithFeedback(page, 'account-type-buyer');
       await shot('role-shop');
       await page.getByTestId('onboarding-role-continue').click();
@@ -265,6 +357,15 @@ async function runBuyerWalkthrough(browser, { viewport, origin, outDir }) {
         throw new Error(`server row not completed as buyer: ${JSON.stringify(user)}`);
       }
       if (JSON.stringify(user.styleInterests) !== '["Womenswear"]') throw new Error(`department not saved: ${JSON.stringify(user.styleInterests)}`);
+      if (user.name !== `${id.firstName} ${id.lastName}`) throw new Error(`name typed before the reload was lost: ${JSON.stringify(user.name)}`);
+      expectAgeSent(api);
+    });
+
+    await report.step('one welcome headline for buyers (the explainer)', async () => {
+      await page.getByRole('button', { name: 'Enter the Thread' }).waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(700); // explainer fade-in
+      const welcomes = await page.getByText(/Welcome to/).count();
+      if (welcomes !== 1) throw new Error(`expected one welcome headline, saw ${welcomes}`);
       await shot('landing');
     });
   } finally {
@@ -291,16 +392,15 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-interest-skip').click();
       await page.getByTestId('onboarding-brands-skip').click();
       await page.getByTestId('onboarding-sizes-skip').click();
-      await page.getByTestId('onboarding-notifications-skip').click();
+      // Web has one Continue here (nothing to turn on or decline in a browser).
+      await page.getByTestId('onboarding-notifications-continue').click();
     });
 
-    await report.step('back button walks back one step', async () => {
+    await report.step('Shop or Sell: back walks back one step', async () => {
       await page.getByTestId('onboarding-role').waitFor({ timeout: 10_000 });
-      // The outgoing layer remains mounted briefly but is aria-hidden/inert.
-      // Target the accessible live control, not both transient testIDs.
-      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      await liveBack(page);
       await page.getByTestId('onboarding-notifications').waitFor({ timeout: 5_000 });
-      await page.getByTestId('onboarding-notifications-skip').click();
+      await page.getByTestId('onboarding-notifications-continue').click();
     });
 
     await report.step('Sell → store name (Depop Start selling)', async () => {
@@ -309,6 +409,11 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       await page.getByTestId('onboarding-role-continue').click();
       await page.getByTestId('onboarding-store').waitFor({ timeout: 10_000 });
       await shot('store');
+      await liveBack(page);
+      await page.getByTestId('onboarding-role').waitFor({ timeout: 5_000 });
+      await shot('store-back-to-role');
+      await page.getByTestId('onboarding-role-continue').click();
+      await page.getByTestId('onboarding-store').waitFor({ timeout: 10_000 });
       await page.getByTestId('onboarding-store-name').fill(id.brandName);
       await page.getByTestId('onboarding-store-continue').click();
     });
@@ -323,7 +428,7 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
         // instead of leaving the legacy store-brand route in the address bar.
         await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/store-setup-brand', { timeout: 20_000 });
         if (new URL(page.url()).pathname === '/') {
-          await page.getByText('Dashboard', { exact: true }).waitFor({ timeout: 10_000 });
+          await page.getByText('Dashboard', { exact: true }).locator('visible=true').first().waitFor({ timeout: 10_000 });
         }
       } catch (error) {
         console.log('Seller finish diagnostic:', JSON.stringify({ url: page.url(), user: api.getUser(), screen: (await page.locator('body').innerText()).slice(-1800) }));
@@ -334,7 +439,44 @@ async function runSellerWalkthrough(browser, { viewport, origin, outDir }) {
       if (!user?.onboardingComplete || user.accountType !== 'seller' || user.brandName !== id.brandName || user.brandStage !== 'build') {
         throw new Error(`server row not completed as seller: ${JSON.stringify(user)}`);
       }
+      expectAgeSent(api);
       await shot('store-setup');
+    });
+  } finally {
+    await context.close();
+  }
+  return report.rows;
+}
+
+/** Welcome → Log in carries an email typed earlier in the attempt to sign-in, prefilled. */
+async function runLoginHandoff(browser, { viewport, origin, outDir }) {
+  const api = createFakeOnboardingApi();
+  const { context, page } = await openOnboardingContext(browser, { viewport, origin, api });
+  const report = makeReport('log-in handoff', viewport.id);
+  const email = 'returning@onboarding-walkthrough.test';
+  let index = 0;
+  const shot = (name) => screenshot(page, outDir, ++index, name);
+  try {
+    await page.goto(`${origin}/onboarding`);
+    await waitClerkLoaded(page);
+    await report.step('email typed, then Log in → sign-in prefilled', async () => {
+      await page.getByTestId('onboarding-welcome').waitFor({ timeout: 20_000 });
+      await dismissCookieBanner(page);
+      await page.getByTestId('onboarding-use-email').click();
+      await page.getByTestId('onboarding-dob').fill('01152000');
+      await page.getByTestId('onboarding-dob-continue').click();
+      await page.getByTestId('onboarding-email-input').fill(email);
+      await liveBack(page);
+      await page.getByTestId('onboarding-birthday').waitFor({ timeout: 5_000 });
+      await liveBack(page);
+      await page.getByTestId('onboarding-welcome').waitFor({ timeout: 5_000 });
+      await page.getByTestId('onboarding-toggle-mode').click();
+      await page.getByText('Log in to', { exact: false }).waitFor({ timeout: 5_000 });
+      await page.getByTestId('onboarding-use-email').click();
+      await page.waitForURL(/\/sign-in\?email=/, { timeout: 10_000 });
+      await page.getByTestId('release-check-email').waitFor({ timeout: 10_000 });
+      await expectValue(page, 'release-check-email', email);
+      await shot('sign-in-prefilled');
     });
   } finally {
     await context.close();
@@ -371,6 +513,18 @@ async function main() {
         allRows.push(...(error.walkthroughRows ?? [{ name: 'walkthrough startup', ok: false, message: String(error) }])
           .map((r) => ({ ...r, viewport: viewport.id, role: 'buyer' })));
       }
+      }
+
+      if (!options.role) {
+        console.log(`-- log-in handoff --`);
+        try {
+          const rows = await runLoginHandoff(browser, { viewport, origin: server.origin, outDir: path.join(OUTPUT_DIR, viewport.id, 'login') });
+          allRows.push(...rows.map((r) => ({ ...r, viewport: viewport.id, role: 'log-in' })));
+        } catch (error) {
+          hadFailure = true;
+          allRows.push(...(error.walkthroughRows ?? [{ name: 'walkthrough startup', ok: false, message: String(error) }])
+            .map((r) => ({ ...r, viewport: viewport.id, role: 'log-in' })));
+        }
       }
 
       if (options.role !== 'buyer') {

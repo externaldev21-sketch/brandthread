@@ -141,3 +141,69 @@ export function resolveResumeStep(draft: Pick<OnboardingDraft, 'stepId' | 'authM
   // Any instance-required password/name is entered again, never restored.
   return 'DETAILS';
 }
+
+// ─── Before the account exists (launch flow) ────────────────────────────────
+
+/**
+ * What app/onboarding.tsx keeps under PENDING_DRAFT_KEY while the person is
+ * still signed out, so a web reload (or the OS dropping the tab while they
+ * fetch the code) never asks for the birthday, email or name again. The
+ * buyer/seller choice is made after sign-in, so there is no `flow` yet.
+ */
+export interface PendingSignUpDraft {
+  version: number;
+  stepId: StepId;
+  authMethod: AuthMethod;
+  /** Lower-cased; also binds the birthday to the account it was typed for. */
+  email: string;
+  codeMode: 'signup' | 'signin';
+  firstName: string;
+  lastName: string;
+  /** MM/DD/YYYY exactly as typed; dropped once /auth/age succeeds. */
+  dobInput: string;
+  savedAt: number;
+}
+
+export function parsePendingSignUp(raw: string | null | undefined): PendingSignUpDraft | null {
+  if (!raw) return null;
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(raw); } catch { return null; }
+  if (!data || typeof data !== 'object' || data.version !== DRAFT_VERSION) return null;
+  if (!isStepId(data.stepId) || !isAuthStep(data.stepId)) return null;
+  return {
+    version: DRAFT_VERSION,
+    stepId: data.stepId,
+    authMethod: data.authMethod === 'apple' || data.authMethod === 'google' ? data.authMethod : 'email',
+    email: str(data.email).trim().toLowerCase(),
+    codeMode: data.codeMode === 'signin' ? 'signin' : 'signup',
+    firstName: str(data.firstName),
+    lastName: str(data.lastName),
+    dobInput: /^\d{2}\/\d{2}\/\d{4}$/.test(str(data.dobInput)) ? str(data.dobInput) : '',
+    savedAt: typeof data.savedAt === 'number' ? data.savedAt : 0,
+  };
+}
+
+/**
+ * A signed-out draft is only resumed for a while: long enough to fetch a code
+ * or come back the same day, not long enough to greet the next person on a
+ * shared device with someone else's email and birthday.
+ */
+export const PENDING_SIGNED_OUT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export function isPendingDraftFresh(draft: PendingSignUpDraft, now = Date.now()): boolean {
+  return now - draft.savedAt >= 0 && now - draft.savedAt < PENDING_SIGNED_OUT_MAX_AGE_MS;
+}
+
+/** SSO drafts carry no email to match, so they only count right after the redirect. */
+export const PENDING_SSO_MAX_AGE_MS = 30 * 60 * 1000;
+
+/**
+ * Whether a signed-out draft belongs to the account that is now signed in:
+ * same email, or an Apple/Google sign-up that just came back. A different
+ * person's half-finished attempt on a shared device never carries over.
+ */
+export function pendingDraftBelongsTo(draft: PendingSignUpDraft, signedInEmail: string | null | undefined, now = Date.now()): boolean {
+  const email = (signedInEmail ?? '').trim().toLowerCase();
+  if (draft.authMethod === 'email') return !!email && draft.email === email;
+  return now - draft.savedAt >= 0 && now - draft.savedAt < PENDING_SSO_MAX_AGE_MS;
+}

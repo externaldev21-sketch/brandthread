@@ -42,9 +42,42 @@ export function clerkOnboardingStubScript() {
       createdUserId: null,
       pendingCode: null,
       pendingProfile: null,
+      missingFields: [],
     };
   }
-  let signUpState = freshSignUpState();
+  // Real Clerk keeps the open sign-up on its client across a page reload, so
+  // the stub does too (tab-scoped): a reload on the code step can resume there.
+  const PENDING_SIGN_UP_KEY = 'bt:onboarding-walkthrough-stub-sign-up:v1';
+  function restoreSignUpState() {
+    try {
+      const raw = sessionStorage.getItem(PENDING_SIGN_UP_KEY);
+      if (raw) return { ...freshSignUpState(), ...JSON.parse(raw) };
+    } catch {}
+    return freshSignUpState();
+  }
+  function persistSignUpState() {
+    try { sessionStorage.setItem(PENDING_SIGN_UP_KEY, JSON.stringify(signUpState)); } catch {}
+  }
+  // window.__btRequireName = true (set by the walkthrough before load) models
+  // a Clerk instance that requires first/last name after the email code.
+  const requireName = () => window.__btRequireName === true;
+  function completeIfReady() {
+    if (requireName() && !signUpState.firstName) {
+      signUpState.status = 'missing_requirements';
+      signUpState.missingFields = ['first_name', 'last_name'];
+      return;
+    }
+    signUpState.status = 'complete';
+    signUpState.missingFields = [];
+    signUpState.pendingProfile = {
+      id: signUpState.createdUserId || genId('user'),
+      firstName: signUpState.firstName || '',
+      lastName: signUpState.lastName || '',
+      username: signUpState.username || '',
+      email: signUpState.emailAddress,
+    };
+  }
+  let signUpState = restoreSignUpState();
 
   let session = null;
   let user = null;
@@ -84,6 +117,7 @@ export function clerkOnboardingStubScript() {
     authListeners.forEach((fn) => { try { fn(payload); } catch {} });
   }
   function notifySignUp() {
+    persistSignUpState();
     signUpSnapshot = { errors: STATIC_EMPTY_ERRORS, fetchStatus: 'idle', signUp: signUpResource };
     signUpListeners.forEach((fn) => { try { fn(); } catch {} });
   }
@@ -163,7 +197,7 @@ export function clerkOnboardingStubScript() {
     get existingSession() { return undefined; },
     requiredFields: [],
     optionalFields: [],
-    missingFields: [],
+    get missingFields() { return signUpState.missingFields || []; },
     unverifiedFields: [],
     unsafeMetadata: {},
     abandonAt: null,
@@ -187,6 +221,7 @@ export function clerkOnboardingStubScript() {
       if (params?.username != null) signUpState.username = params.username;
       if (params?.firstName != null) signUpState.firstName = params.firstName;
       if (params?.lastName != null) signUpState.lastName = params.lastName;
+      if (signUpState.status === 'missing_requirements' && signUpState.id) completeIfReady();
       notifySignUp();
       return { error: null };
     },
@@ -226,14 +261,7 @@ export function clerkOnboardingStubScript() {
           return { error: fakeError('form_code_incorrect', 'Invalid code. Please check and try again.') };
         }
         signUpState.id = signUpState.id || genId('su');
-        signUpState.status = 'complete';
-        signUpState.pendingProfile = {
-          id: genId('user'),
-          firstName: signUpState.firstName || '',
-          lastName: signUpState.lastName || '',
-          username: signUpState.username || '',
-          email: signUpState.emailAddress,
-        };
+        completeIfReady();
         notifySignUp();
         return { error: null };
       },
@@ -265,6 +293,7 @@ export function clerkOnboardingStubScript() {
       target.client = client;
       target.__internal_lastEmittedResources = { client, session, user, organization: null };
       persistSession(profile);
+      try { sessionStorage.removeItem(PENDING_SIGN_UP_KEY); } catch {}
       notifyAuth();
       if (typeof navigate === 'function') {
         // Absolutizing the URL (as real Clerk's decorateUrl does for
