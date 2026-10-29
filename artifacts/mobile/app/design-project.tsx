@@ -1,7 +1,7 @@
 /**
  * Brandthread Design Studio — Project Creation Wizard (6 steps)
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -142,6 +142,8 @@ export default function DesignProjectScreen() {
   const [customHex, setCustomHex] = useState('#C0C0C0');
   const [projectName, setProjectName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  // Sync guard: a double tap lands before isCreating re-renders the button away.
+  const creatingRef = useRef(false);
 
   // Apply URL params on mount
   useEffect(() => {
@@ -178,6 +180,10 @@ export default function DesignProjectScreen() {
 
   function selectTemplate(tmpl: GarmentTemplate) {
     setSelectedTemplate(tmpl);
+    // Garments always use the 1080 × 1080 canvas step 3 shows; drop any size
+    // left over from a canvas preset picked before switching type.
+    setWidthText('1080');
+    setHeightText('1080');
     setProjectName(tmpl.label);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -198,7 +204,8 @@ export default function DesignProjectScreen() {
   }
 
   async function handleCreate() {
-    if (!projectType) return;
+    if (!projectType || creatingRef.current) return;
+    creatingRef.current = true;
     try {
       setIsCreating(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -224,6 +231,7 @@ export default function DesignProjectScreen() {
     } catch (err) {
       Alert.alert('Error', 'Could not create project. Please try again.');
     } finally {
+      creatingRef.current = false;
       setIsCreating(false);
     }
   }

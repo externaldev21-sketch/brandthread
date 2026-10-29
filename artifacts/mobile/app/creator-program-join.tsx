@@ -145,7 +145,8 @@ export default function CreatorProgramJoinScreen() {
                   </View>
                 </>
               ) : info.mine && info.mine.status !== 'removed' && info.mine.status !== 'declined' ? (
-                <ActionButton label="View your code" onPress={() => router.replace('/creator-program' as any)} />
+                // A pending application has no code yet — don't promise one.
+                <ActionButton label={info.mine.status === 'pending' ? 'View your application' : 'View your code'} onPress={() => router.replace('/creator-program' as any)} />
               ) : (
                 <ActionButton
                   label={info.program.autoApprove ? 'Join program' : 'Apply'}

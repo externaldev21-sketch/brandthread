@@ -6,7 +6,7 @@
  * tab, Story mentions or notifications.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -21,6 +21,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { PendingTag, pendingTagTitle } from '@/lib/interactionSettings';
 import { shortRelativeTime } from '@/lib/safety';
+import { showAlert } from '@/lib/actionSheet';
 
 export default function BuyerPendingTags() {
   const colors = useColors();
@@ -60,14 +61,14 @@ export default function BuyerPendingTags() {
       setItems(prev => prev.filter(item => `${item.kind}:${item.id}` !== key));
       hapticSuccessAction();
     } catch {
-      Alert.alert(action === 'approve' ? 'Could not approve tag' : 'Could not remove tag', 'Try again.');
+      showAlert(action === 'approve' ? 'Could not approve tag' : 'Could not remove tag', 'Try again.');
     } finally {
       setBusyKey(null);
     }
   }
 
   function confirmRemove(tag: PendingTag) {
-    Alert.alert('Remove tag?', `You won't be tagged in this ${tag.kind === 'story' ? 'story' : 'post'}.`, [
+    showAlert('Remove tag?', `You won't be tagged in this ${tag.kind === 'story' ? 'story' : 'post'}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => { void act(tag, 'remove'); } },
     ]);

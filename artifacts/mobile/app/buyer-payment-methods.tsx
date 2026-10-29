@@ -7,7 +7,6 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
-import { RetryRow } from '@/components/ui/RetryRow';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -75,7 +74,6 @@ export default function BuyerPaymentMethodsScreen() {
   const [loading, setLoading] = useState(true);
   // A failed fetch is an error, never "No saved payment methods".
   const [loadError, setLoadError] = useState(false);
-  const loadFailed = loadError;
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const { userId } = useAuth();
@@ -174,11 +172,7 @@ export default function BuyerPaymentMethodsScreen() {
               : 'Payment methods saved from your Brandthread purchases.'}
           </Text>
 
-          {loadFailed ? (
-            <View style={{ marginBottom: SPACING.xl }}>
-              <RetryRow label="Couldn't load your saved cards" onRetry={() => void load()} />
-            </View>
-          ) : paymentMethods.length === 0 ? (
+          {paymentMethods.length === 0 ? (
             <EmptyState
               icon="credit-card"
               title="No saved payment methods"

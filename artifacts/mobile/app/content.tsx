@@ -66,7 +66,9 @@ function typeIcon(t: ContentType): IconName {
     video: 'video', image: 'image', slideshow: 'layers', story: 'circle',
     announcement: 'bell', countdown: 'clock', behind_scenes: 'camera', poll: 'bar-chart-2',
   };
-  return map[t];
+  // Older/other-surface rows can carry a media type outside this map (e.g. the
+  // DB default 'photo'); never hand Icon an undefined name.
+  return map[t] ?? 'image';
 }
 
 const VALID_TABS: FilterTab[] = ['all', 'published', 'scheduled', 'draft', 'archived'];

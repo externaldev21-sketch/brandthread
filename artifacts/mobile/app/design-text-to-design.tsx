@@ -98,6 +98,9 @@ export default function AiDesignChatScreen() {
   const [openChip, setOpenChip] = useState<ChipKey | null>(null);
   const flatListRef = useRef<FlatList<ChatTurn>>(null);
   const inputRef = useRef<TextInput>(null);
+  // Sync guard: isGenerating is stale until re-render, so a double tap on
+  // Send / Variation / Retry would otherwise start two paid generations.
+  const generatingRef = useRef(false);
 
   const versionById = useMemo(() => {
     const map = new Map<string, DesignVersion>();
@@ -109,7 +112,8 @@ export default function AiDesignChatScreen() {
 
   // `base` is the version being edited; null starts a brand-new design.
   const runGeneration = useCallback(async (text: string, base: DesignVersion | null, shown = text) => {
-    if (!text || isGenerating) return;
+    if (!text || isGenerating || generatingRef.current) return;
+    generatingRef.current = true;
 
     setInputText('');
     setOpenChip(null);
@@ -143,6 +147,7 @@ export default function AiDesignChatScreen() {
       const message = aiToolErrorMessage(err, 'Design generation failed. Please try again.');
       setTurns(prev => [...prev, { id: uid('turn'), role: 'assistant', error: message }]);
     } finally {
+      generatingRef.current = false;
       setIsGenerating(false);
     }
   }, [isGenerating, garment, placement, colour, referenceUri]);

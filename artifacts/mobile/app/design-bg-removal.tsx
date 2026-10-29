@@ -48,6 +48,7 @@ import { getMediaLibrary, mediaLibraryUnavailableMessage } from '@/lib/mediaLibr
 import { shareImage } from '@/lib/aiToolMedia';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { withCoverFirst } from '@/lib/photoOrder';
 
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
@@ -395,7 +396,9 @@ export default function DesignBgRemovalScreen() {
     if (!uri) return;
     const existing = product.media ?? [];
     const updated = await updateProduct(product.id, {
-      media: [...existing, { id: `cutout-${Date.now()}`, type: 'image', uri, altText: 'Product photo, background removed', isCover: true, sortOrder: existing.length, createdAt: new Date().toISOString() }],
+      // New photo goes first: the cover is media[0] (lib/photoOrder), and an
+      // appended isCover:true left the old cover winning find(m => m.isCover).
+      media: withCoverFirst([{ id: `cutout-${Date.now()}`, type: 'image' as const, uri, altText: 'Product photo, background removed', isCover: true, sortOrder: 0, createdAt: new Date().toISOString() }, ...existing]),
     }).catch(() => null);
     if (updated) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

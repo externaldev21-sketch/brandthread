@@ -266,6 +266,9 @@ export default function CreatePostScreen() {
       setPublishState({ phase: 'error', message: 'Posting is turned off in the preview. Sign in to publish.', draft: asDraft });
       return;
     }
+    // Nothing to save yet (an edit whose post is still loading): bail before the
+    // running state, or the early return below left the spinner stuck forever.
+    if (!(editId && editing) && !media) return;
     abort.current = { aborted: false };
     setPublishState({ phase: 'running', fraction: 0, step: 'uploading', draft: asDraft });
     try {

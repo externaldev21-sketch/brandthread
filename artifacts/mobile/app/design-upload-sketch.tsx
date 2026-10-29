@@ -113,7 +113,9 @@ export default function UploadSketchScreen() {
   }
 
   function handleGenerate() {
-    if (!sketchUri) return;
+    // A run already started (double tap before the results step renders):
+    // starting another would abort it and fire 4 more paid requests.
+    if (!sketchUri || runRef.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     const fresh: AiResultSlot[] = Array.from({ length: RESULT_COUNT }, (_, i) => ({
       id: i, status: 'generating', sourceUri: sketchUri, label: `Design ${i + 1}`,

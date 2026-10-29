@@ -11,7 +11,7 @@
  * Display only: prices gain an "≈" line in this currency; every charge
  * stays in US dollars.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -42,9 +42,16 @@ export default function CurrencyScreen() {
   const { isSignedIn } = useAuth();
   const { currency } = useDisplayCurrency(api);
   const [query, setQuery] = useState('');
+  // A second tap while the first save is in flight navigated back twice.
+  const choosing = useRef(false);
 
   const sections = useMemo<Section[]>(() => {
-    if (query.trim()) return [{ title: null, data: filterCurrencies(query) }];
+    if (query.trim()) {
+      // An empty section still counts as rows (header + footer) in SectionList,
+      // so ListEmptyComponent never showed; no matches must mean no sections.
+      const matches = filterCurrencies(query);
+      return matches.length ? [{ title: null, data: matches }] : [];
+    }
     const popular = POPULAR_CURRENCY_CODES
       .map(code => CURRENCIES.find(c => c.code === code))
       .filter((c): c is CurrencyOption => !!c);
@@ -61,6 +68,8 @@ export default function CurrencyScreen() {
   }, [api, isSignedIn]);
 
   async function choose(code: string) {
+    if (choosing.current) return;
+    choosing.current = true;
     hapticSelection();
     const previous = currency;
     await setDisplayCurrency(code);
@@ -70,6 +79,7 @@ export default function CurrencyScreen() {
       } catch (err) {
         // Not saved on the account: put the device back and say so.
         await setDisplayCurrency(previous);
+        choosing.current = false;
         showAlert("Couldn't change currency", friendlyError(err, 'Try again.'));
         return;
       }

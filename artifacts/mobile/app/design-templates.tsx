@@ -218,9 +218,6 @@ export default function DesignTemplatesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Use template, ${item.name}`}
                 disabled={creatingId === item.id}
-                hitSlop={{ top: 6, bottom: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Use ${item.name} template`}
               >
                 {creatingId === item.id ? (
                   <ActivityIndicator size="small" color={PURPLE_LIGHT} />

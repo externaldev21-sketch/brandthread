@@ -45,6 +45,7 @@ import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
+import { withCoverFirst } from '@/lib/photoOrder';
 import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
 
 // Product photos (the garment the model must wear, exactly) and creative
@@ -347,7 +348,9 @@ export default function AIPhotoshootScreen() {
     if (!uri) return;
     const existing = product.media ?? [];
     const updated = await updateProduct(product.id, {
-      media: [...existing, { id: `photoshoot-${Date.now()}`, type: 'image', uri, altText: 'AI photoshoot photo', isCover: true, sortOrder: existing.length, createdAt: new Date().toISOString() }],
+      // New photo goes first: the cover is media[0] (lib/photoOrder), and an
+      // appended isCover:true left the old cover winning find(m => m.isCover).
+      media: withCoverFirst([{ id: `photoshoot-${Date.now()}`, type: 'image' as const, uri, altText: 'AI photoshoot photo', isCover: true, sortOrder: 0, createdAt: new Date().toISOString() }, ...existing]),
     }).catch(() => null);
     if (updated) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

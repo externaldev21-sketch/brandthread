@@ -748,6 +748,7 @@ export default function StoryComposer() {
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const postingRef = useRef(false);
   // Instagram's own Share sheet: tapping send opens this instead of posting
   // immediately. "Message" (send as a DM attachment before ever publishing
   // the story) is intentionally not a row here — see docs/story-flows.md.
@@ -1125,6 +1126,10 @@ export default function StoryComposer() {
       Alert.alert('Sign in to share', 'Sign in to post a story.');
       return;
     }
+    // Synchronous guard: two taps in the same frame both see isPosting=false,
+    // which would publish (and notify every @mention) twice.
+    if (postingRef.current) return;
+    postingRef.current = true;
     const closeOnly = opts?.closeFriendsOnly ?? closeFriendsOnly;
     setIsPosting(true);
     setPostingPercent(0);
@@ -1182,6 +1187,7 @@ export default function StoryComposer() {
     } catch (err) {
       postingProgress.removeListener(progressListener);
       endUploadActivity(activityId, { status: 'failed' });
+      postingRef.current = false;
       setIsPosting(false);
       // The original expired / was removed (410) or I'm no longer tagged in it (403):
       // show the inline "Story unavailable" state instead of a generic alert.

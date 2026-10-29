@@ -39,7 +39,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 
@@ -154,6 +154,10 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
     try {
       await recoverLegacyDesignProjects();
       setPhase('done');
+      // Refresh now, not only on "Done" — Cancel / back on the done (or
+      // running) phase otherwise left the recovered designs missing and the
+      // "N designs available to recover" row still showing.
+      onRecovered();
     } catch {
       setErrorMsg('Recovery failed. Your original projects were not changed.');
       setPhase('error');
@@ -161,8 +165,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
   }
 
   function handleDone() {
-    onRecovered();   // re-fetches gallery
-    onClose();
+    onClose();   // gallery already re-fetched when recovery finished
   }
 
   // Web inset: 67px status bar + 34px home bar
@@ -1538,12 +1541,18 @@ export default function DesignGalleryScreen() {
     }
   }, []);
 
+  // Read through a ref: with deletedExpanded as a dependency, toggling
+  // Recently Deleted re-ran this focus effect, reloading the whole gallery
+  // (skeleton flash + grid remount back to the top) and double-loading the
+  // deleted list.
+  const deletedExpandedRef = useRef(deletedExpanded);
+  deletedExpandedRef.current = deletedExpanded;
   useFocusEffect(
     useCallback(() => {
       loadData();
-      if (deletedExpanded) setDeletedToken(t => t + 1);
+      if (deletedExpandedRef.current) setDeletedToken(t => t + 1);
       return () => {};
-    }, [loadData, deletedExpanded]),
+    }, [loadData]),
   );
 
   // ── Stacks ─────────────────────────────────────────────────────────────────
@@ -1664,6 +1673,7 @@ export default function DesignGalleryScreen() {
     if (selectedIds.size !== 1) return;
     const [id] = [...selectedIds];
     const project = projects.find(p => p.id === id);
+    setMoreOptionsVisible(false);
     if (project) { setRenameProject(project); cancelSelection(); }
   }
 
@@ -1674,7 +1684,7 @@ export default function DesignGalleryScreen() {
     setMoreOptionsVisible(false);
     Alert.alert(
       selectedIds.size === 1 ? 'Delete this design?' : `Delete ${selectedIds.size} designs?`,
-      'Moved to Recently Deleted — you can restore it for a limited time.',
+      `Moved to Recently Deleted — you can restore ${selectedIds.size === 1 ? 'it' : 'them'} for a limited time.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: bulkSoftDelete },
@@ -1728,7 +1738,14 @@ export default function DesignGalleryScreen() {
         Alert.alert('Nothing to share yet', 'Open this design and export it once before sharing.');
         return;
       }
-      await Sharing.shareAsync(thumb.downloadUrl, { dialogTitle: `Share ${project.name}` });
+      // expo-sharing only accepts local file:// URIs on iOS/Android; the
+      // asset's downloadUrl is a signed https URL, so fetch it to cache first.
+      let shareUri = thumb.downloadUrl;
+      if (Platform.OS !== 'web' && /^https?:\/\//i.test(shareUri)) {
+        const dest = new File(Paths.cache, `share-${project.id}-${Date.now()}.${thumb.format === 'jpeg' ? 'jpg' : thumb.format}`);
+        shareUri = (await File.downloadFileAsync(shareUri, dest, { idempotent: true })).uri;
+      }
+      await Sharing.shareAsync(shareUri, { mimeType: thumb.mimeType, dialogTitle: `Share ${project.name}` });
     } catch {
       Alert.alert('Could not share', 'Try again.');
     } finally {

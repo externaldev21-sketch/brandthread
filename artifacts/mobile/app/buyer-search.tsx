@@ -328,6 +328,8 @@ export default function BuyerSearchScreen() {
   useEffect(() => {
     const q = trimmedQuery;
     if (q.length < 1 && !style) {
+      // Drop any search still in flight so its results can't land after the clear.
+      searchGen.current += 1;
       setTop(EMPTY_TOP);
       setTabLists(emptyTabLists());
       setSearching(false);

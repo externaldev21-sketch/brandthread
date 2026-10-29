@@ -155,7 +155,9 @@ export default function DesignBgReplaceScreen({
     } else if (bgTab === 'upload') {
       prompt = 'Replace background with uploaded image';
     } else {
-      prompt = selectedScene ? `${selectedScene} scene background` : customPrompt;
+      prompt = selectedScene ? `${selectedScene} scene background` : customPrompt.trim();
+      // An empty prompt still runs (and bills) a generation with no direction.
+      if (!prompt) { showAlert('Choose a scene', 'Pick a scene or describe one first.'); return; }
     }
     setIsGenerating(true);
     try {

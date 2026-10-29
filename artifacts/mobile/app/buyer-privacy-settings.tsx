@@ -86,6 +86,10 @@ export default function BuyerPrivacySettings() {
   // GET /api/auth/privacy failed: nothing server-backed is shown as editable.
   const [loadFailed, setLoadFailed] = useState(false);
   const backSaveFailed = useRef(false);
+  // Unsaved edits survive a round trip to a sub-screen (Blocked, Close friends…):
+  // a refocus must not reload the server values over them.
+  const hasChangesRef = useRef(false);
+  hasChangesRef.current = hasChanges;
 
   useFocusEffect(
     useCallback(() => {
@@ -95,6 +99,7 @@ export default function BuyerPrivacySettings() {
         getPrivacySettings().catch(() => ({ ...DEFAULT_PRIVACY_SETTINGS })),
         api.privacy.get().catch(() => null),
       ]).then(([local, server]) => {
+        if (hasChangesRef.current) return;
         setLoadFailed(!server);
         if (server) {
           setDmPrivacy(server.dmPrivacy);

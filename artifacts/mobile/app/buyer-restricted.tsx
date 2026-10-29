@@ -22,6 +22,7 @@ import type { RestrictRecord } from '@/services/socialTypes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { showAlert } from '@/lib/actionSheet';
 
 import { Button, ListRow } from '@/components/ui';
 
@@ -54,7 +55,12 @@ export default function RestrictedAccountsScreen() {
   }, [loadRestricted]));
 
   const handleUnrestrict = async (user: RestrictRecord) => {
-    await unrestrictUser(user.restrictedUserId);
+    try {
+      await unrestrictUser(user.restrictedUserId);
+    } catch {
+      showAlert("Couldn't unrestrict", 'Check your connection and try again.');
+      return;
+    }
     setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
   };
 
@@ -106,7 +112,7 @@ export default function RestrictedAccountsScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="user-x"
-            title="No restricted accounts"
+            title={restricted.length > 0 ? 'No matching accounts' : 'No restricted accounts'}
             style={{ marginTop: SPACING.lg }}
           />
         }
