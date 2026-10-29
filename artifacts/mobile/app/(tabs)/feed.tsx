@@ -2541,8 +2541,10 @@ function FeedScreenContent({
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
   // tap area at any screen width, down to 320pt.
-  // A Back control (onBack) adds a second icon to the left cluster.
-  const topRowSideGuard = 24 + 6 + (onBack ? 24 + topRowIconGap : 0);
+  // A Back control (onBack) adds a second icon to the left cluster, set
+  // tighter than the usual icon gap so the bag keeps clear of the tabs.
+  const leftClusterGap = onBack ? 6 : topRowIconGap;
+  const topRowSideGuard = 24 + 6 + (onBack ? 24 + leftClusterGap : 0);
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -4185,7 +4187,7 @@ function FeedScreenContent({
               of glitch as the old shop pill's frosted background — see
               ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
-            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
+            <View style={[styles.buyerTopCluster, { gap: leftClusterGap }]}>
               {onBack && (
                 <TouchableOpacity
                   style={styles.buyerTopIconBtn}
@@ -4193,7 +4195,7 @@ function FeedScreenContent({
                   onPress={onBack}
                   accessibilityRole="button"
                   accessibilityLabel="Back"
-                  hitSlop={{ top: 4, bottom: 4, left: 10, right: topRowIconGap / 2 }}
+                  hitSlop={{ top: 4, bottom: 4, left: 10, right: leftClusterGap / 2 }}
                   testID="watch-threads-back"
                 >
                   <Icon name="arrow-left" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
