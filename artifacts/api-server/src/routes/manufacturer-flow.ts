@@ -37,6 +37,7 @@ import {
 import { publishNotification } from "./notifications-feed";
 import { serializeMessage } from "./manufacturers";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectPermission } from "../lib/objectAcl";
 import { acceptUploadSession } from "../lib/uploadSessions";
 import { VERIFICATION_REQUIRED_FOR_CARDS, refreshManufacturerVerification } from "../lib/manufacturerTrust";
 
@@ -442,6 +443,22 @@ router.post("/orders/:orderId/updates", ...participantAuth, async (req, res) => 
       : [];
     if (!note && imageObjectPaths.length === 0) {
       res.status(422).json({ error: "Add a note or at least one photo." }); return;
+    }
+    // Only photos this manufacturer uploaded (POST .../updates/photo sets them
+    // as ACL owner). Any other object path would be signed into a download URL
+    // for both participants: a way to read someone else's private upload.
+    const callerId = getAuth(req).userId ?? "";
+    for (const objectPath of imageObjectPaths) {
+      let owned = false;
+      try {
+        const file = await objectStorage.getObjectEntityFile(objectPath);
+        owned = await objectStorage.canAccessObjectEntity({ userId: callerId, objectFile: file, requestedPermission: ObjectPermission.WRITE });
+      } catch {
+        owned = false;
+      }
+      if (!owned) {
+        res.status(422).json({ error: "One of the photos wasn't found. Upload it again.", code: "PHOTO_NOT_OWNED" }); return;
+      }
     }
     const event = await recordOrderEvent(db, {
       order, actorRole: "manufacturer", actorClerkId: getAuth(req).userId ?? null,

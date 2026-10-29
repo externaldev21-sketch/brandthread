@@ -69,6 +69,10 @@ async function requireSellerAccount(req: express.Request, res: express.Response,
   next();
 }
 
+// Boost, campaign and featured-slot ids are uuid columns; anything else can
+// never match and must not reach Postgres (which would throw on the cast).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function statusFor(result: GrantResult): number {
   switch (result.status) {
     case "granted":
@@ -89,6 +93,10 @@ function verifyHandler(kind: PromoKind): express.RequestHandler {
   return async (req, res) => {
     if (!iapPromotionsEnabled()) {
       res.status(503).json({ error: "Native purchases are not enabled.", code: "iap_disabled" });
+      return;
+    }
+    if (!UUID_RE.test(String(req.params.id))) {
+      res.status(404).json({ status: "unmatched", kind });
       return;
     }
     const transactionId = typeof req.body?.transactionId === "string" ? req.body.transactionId.trim() : "";
@@ -133,6 +141,10 @@ function applyCreditHandler(kind: PromoKind): express.RequestHandler {
   return async (req, res) => {
     if (!iapPromotionsEnabled()) {
       res.status(503).json({ error: "Native purchases are not enabled.", code: "iap_disabled" });
+      return;
+    }
+    if (!UUID_RE.test(String(req.params.id))) {
+      res.status(404).json({ status: "unmatched", kind });
       return;
     }
     const purchaserId = getAuth(req).userId;

@@ -11,6 +11,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isLiveTipsEnabled } from "../lib/liveTips";
 
@@ -44,8 +45,10 @@ router.get("/:streamId/total", async (req, res) => {
       totalCents: Number(row?.total_cents ?? 0),
       giftCount: Number(row?.gift_count ?? 0),
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    // Log the cause; never echo database error text to the client.
+    logger.error({ err: e, path: req.path }, "live tips request failed");
+    return res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 

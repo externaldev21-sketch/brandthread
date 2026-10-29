@@ -15,6 +15,7 @@ import { Router, type Response } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { isBlockedEitherWay, optionalViewerId } from "../lib/safety";
 import { parseStartInput } from "../lib/liveAuctionRules";
+import { logger } from "../lib/logger";
 import {
   AuctionError, activeAuctionFor, cancelAuction, isLiveAuctionsEnabled, placeBid, publicAuction, startAuction,
 } from "../lib/liveAuctions";
@@ -31,7 +32,9 @@ function fail(res: Response, e: unknown) {
     }
     return res.status(e.status).json({ error: e.message, code: e.code });
   }
-  return res.status(500).json({ error: (e as any)?.message ?? "Internal server error" });
+  // Unexpected errors (e.g. a database error) must not echo internals to clients.
+  logger.error({ err: e }, "live auction request failed");
+  return res.status(500).json({ error: "Internal server error" });
 }
 
 async function gate(res: Response): Promise<boolean> {

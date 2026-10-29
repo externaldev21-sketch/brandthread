@@ -38,7 +38,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response) => {
-    fn(req, res).catch((e: any) => { if (!res.headersSent) res.status(500).json({ error: e?.message ?? "Server error" }); });
+    fn(req, res).catch((err: unknown) => {
+      // Never echo internal (e.g. database) error text to the client.
+      logger.error({ err }, "live cohost request failed");
+      if (!res.headersSent) res.status(500).json({ error: "Server error" });
+    });
   };
 }
 
@@ -188,10 +192,15 @@ router.post("/:id/cohost/invite", requireAuth, validateBody(cohostUserBody), wra
   });
   if (!verdict.ok) return res.status(verdict.status).json({ error: verdict.error });
 
-  await db.execute(sql`
+  // live_cohosts_open_unique (stream_id, cohost_id WHERE invited/accepted)
+  // settles a double-tap / concurrent invite: the loser gets the same 409.
+  const inserted = await db.execute(sql`
     INSERT INTO live_cohosts (stream_id, host_id, cohost_id, status)
     VALUES (${stream.id}::uuid, ${me}, ${inviteeId}, 'invited')
+    ON CONFLICT DO NOTHING
+    RETURNING id
   `);
+  if (!inserted.rows.length) return res.status(409).json({ error: "Already invited" });
 
   const [host] = await db.execute(sql`
     SELECT COALESCE(brand_name, display_name, 'A seller') AS name, COALESCE(username, '') AS username

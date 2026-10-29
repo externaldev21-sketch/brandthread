@@ -16,7 +16,7 @@
  * surfaced by trending or search).
  */
 import { Router } from "express";
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { db, hashtagFollows, postHashtags, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -38,6 +38,7 @@ export const TRENDING_MIN_POSTS = 3;
 export const TRENDING_MIN_AUTHORS = 2;
 export const TRENDING_MAX = 20;
 const TRENDING_TTL_MS = 5 * 60_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type SortMode = "top" | "recent";
 
@@ -84,6 +85,18 @@ async function tagPostCount(tag: string, viewerId: string | null): Promise<numbe
   return Number(row?.n ?? 0);
 }
 
+/** Post counts for many tags in one grouped query (tags with no posts are absent). */
+async function tagPostCounts(tags: string[], viewerId: string | null): Promise<Map<string, number>> {
+  if (tags.length === 0) return new Map();
+  const rows = await db
+    .select({ tag: postHashtags.tag, n: sql<number>`count(*)::int` })
+    .from(postHashtags)
+    .innerJoin(posts, eq(posts.id, postHashtags.postId))
+    .where(and(inArray(postHashtags.tag, tags), publicPostCondition(), notBlockedWith(viewerId, posts.userId)))
+    .groupBy(postHashtags.tag);
+  return new Map(rows.map((row) => [row.tag, Number(row.n)]));
+}
+
 async function postsForTag(tag: string, sort: SortMode, cursorRaw: string | null, limit: number, viewerId: string | null) {
   const cursor = decodeCursor(cursorRaw);
   const where = [
@@ -96,7 +109,8 @@ async function postsForTag(tag: string, sort: SortMode, cursorRaw: string | null
   if (sort === "recent" && cursor) {
     const [ts, id] = cursor.split("|");
     const at = new Date(ts);
-    if (!Number.isNaN(at.getTime()) && id) {
+    // posts.id is a uuid column: a tampered cursor id must not reach Postgres.
+    if (!Number.isNaN(at.getTime()) && id && UUID_RE.test(id)) {
       where.push(or(
         lt(postHashtags.createdAt, at),
         and(eq(postHashtags.createdAt, at), lt(posts.id, id)),
@@ -317,11 +331,9 @@ router.get("/following", requireAuth, async (req, res) => {
       .where(eq(hashtagFollows.userId, userId))
       .orderBy(desc(hashtagFollows.createdAt))
       .limit(MAX_FOLLOWED_TAGS);
-    const tags = await Promise.all(
-      follows
-        .filter((row) => isTagAllowedPublicly(row.tag))
-        .map(async (row) => ({ tag: row.tag, followedAt: row.followedAt, postCount: await tagPostCount(row.tag, userId) })),
-    );
+    const allowed = follows.filter((row) => isTagAllowedPublicly(row.tag));
+    const counts = await tagPostCounts(allowed.map((row) => row.tag), userId);
+    const tags = allowed.map((row) => ({ tag: row.tag, followedAt: row.followedAt, postCount: counts.get(row.tag) ?? 0 }));
     return res.json({ tags });
   } catch (err) {
     req.log.error({ err, userId }, "Followed hashtags failed");

@@ -193,8 +193,15 @@ onboardingSampleRouter.post("/logo", async (req, res) => {
   try {
     reservationId = await reserveOnboardingSample(userId);
   } catch (error: any) {
-    const status = error?.code === "onboarding_sample_in_progress" ? 409 : 429;
-    res.status(status).json({ error: error?.message || "The onboarding sample is unavailable.", code: error?.code });
+    if (error?.code === "onboarding_sample_in_progress" || error?.code === "onboarding_sample_used") {
+      const status = error.code === "onboarding_sample_in_progress" ? 409 : 429;
+      res.status(status).json({ error: error.message, code: error.code });
+      return;
+    }
+    // Anything else (e.g. a database failure) is not "sample used": retryable,
+    // and its internal message is never sent to the client.
+    req.log?.error?.({ err: error }, "Onboarding sample reservation failed");
+    res.status(503).json({ error: "The onboarding sample is unavailable. Please try again.", retryable: true });
     return;
   }
 

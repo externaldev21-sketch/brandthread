@@ -253,7 +253,9 @@ router.get("/", async (req, res) => {
       .select(publicManufacturerFields)
       .from(manufacturers)
       .where(and(...conditions))
-      .orderBy(DIRECTORY_SORTS[sort] ?? DIRECTORY_SORTS.recommended)
+      // Own keys only: ?sort=constructor / toString must not pick up an
+      // Object.prototype member (that reached drizzle's orderBy and 500ed).
+      .orderBy(typeof sort === "string" && Object.prototype.hasOwnProperty.call(DIRECTORY_SORTS, sort) ? DIRECTORY_SORTS[sort] : DIRECTORY_SORTS.recommended)
       .limit(limit)
       .offset(offset);
     setPaginationHeaders(res, page.data, rows.length);

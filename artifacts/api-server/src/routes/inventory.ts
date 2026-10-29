@@ -13,6 +13,10 @@ router.use(requireAuth);
 // log keeps track of who actually performed each action.
 router.use(teamContext());
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** product_variants.stock is a Postgres int4. */
+const MAX_STOCK = 2_147_483_647;
+
 function stockStatus(stock: number, threshold: number): "out_of_stock" | "low_stock" | "in_stock" {
   if (stock === 0) return "out_of_stock";
   if (stock <= threshold) return "low_stock";
@@ -59,7 +63,8 @@ router.get("/", async (req, res) => {
 router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { variantId } = req.params;
-  const { delta, newStock } = req.body as { delta?: number; newStock?: number };
+  const { delta, newStock } = (req.body ?? {}) as { delta?: number; newStock?: number };
+  if (!UUID_RE.test(String(variantId))) return res.status(404).json({ error: "Variant not found" });
 
   if (delta === undefined && newStock === undefined) {
     return res.status(400).json({ error: "Provide delta or newStock" });
@@ -68,8 +73,11 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
   if (delta !== undefined && !Number.isInteger(delta)) {
     return res.status(400).json({ error: "delta must be an integer" });
   }
-  if (newStock !== undefined && (!Number.isInteger(newStock) || newStock < 0)) {
+  if (newStock !== undefined && (!Number.isInteger(newStock) || newStock < 0 || newStock > MAX_STOCK)) {
     return res.status(400).json({ error: "newStock must be a non-negative integer" });
+  }
+  if (delta !== undefined && Math.abs(delta) > MAX_STOCK) {
+    return res.status(400).json({ error: "delta is too large" });
   }
 
   // Read and write under a row lock in one transaction. A paid-order webhook
@@ -86,7 +94,9 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
       .from(productVariants)
       .innerJoin(
         products,
-        and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId)),
+        // Deleted products are hidden from the list above; adjusting one would
+        // also fire back-in-stock alerts for a product buyers can no longer see.
+        and(eq(productVariants.productId, products.id), eq(products.ownerId, ownerId), isNull(products.deletedAt)),
       )
       .where(eq(productVariants.id, variantId))
       .for("update", { of: productVariants });
@@ -94,6 +104,7 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
 
     const target = newStock !== undefined ? newStock : row.stock + (delta ?? 0);
     if (target < 0) return { kind: "negative" as const };
+    if (target > MAX_STOCK) return { kind: "too_large" as const };
 
     const [updated] = await tx
       .update(productVariants)
@@ -105,6 +116,7 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
 
   if (outcome.kind === "not_found") return res.status(404).json({ error: "Variant not found" });
   if (outcome.kind === "negative") return res.status(400).json({ error: "Stock cannot go below 0" });
+  if (outcome.kind === "too_large") return res.status(400).json({ error: "Stock is too large" });
   const { row, updated, updatedStock } = outcome;
 
   const variantLabel = [updated.size, updated.color].filter(Boolean).join(" / ") || updated.sku;

@@ -29,7 +29,7 @@
  * an HTTP fallback) by jobs/liveViewersPresence.ts.
  */
 import { denyIfAgeRestricted } from "../lib/ageGate";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
@@ -109,6 +109,12 @@ export function uidFromClerkId(clerkId: string): number {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Unexpected failures: log the cause, never echo database error text to clients. */
+function serverError(req: Request, res: Response, err: unknown) {
+  logger.error({ err, path: req.path }, "live request failed");
+  return res.status(500).json({ error: "Something went wrong. Please try again." });
+}
 
 /** Every :id route casts to uuid; a malformed id is a 404, never a 500. */
 router.param("id", (req, res, next, id) => {
@@ -254,7 +260,7 @@ router.get("/active", async (req, res) => {
     `);
     return res.json({ streams: await filterLiveStreamProductTags(rows.rows as any[], null) });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -287,7 +293,7 @@ router.get("/feed", async (req, res) => {
     `);
     return res.json({ streams: rankLiveFeed(await filterLiveStreamProductTags(rows.rows as any[], viewerId)) });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -331,7 +337,7 @@ router.get("/:id", async (req, res) => {
       },
     });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -403,7 +409,7 @@ router.post("/:id/join", async (req, res) => {
       hostAgoraUid: typeof stream.agora_uid === "number" ? stream.agora_uid : null,
     });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -417,7 +423,7 @@ router.post("/:id/leave", requireAuth, async (req, res) => {
     `);
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -449,7 +455,7 @@ router.post("/:id/heartbeat", requireAuth, async (req, res) => {
     `);
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -472,7 +478,7 @@ router.post("/:id/end", requireAuth, async (req, res) => {
     const { replayPostId, replayStatus } = result;
     return res.json({ ok: true, replayPostId, replayStatus });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -511,7 +517,7 @@ router.get("/:id/summary", requireAuth, async (req, res) => {
       },
     });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -543,7 +549,7 @@ router.patch("/:id/products", requireAuth, hostPlan, validateBody(liveProductsBo
     return res.json({ productTags: updatedTags });
   } catch (e: any) {
     if (e instanceof LiveProductTagError) return res.status(e.status).json({ error: e.message });
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -647,7 +653,7 @@ router.post("/:id/comment", requireAuth, validateBody(liveCommentBody), async (r
     broadcastToRoom(String(req.params.id), { type: "comment", comment }, { skipUserIds: skip });
     return res.status(201).json({ comment });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 
@@ -695,7 +701,11 @@ router.post("/:id/like", requireAuth, async (req, res) => {
 
 // ─── GET /api/live/:id/comments ───────────────────────────────────────────────
 router.get("/:id/comments", async (req, res) => {
-  const since = req.query.since as string | undefined;
+  // `since` is cast to timestamptz in SQL: a malformed value is ignored (full
+  // backfill) rather than a Postgres cast error.
+  const sinceRaw = typeof req.query.since === "string" ? req.query.since : "";
+  const sinceMs = sinceRaw ? Date.parse(sinceRaw) : NaN;
+  const since = Number.isFinite(sinceMs) ? new Date(sinceMs).toISOString() : undefined;
   const viewerId = optionalViewerId(req);
   try {
     const rows = await db.execute(sql`
@@ -717,7 +727,7 @@ router.get("/:id/comments", async (req, res) => {
     `);
     return res.json({ comments: rows.rows });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return serverError(req, res, e);
   }
 });
 

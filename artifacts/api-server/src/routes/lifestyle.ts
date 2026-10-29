@@ -68,7 +68,10 @@ function validateImageGroup(images: unknown, label: string, res: import("express
 
 // POST /api/lifestyle/generate
 router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+  // requireAuth sets clerkUserId. (@clerk/express v2 makes req.auth a
+  // function, so the old `req.auth?.userId` read was always undefined and every
+  // user shared one "anon" bucket: 5 generations per minute platform-wide.)
+  const userId = ((req as any).clerkUserId as string | undefined) ?? "anon";
   if (!checkRateLimit(userId)) {
     res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
     return;

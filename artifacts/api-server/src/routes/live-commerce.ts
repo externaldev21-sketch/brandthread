@@ -15,13 +15,14 @@
  * Creating a live-only code goes through the existing POST /api/discount-codes
  * with `liveStreamId` (see routes/discount-codes.ts) — not duplicated here.
  */
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { featureGate } from "../middlewares/featureGate";
 import { optionalViewerId } from "../lib/safety";
 import { broadcastToRoom } from "../ws/liveHub";
+import { logger } from "../lib/logger";
 import {
   MAX_SCHEDULED_PER_SELLER, applyPin, sanitizeProductTags, validateScheduleInput,
 } from "../lib/liveCommerce";
@@ -29,6 +30,12 @@ import {
 const router = Router();
 const hostPlan = featureGate("live_hosting"); // lib/planFeatures.ts (Growth+)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Unexpected failures: log the cause, never echo database error text to clients. */
+function serverError(req: Request, res: Response, err: unknown) {
+  logger.error({ err, path: req.path }, "live commerce request failed");
+  return res.status(500).json({ error: "Something went wrong. Please try again." });
+}
 
 // ─── Pinned product ───────────────────────────────────────────────────────────
 router.post("/:id/pin", requireAuth, hostPlan, async (req, res) => {
@@ -61,8 +68,8 @@ router.post("/:id/pin", requireAuth, hostPlan, async (req, res) => {
     broadcastToRoom(id, { type: "pinned", productId: pin.pinnedProductId });
     broadcastToRoom(id, { type: "products", productTags: pin.productTags });
     return res.json({ pinnedProductId: pin.pinnedProductId, productTags: pin.productTags });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -94,8 +101,8 @@ router.get("/:id/codes", requireAuth, async (req, res) => {
         expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
       })),
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -147,8 +154,8 @@ router.get("/scheduled/upcoming", async (req, res) => {
       LIMIT 30
     `);
     return res.json({ scheduled: (rows.rows as any[]).map(scheduledRow) });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -168,8 +175,8 @@ router.get("/scheduled/mine", requireAuth, async (req, res) => {
       LIMIT 50
     `);
     return res.json({ scheduled: (rows.rows as any[]).map(scheduledRow) });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -194,8 +201,8 @@ router.post("/scheduled", requireAuth, hostPlan, async (req, res) => {
     return res.status(201).json({
       scheduled: scheduledRow({ ...r, reminder_count: 0, reminder_set: false }),
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -210,8 +217,8 @@ router.delete("/scheduled/:id", requireAuth, async (req, res) => {
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Not found" });
     return res.json({ ok: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -229,8 +236,8 @@ router.put("/scheduled/:id/remind", requireAuth, async (req, res) => {
       ON CONFLICT DO NOTHING
     `);
     return res.json({ reminderSet: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 
@@ -243,8 +250,8 @@ router.delete("/scheduled/:id/remind", requireAuth, async (req, res) => {
       WHERE scheduled_live_id = ${req.params.id}::uuid AND user_id = ${userId}
     `);
     return res.json({ reminderSet: false });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch (e) {
+    return serverError(req, res, e);
   }
 });
 

@@ -242,3 +242,15 @@ describe("RevenueCat webhook for promotion purchases", () => {
     expect(row.status).toBe("in_review");
   });
 });
+
+describe("wave1-s06: malformed target ids", () => {
+  it("404s a non-uuid target id on verify and apply-credit instead of erroring", async () => {
+    const tx = storeSale("brandthread_featured_7d");
+    const verify = await call(seller, "POST", "/api/iap-promotions/featured/not-a-uuid/verify", { transactionId: tx });
+    expect(verify.status).toBe(404);
+    expect(verify.body).toMatchObject({ status: "unmatched" });
+    const apply = await call(seller, "POST", "/api/iap-promotions/boost/not-a-uuid/apply-credit");
+    expect(apply.status).toBe(404);
+    expect(apply.body).toMatchObject({ status: "unmatched" });
+  });
+});

@@ -286,3 +286,19 @@ describe("counter-notice", () => {
     expect(audit.body.map((a: any) => a.action)).toEqual(expect.arrayContaining(["counter_notice_received", "counter_notice_upheld", "remove_listing", "seller_notified"]));
   });
 });
+
+describe("wave1-s06: malformed ids", () => {
+  it("400s a non-uuid listingProductId on intake instead of erroring", async () => {
+    const res = await call("/api/ip-cases", { method: "POST", body: notice("https://example.test/x", { listingProductId: "not-a-uuid" }) });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid listing target");
+  });
+
+  it("404s non-uuid case ids on moderator routes, after the moderator gate", async () => {
+    expect((await call("/api/ip-cases/not-a-uuid", { user: BUYER })).status).toBe(403);
+    expect((await call("/api/ip-cases/not-a-uuid", { user: ADMIN })).status).toBe(404);
+    expect((await call("/api/ip-cases/not-a-uuid/audit", { user: ADMIN })).status).toBe(404);
+    expect((await call("/api/ip-cases/not-a-uuid", { method: "PATCH", user: ADMIN, body: { status: "dismissed" } })).status).toBe(404);
+    expect((await call("/api/ip-cases/not-a-uuid/counter-notice/resolve", { method: "POST", user: ADMIN, body: { outcome: "uphold" } })).status).toBe(404);
+  });
+});
