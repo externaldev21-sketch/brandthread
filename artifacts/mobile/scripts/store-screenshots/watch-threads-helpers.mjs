@@ -1,18 +1,46 @@
 /** Shared steps for the Watch Threads verification scripts. */
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { respond } from './demo-data.mjs';
+import { MOBILE_ROOT, WORK_DIR } from './harness.mjs';
+
+const CLIP_URL = 'https://media.brandthread.test/watch-threads-clip.webm';
+
+/**
+ * A 30s VP9 + Opus clip (long enough that a position check never sees a loop wrap) (real picture and a real audio track) cut from the
+ * repo's own fashion_walk.mp4 — Playwright's Chromium cannot decode H.264, so
+ * the app's .mp4 demo clips never play in this harness.
+ */
+function ensureClip() {
+  const out = path.join(WORK_DIR, 'watch-threads-clip.webm');
+  if (existsSync(out)) return out;
+  const src = path.resolve(MOBILE_ROOT, '../../attached_assets/generated_videos/fashion_walk.mp4');
+  const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-stream_loop', '7', '-i', src, '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=48000', '-t', '30',
+    '-vf', 'scale=360:-2', '-c:v', 'libvpx-vp9', '-b:v', '600k', '-c:a', 'libopus', '-b:a', '64k', '-shortest', out], { stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('ffmpeg could not build the test clip');
+  return out;
+}
 
 /**
  * The fake API seeds the Threads feed for its buyer account only; the real
  * GET /api/posts/feed serves any signed-in account (api-server
  * seller-as-buyer.integration.test.ts), so serve the seller the same posts.
  */
-export async function serveFeedToSeller(context) {
+export async function serveFeedToSeller(context, { videoFirst = false } = {}) {
+  if (videoFirst) {
+    const clip = readFileSync(ensureClip());
+    await context.route(CLIP_URL, (route) => route.fulfill({ status: 200, contentType: 'video/webm', body: clip, headers: { 'access-control-allow-origin': '*', 'accept-ranges': 'bytes' } }));
+  }
   await context.route((url) => url.origin === 'https://api.brandthread.test' && /^\/api(\/v1)?\/(posts\/feed|public\/posts)\/?$/.test(url.pathname), (route) => {
     const req = route.request();
     const cors = { 'access-control-allow-origin': req.headers().origin ?? '*', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'authorization,content-type,x-store-context', 'access-control-allow-methods': 'GET,OPTIONS' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const url = new URL(req.url());
-    return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(respond({ method: 'GET', path: url.pathname, query: url.searchParams, role: 'buyer' })) });
+    const posts = respond({ method: 'GET', path: url.pathname, query: url.searchParams, role: 'buyer' });
+    // videoFirst: the first post becomes a playing clip (with sound) so playback can be checked.
+    if (videoFirst && Array.isArray(posts) && posts[0]) posts[0] = { ...posts[0], mediaType: 'video', mediaUrls: [CLIP_URL], mediaUrl: CLIP_URL };
+    return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(posts) });
   });
 }
 

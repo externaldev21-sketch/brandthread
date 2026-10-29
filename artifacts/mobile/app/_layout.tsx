@@ -22,6 +22,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary, ScreenErrorFallback } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { shouldReopenStudioMenu } from '@/lib/navigation/studioReturn';
+import { setStudioMenuOpen } from '@/lib/navigation/studioMenuOpen';
 import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import { NAVIGATION_ISOLATION_TEST } from '@/lib/buildFlags';
 import { AppState, InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
@@ -539,6 +540,12 @@ function SellerBarGate() {
   useEffect(() => {
     if (shouldReopenStudioMenu(pathname)) setStudioOpenRequestKey((k) => k + 1);
   }, [pathname]);
+
+  // Publish the menu's open state so a screen under it can hold its media
+  // (Watch Threads pauses its video while the menu covers it).
+  const studioMenuShowing = showBar && !isDesktopWeb && !isFullScreenRoute && isStudioOpen;
+  useEffect(() => { setStudioMenuOpen(studioMenuShowing); }, [studioMenuShowing]);
+  useEffect(() => () => setStudioMenuOpen(false), []);
 
   if (!showBar) return null;
   // Desktop-width web: the sidebar and top bar (components/web/DesktopShell)

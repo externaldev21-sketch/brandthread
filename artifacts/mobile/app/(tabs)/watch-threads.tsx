@@ -11,22 +11,29 @@
  *    false + RetainedScene), so leaving and coming back lands on the same
  *    post, not the top of the feed (Dev: "let's keep it back here where it's
  *    at");
- *  - Back returns to the tab they came from (backBehavior "history").
+ *  - Back returns to the tab they came from (backBehavior "history");
+ *  - the Studio menu opening over it pauses and silences the playing clip
+ *    (lib/navigation/studioMenuOpen.ts); leaving for another screen keeps it
+ *    stopped, since the feed only plays while focused.
  */
 import React, { useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import FeedScreen from './feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useStudioMenuOpen } from '@/lib/navigation/studioMenuOpen';
 
 export default function WatchThreadsScreen() {
   const router = useRouter();
   const handleBack = useCallback(() => goBackOr(router, '/(tabs)'), [router]);
+  // The Studio menu covering this screen pauses and silences the clip; it
+  // resumes in place if the menu closes back onto the feed.
+  const studioMenuOpen = useStudioMenuOpen();
 
   return (
     <>
       <StatusBar style="light" />
-      <FeedScreen showFashionPreview onBack={handleBack} overSellerTabBar />
+      <FeedScreen showFashionPreview onBack={handleBack} overSellerTabBar playbackHeld={studioMenuOpen} />
     </>
   );
 }

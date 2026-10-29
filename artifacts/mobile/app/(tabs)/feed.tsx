@@ -1605,7 +1605,10 @@ function LiveVideoVisual({
   }, [isActive, player, progressBottom, onFinished]);
   // Background/lock screen pauses the clip (and its watch timer) the same
   // way leaving the screen does.
-  const isScreenFocused = useIsFocused() && appActive;
+  // Held (Watch Threads under the Studio menu) pauses exactly like leaving
+  // the screen: muted, paused, position kept.
+  const playbackHeld = React.useContext(FeedPlaybackHoldContext);
+  const isScreenFocused = useIsFocused() && appActive && !playbackHeld;
   React.useLayoutEffect(() => {
     player.muted = true;
     if (!canPlayFeedAudio({
@@ -2283,6 +2286,7 @@ function ThreadRailOverlay({
   const { userId } = useAuth();
   const focused = useIsFocused();
   const appActive = useAppActive();
+  const playbackHeld = React.useContext(FeedPlaybackHoldContext);
   const { openReport } = useReportSheet();
   const { showToast } = useFeedToast();
   const commentCountDelta = useCommentCountDelta(feedPostId(item.id));
@@ -2306,7 +2310,7 @@ function ThreadRailOverlay({
       }}
       onShare={() => onOpenShare(item.id)} testIdBase={item.id} reduceMotion={reduceMotion}
       footerSlot={<SoundDisc avatarUri={item.avatarUri} avatarSource={item.official ? OFFICIAL_AVATAR_SOURCE : undefined}
-        initials={item.initials} sound={item.sound} spinning={focused && appActive && item.contentType === 'video' && !paused}
+        initials={item.initials} sound={item.sound} spinning={focused && appActive && !playbackHeld && item.contentType === 'video' && !paused}
         reduceMotion={reduceMotion} soundOn onPress={() => {}} testID={`sound-disc-${item.id}`} />}
     />
     <ThreadCommentsSheet visible={commentsOpen} postId={feedPostId(item.id)} postAuthorId={item.sellerId}
@@ -2494,6 +2498,12 @@ interface FeedScreenProps {
    */
   onBack?: () => void;
   /**
+   * Watch Threads: true while the seller's Studio menu covers the feed —
+   * the playing clip pauses and goes silent, keeping its place, and
+   * resumes when the menu closes back onto it.
+   */
+  playbackHeld?: boolean;
+  /**
    * Watch Threads sits above the seller's floating tab bar (regular size,
    * Studio + AI circles) instead of buyer Home's compact one, so the
    * rail, caption and progress line clear that bar instead.
@@ -2501,9 +2511,16 @@ interface FeedScreenProps {
   overSellerTabBar?: boolean;
 }
 
+/** FeedScreen's playbackHeld, read by the video player and the rail's sound disc. */
+const FeedPlaybackHoldContext = React.createContext(false);
+
 export default function FeedScreen(props: FeedScreenProps) {
   const { userId } = useAuth();
-  return <FeedToastProvider key={userId ?? 'guest'}><FeedScreenContent {...props} /></FeedToastProvider>;
+  return (
+    <FeedPlaybackHoldContext.Provider value={!!props.playbackHeld}>
+      <FeedToastProvider key={userId ?? 'guest'}><FeedScreenContent {...props} /></FeedToastProvider>
+    </FeedPlaybackHoldContext.Provider>
+  );
 }
 
 function FeedScreenContent({
@@ -2513,6 +2530,7 @@ function FeedScreenContent({
   anchorPostId,
   onBack,
   overSellerTabBar = false,
+  playbackHeld = false,
 }: FeedScreenProps) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
@@ -2565,10 +2583,10 @@ function FeedScreenContent({
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
   // tap area at any screen width, down to 320pt.
-  // A Back control (onBack) adds a second icon to the left cluster, set
-  // tighter than the usual icon gap so the bag keeps clear of the tabs.
-  const leftClusterGap = onBack ? 6 : topRowIconGap;
-  const topRowSideGuard = 24 + 6 + (onBack ? 24 + leftClusterGap : 0);
+  // Watch Threads (onBack) is one icon a side too — Back left, bag right
+  // (Dev: no LIVE, no search there) — so the same single-icon guard keeps
+  // its two tabs dead center.
+  const topRowSideGuard = 24 + 6;
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -3783,6 +3801,31 @@ function FeedScreenContent({
     ? activeItem as SpotlightItem
     : null;
 
+  // Buyer Home: the bag leads the top row (left). Watch Threads: it moves to
+  // the right, where Search sits on Home (Dev: Back left, bag right).
+  const buyerTopCart = (
+    <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+      <TouchableOpacity
+        style={styles.buyerTopIconBtn}
+        activeOpacity={0.7}
+        onPress={() => {
+          router.push(shopperRoutes.bag as never);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+        hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
+        testID="buyer-home-cart-icon"
+      >
+        <Icon name="shopping-cart" size={24} color={ON_DARK} />
+        {cartCount > 0 && (
+          <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
+            <TickingCount value={cartCount} style={styles.cartCountText} />
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
   return (
     <>
     <View
@@ -4257,40 +4300,20 @@ function FeedScreenContent({
               of glitch as the old shop pill's frosted background — see
               ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
-            <View style={[styles.buyerTopCluster, { gap: leftClusterGap }]}>
-              {onBack && (
+            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
+              {onBack ? (
                 <TouchableOpacity
                   style={styles.buyerTopIconBtn}
                   activeOpacity={0.7}
                   onPress={onBack}
                   accessibilityRole="button"
                   accessibilityLabel="Back"
-                  hitSlop={{ top: 4, bottom: 4, left: 10, right: leftClusterGap / 2 }}
+                  hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                   testID="watch-threads-back"
                 >
                   <Icon name="arrow-left" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
                 </TouchableOpacity>
-              )}
-              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
-                <TouchableOpacity
-                  style={styles.buyerTopIconBtn}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    router.push(shopperRoutes.bag as never);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                  hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
-                  testID="buyer-home-cart-icon"
-                >
-                  <Icon name="shopping-cart" size={24} color={ON_DARK} />
-                  {cartCount > 0 && (
-                    <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
-                      <TickingCount value={cartCount} style={styles.cartCountText} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
+              ) : buyerTopCart}
             </View>
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
@@ -4305,13 +4328,14 @@ function FeedScreenContent({
               style={[styles.buyerTabSwitcherWrap, { left: topRowSideGuard, right: topRowSideGuard }]}
               pointerEvents="box-none"
             >
-              <HomeFeedTabs testID="buyer-home-tabs" onChange={handleHomeTabChange} />
+              <HomeFeedTabs testID="buyer-home-tabs" onChange={handleHomeTabChange} withLive={!onBack} />
             </View>
 
             {/* Bell dropped — Activity already has its own bell in the
                 floating tab bar, so this was a duplicate entry point and
                 the extra icon was part of why the row didn't fit. */}
             <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
+              {onBack ? buyerTopCart : (
               <TouchableOpacity
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
@@ -4325,6 +4349,7 @@ function FeedScreenContent({
               >
                 <Icon name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>

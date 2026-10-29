@@ -14,7 +14,7 @@ describe('Watch Threads: the seller Studio menu card', () => {
 
   it('renders the buyer Home feed (same FeedScreen props) plus Back, above the seller tab bar', () => {
     const screen = read('app/(tabs)/watch-threads.tsx');
-    expect(screen).toContain('<FeedScreen showFashionPreview onBack={handleBack} overSellerTabBar />');
+    expect(screen).toContain('<FeedScreen showFashionPreview onBack={handleBack} overSellerTabBar playbackHeld={studioMenuOpen} />');
     expect(read('app/(buyer)/index.tsx')).toContain('<FeedScreen showFashionPreview />');
     expect(screen).not.toMatch(/'\/\(buyer\)/);
   });
@@ -67,5 +67,34 @@ describe('shopperRoutes: a seller shopping never lands in the buyer tab shell', 
     const row = { targetType: 'buyer_order', targetId: null, type: 'order_shipped' } as unknown as ActivityItem;
     expect(activityHref(row, 'seller')).toBe('/purchases');
     expect(activityHref(row, 'buyer')).toBe('/(buyer)/orders');
+  });
+});
+
+describe('Watch Threads follow-ups: top bar, pause under the Studio menu, tab bar highlight', () => {
+  const feed = read('app/(tabs)/feed.tsx');
+
+  it('top bar: Back alone on the left, bag alone on the right, Following · Threads centered, no LIVE, no Search', () => {
+    expect(feed).toContain("{onBack ? (");
+    expect(feed).toContain("{onBack ? buyerTopCart : (");
+    expect(feed).toContain('withLive={!onBack}');
+    expect(feed).toContain('const topRowSideGuard = 24 + 6;');
+    const tabs = read('components/buyer-feed/HomeFeedTabs.tsx');
+    expect(tabs).toContain("const OPTIONS_WITHOUT_LIVE = OPTIONS.filter(o => o.id !== 'live');");
+    expect(tabs).toContain('options={withLive ? OPTIONS : OPTIONS_WITHOUT_LIVE}');
+  });
+
+  it('pauses (and silences) the clip while the Studio menu is open, from outside the menu', () => {
+    expect(read('app/(tabs)/watch-threads.tsx')).toContain('playbackHeld={studioMenuOpen}');
+    expect(feed).toContain('const isScreenFocused = useIsFocused() && appActive && !playbackHeld;');
+    const layout = read('app/_layout.tsx');
+    expect(layout).toContain('useEffect(() => { setStudioMenuOpen(studioMenuShowing); }, [studioMenuShowing]);');
+    expect(read('components/SellerStudioRadialMenu.tsx')).not.toContain('studioMenuOpen');
+  });
+
+  it('tab bar: a menu-opened screen with no tab of its own puts the highlight on the Studio circle', () => {
+    const bar = read('components/SellerGlobalTabBar.tsx');
+    expect(bar).toContain('const studioOwnsHighlight = !ownedTab && wasOpenedFromStudioMenu();');
+    expect(bar).toContain('const activeTab = studioOwnsHighlight ? null : resolveActiveTab(segments as string[], lastOwnedTabRef.current);');
+    expect(bar).toContain('active={studioOwnsHighlight}');
   });
 });

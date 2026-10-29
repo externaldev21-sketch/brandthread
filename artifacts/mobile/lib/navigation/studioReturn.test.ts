@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   __resetStudioReturnForTests,
   cancelStudioReturn,
+  clearOpenedFromStudioMenu,
   hasPendingStudioReturn,
   isSellerTabRootPath,
   markStudioTileOpened,
   shouldReopenStudioMenu,
+  wasOpenedFromStudioMenu,
 } from './studioReturn';
 
 describe('studioReturn', () => {
@@ -59,5 +61,25 @@ describe('studioReturn', () => {
   it('knows the seller tab roots', () => {
     for (const p of ['/', '/products', '/orders', '/profile']) expect(isSellerTabRootPath(p)).toBe(true);
     for (const p of ['/add-product', '/manufacturer', '/setup']) expect(isSellerTabRootPath(p)).toBe(false);
+  });
+
+  describe('opened from the Studio menu (seller tab bar highlight)', () => {
+    it('is off until a menu card opens a screen, tab card or not', () => {
+      expect(wasOpenedFromStudioMenu()).toBe(false);
+      markStudioTileOpened('/', '/(tabs)/watch-threads');
+      expect(wasOpenedFromStudioMenu()).toBe(true);
+      __resetStudioReturnForTests();
+      markStudioTileOpened('/', '/manufacturer-hub');
+      expect(wasOpenedFromStudioMenu()).toBe(true);
+    });
+
+    it('ends on a tab tap or on reaching a route that owns a tab', () => {
+      markStudioTileOpened('/', '/(tabs)/watch-threads');
+      cancelStudioReturn();
+      expect(wasOpenedFromStudioMenu()).toBe(false);
+      markStudioTileOpened('/', '/(tabs)/watch-threads');
+      clearOpenedFromStudioMenu();
+      expect(wasOpenedFromStudioMenu()).toBe(false);
+    });
   });
 });

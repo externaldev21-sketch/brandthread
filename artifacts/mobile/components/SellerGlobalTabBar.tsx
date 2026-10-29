@@ -49,7 +49,7 @@ import { countRealOrders, maybeRequestStoreReview } from '@/lib/storeReviewPromp
 import { BRANDTHREAD_AVATAR_SOURCE } from '@/constants/branding';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { radius } from '@/constants/radii';
-import { cancelStudioReturn } from '@/lib/navigation/studioReturn';
+import { cancelStudioReturn, clearOpenedFromStudioMenu, wasOpenedFromStudioMenu } from '@/lib/navigation/studioReturn';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -254,7 +254,13 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
   const lastOwnedTabRef = useRef<string | null>(null);
   const ownedTab = getActiveTab(segments as string[]);
   if (ownedTab) lastOwnedTabRef.current = ownedTab;
-  const activeTab = resolveActiveTab(segments as string[], lastOwnedTabRef.current);
+  // A screen opened from the Studio menu with no tab of its own (Watch
+  // Threads, …): the highlight sits on the Studio circle, not on whichever
+  // tab came before (Dev: "rather … hovering over the menu circle instead of
+  // it hovering over a random one").
+  const studioOwnsHighlight = !ownedTab && wasOpenedFromStudioMenu();
+  useEffect(() => { if (ownedTab) clearOpenedFromStudioMenu(); }, [ownedTab]);
+  const activeTab = studioOwnsHighlight ? null : resolveActiveTab(segments as string[], lastOwnedTabRef.current);
   // -1 = no tab active: the indicator fades out (useTabBarActiveIndex).
   const activeIndex = activeTab ? TABS.findIndex((tabDef) => tabDef.name === activeTab) : -1;
   const reducedMotion = useReducedMotion();
@@ -413,6 +419,8 @@ export function SellerGlobalTabBar({ onOpenStudio, isStudioOpen = false, hidden:
         theme={theme}
         size={metrics.circleSize}
         testID="seller-bottom-menu"
+        active={studioOwnsHighlight}
+        selected={studioOwnsHighlight || undefined}
         accessibilityLabel={isStudioOpen ? 'Close Studio tools' : 'Open Studio tools'}
         onPress={openStudio}
       >

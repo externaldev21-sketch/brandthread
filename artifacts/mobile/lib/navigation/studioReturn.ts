@@ -31,6 +31,23 @@ const SELLER_TAB_ROOT_PATHS = new Set([
 
 let pending: PendingReturn | null = null;
 
+/**
+ * The screen on now was opened from the Studio menu (and the seller hasn't
+ * since landed on a route that owns a tab). The seller tab bar reads it to
+ * put its highlight on the Studio circle for a menu-opened screen with no tab
+ * slot of its own (Watch Threads, Analytics, …), instead of an unrelated tab.
+ */
+let openedFromStudioMenu = false;
+
+export function wasOpenedFromStudioMenu(): boolean {
+  return openedFromStudioMenu;
+}
+
+/** A route that owns a tab, or a tab tap, ends the menu-opened state. */
+export function clearOpenedFromStudioMenu(): void {
+  openedFromStudioMenu = false;
+}
+
 export function isSellerTabRootPath(pathname: string): boolean {
   return SELLER_TAB_ROOT_PATHS.has(pathname);
 }
@@ -41,6 +58,7 @@ export function isSellerTabRootPath(pathname: string): boolean {
  * pushing, so there is nothing to pop back from — no return is recorded.
  */
 export function markStudioTileOpened(underlyingPathname: string, tileRoute?: string): void {
+  openedFromStudioMenu = true;
   if (tileRoute && tileRoute.startsWith('/(tabs)/')) {
     pending = null;
     return;
@@ -55,6 +73,7 @@ export function markStudioTileOpened(underlyingPathname: string, tileRoute?: str
  */
 export function cancelStudioReturn(): void {
   pending = null;
+  openedFromStudioMenu = false;
 }
 
 export function hasPendingStudioReturn(): boolean {
@@ -83,4 +102,5 @@ export function shouldReopenStudioMenu(pathname: string): boolean {
 /** Test-only reset. */
 export function __resetStudioReturnForTests(): void {
   pending = null;
+  openedFromStudioMenu = false;
 }

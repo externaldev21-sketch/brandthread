@@ -36,13 +36,17 @@ const OPTIONS: { id: HomeFeedTabId; label: string }[] = [
   { id: 'following', label: 'Following' },
   { id: 'for-you', label: 'Threads' },
 ];
+// Watch Threads (seller): Following · Threads only (Dev: no LIVE there).
+const OPTIONS_WITHOUT_LIVE = OPTIONS.filter(o => o.id !== 'live');
 
 /** Always opens on Threads (the feed's own default tab). */
 export const HomeFeedTabs = memo(function HomeFeedTabs({
-  onChange, testID,
+  onChange, testID, withLive = true,
 }: {
   onChange: (tab: HomeFeedTabId) => void;
   testID?: string;
+  /** False drops the LIVE tab (Watch Threads). */
+  withLive?: boolean;
 }) {
   const [selected, setSelected] = useState<HomeFeedTabId>('for-you');
   // The next Home mount starts on Threads again, like the feed itself.
@@ -52,7 +56,7 @@ export const HomeFeedTabs = memo(function HomeFeedTabs({
       variant="underline"
       size="compact"
       testID={testID}
-      options={OPTIONS}
+      options={withLive ? OPTIONS : OPTIONS_WITHOUT_LIVE}
       selectedId={selected}
       onChange={(id) => {
         const next = id as HomeFeedTabId;
