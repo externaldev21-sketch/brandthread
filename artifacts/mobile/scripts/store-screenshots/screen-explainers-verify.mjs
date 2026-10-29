@@ -5,10 +5,8 @@
  * fully inside the viewport, dismisses (rotating Got it / X / tap outside),
  * and a revisit in the same session shows nothing.
  *
- * The plain preview never shows first-run tips and `&tips=1` forces them on
- * every visit, so neither exercises the real once-only path. Run this
- * against a build where useFirstRunTip's two preview overrides are off
- * (the preview then behaves like a fresh signed-in account).
+ * Runs on the plain preview build with `&tips=1` (the plain preview shows
+ * no tips without it); seen-state holds there like for a real account.
  *
  *   node scripts/store-screenshots/screen-explainers-verify.mjs [outDir]
  */
@@ -88,7 +86,7 @@ function inside(b) {
 async function go(page, activity, origin, role, route) {
   const [want, query] = route.split('?');
   for (let attempt = 0; attempt < 3; attempt++) {
-    await openScreen(page, activity, origin, role, want, { extraQuery: query ? `&${query}` : '' });
+    await openScreen(page, activity, origin, role, want, { extraQuery: `&tips=1${query ? `&${query}` : ''}` });
     await waitForQuietNetwork(activity, 600, 12_000).catch(() => {});
     if (new URL(page.url()).pathname === want) return true;
   }
@@ -137,7 +135,7 @@ async function main() {
       // Warm-up: the home screen's own first-run tip shows on the very first
       // load and the harness's first client-side push can race it. A fresh
       // user has always seen home before any other screen anyway.
-      await openScreen(page, activity, origin, role, '/');
+      await openScreen(page, activity, origin, role, '/', { extraQuery: '&tips=1' });
       await page.waitForTimeout(3000);
       for (const [i, [id, route]] of list.entries()) {
         // After the gallery's explainer, open a new canvas from it: the

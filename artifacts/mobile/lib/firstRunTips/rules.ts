@@ -29,9 +29,10 @@ export function isAuthFlowRoute(pathname: string | null | undefined): boolean {
 /**
  * Dev's own preview/testing override: `?bt_preview=...&tips=1`. Only ever
  * meaningful inside a dev/web preview session (see lib/devPreview.ts) — when
- * present, every tip is treated as unseen so Dev can preview them repeatedly
- * without resetting state. Absent (the default), tips behave normally, and
- * a signed-out preview with no `tips=1` never shows tips at all.
+ * present, tips show in the preview at all; each one still shows once and
+ * stays dismissed (local seen-state), like for a real account. Settings >
+ * Replay tips brings them back. Absent (the default), a preview with no
+ * `tips=1` never shows tips at all.
  */
 const TIPS_FORCE_STORAGE_KEY = 'bt_preview_tips_force';
 
