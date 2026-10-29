@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { pipeline } from "node:stream/promises";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   buildFashionPrompt,
@@ -87,16 +88,20 @@ async function serveFromGCS(
   storageKey: string,
   requestingUserId: string,
 ): Promise<void> {
-  // Ownership check: storageKey must contain the requesting userId in its path
-  const ownedPrefix = `bg-removal/${requestingUserId}/`;
-  const check = storageKey.includes(ownedPrefix);
-  if (!check) {
-    res.status(403).json({ error: "Access denied." });
-    return;
-  }
   const parts = parseBucketAndPrefix();
   if (!parts) {
     res.status(503).json({ error: "Storage not configured." });
+    return;
+  }
+  // Ownership check: the key must be exactly one result saveToGCS wrote for
+  // this user — `<prefix>/bg-removal/<userId>/<uuid>.png` — not merely
+  // contain that text somewhere.
+  const ownedPrefix = parts.prefix
+    ? `${parts.prefix}/bg-removal/${requestingUserId}/`
+    : `bg-removal/${requestingUserId}/`;
+  const fileName = storageKey.startsWith(ownedPrefix) ? storageKey.slice(ownedPrefix.length) : "";
+  if (!/^[0-9a-f-]{36}\.png$/i.test(fileName)) {
+    res.status(403).json({ error: "Access denied." });
     return;
   }
   try {
@@ -108,8 +113,11 @@ async function serveFromGCS(
     }
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "private, max-age=86400");
-    file.createReadStream().pipe(res);
+    // pipeline (not .pipe) so a storage read error ends this response instead
+    // of surfacing as an unhandled stream 'error' event.
+    await pipeline(file.createReadStream(), res);
   } catch {
+    if (res.headersSent) { res.destroy(); return; }
     res.status(502).json({ error: "Could not retrieve result. Please try again." });
   }
 }
@@ -243,13 +251,16 @@ router.get("/results/*storageKey", async (req, res) => {
     return;
   }
 
-  const storageKey = (req.params as any).storageKey as string | undefined;
+  // Express 5 hands a `*name` wildcard over as its (already decoded) path
+  // segments; String() on that array would join them with commas.
+  const raw = (req.params as any).storageKey as string[] | string | undefined;
+  const storageKey = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
   if (!storageKey) {
     res.status(400).json({ error: "No storage key provided." });
     return;
   }
 
-  await serveFromGCS(res, decodeURIComponent(storageKey), userId);
+  await serveFromGCS(res, storageKey, userId);
 });
 
 export default router;

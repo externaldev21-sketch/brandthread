@@ -11,9 +11,16 @@ import { Router } from "express";
 import { db, productReserves, products, drops } from "@workspace/db";
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
+
+// products.id is a uuid column: comparing it to anything else throws (a 500).
+router.param("productId", (req, res, next, productId) => {
+  if (!isUuid(productId)) { res.status(404).json({ error: "Product not found" }); return; }
+  next();
+});
 
 // ── POST /reserve — buyer signals demand for a pre-order product ──────────────
 

@@ -9,7 +9,7 @@ import { eq, sql, inArray, or, asc, desc } from "drizzle-orm";
 import { applyPrivateAccountToggle } from "../lib/privateAccount";
 import crypto from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
-import { rateLimit } from "../middlewares/rateLimit";
+import { RATE_LIMIT_POLICIES, consumeRateLimitBucket, rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { recordSignInAndAlert } from "../lib/loginAlerts";
@@ -159,6 +159,18 @@ const passwordResetConfirmSchema = z.object({
 
 const PASSWORD_RESET_CODE_TTL_MS = 15 * 60_000;
 const MIN_PASSWORD_LENGTH = 8;
+/**
+ * Guesses allowed against one 6-digit code before it is burned. The IP-keyed
+ * "authentication" limiter alone lets many addresses share the million-code
+ * space within the 15-minute TTL; this caps guesses per code wherever they
+ * come from.
+ */
+const PASSWORD_RESET_MAX_ATTEMPTS = 5;
+
+/** A single query-string value; repeated keys (?a=1&a=2) arrive as arrays. */
+function queryText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 function hashResetCode(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
@@ -1159,7 +1171,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
 // Requires auth so the current user's own username is never flagged as taken.
 router.get("/username/check", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const raw = (req.query.username as string || "").trim().toLowerCase();
+  const raw = queryText(req.query.username).trim().toLowerCase();
 
   const fmtErr = validateUsername(raw);
   if (fmtErr) {
@@ -1218,7 +1230,7 @@ router.get("/username/check", requireAuth, async (req, res) => {
 // instead." before burning a Clerk signup attempt, rather than only after.
 // This never reveals which account owns the email, only that one does.
 router.get("/email/check", requireAuth, async (req, res) => {
-  const raw = (req.query.email as string || "").trim().toLowerCase();
+  const raw = queryText(req.query.email).trim().toLowerCase();
   const parsed = requestPrimitives.email.safeParse(raw);
   if (!parsed.success) {
     res.json({ available: false, error: "Enter a valid email address." });
@@ -1248,7 +1260,7 @@ router.get("/email/check", requireAuth, async (req, res) => {
 // this app), so an inactive signed-in session can't otherwise show its real
 // role. Returns only the ids that exist locally; unknown ids are omitted.
 router.get("/account-types", requireAuth, async (req, res) => {
-  const raw = (req.query.clerkIds as string || "").split(",").map((id) => id.trim()).filter(Boolean);
+  const raw = queryText(req.query.clerkIds).split(",").map((id) => id.trim()).filter(Boolean);
   if (raw.length === 0) {
     res.json({ accountTypes: {} });
     return;
@@ -1514,6 +1526,23 @@ router.post(
         res.status(400).json({
           error: "That code has expired. Request a new one.",
           code: "CODE_EXPIRED",
+        });
+        return;
+      }
+      // Counted per code (atomic, shared by every instance) before comparing,
+      // so parallel guesses can't slip past the cap.
+      const attempts = await consumeRateLimitBucket(
+        `password-reset-attempt:${latest.id}`,
+        { ...RATE_LIMIT_POLICIES.authentication, limit: PASSWORD_RESET_MAX_ATTEMPTS, windowMs: PASSWORD_RESET_CODE_TTL_MS },
+      );
+      if (attempts.count > PASSWORD_RESET_MAX_ATTEMPTS) {
+        await db
+          .update(passwordResetCodes)
+          .set({ usedAt: new Date() })
+          .where(sql`${passwordResetCodes.id} = ${latest.id} AND ${passwordResetCodes.usedAt} IS NULL`);
+        res.status(400).json({
+          error: "Too many attempts. Request a new code.",
+          code: "TOO_MANY_ATTEMPTS",
         });
         return;
       }

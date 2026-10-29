@@ -1174,11 +1174,15 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
 
     if (normalizedLoyaltyToken) {
       const reservationId = `checkout:${crypto.randomUUID()}`;
+      // Points must leave a balance after the seller's discount code too:
+      // both go into one Stripe coupon, and a coupon larger than the order
+      // would record (and top the seller up for) points that were never
+      // actually taken off the charge.
       const reserved = await reserveLoyaltyRedemption(
         buyerId,
         normalizedLoyaltyToken,
         reservationId,
-        totalBeforeLoyaltyDiscountCents,
+        totalBeforeLoyaltyDiscountCents - discountCodeAmountCents,
       );
       loyaltyReservation = { buyerId, token: reserved.token, reservationId };
       loyaltyRedemption = {
@@ -1687,7 +1691,7 @@ router.get("/orders", async (req, res) => {
   }
 });
 
-router.get("/orders/:id", async (req, res) => {
+router.get("/orders/:id", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
     const [row] = await db

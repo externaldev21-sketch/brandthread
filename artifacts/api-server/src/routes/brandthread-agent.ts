@@ -24,6 +24,7 @@ import {
   BRANDTHREAD_AGENT_COLOR, isAgentConversation, composeThreadCashCard, composeDiscoverCard,
 } from "../lib/brandthreadAgent";
 import { logger } from "../lib/logger";
+import { isUuid } from "../lib/uuid";
 import {
   assistantAvailable, buildInboxAssistantPrompt, parseAssistantReply, composeLinkCard,
   ASSISTANT_OFFLINE_REPLY, ASSISTANT_UNREACHABLE_REPLY,
@@ -76,6 +77,11 @@ router.post("/message", rateLimit("agent-chat"), requireAiConsent(), async (req:
 
   if (!conversationId || typeof conversationId !== "string") {
     res.status(400).json({ error: "conversationId is required" });
+    return;
+  }
+  // conversation ids are uuids; anything else would 500 in the lookup below.
+  if (!isUuid(conversationId)) {
+    res.status(404).json({ error: "Conversation not found" });
     return;
   }
   const trimmed = typeof text === "string" ? text.trim() : "";
