@@ -11,6 +11,7 @@
 
 import { storyMentionViewerHref } from './storyMentionsRail';
 import { fmtRelativeDay } from './format';
+import { shopperRoutesFor } from './navigation/shopperRoutes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -697,7 +698,7 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // targetType "order" too — send those to the buyer's own order screen,
       // not the seller's /order-detail.
       if (isBuyerOrderNotification(row.type)) {
-        return id ? buyerOrderHref(id, row.type) : '/(buyer)/orders';
+        return id ? buyerOrderHref(id, row.type) : shopperRoutesFor(role).purchases;
       }
       return id ? `/order-detail?id=${q(id)}` : '/(tabs)/orders';
     case 'login_session':
@@ -709,7 +710,7 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       // Chargeback opened/closed (seller) — same screen the push opens.
       return id ? `/dispute-detail?disputeId=${q(id)}` : null;
     case 'buyer_order':
-      return id ? buyerOrderHref(id, row.type) : '/(buyer)/orders';
+      return id ? buyerOrderHref(id, row.type) : shopperRoutesFor(role).purchases;
     case 'sample_order':
       return id ? `/sample-detail?id=${q(id)}` : null;
     case 'bulk_order':

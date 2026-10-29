@@ -16,6 +16,7 @@ import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } fro
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
 
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, Animated, Dimensions, PanResponder, Easing, AccessibilityInfo, AppState, Pressable, Share } from 'react-native';
 
@@ -983,6 +984,7 @@ export default function BuyerProductDetailScreen() {
     dropName?: string;
   }>();
   const router = useRouter();
+  const shopperRoutes = useShopperRoutes();
   const [dropNow, setDropNow] = useState(Date.now);
   const dropsAt = upcomingDropRelease(typeof dropReleaseAt === 'string' ? dropReleaseAt : null, dropNow);
   useEffect(() => {
@@ -2140,7 +2142,7 @@ export default function BuyerProductDetailScreen() {
           >
             <IconButton
               name="shopping-bag"
-              onPress={() => router.push('/(buyer)/cart' as never)}
+              onPress={() => router.push(shopperRoutes.bag as never)}
               accessibilityLabel={cartCount > 0 ? `Open bag, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open bag'}
               accessibilityHint="View items in your bag"
               variant="plain"
@@ -2222,7 +2224,7 @@ export default function BuyerProductDetailScreen() {
           <Button
             label="View in bag"
             variant="primary"
-            onPress={() => router.push('/(buyer)/cart' as never)}
+            onPress={() => router.push(shopperRoutes.bag as never)}
             accessibilityLabel="View in bag"
             fullWidth
             testID="product-view-cart"

@@ -30,6 +30,8 @@ import { useAuth } from '@clerk/expo';
 import { isSecondDeliveryMoment, maybeRequestStoreReview } from '@/lib/storeReviewPrompt';
 
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
+import { keepShopping } from '@/lib/navigation/shopperRoutes';
 
 
 import { prefetchBuyerOrderOnPressIn } from '@/lib/detailPrefetch';
@@ -588,6 +590,8 @@ export default function BuyerOrdersScreen() {
   const barInset = useBuyerTabBarInset();
   const centeredPadding = useCenteredContentPadding();
   const router = useRouter();
+  // A seller's purchases (app/purchases.tsx) are pushed, not a tab: give them Back.
+  const shopperRoutes = useShopperRoutes();
   const openOrder = useCallback((orderId: string) => {
     // Synthetic preview orders never reach the live API: the detail screen
     // renders them read-only from the same local preview data.
@@ -783,7 +787,7 @@ export default function BuyerOrdersScreen() {
   return (
     <BrandthreadScreen noSafeBottom noSafeTop>
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
-      <Header title="My orders" largeTitle showBack={false} />
+      <Header title="My orders" largeTitle showBack={shopperRoutes.isSeller} />
 
       {/* Filter chips — horizontal scroll, edge-to-edge. The screen's own
           gutter (`centeredPadding`) on the content container is what lets
@@ -886,7 +890,7 @@ export default function BuyerOrdersScreen() {
                 action={{
                   label: 'Discover products',
                   icon: 'compass',
-                  onPress: () => router.navigate('/(buyer)/discover' as never),
+                  onPress: () => (shopperRoutes.isSeller ? keepShopping(router, shopperRoutes) : router.navigate('/(buyer)/discover' as never)),
                 }}
                 style={{ flex: 1 }}
               />
