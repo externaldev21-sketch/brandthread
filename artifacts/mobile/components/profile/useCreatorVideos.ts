@@ -37,8 +37,10 @@ export function useCreatorVideos(userId: string | null | undefined, opts: { fres
   const asVisitor = !!opts.asVisitor;
 
   const reload = useCallback(async (reloadOpts: { fresh?: boolean } = {}) => {
-    if (!userId) return;
+    // Bump before the userId check: switching to an unresolved (null) profile
+    // must still invalidate the previous profile's in-flight page.
     const generation = ++generationRef.current;
+    if (!userId) return;
     setError(false);
     if (isPreviewDemoMode() && isOfficialAccountId(userId)) {
       const demo = previewOfficialGrid();

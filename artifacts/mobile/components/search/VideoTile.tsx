@@ -16,7 +16,7 @@ import type { SearchVideo } from '@/lib/searchData';
 // Fixed 9:16 aspect ratio — dark video tiles like Instagram/TikTok grids.
 export const VIDEO_TILE_ASPECT = 9 / 16;
 
-/** Video grid card — 9:16 dark thumbnail, center play affordance, caption/author overlay. */
+/** Video grid card — 9:16 dark thumbnail with a caption / author / likes overlay (no play glyph). */
 export function VideoTile({ item, width, onPress }: {
   item: SearchVideo;
   width: number;

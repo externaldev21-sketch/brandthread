@@ -28,7 +28,10 @@ export function useProfileNote({
   /** Own profile: where tapping the bubble goes (buyers: the inbox notes tray). */
   onCompose?: () => void;
 }): { text: string; placeholder?: boolean; onPress?: () => void } | null {
-  const [text, setText] = useState<string | null>(null);
+  // Keyed by the profile it was loaded for, so a different profile never
+  // shows this one's note while its own loads (or when that load fails).
+  const [loaded, setLoaded] = useState<{ userId: string | null; text: string | null }>({ userId: null, text: null });
+  const ownerKey = userId ?? null;
 
   useFocusEffect(useCallback(() => {
     if (!enabled) return undefined;
@@ -39,17 +42,18 @@ export function useProfileNote({
       const note = isPreviewDemoMode() && isPreviewNotesEnabled()
         ? (own ? getPreviewMyNote() : getPreviewNotesForTray().find((entry) => entry.authorId === userId) ?? null)
         : null;
-      setText(note?.text ?? null);
+      setLoaded({ userId: ownerKey, text: note?.text ?? null });
       return () => { alive = false; };
     }
-    if (!userId) { setText(null); return undefined; }
+    if (!userId) { setLoaded({ userId: null, text: null }); return undefined; }
     getNotesForTray()
-      .then((rows) => { if (alive) setText(rows.find((row) => row.authorId === userId)?.text ?? null); })
+      .then((rows) => { if (alive) setLoaded({ userId, text: rows.find((row) => row.authorId === userId)?.text ?? null }); })
       .catch(() => { /* no bubble rather than a broken one */ });
     return () => { alive = false; };
-  }, [enabled, own, userId]));
+  }, [enabled, own, userId, ownerKey]));
 
   if (!enabled) return null;
+  const text = loaded.userId === ownerKey ? loaded.text : null;
   if (text) return { text, onPress: own ? onCompose : undefined };
   if (own && onCompose) return { text: NOTE_PROMPT, placeholder: true, onPress: onCompose };
   return null;

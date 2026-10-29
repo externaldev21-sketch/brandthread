@@ -56,7 +56,15 @@ export function useImageSourceSheet() {
 
   const run = useCallback((pick: () => Promise<ImagePicker.ImagePickerAsset | null>) => async () => {
     hapticSelection();
-    const asset = await pick();
+    let asset: ImagePicker.ImagePickerAsset | null;
+    try {
+      asset = await pick();
+    } catch {
+      // The camera / library failed to open (no camera, picker error): answer
+      // the caller instead of leaving its open() promise pending forever.
+      settle(null);
+      return;
+    }
     if (asset && circleRef.current && asset.type !== 'video') setCropAsset(asset);
     else settle(asset);
   }, [settle]);

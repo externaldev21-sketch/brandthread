@@ -48,10 +48,18 @@ export function EmailExportSection({ categories }: { categories: string[] }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped after every poll, so a failed poll (state unchanged) still
+  // schedules the next one instead of leaving "Preparing" stuck forever.
+  const [pollTick, setPollTick] = useState(0);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const load = useCallback(async () => {
     if (preview) return;
-    try { setState(await api.dataExportJobs.list()); } catch { /* keep the last known state */ }
+    try {
+      const next = await api.dataExportJobs.list();
+      if (mountedRef.current) setState(next);
+    } catch { /* keep the last known state */ }
   }, [api, preview]);
 
   useEffect(() => { void load(); }, [load]);
@@ -60,9 +68,11 @@ export function EmailExportSection({ categories }: { categories: string[] }) {
   const inFlight = latest?.status === 'queued' || latest?.status === 'running';
   useEffect(() => {
     if (!inFlight) return;
-    timer.current = setTimeout(() => { void load(); }, 5000);
+    timer.current = setTimeout(() => {
+      void load().finally(() => { if (mountedRef.current) setPollTick((n) => n + 1); });
+    }, 5000);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [inFlight, state, load]);
+  }, [inFlight, state, load, pollTick]);
 
   async function request() {
     if (busy) return;

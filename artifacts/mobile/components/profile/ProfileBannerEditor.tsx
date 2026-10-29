@@ -78,15 +78,23 @@ function notify(title: string, message?: string) {
 }
 
 /** Web pickers don't report a video's duration — read it from the file's metadata. */
-function probeWebVideoDuration(uri: string): Promise<number | null> {
+export function probeWebVideoDuration(uri: string): Promise<number | null> {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return Promise.resolve(null);
   return new Promise((resolve) => {
     const video = document.createElement('video');
-    const done = (value: number | null) => { video.removeAttribute('src'); resolve(value); };
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const done = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      video.removeAttribute('src');
+      resolve(value);
+    };
     video.preload = 'metadata';
     video.onloadedmetadata = () => done(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null);
     video.onerror = () => done(null);
-    setTimeout(() => done(null), 5000);
+    timeout = setTimeout(() => done(null), 5000);
     video.src = uri;
   });
 }

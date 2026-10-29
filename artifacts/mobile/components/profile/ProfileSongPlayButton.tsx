@@ -5,7 +5,7 @@
  * never autoplays; plays through the ringer so the silent switch mutes it
  * (playsInSilentMode: false); stops when the screen loses focus.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -19,6 +19,9 @@ export function ProfileSongPlayButton({ song, label }: { song: ProfileSong; labe
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const [playing, setPlaying] = useState(false);
+  // The preview URL the player currently holds: only that song may resume
+  // from where it paused; a changed song always loads its own preview.
+  const loadedUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status.didJustFinish) setPlaying(false);
@@ -43,10 +46,11 @@ export function ProfileSongPlayButton({ song, label }: { song: ProfileSong; labe
     }
     try {
       await setAudioModeAsync({ playsInSilentMode: false });
-      if (status.isLoaded && status.currentTime > 0 && !status.didJustFinish) {
+      if (loadedUrlRef.current === song.previewUrl && status.isLoaded && status.currentTime > 0 && !status.didJustFinish) {
         player.play();
       } else {
         player.replace({ uri: song.previewUrl });
+        loadedUrlRef.current = song.previewUrl;
         player.play();
       }
       setPlaying(true);

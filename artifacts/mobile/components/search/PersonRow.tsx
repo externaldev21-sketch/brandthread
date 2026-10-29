@@ -41,10 +41,11 @@ export type SearchPerson = {
 };
 
 /**
- * Compact inline follow row for the People tab. Only tracks Follow /
- * Following — the buyer search API (`api.social.search`) doesn't return
- * `isFollowedBy`/`isMutual`, so the richer Friends/Follow-Back states from
- * `buyer-other-profile`'s `renderFollowButton` aren't available here.
+ * Compact inline follow row for the People tab. The pill reads Follow /
+ * Following, "Requested" for a pending request (`requested`) and "Follow
+ * back" when the caller knows this person follows the viewer (`followsYou`
+ * — `api.social.search` itself doesn't return it, so search rows only show
+ * Follow / Following / Requested).
  */
 export function PersonRow({
   person,
