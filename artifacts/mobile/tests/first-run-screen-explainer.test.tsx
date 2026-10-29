@@ -38,7 +38,7 @@ const api = {
 };
 vi.mock('@/hooks/useApi', () => ({ useApi: () => api }));
 
-import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
+import { FirstRunTipsProvider, useFirstRunTipsController } from '@/contexts/FirstRunTipsContext';
 import { ScreenExplainer } from '@/components/first-run-tips/ScreenExplainer';
 import { SCREEN_EXPLAINERS } from '@/lib/firstRunTips/content';
 
@@ -107,6 +107,25 @@ describe('ScreenExplainer', () => {
     await act(async () => { first.unmount(); });
     const other = await open('explain-payouts');
     expect(sheet(other, 'explain-payouts')).toHaveLength(1);
+  });
+});
+
+describe('ScreenExplainer and other tips', () => {
+  beforeEach(() => { h.store.clear(); h.server.clear(); });
+
+  it('waits while another tip holds the slot, then shows once it frees', async () => {
+    let controller!: ReturnType<typeof useFirstRunTipsController>;
+    function OtherTip() { controller = useFirstRunTipsController(); return null; }
+    let r!: ReactTestRenderer;
+    await act(async () => { r = create(<FirstRunTipsProvider><OtherTip /></FirstRunTipsProvider>); });
+    await flush();
+    await act(async () => { controller.claim('seller-dashboard'); });
+    await act(async () => { r.update(<FirstRunTipsProvider><OtherTip /><ScreenExplainer id="seller-orders" /></FirstRunTipsProvider>); });
+    await flush();
+    expect(sheet(r)).toHaveLength(0);
+    await act(async () => { controller.release('seller-dashboard'); });
+    await flush();
+    expect(sheet(r)).toHaveLength(1);
   });
 });
 
