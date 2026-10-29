@@ -28,6 +28,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 import { API_BASE_URL, useApi } from '@/lib/api';
 import { FONT, FS, MEDIA, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -310,6 +311,7 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
   const insets = useSafeAreaInsets();
   const topInset = useHeaderTopInset();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -416,8 +418,8 @@ function CameraCheck({ title, coverUrl, featured, scheduledLiveId, onBack }: {
   }
 
   const host = {
-    name: user?.username ?? user?.firstName ?? 'You',
-    imageUrl: user?.imageUrl ?? null,
+    name: identity?.username ?? user?.username ?? user?.firstName ?? 'You',
+    imageUrl: identity?.avatarUrl ?? user?.imageUrl ?? null,
   };
 
   return (

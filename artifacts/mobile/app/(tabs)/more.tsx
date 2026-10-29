@@ -22,6 +22,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 
 import { useLaunchChecklist } from '@/hooks/useLaunchChecklist';
 import { launchProgress } from '@/lib/launchChecklist';
@@ -153,6 +154,7 @@ export default function MoreScreen() {
   const router   = useRouter();
   const topInset = useHeaderTopInset();
   const { user } = useUser();
+  const { identity } = useMyIdentity();
   const { signOut } = useAuth();
   const api = useApi();
 
@@ -193,11 +195,12 @@ export default function MoreScreen() {
 
   // Signed-out preview: the same seller name the Profile tab shows.
   const previewName = previewSellerPersonName();
-  const firstName   = user?.firstName ?? previewName?.firstName ?? 'Seller';
+  const firstName   = user?.firstName ?? previewName?.firstName ?? '';
   const lastName    = user?.lastName  ?? previewName?.lastName ?? '';
-  const displayName = lastName ? `${firstName} ${lastName}` : firstName;
+  // The business name onboarding saved; the person's name only until it loads.
+  const displayName = identity?.displayName || (lastName ? `${firstName} ${lastName}` : firstName);
   const email       = user?.primaryEmailAddress?.emailAddress ?? '';
-  const avatarLetter = (firstName[0] ?? 'S').toUpperCase();
+  const avatarLetter = (displayName[0] ?? 'S').toUpperCase();
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 

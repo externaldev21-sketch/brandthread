@@ -53,6 +53,8 @@ beforeAll(async () => {
       email: `${sellerA}@test.local`,
       name: "Catalog Seller A",
       displayName: "Seller A",
+      // The business name onboarding saved: what buyers see as the seller.
+      brandName: "Atelier A",
       username: `catalog_a_${suffix}`,
       avatarUrl: "https://cdn.test/a.jpg",
       role: "seller",
@@ -115,11 +117,22 @@ describe("public catalog search and related products", () => {
       .map((product: any) => product.priceCents)).toEqual([1_000, 2_500, 3_000]);
   });
 
+  it("names a seller by its business name, falling back to the display name without one", async () => {
+    const response = await fetch(`${base}/api/public/products?limit=50`);
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    const rows: any[] = Array.isArray(body) ? body : body.products ?? body.items ?? [];
+    const byName = new Map(rows.map((row) => [row.name, row.sellerDisplayName]));
+    expect(byName.get("Catalog Jacket")).toBe("Atelier A");
+    expect(byName.get("Catalog Tee")).toBe("Seller B");
+  });
+
   it("returns the seller's handle and avatar for the product page seller row", async () => {
     const response = await fetch(`${base}/api/public/products/${currentProductId}`);
     expect(response.status).toBe(200);
     const product = await response.json() as any;
-    expect(product.sellerDisplayName).toBe("Seller A");
+    // The store's business name, not the owner's personal display name.
+    expect(product.sellerDisplayName).toBe("Atelier A");
     expect(product.sellerUsername).toBe(`catalog_a_${suffix}`);
     expect(product.sellerAvatarUrl).toBe("https://cdn.test/a.jpg");
   });
@@ -132,6 +145,7 @@ describe("public catalog search and related products", () => {
     const related = await response.json() as any[];
     expect(related.some((product) => product.id === currentProductId)).toBe(false);
     expect(related[0].name).toBe("Catalog Bag");
+    expect(related[0].sellerDisplayName).toBe("Atelier A");
     expect(related.every((product) => Array.isArray(product.variants))).toBe(true);
   });
 

@@ -32,12 +32,13 @@ import { LAUNCH_STEP_META, launchProgress } from '@/lib/launchChecklist';
 import { withOrigin } from '@/lib/navigation/flowOrigin';
 
 import { useStoreLink } from '@/hooks/useStoreLink';
+import { headerStoreLinkLabel, sellerStoreLink } from '@/lib/storeShare';
 
 import { navigateOrShareStore } from '@/lib/shareStoreSheet';
 
-import { previewSellerBrandName } from '@/lib/previewIdentity';
 import { Avatar } from '@/components/ui/Avatar';
-import { middleTruncate } from '@/lib/middleTruncate';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
+import SellerMessagesButton from '@/components/SellerMessagesButton';
 
 import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
 import SetupContinueBanner from '@/components/SetupContinueBanner';
@@ -106,6 +107,7 @@ import { SellerDashboardAISuggestions } from '@/components/SellerDashboardAISugg
 import { ReadyToSellChecklist } from '@/components/ReadyToSellChecklist';
 
 import { useReadyToSell } from '@/hooks/useReadyToSell';
+import { readyToSellVisibility } from '@/lib/readyToSell';
 
 import { BG, FG, FONT, FS, GRID_MAX_WIDTH, MUTED, RADIUS, SCREEN_BG, SP } from '@/lib/theme';
 
@@ -282,6 +284,16 @@ export default function SellerHomeCommerceDashboard({
   const [secondaryError, setSecondaryError] = useState(false);
   const [activityItems, setActivityItems] = useState<DashboardActivityItem[]>([]);
 
+  // Store name + profile photo for the header (Shopify home: avatar + store
+  // name, not a generic "Dashboard" title). The canonical identity onboarding
+  // wrote, refetched on focus, so a photo or name set on Profile shows here on
+  // return; the monogram is only the no-photo fallback.
+  const { identity: myIdentity } = useMyIdentity();
+  const storeIdentity = {
+    name: myIdentity?.displayName ?? null,
+    logoUrl: myIdentity?.avatarUrl ?? null,
+  };
+
   // The seller's own public store URL, shown next to the "Dashboard" title
   // and copied to the clipboard on tap — real even before the store is
   // published (Dev: "it's where the store will eventually live"). Uses the
@@ -289,28 +301,11 @@ export default function SellerHomeCommerceDashboard({
   // one — same as app/meta-ads-setup.tsx's own storeUrl fetch.
   // One store link everywhere: brandthread.app/@username (lib/storeShare).
   const storeLink = useStoreLink();
-  const storeUrl = storeLink.url;
+  // The onboarding @username (refetched on focus) wins, so a renamed handle
+  // shows here on return; the hook's own fetch covers the no-username case and
+  // the signed-out preview (which keeps its own fresh/demo link rule).
+  const storeUrl = (sellerPreview ? null : sellerStoreLink(myIdentity?.username)) ?? storeLink.url;
   const [storeUrlCopied, setStoreUrlCopied] = useState(false);
-  // Store name + logo for the header (Shopify home: avatar + store name, not
-  // a generic "Dashboard" title). Same profile fetch as the URL above.
-  const [storeIdentity, setStoreIdentity] = useState<{ name: string | null; logoUrl: string | null }>(() => ({
-    name: previewSellerBrandName(),
-    logoUrl: null,
-  }));
-  useEffect(() => {
-    let cancelled = false;
-    if (sellerPreview) return;
-    api.seller.getProfile().then((profile) => {
-      if (cancelled) return;
-      const p = profile as typeof profile & { avatarPosterUrl?: string | null };
-      setStoreIdentity({
-        name: previewSellerBrandName() ?? (profile.brandName || profile.displayName || null),
-        logoUrl: p.avatarPosterUrl || profile.profileImageUrl || null,
-      });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [api, sellerPreview]);
-
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
   const handleCopyStoreUrl = useCallback(() => {
@@ -735,7 +730,15 @@ export default function SellerHomeCommerceDashboard({
   // Shopify's "Get ready to sell" until the first sale, then the sales hero.
   // If the checklist can't load, the previous setup card stays as the fallback.
   const readyToSell = useReadyToSell();
-  const showReadyToSell = !firstWeek.visible && newSeller && readyToSell.data !== null && !readyToSell.data.hasSale;
+  // Each part retires on server state (lib/readyToSell.ts): the checklist once
+  // every launch step is done, the plan block once a plan is bought. With both
+  // gone the whole section unmounts, so nothing leaves a gap.
+  const showReadyToSell = !firstWeek.visible && newSeller && readyToSell.data !== null && !readyToSell.data.hasSale
+    && readyToSellVisibility({ data: readyToSell.data, progress, hasPlan: readyToSell.hasPlan }).any;
+  // The first product's live flag, from the same server checklist: until it
+  // has loaded the "List your first product" card stays out rather than
+  // flashing in for a seller whose products are already live.
+  const hasLiveProduct = launchChecklist ? launchChecklist.steps.find((step) => step.id === 'first_product')?.done ?? false : null;
   // ── The one top-card slot (milestones, morning brief, …). While it shows a
   // card, the bottom setup prompts wait, so only one promo is on screen. ──
   const topCard = pickTopCard<DashboardTopCardCandidate>([
@@ -874,7 +877,7 @@ export default function SellerHomeCommerceDashboard({
                     testID="seller-dashboard-store-url"
                   >
                     <Text style={[styles.storeUrlText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="middle">
-                      {middleTruncate(storeUrl.replace(/^https?:\/\//, ''))}
+                      {headerStoreLinkLabel(storeUrl)}
                     </Text>
                     <Icon name={storeUrlCopied ? 'check' : 'copy'} size={13} color={theme.muted} />
                   </TouchableOpacity>
@@ -892,6 +895,13 @@ export default function SellerHomeCommerceDashboard({
             >
               <Icon name="share" size={22} color={theme.text ?? FG} />
             </TouchableOpacity>
+            {/* Messages — one tap to the inbox, unread-thread badge. */}
+            <SellerMessagesButton
+              testID="seller-dashboard-messages"
+              color={theme.text ?? FG}
+              size={22}
+              badgeBorderColor={theme.background ?? BG}
+            />
             {(!sellerPreview || isSignedIn) && <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
@@ -1057,10 +1067,11 @@ export default function SellerHomeCommerceDashboard({
 
               {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
               <View style={isTablet ? styles.tabletRow : undefined}>
-                {firstWeek.visible ? null : newSeller ? (
+                {firstWeek.visible ? null : newSeller && hasLiveProduct !== null ? (
                   <View style={[isTablet && styles.tabletRowItem, styles.section]}>
                     <SellerDashboardSetupCard
                       theme={theme}
+                      hasLiveProduct={hasLiveProduct}
                       hasSetupChecklist={Boolean(addProductTask)}
                       onAddProduct={() => nav(withOrigin('/add-product', 'dashboard'))}
                       onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withOrigin('/add-product', 'dashboard')))}

@@ -107,6 +107,17 @@ export function countUnreadBuyerMessages(conversations: any[]): number {
   ), 0);
 }
 
+/**
+ * Buyer threads with anything unread, by the same rule as above — the count
+ * on the dashboard's Messages icon (a thread, not a message, like Instagram's
+ * DM badge).
+ */
+export function countUnreadBuyerThreads(conversations: any[]): number {
+  return conversations.filter((c) => (
+    c && c.type !== 'buyer_to_buyer' && !c.isRequest && !c.isArchived && (Number(c.unreadCount ?? 0) || 0) > 0
+  )).length;
+}
+
 /** Paid, non-cancelled orders: the same orders the sales hero and Top products count. */
 export function countSoldOrders(orders: any[]): number {
   return orders.filter((o) => (o?.paidAt ?? o?.paid_at) && o?.status !== 'cancelled').length;

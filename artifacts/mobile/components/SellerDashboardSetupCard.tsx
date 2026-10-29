@@ -31,8 +31,11 @@ export function SellerDashboardSetupCard({
   onOpenSetup,
   hasSetupChecklist,
   onImport,
+  hasLiveProduct: hasLiveProductProp,
 }: {
   theme: AppThemePreset;
+  /** The host's server checklist flag; when omitted the card reads its own. */
+  hasLiveProduct?: boolean;
   onAddProduct: () => void;
   onOpenSetup: () => void;
   hasSetupChecklist: boolean;
@@ -43,7 +46,7 @@ export function SellerDashboardSetupCard({
   // Products are live but nothing has sold yet: the next step is sharing the
   // store, not adding a first product (first_product counts live products only).
   const { checklist } = useLaunchChecklist();
-  const hasLiveProduct = checklist?.steps.find((step) => step.id === 'first_product')?.done ?? false;
+  const hasLiveProduct = hasLiveProductProp ?? checklist?.steps.find((step) => step.id === 'first_product')?.done ?? false;
   if (hasLiveProduct) {
     const share = () => router.push('/share-store' as never);
     return (

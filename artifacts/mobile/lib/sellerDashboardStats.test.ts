@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countUnreadBuyerThreads,
   countPendingReturns,
   countSoldOrders,
   countUnreadBuyerMessages,
@@ -190,5 +191,24 @@ describe('normalizeRecentOrder', () => {
       status: 'processing',
       orderNumber: '#123456',
     });
+  });
+});
+
+describe('countUnreadBuyerThreads (dashboard Messages badge)', () => {
+  it('counts threads with anything unread, not messages', () => {
+    expect(countUnreadBuyerThreads([
+      { id: 'a', unreadCount: 5 },
+      { id: 'b', unreadCount: 1 },
+      { id: 'c', unreadCount: 0 },
+    ])).toBe(2);
+  });
+  it('skips buyer↔buyer, requests and archived, like the inbox header', () => {
+    expect(countUnreadBuyerThreads([
+      { id: 'a', unreadCount: 2, type: 'buyer_to_buyer' },
+      { id: 'b', unreadCount: 2, isRequest: true },
+      { id: 'c', unreadCount: 2, isArchived: true },
+      null,
+      { id: 'd', unreadCount: '3' },
+    ])).toBe(1);
   });
 });

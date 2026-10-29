@@ -16,3 +16,19 @@ export function sellerStoreLink(username: string | null | undefined): string | n
 export function displayStoreLink(url: string): string {
   return url.replace(/^https?:\/\//, '');
 }
+
+/**
+ * The dashboard header's store link text. Too long for the row (the top bar
+ * also holds Share, Messages and Activity), it drops the domain rather than
+ * cutting the @username in half — the handle onboarding saved is the part
+ * that has to stay readable.
+ */
+export function headerStoreLinkLabel(url: string, maxLength = 28): string {
+  const bare = displayStoreLink(url);
+  if (bare.length <= maxLength) return bare;
+  const at = bare.indexOf('/@');
+  if (at >= 0) return bare.slice(at + 1);
+  const keep = maxLength - 1;
+  const front = Math.ceil(keep * 0.6);
+  return `${bare.slice(0, front)}…${bare.slice(bare.length - (keep - front))}`;
+}

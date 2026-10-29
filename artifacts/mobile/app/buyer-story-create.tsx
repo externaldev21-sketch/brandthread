@@ -26,6 +26,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
+import { useMyIdentity } from '@/hooks/useMyIdentity';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Reanimated, { Easing as ReanimatedEasing, cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -526,8 +527,11 @@ export default function StoryComposer() {
   const { role } = useRole();
   const isSeller = role === 'seller';
 
-  const myName = user?.fullName || user?.firstName || user?.username || 'You';
-  const myHandle = user?.username ? `@${user.username}` : '';
+  // Canonical onboarding identity (seller: business name); Clerk only until it loads.
+  const { identity } = useMyIdentity();
+  const myName = identity?.displayName || user?.fullName || user?.firstName || user?.username || 'You';
+  const myUsername = identity?.username ?? user?.username ?? null;
+  const myHandle = myUsername ? `@${myUsername}` : '';
   const myInitials = myName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
   // Reshare ("Add to your story" from a story that tagged me): skips the camera

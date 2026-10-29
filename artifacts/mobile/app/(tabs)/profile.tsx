@@ -67,6 +67,8 @@ import { anchorFromEvent, type MenuAnchor } from '@/lib/contextMenu';
 import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
 import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { PREVIEW_SELLER_IDENTITY, previewSellerBrandName } from '@/lib/previewIdentity';
+import { atHandle, sellerDisplayName } from '@/lib/identity';
+import { useSellerUnreadThreads } from '@/hooks/useSellerUnreadThreads';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -450,7 +452,9 @@ export default function ProfileScreen() {
   }
 
   // In the dev preview there is no account, so the one shared preview identity is shown here and in Settings / Edit profile.
-  const brandTitle = previewSellerBrandName() ?? (profile?.brandName || profile?.displayName || 'My Brand');
+  // Business name + @username from onboarding (lib/identity.ts) — no placeholder.
+  const brandTitle = previewSellerBrandName() ?? (sellerDisplayName(profile ?? {}) || '');
+  const unreadThreads = useSellerUnreadThreads();
   const avatarInitials = brandTitle
     .split(/\s+/)
     .map((part) => part[0])
@@ -606,9 +610,7 @@ export default function ProfileScreen() {
           name: brandTitle,
           handle: previewSellerBrandName()
             ? PREVIEW_SELLER_IDENTITY.handle
-            : profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
-            ? `@${profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`
-            : null,
+            : atHandle(profile?.username),
           initials: avatarInitials,
           avatarUrl: profile?.avatarPosterUrl || profile?.profileImageUrl || null,
           avatarVideoUrl: profile?.avatarVideoUrl ?? null,
@@ -678,7 +680,9 @@ export default function ProfileScreen() {
                 Messages was the filled "primary" here, which read as the
                 main thing to do on your own profile; buyer messages stay
                 one tap away in the Studio menu. The labelled Share button
-                replaces the unlabelled top-bar share icon. */}
+                replaces the unlabelled top-bar share icon. Messages is back
+                as a third equal secondary button (Dev: one tap to the inbox
+                from Profile too), with the unread-thread count. */}
             <View style={s.actionRow}>
               <View style={s.actionFlex}>
                 <Button
@@ -703,6 +707,25 @@ export default function ProfileScreen() {
                   style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
                   testID="seller-share-profile-btn"
                 />
+              </View>
+              <View style={s.actionFlex}>
+                <Button
+                  label="Messages"
+                  variant="secondary"
+                  size="compact"
+                  fullWidth
+                  onPress={() => { haptics.light(); nav('/seller-inbox'); }}
+                  accessibilityLabel={unreadThreads > 0 ? `Messages, ${unreadThreads} unread` : 'Messages'}
+                  style={[s.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+                  testID="seller-profile-messages-btn"
+                />
+                {unreadThreads > 0 && (
+                  <View pointerEvents="none" style={[s.messagesBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} testID="seller-profile-messages-badge">
+                    <Text style={[s.messagesBadgeText, { color: theme.onAccent }]} allowFontScaling={false}>
+                      {unreadThreads > 99 ? '99+' : unreadThreads}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </>
@@ -806,6 +829,12 @@ const s = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: SP.sm },
   actionFlex: { flex: 1, minWidth: 0 },
   actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
+  // Unread-thread count on the Messages button's corner (same pill as the dashboard icon).
+  messagesBadge: {
+    position: 'absolute', top: -6, right: -4, minWidth: 18, height: 18, borderRadius: 9,
+    paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
+  },
+  messagesBadgeText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold },
   shopPillWrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
   draftsTile: {
     borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,

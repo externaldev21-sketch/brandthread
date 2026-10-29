@@ -60,6 +60,7 @@ import { getPriceHistory } from "../lib/priceHistory";
 import { getStoreLanguage } from "../lib/storeLanguage";
 import { postDimsPayload } from "../lib/mediaDimensions";
 import { postDimsColumns } from "../lib/postDimsColumns";
+import { sellerNameSql } from "../lib/sellerName";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -261,7 +262,7 @@ router.get("/products", async (req, res) => {
     // Attach seller display name (best-effort; null if seller row not found)
     const ownerIds = [...new Set(filtered.map((p) => p.ownerId))];
     const sellerRows = ownerIds.length > 0
-      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
+      ? await db.select({ clerkId: users.clerkId, displayName: sellerNameSql, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
           .from(users)
           .where(inArray(users.clerkId, ownerIds))
       : [];
@@ -310,7 +311,7 @@ router.get("/products/high-demand", async (req, res) => {
         .then((rows) => applySalesToVariants(activeProducts, rows)),
       db.select({
         clerkId: users.clerkId,
-        displayName: users.displayName,
+        displayName: sellerNameSql,
         verified: users.verified,
         verificationStatus: users.verificationStatus,
         activeStanding: users.activeStanding,
@@ -473,7 +474,7 @@ router.get("/products/:id/related", async (req, res) => {
     const [variants, sellerRows] = await Promise.all([
       db.select().from(productVariants).where(inArray(productVariants.productId, productIds))
         .then((rows) => applySalesToVariants(ranked, rows)),
-      db.select({ clerkId: users.clerkId, displayName: users.displayName })
+      db.select({ clerkId: users.clerkId, displayName: sellerNameSql })
         .from(users).where(inArray(users.clerkId, ownerIds)),
     ]);
     const variantsByProduct: Record<string, typeof variants> = {};
@@ -565,7 +566,7 @@ router.get("/products/:id", async (req, res) => {
 
     // Attach seller display name
     const [seller] = await db
-      .select({ displayName: users.displayName, username: users.username, avatarUrl: users.avatarUrl, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
+      .select({ displayName: sellerNameSql, username: users.username, avatarUrl: users.avatarUrl, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
       .where(eq(users.clerkId, product.ownerId))
       .limit(1);
