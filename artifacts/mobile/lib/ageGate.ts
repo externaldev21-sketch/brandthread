@@ -101,9 +101,9 @@ function statusFor(band: AgeBand | null | undefined): AgeStatus {
 export function useAgeStatus(): { status: AgeStatus; setBand: (band: AgeBand) => void } {
   const { isSignedIn, userId } = useAuth();
   const api = useApi();
-  const [status, setStatus] = useState<AgeStatus>(
-    () => (userId && bandCache.has(userId) ? statusFor(bandCache.get(userId)) : 'ok'),
-  );
+  // The loaded status is tagged with the account it belongs to, so after an
+  // account switch or sign-out the previous account's status never shows.
+  const [loaded, setLoaded] = useState<{ userId: string; status: AgeStatus } | null>(null);
   useEffect(() => {
     if (!isSignedIn || !userId) return;
     let cancelled = false;
@@ -111,15 +111,21 @@ export function useAgeStatus(): { status: AgeStatus; setBand: (band: AgeBand) =>
       .then((profile) => {
         const band = (profile.ageBand ?? null) as AgeBand | null;
         bandCache.set(userId, band);
-        if (!cancelled) setStatus(statusFor(band));
+        if (!cancelled) setLoaded({ userId, status: statusFor(band) });
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [api, isSignedIn, userId]);
   const setBand = (band: AgeBand) => {
-    if (userId) bandCache.set(userId, band);
-    setStatus(statusFor(band));
+    if (!userId) return;
+    bandCache.set(userId, band);
+    setLoaded({ userId, status: statusFor(band) });
   };
+  const status: AgeStatus = !isSignedIn || !userId
+    ? 'ok'
+    : loaded?.userId === userId
+      ? loaded.status
+      : bandCache.has(userId) ? statusFor(bandCache.get(userId)) : 'ok';
   return { status, setBand };
 }
 

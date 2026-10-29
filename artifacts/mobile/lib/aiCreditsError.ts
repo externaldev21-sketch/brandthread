@@ -10,6 +10,7 @@
  */
 
 import { OUT_OF_CREDITS_ROUTE } from './aiCredits';
+import { showAlert } from './actionSheet';
 
 export type AiCreditsErrorKind = 'insufficient_credits' | 'user_daily_cap' | 'global_daily_cap';
 
@@ -50,9 +51,9 @@ export function surfaceAiCreditsError(kind: AiCreditsErrorKind, now = Date.now()
       router.push(OUT_OF_CREDITS_ROUTE as never);
       return;
     }
-    const { Alert } = require('react-native') as typeof import('react-native');
+    // showAlert, not Alert.alert: Alert.alert is a silent no-op on web.
     const copy = AI_CREDITS_ALERT_COPY[kind];
-    Alert.alert(copy.title, copy.message);
+    showAlert(copy.title, copy.message);
   } catch {
     // Surfacing is best effort; the original error still reaches the caller.
   }
