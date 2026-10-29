@@ -63,6 +63,7 @@ export interface SellerListHeaderMenuOption {
 
 export interface SellerListHeaderProps {
   title: string;
+  onBack?: () => void;
   /** Omit (or pass an empty array) when there is nothing real to switch
    *  to — the title then renders as plain static text with no chevron,
    *  rather than an affordance that opens a menu leading nowhere. */
@@ -106,7 +107,7 @@ export const sellerListCountRowStyles = StyleSheet.create({
 });
 
 export function SellerListHeader({
-  title, titleMenu, titleAccessibilityLabel, actions,
+  title, onBack, titleMenu, titleAccessibilityLabel, actions,
   searchValue, onSearchChange, searchPlaceholder,
   onFilterPress, hasActiveFilter, filterAccessibilityLabel,
   onSortPress, sortAccessibilityLabel,
@@ -133,6 +134,17 @@ export function SellerListHeader({
     <View>
       {/* Title row */}
       <View style={s.titleRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {onBack ? (
+            <PressableScale
+              style={s.headerIconBtn}
+              onPress={onBack}
+              accessibilityLabel="Go back"
+              testID="seller-list-back"
+            >
+              <Icon name="arrow-left" size={ICON.md} color={theme.text} />
+            </PressableScale>
+          ) : null}
         <View ref={titleWrapRef} collapsable={false}>
           {hasMenu ? (
             <PressableScale
@@ -149,6 +161,7 @@ export function SellerListHeader({
               <Text style={[s.titleText, { color: theme.text }]}>{title}</Text>
             </View>
           )}
+        </View>
         </View>
         <View style={s.titleActions}>
           {actions.map((action) => (
