@@ -12,7 +12,7 @@
  * (getItemType), so a tile row is only ever reused as another tile row.
  */
 import React, { forwardRef, useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -29,7 +29,8 @@ import type { DiscoveryCategory } from '@/lib/discoveryShelves';
 import type { DiscoverPost, DiscoverPersonSuggestion, DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
 import type { SponsoredFeedItem } from '@/lib/feedAds';
-import { buildMasonrySections, splitMasonryColumns, tileAspectRatio, type MasonrySection } from '@/lib/discoverMasonry';
+import { buildMasonrySections, splitMasonryColumns, splitMasonryColumnsN, tileAspectRatio, type MasonrySection } from '@/lib/discoverMasonry';
+import { useContentDimensions, useDesktopShell } from '@/components/web/DesktopShellContext';
 import { DiscoverSectionHeader } from './DiscoverSectionHeader';
 import { DiscoverMasonryTile, DiscoverMasonryTileSkeleton, MASONRY_CAPTION_HEIGHT } from './DiscoverMasonryTile';
 import { DiscoverTrendingNowRail } from './DiscoverTrendingNowRail';
@@ -74,6 +75,16 @@ function RailHeader({ title, sub }: { title: string; sub?: string }) {
 const MASONRY_SIDE = SP.sm;
 const MASONRY_GUTTER = SP.sm;
 const MASONRY_ROW_GAP = 14;
+/** Desktop web: the masonry adds columns until each would drop below this width. */
+const DESKTOP_MASONRY_MIN_COLUMN = 220;
+const DESKTOP_MASONRY_MAX_COLUMNS = 5;
+
+/** Masonry column count: 2 on phones and tablets, more beside the desktop sidebar. */
+function masonryColumnCount(width: number, desktop: boolean): number {
+  if (!desktop) return 2;
+  const fit = Math.floor((width - MASONRY_SIDE * 2 + MASONRY_GUTTER) / (DESKTOP_MASONRY_MIN_COLUMN + MASONRY_GUTTER));
+  return Math.max(2, Math.min(DESKTOP_MASONRY_MAX_COLUMNS, fit));
+}
 const SKELETON_ASPECTS = [3 / 4, 2 / 3, 1, 4 / 5, 2 / 3, 3 / 4];
 
 const EMPTY_SPONSORED: ReadonlyArray<{ afterId: string; item: SponsoredFeedItem }> = [];
@@ -153,7 +164,9 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
   layout = 'explore',
 }, ref) {
   const { theme } = useAppTheme();
-  const { width } = useWindowDimensions();
+  // The content column beside the desktop web sidebar; the window elsewhere.
+  const { width } = useContentDimensions();
+  const masonryColumns = masonryColumnCount(width, useDesktopShell() !== null);
   const cell = Math.floor((width - GRID_GUTTER * 2 - GAP * 2) / 3);
   // 3:4 portrait (width:height) — the whole outfit fits, not a near-square
   // crop. The 2x2 feature spans two rows at the same ratio: doubling both
@@ -174,11 +187,11 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
 
   const masonry = layout === 'masonry';
   const packed = useMemo(() => {
-    const columns = masonry ? 2 : 3;
+    const columns = masonry ? masonryColumns : 3;
     if (!holdIncompleteRow || posts.length < columns) return posts;
     const rem = posts.length % columns;
     return rem ? posts.slice(0, posts.length - rem) : posts;
-  }, [holdIncompleteRow, posts, masonry]);
+  }, [holdIncompleteRow, posts, masonry, masonryColumns]);
   const latest = useRef({ onTilePress, onTileLongPress, flatIndexOf });
   latest.current = { onTilePress, onTileLongPress, flatIndexOf };
   const handleTilePress = useCallback((post: DiscoverPost) => latest.current.onTilePress(post, latest.current.flatIndexOf.get(post.id) ?? 0), []);
@@ -215,7 +228,7 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
     masonry,
   ]);
 
-  const masonryColumnWidth = (width - MASONRY_SIDE * 2 - MASONRY_GUTTER) / 2;
+  const masonryColumnWidth = (width - MASONRY_SIDE * 2 - MASONRY_GUTTER * (masonryColumns - 1)) / masonryColumns;
   const masonrySections = useMemo((): MasonrySection[] => {
     if (!masonry || loading) return [];
     return buildMasonrySections(rows, { trendingNow: trendingProducts.length > 0 });
@@ -256,9 +269,9 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
 
   function renderMasonryBlock(posts: DiscoverPost[]) {
     const imageHeightOf = (post: DiscoverPost) => Math.round(masonryColumnWidth / tileAspectRatio(post));
-    const cols = splitMasonryColumns(posts, (post) => imageHeightOf(post) + (hideCreatorRows ? 0 : MASONRY_CAPTION_HEIGHT), MASONRY_ROW_GAP);
-    const column = (list: DiscoverPost[]) => (
-      <View style={{ width: masonryColumnWidth, gap: MASONRY_ROW_GAP }}>
+    const tileHeightOf = (post: DiscoverPost) => imageHeightOf(post) + (hideCreatorRows ? 0 : MASONRY_CAPTION_HEIGHT);
+    const column = (list: DiscoverPost[], key?: number) => (
+      <View key={key} style={{ width: masonryColumnWidth, gap: MASONRY_ROW_GAP }}>
         {list.map((post) => (
           <DiscoverMasonryTile
             key={post.id}
@@ -272,6 +285,14 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
         ))}
       </View>
     );
+    if (masonryColumns !== 2) {
+      return (
+        <View style={styles.masonryBlock}>
+          {splitMasonryColumnsN(posts, masonryColumns, tileHeightOf, MASONRY_ROW_GAP).map((list, i) => column(list, i))}
+        </View>
+      );
+    }
+    const cols = splitMasonryColumns(posts, tileHeightOf, MASONRY_ROW_GAP);
     return (
       <View style={styles.masonryBlock}>
         {column(cols.left)}
@@ -332,11 +353,11 @@ export const DiscoverGrid = forwardRef<FlashListRef<Row>, {
         ListEmptyComponent={listEmpty}
         renderItem={({ item: section }) => {
           if (section.type === 'skeleton') {
-            const left = SKELETON_ASPECTS.filter((_, i) => i % 2 === 0);
-            const right = SKELETON_ASPECTS.filter((_, i) => i % 2 === 1);
+            const skeletonColumns = Array.from({ length: masonryColumns }, (_, col) =>
+              SKELETON_ASPECTS.filter((_, i) => i % masonryColumns === col));
             return (
               <View style={styles.masonryBlock}>
-                {[left, right].map((aspects, col) => (
+                {skeletonColumns.map((aspects, col) => (
                   <View key={col} style={{ width: masonryColumnWidth, gap: MASONRY_ROW_GAP }}>
                     {aspects.map((a, i) => (
                       <DiscoverMasonryTileSkeleton key={i} width={masonryColumnWidth} imageHeight={Math.round(masonryColumnWidth / a)} />

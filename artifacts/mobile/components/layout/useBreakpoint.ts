@@ -1,5 +1,6 @@
 import { useWindowDimensions } from 'react-native';
 import { BREAKPOINT, CONTENT_MAX_WIDTH, GRID_MAX_WIDTH, GUTTER } from '@/lib/theme';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 
 /**
  * One shared breakpoint read so every screen agrees on when it's "iPad" —
@@ -7,7 +8,12 @@ import { BREAKPOINT, CONTENT_MAX_WIDTH, GRID_MAX_WIDTH, GUTTER } from '@/lib/the
  * phones. Use `isTablet` to switch column counts, not orientation alone.
  */
 export function useBreakpoint() {
-  const { width, height } = useWindowDimensions();
+  const windowSize = useWindowDimensions();
+  // Inside the desktop web shell, screens lay out against their content
+  // column (beside the sidebar), not the whole browser window.
+  const desktopShell = useDesktopShell();
+  const width = desktopShell ? desktopShell.contentWidth : windowSize.width;
+  const height = desktopShell ? desktopShell.contentHeight : windowSize.height;
   const isTablet = width >= BREAKPOINT.tablet;
   const isLandscape = width > height;
   return { width, height, isTablet, isLandscape };

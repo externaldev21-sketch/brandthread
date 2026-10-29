@@ -110,6 +110,7 @@ import { useReadyToSell } from '@/hooks/useReadyToSell';
 import { BG, FG, FONT, FS, GRID_MAX_WIDTH, MUTED, RADIUS, SCREEN_BG, SP } from '@/lib/theme';
 
 import { Icon } from '@/components/ui/Icon';
+import { DesktopColumns } from '@/components/web/DesktopColumns';
 
 import { updateSellerTodayWidget } from '@/lib/nativeSystem';
 import { SellerDashboardTodo, SHIP_NOW_ROUTE } from '@/components/SellerDashboardTodo';
@@ -1052,6 +1053,9 @@ export default function SellerHomeCommerceDashboard({
                 )}
               </View>
 
+              {/* Desktop web: the cards below flow into two columns beside
+                  the sidebar (components/web/DesktopColumns); one stack elsewhere. */}
+              <DesktopColumns>
               {/* AI suggestions from the seller's own data; renders nothing
                   when AI Settings turns them off or there are none. */}
               <SellerDashboardAISuggestions theme={theme} refreshKey={retryTick + storeContextTick} style={styles.section} />
@@ -1126,6 +1130,7 @@ export default function SellerHomeCommerceDashboard({
                   onOpenOrder={(id) => nav(`/order-detail?id=${encodeURIComponent(id)}`)}
                 />
               </View>
+              </DesktopColumns>
             </>
           )}
 

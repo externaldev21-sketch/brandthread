@@ -7,7 +7,8 @@
  * (https://mobbin.com/screens/8f7bd3a9-1ab5-4288-9827-55d517cebb84).
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useContentDimensions } from '@/components/web/DesktopShellContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP, FONT } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -33,7 +34,7 @@ function railCardWidth(screenWidth: number): number {
 
 export function DiscoverTrendingBrandsRail({ brands, onSeeAll }: { brands: BrandCardData[]; onSeeAll?: () => void }) {
   const { theme } = useAppTheme();
-  const { width } = useWindowDimensions();
+  const { width } = useContentDimensions();
   const cardWidth = railCardWidth(width);
   if (brands.length === 0) return null;
   return (

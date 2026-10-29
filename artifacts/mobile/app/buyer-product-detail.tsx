@@ -69,6 +69,7 @@ import { useSignInGate } from '@/hooks/useSignInGate';
 import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_SUCCESS_G, FONT, FS, SP, RADIUS, COMP, ICON, TYPE } from '@/lib/theme';
 
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
+import { useDesktopShell } from '@/components/web/DesktopShellContext';
 
 import { SaveHeart } from '@/components/SaveHeart';
 
@@ -314,6 +315,20 @@ export const IN_BAG_CONFIRM_MS = 2000;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 const GALLERY_HEIGHT = Math.min(productPhotoHeight(GALLERY_WIDTH), Dimensions.get('window').height * 0.6);
 
+/**
+ * The gallery's size. Full-bleed (the constants above) everywhere except the
+ * desktop web shell's two-column product page, which provides the left
+ * column's size instead.
+ */
+const GalleryDimsContext = React.createContext({ width: GALLERY_WIDTH, height: GALLERY_HEIGHT });
+function useGalleryDims() {
+  return React.useContext(GalleryDimsContext);
+}
+
+/** Desktop web: gallery left, product info right, once the column is this wide. */
+const DESKTOP_TWO_COLUMN_MIN_WIDTH = 960;
+const DESKTOP_COLUMN_GAP = SP.xl;
+
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
   return '★'.repeat(full) + '☆'.repeat(5 - full);
@@ -363,6 +378,7 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
   onZoomChange?: (zoomed: boolean) => void;
   onLoupeChange?: (active: boolean) => void;
 }) {
+  const { width: galleryWidth, height: galleryHeight } = useGalleryDims();
   const [failed, setFailed] = useState(false);
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -380,12 +396,12 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
 
   const clampX = (x: number, sc: number) => {
     'worklet';
-    const max = (GALLERY_WIDTH * sc - GALLERY_WIDTH) / 2;
+    const max = (galleryWidth * sc - galleryWidth) / 2;
     return Math.max(-max, Math.min(max, x));
   };
   const clampY = (y: number, sc: number) => {
     'worklet';
-    const max = (GALLERY_HEIGHT * sc - GALLERY_HEIGHT) / 2;
+    const max = (galleryHeight * sc - galleryHeight) / 2;
     return Math.max(-max, Math.min(max, y));
   };
 
@@ -442,8 +458,8 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
         return;
       }
       // Zoom toward the tapped point.
-      const nextTx = clampX((GALLERY_WIDTH / 2 - e.x) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
-      const nextTy = clampY((GALLERY_HEIGHT / 2 - e.y) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
+      const nextTx = clampX((galleryWidth / 2 - e.x) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
+      const nextTy = clampY((galleryHeight / 2 - e.y) * (DOUBLE_TAP_ZOOM - 1), DOUBLE_TAP_ZOOM);
       scale.value = withTiming(DOUBLE_TAP_ZOOM, { duration: 220 });
       tx.value = withTiming(nextTx, { duration: 220 });
       ty.value = withTiming(nextTy, { duration: 220 });
@@ -462,12 +478,12 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
   }));
 
   if (failed) {
-    return <ProductPhotoPlaceholder brand={brand} name={name} style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT }} />;
+    return <ProductPhotoPlaceholder brand={brand} name={name} style={{ width: galleryWidth, height: galleryHeight }} />;
   }
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} testID="product-gallery-photo" {...loupe.touchHandlers}>
+      <View style={{ width: galleryWidth, height: galleryHeight, overflow: 'hidden' }} testID="product-gallery-photo" {...loupe.touchHandlers}>
         <Reanimated.View style={[StyleSheet.absoluteFill, imageStyle]}>
           <CachedImage
             source={{ uri }}
@@ -481,7 +497,7 @@ function ZoomableGalleryImage({ uri, brand, name, onOpen, onZoomChange, onLoupeC
             accessibilityLabel="Product photo. Pinch or double-tap to zoom."
           />
         </Reanimated.View>
-        {loupe.point && <GalleryLoupe uri={uri} point={loupe.point} width={GALLERY_WIDTH} height={GALLERY_HEIGHT} />}
+        {loupe.point && <GalleryLoupe uri={uri} point={loupe.point} width={galleryWidth} height={galleryHeight} />}
         {zoomed && (
           <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
             <AppIcon name="minimize-2" size={14} color={ON_DARK} />
@@ -538,6 +554,7 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
   /** Polish 94: picking a colour pages the gallery to that colour's photo. */
   focusUri?: string;
 }) {
+  const { width: galleryWidth, height: galleryHeight } = useGalleryDims();
   const images = imageUris.filter(Boolean);
   const slides: GallerySlide[] = [
     ...(video?.videoUrl ? [{ kind: 'video' as const, uri: video.videoUrl, poster: video.posterUrl }] : []),
@@ -568,13 +585,13 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
 
   if (!slides.length) {
     return (
-      <ProductPhotoPlaceholder brand={brand} name={name} style={galleryStyles.gallery} />
+      <ProductPhotoPlaceholder brand={brand} name={name} style={[galleryStyles.gallery, { width: galleryWidth, height: galleryHeight }]} />
     );
   }
 
   return (
     <View>
-      <View style={galleryStyles.gallery}>
+      <View style={[galleryStyles.gallery, { width: galleryWidth, height: galleryHeight }]}>
         <Animated.FlatList
           ref={listRef}
           data={slides}
@@ -584,12 +601,12 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
           scrollEnabled={!loupeActive && !zoomedPhoto}
           showsHorizontalScrollIndicator={false}
           renderItem={({ item, index }) => item.kind === 'video'
-            ? <GalleryVideoSlide video={video!} active={index === activeIndex} width={GALLERY_WIDTH} height={GALLERY_HEIGHT} />
+            ? <GalleryVideoSlide video={video!} active={index === activeIndex} width={galleryWidth} height={galleryHeight} />
             : <ZoomableGalleryImage uri={item.uri} brand={brand} name={name} onAspect={(aspect) => onPhotoAspect(item.uri, aspect)} onZoomChange={setZoomedPhoto} onOpen={() => setViewerIndex(images.indexOf(item.uri))} onLoupeChange={setLoupeActive} />}
-          getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
+          getItemLayout={(_, index) => ({ length: galleryWidth, offset: galleryWidth * index, index })}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
           onMomentumScrollEnd={(e) => {
-            const next = Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH);
+            const next = Math.round(e.nativeEvent.contentOffset.x / galleryWidth);
             const clamped = Math.max(0, Math.min(slides.length - 1, next));
             setActiveIndex(clamped);
             onIndexChange?.(clamped);
@@ -598,7 +615,7 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
         />
         <View style={galleryStyles.galleryShade} pointerEvents="none" />
         {showPinchHint && slides[activeIndex]?.kind === 'image' && (() => {
-          const bands = containedPhotoBands(GALLERY_WIDTH, GALLERY_HEIGHT, aspectByUri[slides[activeIndex].uri]);
+          const bands = containedPhotoBands(galleryWidth, galleryHeight, aspectByUri[slides[activeIndex].uri]);
           return (
           <View
             style={[galleryStyles.galleryMeta, { left: SP.md + bands.horizontal, bottom: SP.md + bands.vertical }]}
@@ -622,12 +639,12 @@ export function ProductGallery({ imageUris, accentColor, video, focusUri, brand,
           <View style={galleryStyles.dots} pointerEvents="none">
             {slides.map((_, index) => {
               const width = scrollX.interpolate({
-                inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+                inputRange: [(index - 1) * galleryWidth, index * galleryWidth, (index + 1) * galleryWidth],
                 outputRange: [6, 16, 6],
                 extrapolate: 'clamp',
               });
               const opacity = scrollX.interpolate({
-                inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+                inputRange: [(index - 1) * galleryWidth, index * galleryWidth, (index + 1) * galleryWidth],
                 outputRange: [0.45, 1, 0.45],
                 extrapolate: 'clamp',
               });
@@ -1004,6 +1021,18 @@ export default function BuyerProductDetailScreen() {
     return usesThreadPull ? back() : goBackOr(router, '/(buyer)/discover');
   };
   const insets = useSafeAreaInsets();
+  // Desktop web shell: gallery left, info right (see GalleryDimsContext).
+  const desktopShell = useDesktopShell();
+  const desktopColumns = useMemo(() => {
+    if (!desktopShell || desktopShell.contentWidth < DESKTOP_TWO_COLUMN_MIN_WIDTH) return null;
+    const galleryWidth = Math.round((desktopShell.contentWidth - DESKTOP_COLUMN_GAP) * 0.55);
+    const galleryHeight = Math.round(Math.min(productPhotoHeight(galleryWidth), desktopShell.contentHeight - SP.xxl * 2));
+    return { galleryWidth, galleryHeight };
+  }, [desktopShell]);
+  const galleryDims = useMemo(
+    () => (desktopColumns ? { width: desktopColumns.galleryWidth, height: desktopColumns.galleryHeight } : { width: GALLERY_WIDTH, height: GALLERY_HEIGHT }),
+    [desktopColumns],
+  );
   const [topBarHeight, setTopBarHeight] = useState(0);
   const headerTopInset = useHeaderTopInset();
   const api    = useApi();
@@ -1654,7 +1683,7 @@ export default function BuyerProductDetailScreen() {
         scrollEventThrottle={16}
         onScroll={(e) => {
           scrollYRef.current = e.nativeEvent.contentOffset.y;
-          const next = e.nativeEvent.contentOffset.y > GALLERY_HEIGHT - topBarHeight;
+          const next = e.nativeEvent.contentOffset.y > galleryDims.height - topBarHeight;
           if (next !== pastPhotoRef.current) { pastPhotoRef.current = next; setPastPhoto(next); }
         }}
         refreshControl={
@@ -1664,10 +1693,19 @@ export default function BuyerProductDetailScreen() {
             tintColor={PURPLE}
           />
         }
-        contentContainerStyle={{ paddingBottom: insets.bottom + 184 }}
+        contentContainerStyle={[
+          { paddingBottom: insets.bottom + 184 },
+          // Both columns start below the top bar, which stays solid on desktop.
+          desktopColumns && { flexDirection: 'row', alignItems: 'flex-start', gap: DESKTOP_COLUMN_GAP, paddingTop: headerTopInset + SP.sm + COMP.iconBtn + SP.sm },
+        ]}
       >
+        <GalleryDimsContext.Provider value={galleryDims}>
         {/* Immersive product gallery */}
-        <View style={s.imageArea} ref={galleryRef} collapsable={false}>
+        <View
+          style={[s.imageArea, desktopColumns && { width: desktopColumns.galleryWidth, minHeight: desktopColumns.galleryHeight, borderRadius: RADIUS.lg, overflow: 'hidden' }]}
+          ref={galleryRef}
+          collapsable={false}
+        >
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} video={galleryVideo} focusUri={product.options.find(o => o.id === "opt_color")?.values.find(v => v.id === selections.opt_color)?.imageUri} brand={product.sellerName} name={product.name} onIndexChange={(i) => { galleryIndexRef.current = i; }} />
           {sellerPreview && (
             <View
@@ -1683,7 +1721,9 @@ export default function BuyerProductDetailScreen() {
           )}
         </View>
 
-        <ResponsiveContainer style={s.body}>
+        </GalleryDimsContext.Provider>
+
+        <ResponsiveContainer style={desktopColumns ? { ...s.body, flex: 1, minWidth: 0, width: undefined, paddingHorizontal: 0, paddingTop: 0 } : s.body}>
           {/* Polish 87: lululemon's model line, directly under the photos. */}
           <ModelInfoLine details={pageDetails} />
           {/* Badges */}
@@ -2103,7 +2143,7 @@ export default function BuyerProductDetailScreen() {
         style={[
           s.topBar,
           { paddingTop: headerTopInset + SP.sm, paddingLeft: SP.md + insets.left, paddingRight: SP.md + insets.right },
-          pastPhoto && { backgroundColor: theme.background },
+          (pastPhoto || desktopColumns) && { backgroundColor: theme.background },
         ]}
         pointerEvents="box-none"
         testID="product-top-bar"
@@ -2202,7 +2242,7 @@ export default function BuyerProductDetailScreen() {
           This screen is pushed as a root stack card over the whole app (not
           nested under the buyer tab group), so it never sits behind the
           floating tab bar — no tabBarInset is passed. */}
-      <StickyFooter style={s.actionBar}>
+      <StickyFooter style={desktopColumns ? { ...s.actionBar, left: desktopColumns.galleryWidth + DESKTOP_COLUMN_GAP - SP.md } : s.actionBar}>
       <View
         ref={actionBarRef}
         onLayout={actionBarOnLayout}

@@ -79,6 +79,22 @@ export function splitMasonryColumns<T>(items: T[], heightOf: (item: T) => number
   return out;
 }
 
+/**
+ * The same greedy shortest-column split across `count` columns — the desktop
+ * web Discover grid's wider masonry (ties go to the leftmost column).
+ */
+export function splitMasonryColumnsN<T>(items: T[], count: number, heightOf: (item: T) => number, gap = 0): T[][] {
+  const columns: T[][] = Array.from({ length: count }, () => []);
+  const heights = new Array<number>(count).fill(0);
+  for (const item of items) {
+    let target = 0;
+    for (let i = 1; i < count; i++) if (heights[i] < heights[target]) target = i;
+    heights[target] += (columns[target].length > 0 ? gap : 0) + heightOf(item);
+    columns[target].push(item);
+  }
+  return columns;
+}
+
 type MasonryRow = GridRow | { key: string; type: "sponsored"; item: SponsoredFeedItem };
 export type MasonrySection =
   | { key: string; type: 'trendingNow' }

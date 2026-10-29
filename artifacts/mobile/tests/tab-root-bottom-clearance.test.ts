@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 let bottomInset = 0;
 vi.mock('react-native', () => ({ useWindowDimensions: () => ({ width: 390, height: 844 }) }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: bottomInset, left: 0, right: 0 }) }));
+// Outside the desktop web shell (which has no floating bar to clear).
+vi.mock('@/components/web/DesktopShellContext', () => ({ useDesktopShell: () => null }));
 
 import { getBuyerTabBarMetrics, useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
 
