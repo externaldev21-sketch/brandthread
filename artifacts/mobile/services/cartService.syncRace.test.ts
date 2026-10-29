@@ -21,7 +21,7 @@ vi.mock("@/lib/serviceConfig", () => ({ serviceRequest }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("@/lib/marketingPixels", () => ({ trackAndRelayConversionEvent: vi.fn(() => false) }));
 
-import { addToCart, getCartForScreen, initCartService, resolveRemoteCart } from "./cartService";
+import { addToCart, clearCartCache, getCartForScreen, initCartService, resolveRemoteCart } from "./cartService";
 import type { BuyerProduct, BuyerProductVariant, Cart } from "./cartTypes";
 
 function product(id: string): BuyerProduct {
@@ -57,10 +57,14 @@ function fakeServer(initial: { items: any[]; savedItems: any[] }, opts: { syncFa
 }
 
 describe("cart write-through sync — the added line survives the next read", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     store.clear();
     serviceRequest.mockReset();
     initCartService("sync-race-user");
+    // Each test is a fresh install for this account: forget the previous
+    // test's "confirmed against the server" stamp too (the real sign-out
+    // path), or the next add trusts an empty local bag as already confirmed.
+    await clearCartCache("sync-race-user");
   });
 
   it("keeps the added item when the cart screen loads while the sync is still in flight", async () => {
@@ -123,7 +127,22 @@ describe("resolveRemoteCart", () => {
     expect(r.adoptedRemote).toBe(true);
     expect(r.cart.items).toHaveLength(1);
   });
-  it("keeps the local cart when the server is empty", () => {
-    expect(resolveRemoteCart(local, { items: [], savedItems: [] }).adoptedRemote).toBe(false);
+  // Deliberate rule (services/cartSync.ts reconcileCartLoad): an empty server
+  // bag only loses to a local bag that has lines the server may never have
+  // received (pending, or cached before the sync marker existed); an
+  // acknowledged local bag follows the server even when it was emptied on
+  // another device.
+  it("keeps (and re-pushes) a never-synced local cart when the server is empty", () => {
+    const untracked: Cart = { ...local, items: [serverLine("kept") as any] };
+    const r = resolveRemoteCart(untracked, { items: [], savedItems: [] });
+    expect(r.adoptedRemote).toBe(false);
+    expect(r.push).toBe(true);
+    expect(r.cart.items.map(i => i.productId)).toEqual(["kept"]);
+  });
+  it("follows an emptied server cart once local changes were acknowledged", () => {
+    const acknowledged: Cart = { ...local, items: [serverLine("gone") as any], syncPending: false };
+    const r = resolveRemoteCart(acknowledged, { items: [], savedItems: [] });
+    expect(r.adoptedRemote).toBe(true);
+    expect(r.cart.items).toEqual([]);
   });
 });

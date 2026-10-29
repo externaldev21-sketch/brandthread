@@ -77,7 +77,13 @@ describe("Cart persistence when the browser's storage throws (blocked/sandboxed 
     storageState.blocked = true;
     __resetSafeStorageForTests();
     serviceRequest.mockReset();
-    serviceRequest.mockResolvedValue({ items: [], savedItems: [] });
+    // A server that keeps what a sync sends (like api-server routes/cart-db.ts):
+    // once a sync is acknowledged, the next read returns that bag.
+    let serverCart: { items: unknown[]; savedItems: unknown[] } = { items: [], savedItems: [] };
+    serviceRequest.mockImplementation(async (path: string, init?: { body?: string }) => {
+      if (path === "/api/buyer/cart/sync") { serverCart = JSON.parse(init!.body!); return { ok: true }; }
+      return serverCart;
+    });
     // Matches the reported repro: a signed-in buyer, addToCart() from Shop
     // the Post on a web preview whose persistent storage is unavailable.
     initCartService("storage-blocked-test-user");

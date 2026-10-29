@@ -7,7 +7,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,10 +58,12 @@ async function persist(results: BgRemovalResult[]): Promise<void> {
  * Uses Paths.document so the file survives app restarts.
  */
 function buildLocalPath(id: string): string {
-  const dir = new File(Paths.document, BG_RESULTS_DIR);
+  // A Directory, not a File: File#create() would make an empty *file* named
+  // bg-results, and every PNG write beneath it would then fail.
+  const dir = new Directory(Paths.document, BG_RESULTS_DIR);
   if (!dir.exists) {
     // Create directory synchronously — expo-file-system v19 supports this
-    try { dir.create(); } catch {}
+    try { dir.create({ intermediates: true, idempotent: true }); } catch {}
   }
   return new File(dir, `${id}.png`).uri;
 }
