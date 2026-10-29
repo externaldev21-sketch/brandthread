@@ -114,10 +114,17 @@ function PostCard({
   const zoomingRef = useRef(false);
   const zoomEndedAt = useRef(0);
   useEffect(() => () => { if (singleTapTimer.current) clearTimeout(singleTapTimer.current); }, []);
-  const onMediaPress = (event: GestureResponderEvent) => {
+  // Where the finger went down: on web onPress carries the click event,
+  // which has no locationX/Y, so the point comes from onPressIn (as Home does).
+  const pressPoint = useRef({ x: 0, y: 0 });
+  const onMediaPressIn = (event: GestureResponderEvent) => {
+    const { locationX, locationY } = event.nativeEvent;
+    if (Number.isFinite(locationX) && Number.isFinite(locationY)) pressPoint.current = { x: locationX, y: locationY };
+  };
+  const onMediaPress = () => {
     // A pinch that just ended is not a tap.
     if (zoomingRef.current || Date.now() - zoomEndedAt.current < 300) { lastTap.current = null; return; }
-    const { locationX: x, locationY: y } = event.nativeEvent;
+    const { x, y } = pressPoint.current;
     const now = Date.now();
     const prev = lastTap.current;
     if (prev && now - prev.at < DOUBLE_TAP_MS && Math.hypot(prev.x - x, prev.y - y) < 40) {
@@ -181,7 +188,7 @@ function PostCard({
       {/* Media — Instagram: double-tap likes (heart where you tapped), one
           tap still opens comments once the double-tap window has passed,
           two fingers zoom the photo in place above the feed. */}
-      <PressableScale accessibilityLabel="Open comments" onPress={onMediaPress} style={s.mediaPress} testID={`friends-post-media-${post.id}`}>
+      <PressableScale accessibilityLabel="Open comments" onPressIn={onMediaPressIn} onPress={onMediaPress} style={s.mediaPress} testID={`friends-post-media-${post.id}`}>
         <PinchToZoom uri={post.mediaUrl} onZoomChange={(z) => { zoomingRef.current = z; if (!z) zoomEndedAt.current = Date.now(); }} testID={`friends-post-zoom-${post.id}`}>
           {post.mediaUrl ? (
             <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />

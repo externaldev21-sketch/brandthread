@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, runOnJS, useAnimatedStyle, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Icon } from '@/components/ui/Icon';
@@ -134,18 +134,28 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
     }
   };
 
-  const contentWidth = useSharedValue(-1);
-  // The new label gets its full natural width at once, so it never wraps or
-  // ellipsizes while the clip around it is still easing open.
-  const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
-  const onMeasure = (e: LayoutChangeEvent) => {
+  // Width morph: at rest the content lays out naturally (exactly as before).
+  // Only when the label changes is the width pinned to the old label's width
+  // and eased to the new one, then released again.
+  const contentWidth = useSharedValue(0);
+  const morphing = useSharedValue(false);
+  const lastMeasured = useRef<{ label: string; width: number } | null>(null);
+  const endMorph = () => { morphing.value = false; };
+  const onMeasure = (e: LayoutChangeEvent, measuredLabel: string) => {
     const w = Math.ceil(e.nativeEvent.layout.width);
     if (w <= 0) return;
-    setNaturalWidth(w);
-    // First measure sizes it outright; every later change eases.
-    contentWidth.value = contentWidth.value < 0 ? w : withTiming(w, { duration: 220, easing: Easing.out(Easing.cubic) });
+    const prev = lastMeasured.current;
+    lastMeasured.current = { label: measuredLabel, width: w };
+    // First layout, or the same label re-measured (e.g. the font finished
+    // loading): nothing to animate.
+    if (!prev || prev.label === measuredLabel || prev.width === w) return;
+    contentWidth.value = prev.width;
+    morphing.value = true;
+    contentWidth.value = withTiming(w, { duration: 220, easing: Easing.out(Easing.cubic) }, (finished) => {
+      if (finished) runOnJS(endMorph)();
+    });
   };
-  const widthStyle = useAnimatedStyle(() => (contentWidth.value < 0 ? {} : { width: contentWidth.value }));
+  const widthStyle = useAnimatedStyle(() => (morphing.value ? { width: contentWidth.value } : {}));
 
   const label = state.isFollowing
     ? (state.isMutual ? 'Friends' : 'Following')
@@ -155,7 +165,7 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
   const content = (
     <>
       {state.isFollowing && <Icon name="check" size={14} color={fg} style={styles.icon} />}
-      <Text style={[styles.label, { color: fg }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.label, styles.noShrink, { color: fg }]}>{label}</Text>
     </>
   );
 
@@ -181,12 +191,12 @@ export default function FollowButton({ userId, initial, onChange, disabled, size
       ]}
     >
       <Animated.View style={[styles.morph, widthStyle]}>
-        <Animated.View key={label} entering={FadeIn.duration(160)} style={[styles.row, styles.label0, naturalWidth != null && { width: naturalWidth }]}>
+        <Animated.View key={label} entering={FadeIn.duration(160)} style={[styles.row, styles.noShrink]}>
           {content}
         </Animated.View>
         {/* Invisible copy at natural width: drives the width ease above. */}
         <View style={[styles.measureBox, { width: MEASURE_ROOM }]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <View style={styles.row} onLayout={onMeasure}>{content}</View>
+          <View style={styles.row} onLayout={(e) => onMeasure(e, label)}>{content}</View>
         </View>
       </Animated.View>
     </Pressable>
@@ -210,7 +220,7 @@ const makeStyles = (theme: AppThemePreset, size: 'default' | 'compact') => Style
   icon: { marginRight: 4 },
   morph: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  label0: { justifyContent: 'center', flexShrink: 0 },
+  noShrink: { flexShrink: 0 },
   measureBox: { position: 'absolute', left: 0, top: 0, flexDirection: 'row', alignItems: 'flex-start', opacity: 0 },
   label: { fontFamily: FONT.semibold, fontSize: size === 'compact' ? FS.meta : FS.sm },
 });

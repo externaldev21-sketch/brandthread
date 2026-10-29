@@ -13,7 +13,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  DEFAULT_BUILD_DIR, MOBILE_ROOT, launchBrowser, openContext, openScreen, serveBuild, waitForQuietNetwork,
+  DEV_BUILD_DIR, DEFAULT_BUILD_DIR, MOBILE_ROOT, launchBrowser, openContext, openScreen, serveBuild, waitForQuietNetwork,
 } from './store-screenshots/harness.mjs';
 import { ensureDemoImages } from './store-screenshots/demo-images.mjs';
 
@@ -22,6 +22,8 @@ const val = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const OUT = path.resolve(val('--out', path.join(MOBILE_ROOT, 'scratch', 'micro-interactions')));
 const BUILD = path.resolve(val('--build-dir', DEFAULT_BUILD_DIR));
 const ONLY = val('--only', null)?.split(',');
+// DMs use the dev-mode export: the preview conversations are __DEV__ seeds.
+const DEV_BUILD = path.resolve(val('--dev-build-dir', DEV_BUILD_DIR));
 const DEVICE = { viewport: { width: 390, height: 844 }, scale: 2, isMobile: true, userAgent: undefined };
 const IMAGE_HOST = 'https://cdn.brandthread.test';
 const img = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
@@ -80,13 +82,26 @@ const exists = (page, testId) => page.getByTestId(testId).count().then((n) => n 
 
 // Home feed fixture: a 3-photo post first (edge taps / pinch), then the demo
 // posts. `fresh` adds a brand-new post on top (the "New posts" check).
+async function stubInteractions(context) {
+  await context.route(/api\.brandthread\.test\/api\/(v1\/)?(posts\/[^/]+\/(interact|like|save)|buyer\/saved)/, async (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fallback();
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      headers: { 'access-control-allow-origin': req.headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
+      body: JSON.stringify({ action: 'added' }),
+    });
+  });
+}
+
 function feedRoutes(state) {
   return async (context) => {
+    await stubInteractions(context);
     await context.route(/api\.brandthread\.test\/api\/(v1\/)?(posts\/feed|public\/posts|posts\/for-you|feed\/for-you)/, async (route) => {
       const req = route.request();
       if (req.method() === 'OPTIONS') return route.fallback();
       const base = Array.from({ length: 5 }, (_, i) => ({
-        id: `post_mi_${i + 1}`, userId: 'user_seller_northline',
+        id: `0000000${i + 1}-0000-4000-8000-00000000000${i + 1}`, userId: 'user_seller_northline',
         seller: { brandName: 'Northline Studio', displayName: 'Northline Studio' },
         caption: i === 0 ? 'Three looks, one jacket.' : `Look ${i + 1}`,
         mediaType: 'photo',
@@ -94,7 +109,7 @@ function feedRoutes(state) {
         mediaUrl: img('story-rust'), likesCount: 100 + i, commentsCount: 3, repostsCount: 1,
         createdAt: new Date(Date.now() - (i + 1) * 3600e3).toISOString(),
       }));
-      const rows = state.fresh ? [{ ...base[1], id: 'post_mi_fresh', caption: 'Just posted' }, ...base] : base;
+      const rows = state.fresh ? [{ ...base[1], id: '00000009-0000-4000-8000-000000000009', caption: 'Just posted' }, ...base] : base;
       state.feedRequests = (state.feedRequests ?? 0) + 1;
       const offset = Number(new URL(req.url()).searchParams.get('offset') ?? 0);
       return route.fulfill({
@@ -113,7 +128,9 @@ Object.assign(STEPS, {
     const s = await open(browser, images, origin, 'buyer', '/', { routes: feedRoutes(state) });
     await s.settle(2500);
     await s.shot('home-00-start');
-    const r = { feedRequestsAtStart: state.feedRequests ?? 0 };
+    const r = { feedRequestsAtStart: state.feedRequests ?? 0, engagementCalls: [] };
+    s.page.on('response', (res) => { if (/interact|saved|like/.test(res.url()) && res.request().method() !== 'OPTIONS') r.engagementCalls.push(`${res.request().method()} ${new URL(res.url()).pathname} ${res.status()}`); });
+    s.page.on('requestfailed', (req) => { if (/interact|like/.test(req.url())) r.engagementCalls.push(`FAILED ${req.method()} ${req.url()} ${req.failure()?.errorText}`); });
     const surface = await s.page.locator('[data-testid^="video-touch-surface-"]').first().boundingBox();
     r.surface = surface;
     const midX = 195, midY = 420;
@@ -130,7 +147,11 @@ Object.assign(STEPS, {
     await s.shot('home-02-edge-tap-left');
     // Double-tap like: heart burst frames.
     await tap(s.cdp, midX, midY); await s.page.waitForTimeout(90); await tap(s.cdp, midX, midY);
-    await frames(s, 'home-03-double-tap-heart', 5, 110);
+    for (let i = 0; i < 5; i += 1) {
+      await s.shot(`home-03-double-tap-heart-f${i}`);
+      await s.page.locator('[data-testid^="like-btn-"]').first().screenshot({ path: path.join(OUT, `home-03b-rail-heart-pop-f${i}.png`) }).catch(() => {});
+      await s.page.waitForTimeout(70);
+    }
     r.likeLabelAfterDoubleTap = await s.page.locator('[data-testid^="like-btn-"]').first().getAttribute('aria-label').catch(() => null);
     r.dotsAfterDoubleTap = [await dotColor(0), await dotColor(1)];
     // Pinch in place: two fingers spread from the photo's middle.
@@ -176,6 +197,241 @@ Object.assign(STEPS, {
     await s.shot('home-08-after-home-retap');
     results.home = r;
     await s.context.close();
+  },
+});
+
+// The demo friend-activity rows omit `hashtags`, which the real API always
+// sends (api-server social.ts) — the Friends card reads `.length` on it.
+function friendsRoutes() {
+  return async (context) => {
+    await stubInteractions(context);
+    await context.route(/api\.brandthread\.test\/api\/(v1\/)?social\/friends\/activity/, async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') return route.fallback();
+      const rows = ['look-mono', 'hoodie-moss', 'runner-rust'].map((image, i) => ({
+        id: `1000000${i + 1}-0000-4000-8000-00000000000${i + 1}`, authorId: `user_friend_${i + 1}`,
+        authorName: ['Ava Chen', 'Sam Ortiz', 'Priya Nair'][i], authorHandle: ['@avachen', '@samortiz', '@priyanair'][i],
+        authorInitials: ['AC', 'SO', 'PN'][i], authorColor: '#2A2A2E', type: 'photo', mediaUrl: img(image),
+        caption: ['Mono fit check.', 'Moss hoodie, finally.', 'Trail Runner 02 on the commute.'][i], hashtags: [],
+        likesCount: 40 - i, commentsCount: 3, repostsCount: 1, likedByMe: false, repostedByMe: false,
+        createdAt: new Date(Date.now() - (i + 1) * 3600e3).toISOString(),
+      }));
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        headers: { 'access-control-allow-origin': req.headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
+        body: JSON.stringify(rows),
+      });
+    });
+  };
+}
+
+async function openWithRetry(browser, images, origin, role, target, ready, opts) {
+  for (let attempt = 0; ; attempt += 1) {
+    const s = await open(browser, images, origin, role, target, opts);
+    try { await ready(s.page).first().waitFor({ timeout: 15_000 }); return s; } catch (e) {
+      await s.context.close();
+      if (attempt >= 2) throw e;
+    }
+  }
+}
+
+Object.assign(STEPS, {
+  // Friends card: (1) double-tap like + heart pop, (2) in-place pinch, (13) save bounce + toast
+  async friends(browser, images, origin) {
+    const s = await openWithRetry(browser, images, origin, 'buyer', '/friends',
+      (p) => p.locator('[data-testid^="friends-post-media-"]'), { routes: friendsRoutes() });
+    await s.settle(1200);
+    const r = {};
+    const m = await box(s.page, 'friends-post-media-10000001-0000-4000-8000-000000000001');
+    await s.shot('friends-00-start');
+    // Single tap must wait for the double-tap window; double tap likes.
+    await tap(s.cdp, m.cx, m.cy); await s.page.waitForTimeout(90); await tap(s.cdp, m.cx, m.cy);
+    await frames(s, 'friends-01-double-tap-heart', 5, 100);
+    r.urlAfterDoubleTap = s.page.url();
+    r.likeCountAfterDoubleTap = await s.page.getByTestId('friends-like-icon-10000001-0000-4000-8000-000000000001').locator('xpath=..').innerText().catch(() => null);
+    // Pinch in place over the photo.
+    const fr = [];
+    for (let i = 0; i <= 12; i += 1) {
+      const d = lerp(30, 120, i / 12);
+      fr.push([{ x: m.cx - d, y: m.cy - d * 0.4 }, { x: m.cx + d, y: m.cy + d * 0.4 }]);
+    }
+    await touchPath(s.cdp, fr, { stepMs: 24 });
+    await s.page.waitForTimeout(150);
+    r.zoomLiftWhilePinching = await exists(s.page, 'photo-zoom-lift');
+    await s.shot('friends-02-pinch-zoom-mid');
+    await touchEnd(s.cdp);
+    await s.page.waitForTimeout(900);
+    r.zoomLiftAfterRelease = await exists(s.page, 'photo-zoom-lift');
+    r.urlAfterPinch = s.page.url();
+    // Save: bookmark bounce + saved bar.
+    const save = s.page.getByLabel('Save post').first();
+    await save.scrollIntoViewIfNeeded().catch(() => {});
+    const sb = await save.boundingBox();
+    if (sb) await tap(s.cdp, sb.x + sb.width / 2, sb.y + sb.height / 2);
+    await frames(s, 'friends-03-save', 4, 120);
+    r.savedToastText = await s.page.getByText('Added to Favorites').first().isVisible().catch(() => false);
+    // Single tap still opens comments (after the window).
+    await tap(s.cdp, m.cx, m.cy);
+    await s.page.waitForTimeout(1500);
+    r.urlAfterSingleTap = s.page.url();
+    results.friends = r;
+    await s.context.close();
+  },
+
+  // (12) comment sheet physics on Home
+  async comments(browser, images, origin) {
+    const state = {};
+    const s = await openWithRetry(browser, images, origin, 'buyer', '/',
+      (p) => p.locator('[data-testid^="comment-btn-"]'), { routes: feedRoutes(state) });
+    await s.settle(1500);
+    const r = {};
+    await s.page.locator('[data-testid^="comment-btn-"]').first().click();
+    await s.page.getByTestId('comments-sheet').first().waitFor({ timeout: 15_000 });
+    await s.page.waitForTimeout(900);
+    r.openDetent = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
+    await s.shot('comments-00-half');
+    const sheet = await box(s.page, 'comments-sheet');
+    const gx = 195, gy = sheet.y - 8; // the grabber row sits just above the thread
+    r.sheetTopHalf = sheet.y;
+    // Drag the handle up past the top -> full.
+    const up = []; for (let i = 0; i <= 15; i += 1) up.push([{ x: gx, y: lerp(gy, 60, i / 15) }]);
+    await touchPath(s.cdp, up, { stepMs: 20 });
+    await s.shot('comments-01-dragging-up');
+    await touchEnd(s.cdp);
+    await s.page.waitForTimeout(900);
+    r.detentAfterPullUp = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
+    r.sheetTopFull = (await box(s.page, 'comments-sheet')).y;
+    await s.shot('comments-02-full');
+    // Flick down from full -> back to half.
+    const top = (await box(s.page, 'comments-sheet')).y - 8;
+    const flick1 = []; for (let i = 0; i <= 8; i += 1) flick1.push([{ x: gx, y: top + 170 * (i / 8) ** 1.5 }]);
+    await touchPath(s.cdp, flick1, { stepMs: 16 });
+    await s.shot('comments-02b-dragging-down');
+    await touchEnd(s.cdp);
+    await s.page.waitForTimeout(900);
+    r.detentAfterFlickDown = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
+    await s.shot('comments-03-back-to-half');
+    // Flick down from half -> dismissed.
+    const top2 = (await box(s.page, 'comments-sheet')).y - 8;
+    const flick2 = []; for (let i = 0; i <= 8; i += 1) flick2.push([{ x: gx, y: top2 + 260 * (i / 8) ** 1.5 }]);
+    await touchPath(s.cdp, flick2, { stepMs: 16 });
+    await touchEnd(s.cdp);
+    await s.page.waitForTimeout(1200);
+    r.sheetGoneAfterFlick = !(await exists(s.page, 'comments-sheet'));
+    await s.shot('comments-04-dismissed');
+    results.comments = r;
+    await s.context.close();
+  },
+
+  // (11) Follow -> Following morph (Discover > People)
+  async follow(browser, images, origin) {
+    const s = await openWithRetry(browser, images, origin, 'buyer', '/discover',
+      (p) => p.getByText('People', { exact: true }));
+    await s.settle(800);
+    for (let i = 0; i < 4; i += 1) {
+      await s.page.getByText('People', { exact: true }).first().click({ force: true });
+      try { await s.page.locator('[data-testid="follow-button"]').first().waitFor({ timeout: 8_000 }); break; } catch (e) { if (i === 3) throw e; }
+    }
+    await s.settle(600);
+    const btn = s.page.locator('[data-testid="follow-button"]').first();
+    const r = { labelBefore: await btn.getAttribute('aria-label'), widthBefore: (await btn.boundingBox())?.width };
+    await s.shot('follow-00-before');
+    await btn.click();
+    const widths = [];
+    for (let i = 0; i < 6; i += 1) {
+      widths.push(Math.round(((await btn.boundingBox())?.width ?? 0) * 10) / 10);
+      await s.shot(`follow-01-morph-f${i}`);
+      await s.page.waitForTimeout(45);
+    }
+    await s.page.waitForTimeout(400);
+    r.widthsDuringMorph = widths;
+    r.labelAfter = await btn.getAttribute('aria-label');
+    r.widthAfter = (await btn.boundingBox())?.width;
+    r.spinnerShown = await s.page.locator('[data-testid="follow-button"] [role="progressbar"]').count();
+    await s.shot('follow-02-after');
+    results.follow = r;
+    await s.context.close();
+  },
+
+  // (3) swipe-down dismiss on the product photo viewer + (14) bag tick
+  async product(browser, images, origin) {
+    const s = await openWithRetry(browser, images, origin, 'buyer', '/buyer-product-detail?productId=prod_nl_hoodie_ember',
+      (p) => p.getByTestId('product-add-to-cart'));
+    await s.settle(1200);
+    const r = {};
+    // Bag: add to cart, film the badge.
+    r.badgeBefore = await s.page.getByTestId('product-cart-badge').innerText().catch(() => null);
+    await s.page.getByTestId('product-add-to-cart').click();
+    for (let i = 0; i < 6; i += 1) {
+      await s.page.getByTestId('product-cart-button').screenshot({ path: path.join(OUT, `product-00-bag-tick-f${i}.png`) }).catch(() => {});
+      await s.page.waitForTimeout(50);
+    }
+    await s.page.waitForTimeout(800);
+    r.badgeAfter = await s.page.getByTestId('product-cart-badge').innerText().catch(() => null);
+    await s.shot('product-01-after-add');
+    // Close any sheet the add opened, then open the photo viewer.
+    await s.page.keyboard.press('Escape').catch(() => {});
+    await s.page.waitForTimeout(600);
+    await tap(s.cdp, 195, 260);
+    await s.page.waitForTimeout(1200);
+    r.viewerOpen = await exists(s.page, 'photo-viewer-close');
+    await s.shot('product-02-viewer-open');
+    if (r.viewerOpen) {
+      const down = []; for (let i = 0; i <= 14; i += 1) down.push([{ x: lerp(195, 225, i / 14), y: lerp(420, 600, i / 14) }]);
+      await touchPath(s.cdp, down, { stepMs: 24 });
+      await s.page.waitForTimeout(80);
+      await s.shot('product-03-dismiss-drag-mid');
+      r.midDragTransform = await s.page.evaluate(() => {
+        const imgs = [...document.querySelectorAll('img')].filter((i) => i.getBoundingClientRect().width > 200);
+        const el = imgs[0]?.closest('[style*="transform"]');
+        return el ? getComputedStyle(el).transform : null;
+      });
+      await touchEnd(s.cdp);
+      await s.page.waitForTimeout(900);
+      r.viewerClosedAfterDrag = !(await exists(s.page, 'photo-viewer-close'));
+      await s.shot('product-04-after-dismiss');
+    }
+    results.product = r;
+    await s.context.close();
+  },
+});
+
+Object.assign(STEPS, {
+  // (7) swipe-right quote reply, (8) double-tap heart, (9) long-press reaction row
+  async dm(browser, images) {
+    const devServer = await serveBuild(DEV_BUILD);
+    try {
+      const s = await openWithRetry(browser, images, devServer.origin, 'seller', '/seller-conversation?id=preview-seller-conversation-01',
+        (p) => p.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])'));
+      await s.settle(1200);
+      const r = {};
+      await s.shot('dm-00-thread');
+      const bubbles = s.page.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])');
+      r.bubbleCount = await bubbles.count();
+      const b = await bubbles.nth(Math.max(0, r.bubbleCount - 2)).boundingBox();
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+      // Swipe right -> reply banner.
+      const sw = []; for (let i = 0; i <= 12; i += 1) sw.push([{ x: cx + 90 * (i / 12), y: cy }]);
+      await touchPath(s.cdp, sw, { stepMs: 20 });
+      await s.shot('dm-01-swipe-right-mid');
+      await touchEnd(s.cdp);
+      await s.page.waitForTimeout(700);
+      r.replyBanner = await s.page.getByText(/Replying to/i).first().isVisible().catch(() => false);
+      await s.shot('dm-02-reply-banner');
+      // Double-tap -> heart.
+      await tap(s.cdp, cx, cy); await s.page.waitForTimeout(80); await tap(s.cdp, cx, cy);
+      await frames(s, 'dm-03-double-tap-heart', 4, 110);
+      await s.page.waitForTimeout(900);
+      // Long-press -> reaction row.
+      await touchPath(s.cdp, [[{ x: cx, y: cy }]]);
+      await s.page.waitForTimeout(900);
+      await touchEnd(s.cdp);
+      await s.page.waitForTimeout(500);
+      await s.shot('dm-04-long-press-reactions');
+      r.reactionRowText = (await s.page.locator('body').innerText()).match(/super react|Reply|Copy/gi)?.slice(0, 4) ?? [];
+      results.dm = r;
+      await s.context.close();
+    } finally { devServer.close(); }
   },
 });
 
