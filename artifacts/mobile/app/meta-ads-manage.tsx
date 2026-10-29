@@ -45,7 +45,14 @@ type Row = MetaCampaign & { insights?: MetaCampaignInsights };
 
 const objectiveLabel = (o: string) => META_OBJECTIVE_OPTIONS.find((x) => x.objective === o)?.label ?? o;
 
+// Mounted once around every state (checking, Connect Meta, campaigns): a
+// first-time seller passes through several, and a per-branch mount would
+// unmount mid-show and count as seen.
 export default function MetaAdsManageScreen() {
+  return <><MetaAdsManageContent /><ScreenExplainer id="explain-meta-ads" /></>;
+}
+
+function MetaAdsManageContent() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
@@ -236,7 +243,6 @@ export default function MetaAdsManageScreen() {
             style={{ marginTop: SP.xl }}
           />
         )}
-        {connState !== 'not_configured' && <ScreenExplainer id="explain-meta-ads" />}
       </BrandthreadScreen>
     );
   }
@@ -312,7 +318,6 @@ export default function MetaAdsManageScreen() {
               />
             </View>
       </Sheet>
-      <ScreenExplainer id="explain-meta-ads" />
     </BrandthreadScreen>
   );
 }

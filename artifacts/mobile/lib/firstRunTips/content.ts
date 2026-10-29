@@ -88,7 +88,7 @@ export const SCREEN_EXPLAINERS = {
     lines: [
       'Draw and lay out a design here. It saves as you go.',
       'Brush, Smudge and Eraser paint. Layers keeps each part of the design separate. The circle picks a color.',
-      'The wrench adds photos and text and exports. The lightning bolt adjusts color. The arrow moves and resizes.',
+      'Tap Modify for more: the wrench adds photos and text and exports, the lightning bolt adjusts color, the arrow moves and resizes.',
       'Pinch to zoom in on details.',
     ],
   },
@@ -297,8 +297,8 @@ export const SCREEN_EXPLAINERS = {
   'explain-checkout': {
     title: 'Checkout',
     lines: [
-      'One page to pay: contact, shipping, payment, then your order summary.',
-      'Apple Pay or Google Pay at the top fills it all in for you.',
+      'Review your items, then add shipping and payment, all on this one page.',
+      'If your phone has Apple Pay or Google Pay, it fills everything in for you.',
       'Add a promo code or Thread Cash before you tap Pay.',
     ],
   },
