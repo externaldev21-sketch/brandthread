@@ -10,10 +10,10 @@
  * not swallow single-finger drawing gestures owned by the canvas itself.
  *
  * NOTE: react-native-gesture-handler's tap gesture doesn't have a built-in
- * "N-finger tap" primitive the way native Procreate does, so we approximate
- * it with `numberOfPointers` on a very-short-duration pan gesture (a tap that
- * lifts before any real movement threshold), which is the standard RNGH
- * pattern for multi-finger taps.
+ * "exactly N fingers" primitive the way native Procreate does, so we
+ * approximate it with Tap gestures using `minPointers(N)` and a short
+ * `maxDuration`, raced so the three-finger tap wins over the two-finger one
+ * (see the comment above `twoFingerTap`).
  */
 
 import React from 'react';

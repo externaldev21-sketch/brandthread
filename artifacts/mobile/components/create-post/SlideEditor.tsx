@@ -17,7 +17,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ASPECT_RATIO_VALUE, ASPECTS_BY_MODE, type PostAspect } from '@/constants/postLimits';
 import type { SlideDraft } from '@/lib/createPost/types';
 import { CP, IconButton, PillButton, tap } from '@/components/create-post/ui';
-import { ReorderStrip } from '@/components/create-post/ReorderStrip';
+import { indexAfterMove, ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { CropFrame } from '@/components/create-post/CropFrame';
 
 const ASPECT_ICON: Record<PostAspect, { w: number; h: number }> = {
@@ -85,7 +85,7 @@ export function SlideEditor({ slides, aspect, activeIndex, onActiveIndex, onAspe
         onReorder={(from, to) => {
           const next = [...slides]; const [m] = next.splice(from, 1); next.splice(to, 0, m);
           onSlides(next);
-          onActiveIndex(activeIndex === from ? to : activeIndex);
+          onActiveIndex(indexAfterMove(activeIndex, from, to));
         }}
         onPressItem={(_item, i) => onActiveIndex(i)}
         renderItem={(sl, i) => (

@@ -99,7 +99,8 @@ export function buildAdjustmentStages(
         nodes.push(<FeOffset key={`mb_t${idx}`} in={i} dx={t.dx} dy={t.dy} result={`mb_t${idx}`} />);
         nodes.push(
           idx === 0
-            ? <FeComposite key="mb_a0" in="mb_t0" in2="mb_t0" operator="arithmetic" k1={0} k2={w} k3={0} k4={0} result="mb_a0" />
+            // A single tap (zero-length blur at this render scale) is also the last one.
+            ? <FeComposite key="mb_a0" in="mb_t0" in2="mb_t0" operator="arithmetic" k1={0} k2={w} k3={0} k4={0} result={taps.length === 1 ? 'mblur' : 'mb_a0'} />
             : <FeComposite key={`mb_a${idx}`} in={`mb_a${idx - 1}`} in2={`mb_t${idx}`} operator="arithmetic" k1={0} k2={1} k3={w} k4={0} result={idx === taps.length - 1 ? 'mblur' : `mb_a${idx}`} />,
         );
       });

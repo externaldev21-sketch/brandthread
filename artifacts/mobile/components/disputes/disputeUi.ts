@@ -55,7 +55,8 @@ export function daysLeft(iso: string | null | undefined, now = Date.now()): numb
 export function dueChipLabel(iso: string | null | undefined, now = Date.now()): string | null {
   const d = daysLeft(iso, now);
   if (d === null) return null;
-  if (d < 0) return 'Past due';
+  // Past the deadline by less than a day ceils to (-)0: still past due, not "today".
+  if (new Date(iso!).getTime() < now) return 'Past due';
   if (d === 0) return 'Due today';
   if (d === 1) return 'Due in 1 day';
   return `Due in ${d} days`;

@@ -46,7 +46,11 @@ function DiscoverTileViewImpl({
   const [loaded, setLoaded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useEffect(() => { setAttempt(0); setFailed(false); setLoaded(false); }, [post.imageUri]);
+  useEffect(() => {
+    // A retry scheduled for the previous image must not bump the new one's attempt.
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    setAttempt(0); setFailed(false); setLoaded(false);
+  }, [post.imageUri]);
 
   const handleError = useCallback(() => {
     const delay = TILE_RETRY_DELAYS_MS[attempt];

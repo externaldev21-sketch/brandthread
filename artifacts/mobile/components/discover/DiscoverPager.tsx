@@ -104,6 +104,8 @@ const GAP = 10;
 /** Preload the next/prev N products' images so swiping never shows a blank frame. */
 const PRELOAD_RADIUS = 2;
 
+const ADD_FAILED = "Couldn't add to bag. Try again.";
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function DiscoverPager() {
@@ -130,7 +132,8 @@ export function DiscoverPager() {
   const [pickerProduct, setPickerProduct] = useState<DiscoverFeedItem | null>(null);
   const [buyNowItem, setBuyNowItem] = useState<DiscoverFeedItem | null>(null);
   const [flyImage, setFlyImage] = useState<{ uri?: string; startX: number; startY: number } | null>(null);
-  const [addedToast, setAddedToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  // `bagAction`: the "View bag" action only follows a real add; a failure toast has none.
+  const [addedToast, setAddedToast] = useState<{ visible: boolean; message: string; bagAction?: boolean }>({ visible: false, message: '' });
   const addedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartIconRef = useRef<View>(null);
   // Same bump as the feed's cart icon, fired only on a real add success.
@@ -232,7 +235,11 @@ export function DiscoverPager() {
         attribution: { channel: 'discover' },
       });
       const newCount = getSuccessfulCartCount(result);
-      if (newCount == null) return;
+      if (newCount == null) {
+        // addToCart refused (sold out, over the stock cap, inactive): say why.
+        showAddToast(result.message || ADD_FAILED, false);
+        return;
+      }
       setCartCount(newCount);
       bumpCart();
       const reduceMotion = false; // Discover always attempts the fly animation; measureCartTarget degrades gracefully.
@@ -242,28 +249,41 @@ export function DiscoverPager() {
           cartIconRef.current?.measureInWindow?.bind(cartIconRef.current),
           fallback,
         );
-        void getCartFlightVector(startX, startY, target); // computed for the caller's fly-animation layer
+        // Computed but not drawn: this screen has no fly-to-cart layer yet
+        // (flyImage is only carried through the variant picker).
+        void getCartFlightVector(startX, startY, target);
       }
       haptics.light();
       // A real confirmation beyond just the cart badge count changing.
-      if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
-      setAddedToast({ visible: true, message: `Added ${product.name} to bag` });
-      addedToastTimer.current = setTimeout(() => setAddedToast(t => ({ ...t, visible: false })), 2200);
+      showAddToast(`Added ${product.name} to bag`, true);
     } catch {
-      // Swallow — the per-card UI already shows its own busy/error affordance.
+      // The card has no busy/error state of its own, so the failure is told here.
+      showAddToast(ADD_FAILED, false);
     }
   }
 
+  function showAddToast(message: string, bagAction: boolean) {
+    if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
+    setAddedToast({ visible: true, message, bagAction });
+    addedToastTimer.current = setTimeout(() => setAddedToast(t => ({ ...t, visible: false })), 2200);
+  }
+
   async function handleAddToCartPress(feedItem: DiscoverFeedItem, startX: number, startY: number) {
-    const product = await getBuyerProduct(feedItem.productId);
-    if (!product) return;
+    let product: BuyerProduct | null;
+    try {
+      product = await getBuyerProduct(feedItem.productId);
+    } catch {
+      showAddToast(ADD_FAILED, false);
+      return;
+    }
+    if (!product) { showAddToast('This product is no longer available.', false); return; }
     if (product.options.length > 0) {
       setPickerProduct(feedItem);
       setFlyImage({ uri: feedItem.images[0], startX, startY });
       return;
     }
     const variant = product.variants[0];
-    if (!variant) return;
+    if (!variant) { showAddToast('This product is no longer available.', false); return; }
     await performAddToCart(feedItem, variant, product, 1, startX, startY);
   }
 
@@ -395,7 +415,7 @@ export function DiscoverPager() {
       <Snackbar
         visible={addedToast.visible}
         message={addedToast.message}
-        actionLabel="View bag"
+        actionLabel={addedToast.bagAction ? 'View bag' : undefined}
         onAction={() => {
           if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
           setAddedToast(t => ({ ...t, visible: false }));

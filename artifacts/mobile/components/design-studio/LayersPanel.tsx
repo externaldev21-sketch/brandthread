@@ -17,10 +17,11 @@ import { MEDIA } from '@/lib/theme';
  * real data-model + compositor + export change, not a panel-only stub. Left
  * for a follow-up rather than faked as a button that does nothing.
  *
- * Similarly, the Procreate context menu's Fill Layer / Clear / Invert /
- * Reference entries are left out: none of those have backing logic anywhere
- * in design-canvas.tsx today, and adding fake menu items that no-op would
- * violate "no stubs" more than leaving them out.
+ * Fill Layer / Clear appear (drawing layers only) when the host passes
+ * `onFillLayer` / `onClearLayer`. The Procreate context menu's Invert /
+ * Reference entries are left out: they have no backing logic in
+ * design-canvas.tsx, and fake menu items that no-op would violate "no stubs"
+ * more than leaving them out.
  *
  * Pure presentational + callback-driven: the host screen (design-canvas.tsx)
  * owns the layer array and undo/autosave wiring, and passes down the current
@@ -159,6 +160,8 @@ export default function LayersPanel(props: LayersPanelProps) {
       onPanResponderRelease: (_e, g) => {
         if (shouldSwipeOpen(base, g.dx, SWIPE_OPEN_THRESHOLD)) {
           Animated.timing(anim, { toValue: -SWIPE_ACTIONS_WIDTH, duration: 140, useNativeDriver: true }).start();
+          // One row open at a time: slide the previously open row shut too.
+          if (openSwipeId && openSwipeId !== id) closeSwipe(openSwipeId);
           setOpenSwipeId(id);
         } else {
           Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true }).start();

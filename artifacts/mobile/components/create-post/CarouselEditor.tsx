@@ -22,7 +22,7 @@ import { ADJUST_TOOLS, FILTER_PRESETS, isNeutral, matchingPreset, NO_ADJUST, pre
 import type { SlideDraft } from '@/lib/createPost/types';
 import { CP, IconButton, PillButton, tap } from '@/components/create-post/ui';
 import { CropFrame } from '@/components/create-post/CropFrame';
-import { ReorderStrip } from '@/components/create-post/ReorderStrip';
+import { indexAfterMove, ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { formatDuration, MediaThumb } from '@/components/create-post/GalleryPicker';
 import { crispPx } from '@/lib/crispPixel';
 
@@ -186,7 +186,7 @@ export function CarouselEditor({ slides, activeIndex, onActiveIndex, onSlides, o
         focusId={active.id}
         onReorder={(from, to) => {
           const n = [...slides]; const [m] = n.splice(from, 1); n.splice(to, 0, m);
-          onSlides(n); onActiveIndex(activeIndex === from ? to : activeIndex);
+          onSlides(n); onActiveIndex(indexAfterMove(activeIndex, from, to));
         }}
         onPressItem={(_i, i) => onActiveIndex(i)}
         renderItem={(sl, i) => (

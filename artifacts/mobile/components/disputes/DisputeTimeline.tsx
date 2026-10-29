@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useColors } from '@/hooks/useColors';
@@ -28,8 +28,13 @@ export function DisputeTimeline({ disputeId, demo, refreshKey = 0 }: Props) {
     demo ? demoSteps(demo.status, demo.createdAt, demo.evidenceDeadline) : null,
   );
   const [failed, setFailed] = useState(false);
+  // Only the latest request may write: a refetch (refreshKey bump, retry, new
+  // dispute) must not be overwritten by an older response landing after it.
+  const requestSeq = useRef(0);
+  useEffect(() => () => { requestSeq.current += 1; }, []);
 
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     if (demo) {
       setSteps(demoSteps(demo.status, demo.createdAt, demo.evidenceDeadline));
       return;
@@ -37,8 +42,10 @@ export function DisputeTimeline({ disputeId, demo, refreshKey = 0 }: Props) {
     setFailed(false);
     try {
       const t = await api.disputes.timeline(disputeId);
+      if (seq !== requestSeq.current) return;
       setSteps(t.steps);
     } catch {
+      if (seq !== requestSeq.current) return;
       setFailed(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

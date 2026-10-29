@@ -10,6 +10,18 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
+/**
+ * Where the item that sat at `active` ends up after the strip moves the item
+ * at `from` to `to` (splice out, splice in). Moving a neighbour across the
+ * active item shifts it by one; moving the active item itself lands on `to`.
+ */
+export function indexAfterMove(active: number, from: number, to: number): number {
+  if (active === from) return to;
+  if (from < active && to >= active) return active - 1;
+  if (from > active && to <= active) return active + 1;
+  return active;
+}
+
 export interface ReorderStripProps<T extends { id: string }> {
   items: T[];
   itemW: number;

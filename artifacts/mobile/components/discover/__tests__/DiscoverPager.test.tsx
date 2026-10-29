@@ -71,6 +71,9 @@ vi.mock('react-native', async (importOriginal) => {
     ActivityIndicator: el('ActivityIndicator'),
     Modal: el('Modal'),
     Linking: { openURL: vi.fn(async () => {}) },
+    // Snackbar renders components/ui/TopToast, which builds a swipe-to-dismiss
+    // PanResponder; the shared react-native test shim has none.
+    PanResponder: { create: () => ({ panHandlers: {} }) },
     // hooks/useCartBadgeBump reads Reduce Motion.
     AccessibilityInfo: {
       isReduceMotionEnabled: vi.fn(async () => false),
@@ -83,6 +86,8 @@ vi.mock('react-native', async (importOriginal) => {
       spring: () => ({ start: (cb?: () => void) => cb?.() }),
       stagger: () => ({ start: (cb?: () => void) => cb?.() }),
       sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      // TopToast (via Snackbar) composes its entrance and drag offsets.
+      add: (a: unknown) => a,
       View: el('AnimatedView'),
       Text: el('AnimatedText'),
       createAnimatedComponent: (c: unknown) => c,
@@ -398,6 +403,50 @@ describe('DiscoverPager — add to cart', () => {
 
     expect(measureCartTarget).toHaveBeenCalled();
     expect(getSuccessfulCartCount).toHaveBeenCalledWith({ success: true, cart: { items: [{ quantity: 1 }] } });
+    r.unmount();
+  });
+});
+
+describe('DiscoverPager — add to cart failures are shown, not swallowed', () => {
+  const product = {
+    id: 'prod_1', options: [], variants: [{ id: 'v1', priceCents: 4500, inventoryQuantity: 0, isAvailable: true, optionValues: [] }],
+    imageUris: [], name: 'Classic Tee', sellerId: 'brand_1', sellerName: 'Acme Co', sellerHandle: 'acme',
+    isActive: true, isPreOrder: false, description: '', category: 'apparel', priceCents: 4500, tags: [],
+  };
+
+  async function tapAdd() {
+    discoverFeedMock.mockResolvedValue({ items: [makeItem()], computedAt: '', source: 'computed', nextOffset: null });
+    const r = await render(<DiscoverPager />);
+    const addBtn = r.root.findByProps({ accessibilityLabel: 'Add to bag' });
+    await act(async () => {
+      addBtn.props.onPress();
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    });
+    return r;
+  }
+
+  it('shows addToCart\'s own refusal message (e.g. sold out)', async () => {
+    getBuyerProductMock.mockResolvedValue(product);
+    addToCartMock.mockResolvedValue({ success: false, message: 'Only 0 units available.', cart: { items: [] } });
+    const r = await tapAdd();
+    expect(textContent(r)).toContain('Only 0 units available.');
+    expect(r.root.findAllByProps({ accessibilityLabel: 'Open bag, 1 item' })).toHaveLength(0);
+    r.unmount();
+  });
+
+  it('shows an error when the add throws', async () => {
+    getBuyerProductMock.mockResolvedValue(product);
+    addToCartMock.mockRejectedValue(new Error('offline'));
+    const r = await tapAdd();
+    expect(textContent(r)).toContain("Couldn't add to bag. Try again.");
+    r.unmount();
+  });
+
+  it('shows an error when the product lookup fails', async () => {
+    getBuyerProductMock.mockRejectedValue(new Error('API 500: boom'));
+    const r = await tapAdd();
+    expect(addToCartMock).not.toHaveBeenCalled();
+    expect(textContent(r)).toContain("Couldn't add to bag. Try again.");
     r.unmount();
   });
 });

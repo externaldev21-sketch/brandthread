@@ -84,6 +84,9 @@ export default function PaintSurface({ model, enabled, testID }: PaintSurfacePro
     el.addEventListener('contextmenu', noMenu);
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      // Disabled (or unmounted) mid-gesture: the pointerup will never reach
+      // us, so end the gesture now instead of leaving a stroke/pinch open.
+      if (active.size > 0) { active.clear(); modelRef.current.cancel(); }
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
