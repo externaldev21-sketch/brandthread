@@ -122,6 +122,11 @@ function dataUrl(b64: string): string {
   return `data:${mime};base64,${s}`;
 }
 
+// Provider / database errors can carry request details (OpenAI 401s quote a
+// masked API key), so they are logged, never sent to the client.
+const AI_FAILED = { error: "Couldn't generate your store design. Try again.", code: "ai_failed" };
+const isImageList = (v: unknown): v is string[] => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "string" && x.length > 0);
+
 function parseStoreJson(raw: string): Record<string, unknown> {
   const clean = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   try { return JSON.parse(clean); } catch { return {}; }
@@ -159,7 +164,7 @@ router.post("/generate", async (req, res): Promise<void> => {
 // POST /api/store/ai/from-logo — extract palette from logo using GPT-5 vision
 router.post("/from-logo", async (req, res): Promise<void> => {
   const { base64 } = req.body;
-  if (!base64) { res.status(400).json({ error: "base64 image required" }); return; }
+  if (typeof base64 !== "string" || !base64) { res.status(400).json({ error: "base64 image required" }); return; }
   const answers = parseStoreAnswers(req.body.answers, res);
   if (!answers) return;
 
@@ -187,14 +192,15 @@ router.post("/from-logo", async (req, res): Promise<void> => {
     const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
     res.json({ config });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    req.log?.error({ err }, "store ai vision generation failed");
+    res.status(500).json(AI_FAILED);
   }
 });
 
 // POST /api/store/ai/from-moodboard — generate from moodboard images using GPT-5 vision
 router.post("/from-moodboard", async (req, res): Promise<void> => {
   const { base64List } = req.body;
-  if (!Array.isArray(base64List) || !base64List.length) { res.status(400).json({ error: "base64List required" }); return; }
+  if (!isImageList(base64List)) { res.status(400).json({ error: "base64List required" }); return; }
   const answers = parseStoreAnswers(req.body.answers, res);
   if (!answers) return;
 
@@ -225,7 +231,8 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
     const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
     res.json({ config });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    req.log?.error({ err }, "store ai vision generation failed");
+    res.status(500).json(AI_FAILED);
   }
 });
 
@@ -239,7 +246,7 @@ router.post("/from-social", async (req, res): Promise<void> => {
   if (!answers) return;
 
   // Vision-based analysis when screenshots are provided
-  if (Array.isArray(base64List) && base64List.length > 0) {
+  if (isImageList(base64List)) {
     try {
       const imageContent = (base64List as string[]).slice(0, 4).map((b64: string) => ({
         type: "image_url" as const,
@@ -328,7 +335,8 @@ router.use((err: any, _req: any, res: any, _next: any) => {
     });
     return;
   }
-  res.status(500).json({ error: String(err) });
+  _req.log?.error({ err }, "store ai request failed");
+  res.status(500).json(AI_FAILED);
 });
 
 export default router;

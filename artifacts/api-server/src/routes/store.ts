@@ -135,6 +135,24 @@ function safeFontFamily(val: unknown, fallback: string): string {
   return SAFE_FONT_RE.test(s) && s.length <= 200 ? s : fallback;
 }
 
+/** Plain JSON objects only — section / FAQ / review / link entries may be anything the editor stored. */
+const isPlainObject = (v: unknown): v is Record<string, any> => !!v && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * A seller-entered link is safe for an <a href> on the public store page when
+ * it is http(s)/mailto or has no scheme at all. Browsers ignore whitespace and
+ * control characters inside a scheme ("java\tscript:"), so those are removed
+ * before looking for one.
+ */
+export function safeLinkHref(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const url = raw.trim();
+  if (!url) return null;
+  const compact = url.replace(/[\u0000-\u0020\u007f]/g, "");
+  if (/^(https?:|mailto:)/i.test(compact)) return url;
+  return /^[^/?#]*:/.test(compact) ? null : url;
+}
+
 /** Shallow-merge a partial JSON object into a stored JSON column value. */
 function mergeJsonObject(stored: unknown, incoming: unknown): unknown {
   const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -315,7 +333,8 @@ export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boo
   const theme    = (sf.theme    as any) ?? {};
   const branding = (sf.branding as any) ?? {};
   const seo      = (sf.seo     as any) ?? {};
-  const sections: any[] = Array.isArray(sf.sections) ? sf.sections : [];
+  // A null / non-object entry in a stored list must not 500 the public page.
+  const sections: any[] = Array.isArray(sf.sections) ? sf.sections.filter(isPlainObject) : [];
   // Published Store Builder collections / pages / menus (never break the page).
   const builder = renderBuilderHtml(await safePublicBuilderData(ownerId, sf));
 
@@ -389,14 +408,14 @@ export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boo
       return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form><input aria-label="Email address" placeholder="Email address"><button type="button">${joinLabel}</button></form></section>`;
     }
     if (t === "faq") {
-      const faqs: Array<{ q?: string; a?: string }> = Array.isArray(s.settings?.faqs) ? s.settings.faqs : [];
+      const faqs: Array<{ q?: string; a?: string }> = Array.isArray(s.settings?.faqs) ? s.settings.faqs.filter(isPlainObject) : [];
       return `<section class="faq-section">
         <div class="section-heading"><h2>${h || "Questions"}</h2></div>
         ${faqs.map((f) => `<details class="faq-item"><summary>${escapeHtml(f.q)}</summary><p>${escapeHtml(f.a)}</p></details>`).join("")}
       </section>`;
     }
     if (t === "customer_reviews") {
-      const reviews: Array<{ author?: string; text?: string; rating?: number }> = Array.isArray(s.settings?.reviews) ? s.settings.reviews : [];
+      const reviews: Array<{ author?: string; text?: string; rating?: number }> = Array.isArray(s.settings?.reviews) ? s.settings.reviews.filter(isPlainObject) : [];
       return `<section class="reviews-section">
         <div class="section-heading"><h2>${h || "What people say"}</h2></div>
         <div class="reviews-grid">
@@ -408,11 +427,11 @@ export async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boo
       </section>`;
     }
     if (t === "social_links") {
-      const links: Array<{ platform?: string; url?: string }> = Array.isArray(s.settings?.socialLinks) ? s.settings.socialLinks : [];
+      const links: Array<{ platform?: string; url?: string }> = Array.isArray(s.settings?.socialLinks) ? s.settings.socialLinks.filter(isPlainObject) : [];
       return `<section class="social-links-section">
         ${h ? `<h2>${h}</h2>` : ""}
         <div class="social-links-row">
-          ${links.filter((l) => l.url).map((l) => `<a href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.platform ?? "Link")}</a>`).join("")}
+          ${links.map((l) => ({ l, href: safeLinkHref(l.url) })).filter((x) => x.href).map(({ l, href }) => `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.platform ?? "Link")}</a>`).join("")}
         </div>
       </section>`;
     }
@@ -856,7 +875,9 @@ router.get("/by-username/:username", async (req, res): Promise<void> => {
   res.set("Content-Type", "text/html");
   if (!sf) { res.status(404).send(NOT_FOUND_PAGE); return; }
   if (storeLockedFor(req, sf)) { sendStorePasswordPage(res, sf); return; }
-  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
+  // Same Global Privacy Control / Do Not Track handling as /site/:slug.
+  res.set("Vary", "Sec-GPC, DNT");
+  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf, optOutTracking: requestOptsOutOfTracking(req.headers) }));
 });
 router.post("/by-username/:username", rateLimit("authentication"), async (req, res): Promise<void> => {
   const sf = await publishedStorefrontForUsername(String(req.params.username ?? ""));
@@ -875,7 +896,9 @@ router.get("/host-site", async (req, res): Promise<void> => {
   res.set("Content-Type", "text/html");
   // A protected store's page is per-visitor: never shared-cache it.
   res.set("Cache-Control", storePasswordRequired(sf) ? "private, no-store" : "public, max-age=60");
-  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf }));
+  // Same Global Privacy Control / Do Not Track handling as /site/:slug.
+  res.set("Vary", "Sec-GPC, DNT");
+  res.send(await buildPreviewHtml(sf.ownerId, { isPreview: false, sf, optOutTracking: requestOptsOutOfTracking(req.headers) }));
 });
 router.post("/host-site", rateLimit("authentication"), async (req, res): Promise<void> => {
   const sf = await hostSiteStorefront(req);
@@ -1536,16 +1559,8 @@ router.put("/subdomain", async (req, res): Promise<void> => {
   }
 });
 
-// GET /api/store/public/:slug — public storefront (no auth)
-router.get("/public/:slug", async (req, res): Promise<void> => {
-  const { slug } = req.params;
-  const [sf] = await db
-    .select()
-    .from(storefronts)
-    .where(eq(storefronts.slug, slug))
-    .limit(1);
-  if (!sf || sf.status !== "published") { res.status(404).json({ error: "Store not found" }); return; }
-  res.json(sf);
-});
+// (GET /public/:slug is served above, before requireAuth, with the public
+// projection only. A second copy here returned the raw row — password hash and
+// share-preview fingerprint included — and has been removed.)
 
 export default router;
