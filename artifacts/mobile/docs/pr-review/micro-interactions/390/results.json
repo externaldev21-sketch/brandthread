@@ -1,0 +1,85 @@
+{
+  "friends": {
+    "urlAfterDoubleTap": "http://127.0.0.1:42439/friends?bt_preview=buyer",
+    "likeCountAfterDoubleTap": "\uf004\n41",
+    "zoomLiftWhilePinching": true,
+    "liftTimeline": [
+      {
+        "ms": 150,
+        "lift": true
+      },
+      {
+        "ms": 450,
+        "lift": true
+      },
+      {
+        "ms": 900,
+        "lift": true
+      },
+      {
+        "ms": 2000,
+        "lift": false
+      }
+    ],
+    "zoomLiftAfterRelease": false,
+    "urlAfterPinch": "http://127.0.0.1:42439/friends?bt_preview=buyer",
+    "savedToastText": true,
+    "urlAfterSingleTap": "http://127.0.0.1:42439/buyer-post-comments?postId=10000001-0000-4000-8000-000000000001&postAuthorName=Ava%20Chen&postAuthorInitials=AC&postAuthorColor=%232A2A2E&postCaption=Mono%20fit%20check.&postMediaColor1=%231a1a2e&postMediaColor2=%230d0d1a&postType=photo"
+  },
+  "follow": {
+    "error": "locator.waitFor: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"follow-button\"]').first() to be visible\u001b[22m\n\n    at follow (/home/user/brandthread/artifacts/mobile/scripts/micro-interactions-verify.mjs:352:75)\n    at async file:///home/user/brandthread/artifacts/mobile/scripts/micro-interactions-verify.mjs:521:11"
+  },
+  "product": {
+    "badgeBefore": "3",
+    "badgeAfter": "4",
+    "viewerOpen": true,
+    "midDragTransform": "matrix(1, 0, 0, 1, 0, 0)",
+    "viewerClosedAfterDrag": true
+  },
+  "dm": {
+    "bubbleCount": 5,
+    "replyBanner": false,
+    "reactionRowWhileHeld": true,
+    "reactionRowText": [
+      "Reply",
+      "Copy"
+    ]
+  },
+  "comments": {
+    "error": "locator.boundingBox: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('comments-sheet').first()\u001b[22m\n\n    at box (/home/user/brandthread/artifacts/mobile/scripts/micro-interactions-verify.mjs:76:52)\n    at comments (/home/user/brandthread/artifacts/mobile/scripts/micro-interactions-verify.mjs:334:25)\n    at async file:///home/user/brandthread/artifacts/mobile/scripts/micro-interactions-verify.mjs:521:11"
+  },
+  "home": {
+    "feedRequestsAtStart": 4,
+    "surface": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    },
+    "dotsBefore": [
+      "rgb(255, 255, 255)",
+      "rgba(255, 255, 255, 0.4)"
+    ],
+    "dotsAfterRightEdge": [
+      "rgba(255, 255, 255, 0.4)",
+      "rgb(255, 255, 255)"
+    ],
+    "dotsAfterLeftEdge": [
+      "rgb(255, 255, 255)",
+      "rgba(255, 255, 255, 0.4)"
+    ],
+    "likeLabelAfterDoubleTap": "Unlike, 101 likes",
+    "dotsAfterDoubleTap": [
+      "rgb(255, 255, 255)",
+      "rgba(255, 255, 255, 0.4)"
+    ],
+    "zoomLiftWhilePinching": true,
+    "zoomLiftAfterRelease": false,
+    "pillShown": true,
+    "pillGoneAfterTap": true,
+    "refreshRequestedByPill": true,
+    "scrollTopAfterPill": 0,
+    "refreshRequestedByRetap": true,
+    "scrollTopAfterRetap": 0
+  }
+}

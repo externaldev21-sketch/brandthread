@@ -50,6 +50,9 @@ export function PinchToZoom({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const size = useSharedValue({ w: 0, h: 0 });
+  /** Midpoint of the two fingers in page coordinates, and the view's page origin. */
+  const mid = useSharedValue({ x: 0, y: 0 });
+  const origin = useSharedValue({ x: 0, y: 0 });
   const enabled = !!uri;
   const parentScroll = useParentScrollGesture();
 
@@ -85,19 +88,30 @@ export function PinchToZoom({
       if (e.numberOfTouches === 1 && t) { startX.value = t.absoluteX; startY.value = t.absoluteY; }
     })
     .onTouchesMove((e, manager) => {
-      if (e.numberOfTouches >= 2) { manager.activate(); return; }
+      if (e.numberOfTouches >= 2) {
+        const [a, b] = e.allTouches;
+        if (a && b) mid.value = { x: (a.absoluteX + b.absoluteX) / 2, y: (a.absoluteY + b.absoluteY) / 2 };
+        manager.activate();
+        return;
+      }
       const t = e.allTouches[0];
       if (t && Math.hypot(t.absoluteX - startX.value, t.absoluteY - startY.value) > ONE_FINGER_SLOP) manager.fail();
     })
-    .onStart((e) => {
+    .onStart(() => {
       pinching.value = true;
-      f0.value = { x: e.focalX - size.value.w / 2, y: e.focalY - size.value.h / 2 };
-      runOnJS(zoomChange)(true);
+      // Focal point from the fingers' page positions minus the view's page
+      // origin: the same on web (where the event focal is page-relative)
+      // and native (view-relative).
       const m = measure(ref);
+      if (m) origin.value = { x: m.pageX, y: m.pageY };
+      f0.value = { x: mid.value.x - origin.value.x - size.value.w / 2, y: mid.value.y - origin.value.y - size.value.h / 2 };
+      runOnJS(zoomChange)(true);
       if (m) runOnJS(lift)({ x: m.pageX, y: m.pageY, width: m.width, height: m.height });
     })
     .onUpdate((e) => {
-      const z = focalZoom({ scale: 1, tx: 0, ty: 0 }, f0.value.x, f0.value.y, e.focalX - size.value.w / 2, e.focalY - size.value.h / 2, e.scale, 1);
+      const fx = mid.value.x - origin.value.x - size.value.w / 2;
+      const fy = mid.value.y - origin.value.y - size.value.h / 2;
+      const z = focalZoom({ scale: 1, tx: 0, ty: 0 }, f0.value.x, f0.value.y, fx, fy, e.scale, 1);
       scale.value = z.scale; tx.value = z.tx; ty.value = z.ty;
     })
     // Release: onEnd for a completed pinch, onFinalize for a cancelled one —

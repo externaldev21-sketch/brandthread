@@ -30,6 +30,8 @@ const img = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
 
 mkdirSync(OUT, { recursive: true });
 const results = {};
+/** API calls the demo data has no answer for (diagnostics). */
+const unseeded = [];
 
 /** Multi-touch over CDP: each frame is a list of {x, y} fingers (ids by index). */
 async function touchPath(cdp, frames, { stepMs = 16 } = {}) {
@@ -46,7 +48,7 @@ const tap = (cdp, x, y) => touchPath(cdp, [[{ x, y }]]).then(() => touchEnd(cdp)
 
 async function open(browser, images, origin, role, target, { contextOptions = {}, routes, direct = false } = {}) {
   const { context, page, activity } = await openContext(browser, {
-    device: DEVICE, role, origin, images, contextOptions: { reducedMotion: 'no-preference', ...contextOptions },
+    device: DEVICE, role, origin, images, onUnseeded: (c) => { if (!unseeded.includes(c)) unseeded.push(c); }, contextOptions: { reducedMotion: 'no-preference', ...contextOptions },
   });
   if (routes) await routes(context);
   if (direct) await page.goto(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
@@ -275,9 +277,17 @@ Object.assign(STEPS, {
     await touchPath(s.cdp, fr, { stepMs: 24 });
     await s.page.waitForTimeout(150);
     r.zoomLiftWhilePinching = await exists(s.page, 'photo-zoom-lift');
+    r.mediaBox = m;
+    r.liftBox = await s.page.getByTestId('photo-zoom-lift').boundingBox().catch(() => null);
+    r.liftStyle = await s.page.getByTestId('photo-zoom-lift').evaluate((n) => ({ t: getComputedStyle(n).transform, o: getComputedStyle(n).opacity, img: n.querySelector('img')?.getAttribute('src') })).catch(() => null);
     await s.shot('friends-02-pinch-zoom-mid');
     await touchEnd(s.cdp);
-    await s.page.waitForTimeout(900);
+    r.liftTimeline = [];
+    for (const ms of [150, 450, 900, 2000]) {
+      await s.page.waitForTimeout(ms - (r.liftTimeline.at(-1)?.ms ?? 0));
+      r.liftTimeline.push({ ms, lift: await exists(s.page, 'photo-zoom-lift') });
+    }
+    await s.shot('friends-02b-after-release');
     r.zoomLiftAfterRelease = await exists(s.page, 'photo-zoom-lift');
     r.urlAfterPinch = s.page.url();
     // Save: bookmark bounce + saved bar.
@@ -302,9 +312,13 @@ Object.assign(STEPS, {
       (p) => p.locator('[data-testid^="comment-btn-"]'), { routes: feedRoutes(state) });
     await s.settle(1500);
     const r = {};
-    await s.page.locator('[data-testid^="comment-btn-"]').first().click();
+    const cb = await s.page.locator('[data-testid^="comment-btn-"]').first().boundingBox();
+    await tap(s.cdp, cb.x + cb.width / 2, cb.y + cb.height / 2);
+    await s.page.waitForTimeout(400);
+    await s.shot('comments-00a-after-open-tap');
     await s.page.getByTestId('comments-sheet').first().waitFor({ timeout: 15_000 });
     await s.page.waitForTimeout(900);
+    await s.shot('comments-00b-settled');
     r.openDetent = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
     await s.shot('comments-00-half');
     const sheet = await box(s.page, 'comments-sheet');
@@ -319,34 +333,46 @@ Object.assign(STEPS, {
     r.detentAfterPullUp = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
     r.sheetTopFull = (await box(s.page, 'comments-sheet')).y;
     await s.shot('comments-02-full');
-    // Flick down from full -> back to half.
-    const top = (await box(s.page, 'comments-sheet')).y - 8;
-    const flick1 = []; for (let i = 0; i <= 8; i += 1) flick1.push([{ x: gx, y: top + 170 * (i / 8) ** 1.5 }]);
-    await touchPath(s.cdp, flick1, { stepMs: 16 });
-    await s.shot('comments-02b-dragging-down');
-    await touchEnd(s.cdp);
-    await s.page.waitForTimeout(900);
-    r.detentAfterFlickDown = await s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => null);
+    const detentNow = () => s.page.locator('[data-testid^="thread-comments-detent-"]').first().getAttribute('data-testid').catch(() => 'gone');
+    const dragDown = async (dist, frames, stepMs) => {
+      const top = (await box(s.page, 'comments-sheet')).y - 8;
+      const f = []; for (let i = 0; i <= frames; i += 1) f.push([{ x: gx, y: top + dist * (i / frames) }]);
+      await touchPath(s.cdp, f, { stepMs });
+      await touchEnd(s.cdp);
+      await s.page.waitForTimeout(1000);
+    };
+    // Slow drag down from full (140pt) -> back to half.
+    await dragDown(140, 14, 30);
+    r.detentAfterDragDownFromFull = await detentNow();
     await s.shot('comments-03-back-to-half');
-    // Flick down from half -> dismissed.
-    const top2 = (await box(s.page, 'comments-sheet')).y - 8;
-    const flick2 = []; for (let i = 0; i <= 8; i += 1) flick2.push([{ x: gx, y: top2 + 260 * (i / 8) ** 1.5 }]);
-    await touchPath(s.cdp, flick2, { stepMs: 16 });
-    await touchEnd(s.cdp);
-    await s.page.waitForTimeout(1200);
-    r.sheetGoneAfterFlick = !(await exists(s.page, 'comments-sheet'));
-    await s.shot('comments-04-dismissed');
+    // Pull up again, then a quick flick down from full -> half (Instagram).
+    const top1 = (await box(s.page, 'comments-sheet')).y - 8;
+    const up2 = []; for (let i = 0; i <= 15; i += 1) up2.push([{ x: gx, y: lerp(top1, 60, i / 15) }]);
+    await touchPath(s.cdp, up2, { stepMs: 20 }); await touchEnd(s.cdp); await s.page.waitForTimeout(1000);
+    r.detentAfterSecondPullUp = await detentNow();
+    await dragDown(120, 4, 16);
+    r.detentAfterFlickFromFull = await detentNow();
+    await s.shot('comments-03b-after-flick-from-full');
+    // From half: a longer drag down dismisses.
+    if (r.detentAfterFlickFromFull !== 'gone') {
+      await dragDown(300, 12, 25);
+      r.detentAfterDragDownFromHalf = await detentNow();
+      r.sheetGoneAfterDragFromHalf = !(await exists(s.page, 'comments-sheet'));
+      await s.shot('comments-04-dismissed');
+    }
     results.comments = r;
     await s.context.close();
   },
 
   // (11) Follow -> Following morph (Discover > People)
   async follow(browser, images, origin) {
-    const s = await openWithRetry(browser, images, origin, 'buyer', '/discover',
-      (p) => p.getByText('People', { exact: true }));
+    const s = await openWithRetry(browser, images, origin, 'buyer', '/', (p) => p.getByTestId('buyer-tab-discover'));
     await s.settle(800);
+    await s.page.getByTestId('buyer-tab-discover').click();
+    await s.page.getByText('People', { exact: true }).last().waitFor({ timeout: 15_000 });
+    await s.settle(600);
     for (let i = 0; i < 4; i += 1) {
-      await s.page.getByText('People', { exact: true }).first().click({ force: true });
+      await s.page.getByText('People', { exact: true }).last().click({ force: true });
       try { await s.page.locator('[data-testid="follow-button"]').first().waitFor({ timeout: 8_000 }); break; } catch (e) {
         if (i === 3) { await s.shot('follow-load-fail'); throw e; }
       }
@@ -419,13 +445,54 @@ Object.assign(STEPS, {
   },
 });
 
+// One buyer <-> seller thread for the DM step (conversation cv_1 from the
+// seeded seller inbox), served directly so it works on the production export.
+function dmRoutes() {
+  return async (context) => {
+    await stubInteractions(context);
+    const now = Date.now();
+    const them = { fromId: 'user_buyer_1', fromName: 'Jordan Reyes', fromInitials: 'JR', fromColor: '#5E5E66' };
+    const me = { fromId: 'user_northline', fromName: 'Northline Studio', fromInitials: 'NS', fromColor: '#2B2B30' };
+    const messages = [
+      { ...them, text: 'Hey! Is the Ember hoodie true to size?' },
+      { ...me, text: 'It runs a little boxy, most people stay with their usual size.' },
+      { ...them, text: 'Perfect. Any chance it ships before Friday?' },
+      { ...me, text: 'Yes, order today and it leaves tomorrow morning.' },
+      { ...them, text: 'Amazing, ordering now' },
+    ].map((m, i) => ({ id: `msg_${i + 1}`, conversationId: 'cv_1', reactions: [], status: 'read', ts: now - (10 - i) * 60e3, ...m }));
+    const conversation = {
+      id: 'cv_1', type: 'buyer_to_seller',
+      participants: [
+        { userId: 'user_buyer_1', name: 'Jordan Reyes', handle: '@jordanreyes', initials: 'JR', color: '#5E5E66', accountType: 'buyer' },
+        { userId: 'user_northline', name: 'Northline Studio', handle: '@northlinestudio', initials: 'NS', color: '#2B2B30', accountType: 'seller' },
+      ],
+      lastMessage: messages[4].text, lastMessageTs: messages[4].ts, unreadCount: 0, isRequest: false,
+      createdAt: new Date(now - 864e5).toISOString(), updatedAt: new Date(now).toISOString(),
+    };
+    await context.route(/api\.brandthread\.test\/api\/(v1\/)?conversations\/cv_1(\/messages)?(\?.*)?$/, async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') return route.fallback();
+      const isMessages = /\/messages/.test(new URL(req.url()).pathname);
+      const body = req.method() !== 'GET' ? { ok: true } : isMessages ? messages : conversation;
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        headers: { 'access-control-allow-origin': req.headers().origin ?? '*', 'access-control-allow-credentials': 'true' },
+        body: JSON.stringify(body),
+      });
+    });
+  };
+}
+
 Object.assign(STEPS, {
   // (7) swipe-right quote reply, (8) double-tap heart, (9) long-press reaction row
-  async dm(browser, images) {
-    const devServer = await serveBuild(DEV_BUILD);
+  async dm(browser, images, origin) {
+    const devServer = { origin, close() {} };
     try {
-      const s = await openWithRetry(browser, images, devServer.origin, 'seller', '/seller-conversation?id=preview-seller-conversation-01',
-        (p) => p.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])'), { direct: true });
+      const s = await openWithRetry(browser, images, devServer.origin, 'seller', '/seller-conversation?id=cv_1',
+        (p) => p.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])'),
+        // Pointer (mouse) input at the same 390x844 viewport, as
+        // scripts/swipe-reply-screenshots.mjs drives the chat gestures.
+        { routes: dmRoutes(), contextOptions: { isMobile: false, hasTouch: false } });
       await s.settle(1200);
       const r = {};
       await s.shot('dm-00-thread');
@@ -434,24 +501,35 @@ Object.assign(STEPS, {
       const b = await bubbles.nth(Math.max(0, r.bubbleCount - 2)).boundingBox();
       const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
       // Swipe right -> reply banner.
-      const sw = []; for (let i = 0; i <= 12; i += 1) sw.push([{ x: cx + 90 * (i / 12), y: cy }]);
-      await touchPath(s.cdp, sw, { stepMs: 20 });
+      // A received bubble (left side), dragged slowly past the threshold.
+      const them = await bubbles.nth(2).boundingBox();
+      const tx0 = them.x + 16, ty0 = them.y + them.height / 2;
+      // Mouse drag, as the repo's own swipe-to-reply verifier drives it
+      // (scripts/swipe-reply-screenshots.mjs): RN-web's responder path.
+      await s.page.mouse.move(tx0, ty0);
+      await s.page.mouse.down();
+      for (let dx = 6; dx <= 56; dx += 6) { await s.page.mouse.move(tx0 + dx, ty0, { steps: 3 }); await s.page.waitForTimeout(30); }
+      await s.page.waitForTimeout(150);
       await s.shot('dm-01-swipe-right-mid');
-      await touchEnd(s.cdp);
+      await s.page.mouse.up();
       await s.page.waitForTimeout(700);
-      r.replyBanner = await s.page.getByText(/Replying to/i).first().isVisible().catch(() => false);
+      r.replyBanner = await s.page.getByText(/Replying to|Reply to/i).first().isVisible().catch(() => false);
       await s.shot('dm-02-reply-banner');
       // Double-tap -> heart.
-      await tap(s.cdp, cx, cy); await s.page.waitForTimeout(80); await tap(s.cdp, cx, cy);
+      await s.page.mouse.click(cx, cy); await s.page.waitForTimeout(80); await s.page.mouse.click(cx, cy);
       await frames(s, 'dm-03-double-tap-heart', 4, 110);
       await s.page.waitForTimeout(900);
-      // Long-press -> reaction row.
-      await touchPath(s.cdp, [[{ x: cx, y: cy }]]);
-      await s.page.waitForTimeout(900);
-      await touchEnd(s.cdp);
+      // Long-press -> reaction row (shot while still held, and after).
+      await s.page.mouse.move(cx, cy);
+      await s.page.mouse.down();
+      await s.page.waitForTimeout(700);
+      await s.shot('dm-04a-long-press-held');
+      r.reactionRowWhileHeld = await s.page.getByText('Tap and hold to react').isVisible().catch(() => false);
+      await s.page.mouse.up();
       await s.page.waitForTimeout(500);
       await s.shot('dm-04-long-press-reactions');
       r.reactionRowText = (await s.page.locator('body').innerText()).match(/super react|Reply|Copy/gi)?.slice(0, 4) ?? [];
+      r.unseeded = unseeded;
       results.dm = r;
       await s.context.close();
     } finally { devServer.close(); }
