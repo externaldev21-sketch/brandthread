@@ -36,7 +36,10 @@ async function start() {
   });
   app.get("/product/:id", responseCache({ name: "product", ttlSeconds: 15, scope: "anon", idKey: (r) => String(r.params.id) }), (req, res) => {
     hits++;
-    res.json({ id: req.params.id, n: hits });
+    // Like routes/public.ts: the owner's draft preview is private.
+    const preview = auth.userId === "draft_owner";
+    if (preview) res.setHeader("Cache-Control", "private, no-store");
+    res.json({ id: req.params.id, n: hits, ...(preview ? { previewOnly: true } : {}) });
   });
   server = app.listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -153,6 +156,33 @@ describe("responseCache with a store", () => {
     const fresh = await get(`/product/${id}`);
     expect(fresh.cache).toBe("MISS");
     expect(fresh.body.n).toBe(2);
+  });
+});
+
+describe("responseCache anon scope and per-viewer answers (wave 1 s00)", () => {
+  beforeEach(async () => { __setCacheStoreForTests(new MemoryStore()); await start(); });
+  const id = "22222222-2222-2222-2222-222222222222";
+
+  it("never stores a private answer (owner's draft preview) as the shared entry", async () => {
+    auth.userId = "draft_owner";
+    const preview = await get(`/product/${id}`);
+    expect(preview.body.previewOnly).toBe(true);
+    auth.userId = null;
+    const visitor = await get(`/product/${id}`);
+    expect(visitor.cache).toBe("MISS");
+    expect(visitor.body.previewOnly).toBeUndefined();
+    expect(hits).toBe(2);
+  });
+
+  it("serves a viewer who has blocks from the handler, not the shared anon entry", async () => {
+    await get(`/product/${id}`); // anonymous warms the entry
+    blocks.users.add("viewer_blocked_seller");
+    auth.userId = "viewer_blocked_seller";
+    const mine = await get(`/product/${id}`);
+    expect(mine.cache).toBeNull();
+    expect(hits).toBe(2);
+    auth.userId = "viewer_clean_anon";
+    expect((await get(`/product/${id}`)).cache).toBe("HIT");
   });
 });
 

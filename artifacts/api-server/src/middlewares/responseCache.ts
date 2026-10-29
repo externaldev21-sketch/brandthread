@@ -4,7 +4,8 @@
  *
  *  - Off unless a cache store exists (REDIS_URL set, CACHE_DISABLED != 1): then
  *    this middleware is a pass-through and behavior is exactly as before.
- *  - Only 200 JSON responses are stored. Errors are never cached.
+ *  - Only 200 JSON responses are stored. Errors are never cached, and an
+ *    "anon" entry is never filled from a response marked private / no-store.
  *  - Single-flight: when N requests miss on the same key at once, one runs the
  *    handler and the rest wait for its answer, so a hot key costs one database
  *    query, not N.
@@ -117,6 +118,13 @@ export function responseCache(opts: ResponseCacheOptions): RequestHandler {
 
     let key: string;
     try {
+      // "anon" entries are one answer for everyone, but the handlers behind
+      // them still hide sellers with a block relationship to the viewer, so a
+      // viewer who has any block is served by the handler, never the entry.
+      if (opts.scope === "anon") {
+        const viewer = viewerIdOf(req);
+        if (viewer && await hasBlocks(viewer)) { next(); return; }
+      }
       let scopeId = await scopeIdFor(opts.scope, req);
       if (opts.generational) scopeId = `${scopeId}:g${(await store.get(generationKey(opts.name))) ?? "0"}`;
       key = cacheKeyFor(opts, req, scopeId);
@@ -150,9 +158,14 @@ export function responseCache(opts: ResponseCacheOptions): RequestHandler {
     const originalJson = res.json.bind(res) as Response["json"];
     let captured: Stored | null = null;
     res.json = ((body: unknown) => {
-      if (res.statusCode === 200) {
-        const cc = res.getHeader("Cache-Control");
-        captured = { status: 200, body, cacheControl: typeof cc === "string" ? cc : undefined };
+      const cc = res.getHeader("Cache-Control");
+      const ccText = typeof cc === "string" ? cc : "";
+      // A response the handler marked private (e.g. a seller's "Preview as
+      // buyer" of their own draft product) must never become the shared
+      // "anon" entry that every visitor is then served.
+      const privateAnswer = opts.scope === "anon" && /\b(private|no-store)\b/i.test(ccText);
+      if (res.statusCode === 200 && !privateAnswer) {
+        captured = { status: 200, body, cacheControl: ccText || undefined };
       }
       return originalJson(body);
     }) as Response["json"];

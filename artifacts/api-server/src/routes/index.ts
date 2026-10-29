@@ -344,7 +344,8 @@ router.use("/support",         supportRouter);
 // and the AI credits catalogue) sends a person's content to a provider, or
 // debits credits, without their stored yes. Only acts on those paths.
 router.use("/ai-consent",      aiConsentRouter);
-router.use("/support-chat",    aiSafetyGuard("support-chat", { mode: "chat" }), supportChatRouter);
+// /support-chat is mounted once, below aiCreditsGate (see there), so every
+// message is metered. A second mount up here used to answer first and skip it.
 router.use("/ip-cases",        ipCasesRouter);
 router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
@@ -482,6 +483,19 @@ router.use("/seller/milestones",         tc, sellerMilestonesRouter);
 router.use("/seller/live-map",           tc, sellerLiveMapRouter);
 router.use("/seller/brand-assets",       tc, sellerBrandAssetsRouter);
 router.use("/seller/analytics",         tc, sellerAnalyticsRouter); // marketing, production, profit, payouts, store
+// These /seller/* routers must sit above the /seller catch-all: mounted
+// below it, every request first ran the catch-all's team rule (writes need
+// "products"), which blocked a team member's own notification prefs and a
+// marketing member's product feed. Their own rules are in teamRouteRules.ts.
+router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
+router.use("/seller/locations",          tc, sellerLocationsRouter);
+router.use("/seller/metafields",         tc, sellerMetafieldsRouter);
+router.use("/seller/settings",           tc, sellerSettingsExtRouter);
+router.use("/seller/vacation",          tc, vacationRouter);
+router.use("/seller/quick-replies",     tc, quickRepliesRouter);
+router.use("/seller/away-message",      tc, awayMessageRouter);
+router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
+router.use("/seller/product-feed",  tc, sellerProductFeedRouter); // seller feed URL: view, create, regenerate
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
 router.use("/product-qa",                tc, productQaRouter);
@@ -522,7 +536,6 @@ router.use("/referrals",                 referralsRouter);
 router.use("/seller-referrals",          sellerReferralsRouter); // brand → brand free month (BT-313, off unless SELLER_REFERRAL_ENABLED=true)
 router.use("/affiliate/payout-account",  affiliatePayoutRedirectRouter); // Stripe onboarding return/refresh: no auth
 router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
-router.use("/affiliate",                 affiliateCreatorRouter); // creator side; acts as the signed-in user, no tc
 router.use("/shipping-rates",            tc, shippingRatesRouter);
 router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
@@ -539,7 +552,6 @@ router.use("/finance/statements",        financeStatementsRouter);
 router.use("/finance/fees",              financeFeesRouter); // before financeRouter: no payout permission needed
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
-router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
@@ -562,9 +574,6 @@ router.use("/freelancers",               tc, freelancersRouter);
 router.use("/freelancer-jobs",           tc, freelancerJobsRouter);
 
 // ─── New seller settings + buyer payments routes ──────────────────────────────
-router.use("/seller/locations",          tc, sellerLocationsRouter);
-router.use("/seller/metafields",         tc, sellerMetafieldsRouter);
-router.use("/seller/settings",           tc, sellerSettingsExtRouter);
 router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
@@ -601,18 +610,13 @@ router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/iap-promotions",            tc, iapPromotionsRouter);
 router.use("/ads",                       adsServeRouter); // buyer feed ad delivery; no tc
 router.use("/meta-ads",                  tc, metaAdsRouter);
-router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/link-preview",             linkPreviewRouter); // DM link cards (signed-in, SSRF-guarded)
-router.use("/seller/quick-replies",     tc, quickRepliesRouter);
-router.use("/seller/away-message",      tc, awayMessageRouter);
-router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 // Seller growth tools: tracked UTM links, link-in-bio, store pixels.
 router.use("/growth",              tc, growthRouter);
 // My Store: the product blocks on brandthread.app/@handle.
 router.use("/store-blocks",        tc, storeBlocksRouter);
-router.use("/seller/product-feed",  tc, sellerProductFeedRouter); // seller feed URL: view, create, regenerate
 router.use("/gift-cards",          giftCardsRouter); // buyer + seller (own auth/permission checks); no tc
 
 export default router;
