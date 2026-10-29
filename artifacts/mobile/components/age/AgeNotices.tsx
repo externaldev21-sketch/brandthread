@@ -139,5 +139,5 @@ export function AgeRestrictedScreen({ title, status, onResolved }: {
 
 const styles = StyleSheet.create({
   inline: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md },
-  inlineText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 },
+  inlineText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18 },
 });

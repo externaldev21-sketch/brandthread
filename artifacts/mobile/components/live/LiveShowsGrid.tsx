@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3,
   },
   badgeText: { color: MEDIA.fg, fontFamily: FONT.bold, fontSize: FS.meta },
-  title: { fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17, marginTop: 6 },
+  title: { fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 18, marginTop: 6 },
   meta: { fontFamily: FONT.regular, fontSize: FS.meta, marginTop: 1 },
   upList: { marginTop: SP.xl, paddingHorizontal: H_PAD + 4 },
   upHeader: { fontFamily: FONT.bold, fontSize: FS.base, marginBottom: SP.xs },

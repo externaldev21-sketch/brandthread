@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   count: { fontVariant: ['tabular-nums'],  fontFamily: FONT.regular, fontSize: FS.meta },
   field: { minHeight: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
   multiline: { minHeight: 96, paddingTop: SP.md - 2, textAlignVertical: 'top' },
-  note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17 },
+  note: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.md, borderRadius: RADIUS.md },
   toggleTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
 });

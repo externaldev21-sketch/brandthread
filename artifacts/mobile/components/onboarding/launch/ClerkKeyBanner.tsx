@@ -6,7 +6,7 @@
  * and never shows any part of a key.
  */
 import React, { useEffect, useState } from 'react';
-import { MEDIA } from '@/lib/theme';
+import { MEDIA, FONT } from '@/lib/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { serviceRequest } from '@/lib/serviceConfig';
@@ -43,5 +43,5 @@ const s = StyleSheet.create({
     backgroundColor: '#FFD580', marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 8,
   },
   text: { flex: 1, color: MEDIA.background, fontSize: 13, lineHeight: 18 },
-  bold: { fontWeight: '700' },
+  bold: { fontFamily: FONT.bold },
 });

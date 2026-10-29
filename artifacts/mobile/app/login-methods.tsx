@@ -118,7 +118,7 @@ export default function LoginMethods() {
       // Google's brand blue only clears WCAG AA (4.5:1) against a dark "G",
       // not white — the audit's own contrast check confirmed white here
       // was 3.56:1.
-      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#0A0A0B', lineHeight: 14 }}>G</Text></View>,
+      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#0A0A0B', lineHeight: 16 }}>G</Text></View>,
       connected: hasGoogle,
     },
     {

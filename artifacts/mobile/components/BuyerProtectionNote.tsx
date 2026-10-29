@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   headCopy: { flex: 1 },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
   status: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
-  body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+  body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14 },
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', minHeight: 44 },
   linkText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   flatRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.md },

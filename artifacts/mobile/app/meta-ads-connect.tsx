@@ -432,7 +432,7 @@ const s = StyleSheet.create({
   center:      { paddingVertical: SP.xxl, alignItems: 'center' },
   introCard:   { borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg, gap: SP.sm },
   introTitle:  { fontSize: FS.lg, fontFamily: FONT.bold },
-  introBody:   { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  introBody:   { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   checkCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs },
   stepTitle:   { fontSize: FS.base, fontFamily: FONT.bold, marginBottom: SP.xs },
   radio:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

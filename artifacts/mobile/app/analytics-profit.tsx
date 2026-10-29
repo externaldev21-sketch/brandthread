@@ -225,7 +225,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   lineAmount:{ fontSize: FS.base, fontFamily: FONT.semibold },
   payoutCard:{ backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
   payoutLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: 4 },
-  payoutValue:{ fontSize: 36, fontFamily: FONT.bold, color: colors.foreground },
+  payoutValue:{ fontSize: FS.h1, fontFamily: FONT.bold, color: colors.foreground },
   nextPayoutBadge:{ backgroundColor: colors.success + '22', borderRadius: RADIUS.sm, padding: SP.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.success + '44' },
   nextPayoutDate:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.success },
   nextPayoutAmt:{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.success },

@@ -550,7 +550,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   sectionTitle: {
     color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: SP.sm,
   },
-  bio: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21 },
+  bio: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   tag: {
     paddingHorizontal: SP.sm + 2, paddingVertical: 5,

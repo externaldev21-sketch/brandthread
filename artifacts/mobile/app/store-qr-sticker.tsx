@@ -136,7 +136,7 @@ export default function StoreQrStickerScreen() {
     },
     actionLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text, marginTop: 8 },
     emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.lg, color: theme.text, marginBottom: SP.sm },
-    emptyBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, lineHeight: 20, marginBottom: SP.lg },
+    emptyBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, lineHeight: 18, marginBottom: SP.lg },
   }), [theme]);
 
   const Action = ({ icon, label, onPress, loading, testID }: {

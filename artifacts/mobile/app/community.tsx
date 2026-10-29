@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   unreadDot: { width: 8, height: 8, borderRadius: 4 },
   linkBtn: { minHeight: COMP.minTouchTarget, justifyContent: 'center' },
   linkText: { fontFamily: FONT.medium, fontSize: FS.sm },
-  inlineNote: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 17, marginTop: SP.sm },
+  inlineNote: { fontFamily: FONT.regular, fontSize: FS.meta, lineHeight: 16, marginTop: SP.sm },
   createRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.md - 4, marginTop: SP.md, padding: SP.md - 4,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, minHeight: 64,
@@ -386,5 +386,5 @@ const styles = StyleSheet.create({
   footer: { paddingVertical: SP.md },
   sheet: { alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.md },
   sheetName: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.2 },
-  sheetDesc: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, textAlign: 'center', marginBottom: SP.xs },
+  sheetDesc: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, textAlign: 'center', marginBottom: SP.xs },
 });

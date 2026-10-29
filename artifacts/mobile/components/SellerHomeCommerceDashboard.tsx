@@ -1296,6 +1296,6 @@ const styles = StyleSheet.create({
   setupIcon: { width: 40, height: 40, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   setupCopy: { flex: 1, minWidth: 0 },
   setupTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, letterSpacing: -0.1 },
-  setupDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: 3 },
+  setupDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14, marginTop: 3 },
   optionsButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

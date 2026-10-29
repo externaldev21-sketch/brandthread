@@ -80,6 +80,6 @@ const styles = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
   initials: { fontFamily: FONT.bold },
   textWrap: { alignItems: 'center', gap: 4 },
-  title: { textAlign: 'center', fontWeight: '700' },
+  title: { textAlign: 'center', fontFamily: FONT.bold },
   subtitle: { textAlign: 'center' },
 });

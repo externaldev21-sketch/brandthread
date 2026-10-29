@@ -640,7 +640,7 @@ export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: Tr
           <Icon name={isOutForDelivery ? 'truck' : 'alert-triangle'} size={ICON.sm} color={color} />
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color }}>{title}</Text>
         </View>
-        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 }}>{message}</Text>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18 }}>{message}</Text>
       </GradientCard>
     </View>
   );
@@ -1533,7 +1533,7 @@ export default function BuyerOrderDetailScreen() {
                 </View>
                 <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
               </View>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18, marginBottom: SP.lg }}>
                 Your payment will be fully refunded. {refundExpectedLabel(new Date())} on your statement.
               </Text>
               <View style={{ flexDirection: 'row', gap: SP.sm }}>
@@ -1564,7 +1564,7 @@ export default function BuyerOrderDetailScreen() {
                 </View>
                 <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Did it arrive?</Text>
               </View>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18, marginBottom: SP.lg }}>
                 Confirming marks this order as delivered and ends the delivery guarantee, so you will no longer be refunded automatically if it is late. Only confirm once it is in your hands.
               </Text>
               <View style={{ flexDirection: 'row', gap: SP.sm }}>
@@ -1611,7 +1611,7 @@ const makeStyles = (theme: AppThemePreset) => {
     returnDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
     sellerResponse: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
     sellerResponseLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: 4 },
-    sellerResponseText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+    sellerResponseText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
     returnPendingText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
     returnUpdated: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm },
 
@@ -1629,7 +1629,7 @@ const makeStyles = (theme: AppThemePreset) => {
     lineItemPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, fontVariant: ['tabular-nums'] },
 
     // Address
-    addressLine: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 22 },
+    addressLine: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18 },
 
     // Payment summary
     divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },

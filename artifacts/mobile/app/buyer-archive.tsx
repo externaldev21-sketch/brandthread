@@ -345,5 +345,5 @@ const makeStyles = (theme: { accent: string; accentDim: string }, CELL: number) 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 18 },
 });

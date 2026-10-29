@@ -44,5 +44,5 @@ export function DiscoverSectionHeader({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10, minHeight: 25 },
-  title: { fontSize: 20, lineHeight: 25, fontFamily: FONT.bold, flexShrink: 1 },
+  title: { fontSize: 20, lineHeight: 24, fontFamily: FONT.bold, flexShrink: 1 },
 });

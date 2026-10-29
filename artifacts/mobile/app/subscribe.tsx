@@ -18,6 +18,7 @@ import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { parseWebCheckoutParams } from '@/lib/webSubscribeLink';
 
+import { FONT } from '@/lib/theme';
 export default function SubscribeScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -77,7 +78,7 @@ export default function SubscribeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 12 },
-  title: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  title: { fontSize: 17, fontFamily: FONT.semibold, textAlign: 'center' },
   note: { fontSize: 15, textAlign: 'center' },
   actions: { alignSelf: 'stretch', gap: 8, marginTop: 12 },
 });

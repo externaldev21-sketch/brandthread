@@ -94,7 +94,7 @@ export default function SellerCreatorProgramScreen() {
     content: { paddingHorizontal: SP.md, paddingTop: SP.sm },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
     title: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text },
-    body: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: theme.muted, marginTop: 4 },
+    body: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.muted, marginTop: 4 },
     input: { borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, paddingHorizontal: SP.md, minHeight: 48, justifyContent: 'center', marginBottom: SP.sm },
     inputText: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text },
     creatorRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border, minHeight: 64 },

@@ -383,14 +383,14 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md },
   url: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.md },
   row: { flexDirection: 'row', gap: SP.sm },
-  muted: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 19 },
+  muted: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
   error: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   reason: { marginTop: SP.sm, textAlign: 'center' },
   countCard: {
     marginTop: SP.sm, backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border,
     paddingVertical: SP.md, alignItems: 'center',
   },
-  countValue: { fontSize: 32, fontFamily: FONT.bold, color: theme.text },
+  countValue: { fontSize: FS.h1, fontFamily: FONT.bold, color: theme.text },
   toRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   chip: {
@@ -401,7 +401,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   messageBox: {
     marginTop: SP.sm, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.md,
   },
-  messageText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 },
+  messageText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18 },
   sentRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md },
   sentTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   storyWrap: { alignItems: 'center', gap: SP.md },

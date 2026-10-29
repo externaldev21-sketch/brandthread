@@ -32,7 +32,7 @@ import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { hapticSelection } from '@/lib/haptics';
 import { pickFromLibrary } from '@/lib/pickProfileImage';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import {
   STORE_SITE_FONTS, STORE_SITE_THEMES, storeSiteFontFamily, storeSiteTheme, type ButtonStyle, type StoreSiteFont,
 } from '@/lib/storeSiteDesign';
@@ -315,7 +315,7 @@ function ToolGlyph({ panel, draft }: { panel: Panel; draft: DesignDraft }) {
     const t = storeSiteTheme(draft.siteTheme);
     return (
       <View style={[s.glyph, { backgroundColor: t.bg, borderColor: theme.borderSubtle }]}>
-        <Text style={{ color: t.fg, fontSize: 11, fontWeight: '700' }}>Aa</Text>
+        <Text style={{ color: t.fg, fontSize: 11, fontFamily: FONT.bold }}>Aa</Text>
       </View>
     );
   }
@@ -339,7 +339,7 @@ const s = StyleSheet.create({
     backgroundColor: FILL_ELEVATED, borderRadius: RADII.sheet,
   },
   tool: { width: 72, alignItems: 'center', gap: 4, paddingVertical: 2 },
-  toolLabel: { fontSize: 12, fontWeight: '500' },
+  toolLabel: { fontSize: 12, fontFamily: FONT.medium },
   glyph: { width: 28, height: 28, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   glyphRound: { borderRadius: 14, borderWidth: 0 },
   center: { alignItems: 'center', justifyContent: 'center' },
@@ -350,12 +350,12 @@ const s = StyleSheet.create({
   grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
   grabber: { width: 36, height: 5, borderRadius: 3, opacity: 0.5 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, minHeight: 48 },
-  sheetTitle: { fontSize: 20, fontWeight: '700' },
+  sheetTitle: { fontSize: 20, fontFamily: FONT.bold },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingBottom: 24, rowGap: 12 },
   themeCell: { width: '33.33%', alignItems: 'center', paddingHorizontal: 4 },
   themeTile: { width: '100%', aspectRatio: 1.35, borderRadius: 12, padding: 10, justifyContent: 'space-between' },
-  themeAa: { fontSize: 20, fontWeight: '600' },
+  themeAa: { fontSize: 20, fontFamily: FONT.semibold },
   themeBtn: { height: 12, width: '100%' },
   themeLabel: { fontSize: 13, marginTop: 6 },
   panelBody: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },

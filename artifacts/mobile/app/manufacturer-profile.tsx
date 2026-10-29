@@ -702,7 +702,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, textAlign: 'center',
   },
   description: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 20,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18,
     marginTop: SP.sm,
   },
   capabilityBlock: {
@@ -780,7 +780,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18,
   },
   reviewBreakdown: {
-    fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle, lineHeight: 17,
+    fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle, lineHeight: 14,
   },
   contactRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,

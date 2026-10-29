@@ -737,14 +737,14 @@ const styles = StyleSheet.create({
   modeChip: { flex: 1, flexBasis: 0, minWidth: 0, minHeight: 40, borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   modeChipText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   outfitNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1 },
-  outfitNoticeText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 17 },
+  outfitNoticeText: { flex: 1, fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 16 },
   // Narrow enough that the badge never eats into the title's available
   // width — a wider badge here previously clipped "AI Product Photography"
   // (251px of text in a 246px box) once the header row split the space.
   bubble: { maxWidth: '85%', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   attachedRow: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   attachedItem: { alignItems: 'center', gap: 3 },
   attachedThumb: { width: 48, height: 48, borderRadius: 8 },

@@ -222,7 +222,7 @@ function makeStyles(theme: AppThemePreset) {
     dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6, backgroundColor: theme.border },
     dotCurrent: { backgroundColor: theme.text },
     eventTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
-    muted: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: theme.muted },
+    muted: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.muted },
     inlineError: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   });
 }

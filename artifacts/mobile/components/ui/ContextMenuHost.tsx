@@ -21,7 +21,7 @@ import { Icon } from '@/components/ui/Icon';
 import { springTo } from '@/constants/motion';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { haptics } from '@/lib/haptics';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   previewHeader: { flexDirection: 'row', alignItems: 'center', height: 52, paddingHorizontal: 12, gap: 10 },
   previewAvatar: { width: 32, height: 32, borderRadius: 16 },
   previewHeaderText: { flex: 1, minWidth: 0 },
-  previewTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  previewTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
   previewSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginTop: 1 },
   previewBody: { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular, padding: 14 },
   previewList: { marginTop: 12, borderRadius: 14, maxHeight: 360 },

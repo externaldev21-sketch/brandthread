@@ -15,7 +15,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
@@ -735,7 +735,7 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: CP.black },
   captionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 4 },
   captionBox: { flex: 1, minHeight: 132 },
-  captionText: { fontFamily: FONT.regular, fontSize: 16, lineHeight: 22, padding: 0, margin: 0, color: CP.silver },
+  captionText: { fontFamily: FONT.regular, fontSize: 16, lineHeight: 21, padding: 0, margin: 0, color: CP.silver },
   mirror: { position: 'absolute', left: 0, right: 0, top: 0 },
   captionInput: { minHeight: 132, textAlignVertical: 'top', color: 'transparent', outlineStyle: 'none' as any },
   tokenText: { color: CP.white },
@@ -745,17 +745,17 @@ const s = StyleSheet.create({
   chips: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
   // Same-row chips share one width (equal grid), inner padding ≥12px.
   chip: { backgroundColor: CP.surface2, paddingHorizontal: 12, width: 124, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  chipText: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14 },
+  chipText: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base },
   people: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
   person: { backgroundColor: CP.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, maxWidth: 180 },
-  personName: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14 },
+  personName: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base },
   personHandle: { color: CP.silver, fontFamily: FONT.regular, fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, minHeight: 60, paddingVertical: 10 },
   rowLabel: { color: CP.white, fontFamily: FONT.semibold, fontSize: 16 },
   rowValue: { color: CP.silver, fontFamily: FONT.regular, fontSize: 13, marginTop: 2 },
   officialAvatar: { width: 28, height: 28, borderRadius: 14, overflow: 'hidden', backgroundColor: CP.black, borderWidth: 1, borderColor: CP.surface2 },
   creditBox: { marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 10, backgroundColor: CP.surface },
-  creditTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14, marginBottom: 8 },
+  creditTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: 8 },
   creditRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: CP.surface2, borderRadius: 8, paddingLeft: 10 },
   creditAt: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 15 },
   creditInput: { flex: 1, height: 40, paddingHorizontal: 6, color: CP.white, fontFamily: FONT.regular, fontSize: 15, outlineStyle: 'none' as any },
@@ -766,7 +766,7 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, color: CP.white, fontFamily: FONT.regular, fontSize: 15, outlineStyle: 'none' as any },
   emptyWrap: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle: { color: CP.white, fontFamily: FONT.bold, fontSize: 17, textAlign: 'center' },
-  emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: 14, textAlign: 'center', marginTop: 6 },
+  emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 6 },
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 64, paddingVertical: 10 },
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: crispPx(1.5), borderColor: CP.silver, alignItems: 'center', justifyContent: 'center' },
   checkOn: { backgroundColor: CP.white, borderColor: CP.white },

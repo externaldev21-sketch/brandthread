@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 interface Props {
@@ -69,6 +69,6 @@ const s = StyleSheet.create({
   grabber: { width: 36, height: 5, borderRadius: 3, opacity: 0.5 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, minHeight: 48 },
   back: { width: 32, height: 44, justifyContent: 'center', marginLeft: -6 },
-  title: { flex: 1, fontSize: 20, fontWeight: '700' },
+  title: { flex: 1, fontSize: 20, fontFamily: FONT.bold },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 });

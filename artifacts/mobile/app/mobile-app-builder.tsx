@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   heroTitle: { fontSize: 20, fontFamily: FONT.bold, marginTop: 4 },
-  heroSub: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 19 },
+  heroSub: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   ctaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, marginTop: 6 },
   ctaText: { fontSize: 15, fontFamily: FONT.semibold },
   sectionTitle: { fontSize: 17, fontFamily: FONT.semibold, marginBottom: 12 },

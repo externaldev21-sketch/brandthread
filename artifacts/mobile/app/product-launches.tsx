@@ -414,7 +414,7 @@ const s = StyleSheet.create({
   thumb: { width: 52, height: 52, borderRadius: RADIUS.sm },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  meta: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
+  meta: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: SP.lg },
   form: { padding: SP.md, gap: SP.md },

@@ -780,7 +780,7 @@ function Stepper({ label, value, min, max, onChange, colors, theme }: any) {
 const s = StyleSheet.create({
   sectionTitle: { fontSize: FS.base, fontFamily: FONT.bold, marginBottom: SP.sm, letterSpacing: -0.1 },
   sectionCard:  { borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, gap: SP.md },
-  helper:       { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 17 },
+  helper:       { fontSize: FS.meta, fontFamily: FONT.regular, lineHeight: 16 },
   sourceChip:   { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.sm, paddingHorizontal: SP.xs },
   sourceChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center' },
   chip:         { borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },

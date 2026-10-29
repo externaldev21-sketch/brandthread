@@ -29,7 +29,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, RED, MEDIA } from '@/lib/theme';
+import { FONT, RED, MEDIA, FS } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { DENSE_MAX_FONT_MULTIPLIER } from '@/lib/dynamicType';
@@ -140,7 +140,7 @@ const toastStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold },
-  message: { fontSize: 14, lineHeight: 19, fontFamily: FONT.regular, marginTop: 2 },
+  message: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.regular, marginTop: 2 },
   single: { fontSize: 15, lineHeight: 20, fontFamily: FONT.medium },
 });
 

@@ -106,8 +106,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm, borderWidth: 1,
     paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: 44,
   },
-  fieldText: { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.regular },
-  fieldSub: { fontSize: FS.xs, lineHeight: 15, fontFamily: FONT.regular },
+  fieldText: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.regular },
+  fieldSub: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.regular },
   search: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     marginHorizontal: SHEET_GUTTER, marginBottom: SP.sm,
@@ -117,5 +117,5 @@ const styles = StyleSheet.create({
   empty: { paddingHorizontal: SHEET_GUTTER, paddingVertical: SP.lg, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SHEET_GUTTER, paddingVertical: SP.sm + SP.xs, minHeight: 56 },
   rowTitle: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.medium },
-  rowSub: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.regular, marginTop: 2 },
+  rowSub: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.regular, marginTop: 2 },
 });

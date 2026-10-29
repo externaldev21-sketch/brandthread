@@ -98,6 +98,6 @@ function makeStyles(theme: Theme) {
     root: { flex: 1, backgroundColor: theme.background },
     saveBtn: { minWidth: 56, height: 44, alignItems: 'center', justifyContent: 'center' },
     saveText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
-    footnote: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: theme.muted, marginTop: SP.xs },
+    footnote: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: theme.muted, marginTop: SP.xs },
   });
 }

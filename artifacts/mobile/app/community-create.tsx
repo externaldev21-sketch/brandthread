@@ -149,7 +149,7 @@ export default function CommunityCreateScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.md },
-  note: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  note: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   inviteBlock: { marginTop: SP.sm, gap: SP.sm },
   sectionTitle: { fontFamily: FONT.bold, fontSize: FS.md, letterSpacing: -0.2 },
   inviteRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },

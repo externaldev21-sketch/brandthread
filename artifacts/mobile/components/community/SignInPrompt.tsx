@@ -27,5 +27,5 @@ export function SignInPrompt({ message = 'Sign in to join groups and chat with t
 
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.lg, padding: SP.md, gap: SP.sm, alignItems: 'flex-start' },
-  text: { fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 21 },
+  text: { fontFamily: FONT.medium, fontSize: FS.base, lineHeight: 20 },
 });

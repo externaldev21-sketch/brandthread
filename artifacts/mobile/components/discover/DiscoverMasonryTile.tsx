@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { formatCents } from '@/lib/money';
@@ -108,7 +108,7 @@ export function DiscoverMasonryTileSkeleton({ width, imageHeight }: { width: num
 const styles = StyleSheet.create({
   imageWrap: { width: '100%', borderRadius: radius.lg, overflow: 'hidden' },
   fallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, gap: 6 },
-  fallbackInitials: { fontFamily: FONT.bold, fontSize: 18 },
+  fallbackInitials: { fontFamily: FONT.bold, fontSize: FS.md },
   fallbackCaption: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, textAlign: 'center' },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
   },
   topRight: { position: 'absolute', top: 8, right: 8 },
   bottomLeft: { position: 'absolute', left: 8, bottom: 8 },
-  chipText: { color: ON_PHOTO, fontFamily: FONT.semibold, fontSize: 11, lineHeight: 13 },
-  priceText: { color: ON_PHOTO, fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
+  chipText: { color: ON_PHOTO, fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
+  priceText: { color: ON_PHOTO, fontFamily: FONT.semibold, fontSize: 12, lineHeight: 16 },
   byline: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, height: MASONRY_AVATAR },
   avatar: { width: MASONRY_AVATAR, height: MASONRY_AVATAR, borderRadius: MASONRY_AVATAR / 2 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { color: ON_PHOTO, fontFamily: FONT.bold, fontSize: 10, lineHeight: 12 },
-  name: { flex: 1, minWidth: 0, fontFamily: FONT.medium, fontSize: 13, lineHeight: 16 },
+  avatarInitials: { color: ON_PHOTO, fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 12 },
+  name: { flex: 1, minWidth: 0, fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
 });

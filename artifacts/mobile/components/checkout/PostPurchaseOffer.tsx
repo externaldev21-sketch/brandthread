@@ -239,7 +239,7 @@ function makeStyles(ck: CheckoutColors) {
     badge: { borderWidth: 1, borderColor: ck.fieldBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
     badgeText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: ck.text },
     options: { marginBottom: SP.sm },
-    sub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted, marginTop: 2 },
+    sub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, color: ck.muted, marginTop: 2 },
     errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
     errorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: ck.text },
     actions: { marginTop: SP.md },

@@ -59,5 +59,5 @@ export default function SellerGiveaways() {
 
 const styles = StyleSheet.create({
   title: { fontSize: FS.lg, fontFamily: FONT.bold },
-  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
 });

@@ -16,6 +16,7 @@ import type { FeaturedBrand } from '@/services/discoverService';
 import { radius } from '@/constants/radii';
 import { SPACE } from './onboardingTokens';
 
+import { FONT, FS } from '@/lib/theme';
 const CARD_WIDTH = 188;
 
 export function FeaturedBrandsRail({
@@ -84,6 +85,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   photo: { flex: 1, aspectRatio: 4 / 5, backgroundColor: theme.surface },
   body: { padding: 12, gap: 6 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { flexShrink: 1, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text },
-  count: { fontSize: 12, fontFamily: 'Inter_500Medium', color: theme.muted, marginBottom: 4 },
+  name: { flexShrink: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  count: { fontSize: 12, fontFamily: FONT.medium, color: theme.muted, marginBottom: 4 },
 });

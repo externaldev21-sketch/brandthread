@@ -10,6 +10,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StoreSheet } from '@/components/store/StoreSheet';
 import { monthGrid, shipByRange, toDay } from '@/lib/storeBlocks';
 
+import { FONT } from '@/lib/theme';
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function ShipDateSheet({ visible, value, onPick, onClose }: {
@@ -81,9 +82,9 @@ const s = StyleSheet.create({
   body: { paddingHorizontal: 16, paddingBottom: 8 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   nav: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  month: { fontSize: 17, fontWeight: '600' },
+  month: { fontSize: 17, fontFamily: FONT.semibold },
   week: { flexDirection: 'row' },
-  wd: { flex: 1, textAlign: 'center', fontSize: 13, fontWeight: '600', paddingVertical: 6 },
+  wd: { flex: 1, textAlign: 'center', fontSize: 13, fontFamily: FONT.semibold, paddingVertical: 6 },
   cell: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 16, fontVariant: ['tabular-nums'] },

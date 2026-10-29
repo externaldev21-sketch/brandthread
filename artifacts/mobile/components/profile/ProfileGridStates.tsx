@@ -5,7 +5,7 @@ import { Icon as Feather } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, SP } from '@/lib/theme';
+import { FONT, SP, FS } from '@/lib/theme';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { ProfileGridSkeleton } from './ProfileVideoGrid';
 import type { ProfileLayout } from './profileLayout';
@@ -143,5 +143,5 @@ const styles = StyleSheet.create({
   quietTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20, textAlign: 'center', marginTop: 2 },
   quietMessage: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   quietAction: { minHeight: 32, justifyContent: 'center', paddingHorizontal: SP.sm },
-  quietActionText: { fontFamily: FONT.semibold, fontSize: 14 },
+  quietActionText: { fontFamily: FONT.semibold, fontSize: FS.base },
 });

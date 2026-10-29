@@ -111,8 +111,8 @@ function bannerStyles(theme: AppThemePreset) {
     },
     head: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     title: { flex: 1, fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
-    body: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
-    sub: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, lineHeight: 18 },
+    body: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text, lineHeight: 18 },
+    sub: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, lineHeight: 14 },
   });
 }
 
@@ -212,7 +212,7 @@ function sheetStyles(theme: AppThemePreset) {
       padding: SP.lg, paddingBottom: SP.xl + 20,
     },
     title: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text },
-    hint: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, marginBottom: SP.sm, lineHeight: 20 },
+    hint: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, marginBottom: SP.sm, lineHeight: 18 },
     itemRow: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 48,
       borderBottomWidth: 1, borderBottomColor: theme.border,

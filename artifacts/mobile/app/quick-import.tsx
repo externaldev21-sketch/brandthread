@@ -24,6 +24,7 @@ import { hapticSuccess } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import type { ImportCommitResult, ImportProviders, QuickImportItem } from '@/lib/productImportTypes';
 
+import { FONT, FS } from '@/lib/theme';
 type Source = 'shopify-url' | 'instagram';
 type Phase =
   | { kind: 'start' }
@@ -249,28 +250,28 @@ const checkStyles = StyleSheet.create({
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   body: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
-  label: { fontSize: 13, fontWeight: '600', color: theme.muted },
+  label: { fontSize: 13, fontFamily: FONT.semibold, color: theme.muted },
   field: {
     height: 52, borderRadius: 14, paddingHorizontal: 16, justifyContent: 'center',
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
   input: { fontSize: 16, color: theme.text, paddingVertical: 0 },
   primary: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.text },
-  primaryText: { fontSize: 16, fontWeight: '600', color: theme.background },
+  primaryText: { fontSize: 16, fontFamily: FONT.semibold, color: theme.background },
   secondary: {
     height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: theme.border, marginTop: 8,
   },
-  secondaryText: { fontSize: 16, fontWeight: '600', color: theme.text },
-  error: { fontSize: 14, color: theme.error },
+  secondaryText: { fontSize: 16, fontFamily: FONT.semibold, color: theme.text },
+  error: { fontSize: FS.sm, color: theme.error },
   fine: { fontSize: 13, color: theme.muted, marginTop: 4 },
   selectAll: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
-  selectAllText: { fontSize: 15, fontWeight: '600', color: theme.text, fontVariant: ['tabular-nums'] },
+  selectAllText: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text, fontVariant: ['tabular-nums'] },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: 16 + 22 + 12 },
   thumb: { width: 44, height: 55, borderRadius: 6, overflow: 'hidden', backgroundColor: theme.surface },
   rowText: { flex: 1 },
-  rowName: { fontSize: 15, fontWeight: '600', color: theme.text },
+  rowName: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
   rowMeta: { fontSize: 13, color: theme.muted, marginTop: 2, fontVariant: ['tabular-nums'] },
   note: { fontSize: 13, color: theme.muted, paddingHorizontal: 16, paddingTop: 16 },
   footer: {
@@ -278,6 +279,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     backgroundColor: theme.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border,
   },
   doneBody: { paddingHorizontal: 16, paddingTop: 24, gap: 8 },
-  doneTitle: { fontSize: 28, fontWeight: '700', color: theme.text, letterSpacing: -0.6 },
+  doneTitle: { fontSize: 28, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.6 },
   doneLine: { fontSize: 15, color: theme.muted },
 });

@@ -29,7 +29,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useStoreLink } from '@/hooks/useStoreLink';
 import { storeSiteViewFromBio, useStoreSite } from '@/hooks/useStoreSite';
 import { useScreenBottomInset } from '@/hooks/useScreenBottomInset';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS } from '@/lib/theme';
 import { displayStoreLink } from '@/lib/storeShare';
 import { openShareStoreSheet } from '@/lib/shareStoreSheet';
 import { leaveSetupFlow } from '@/lib/setupNavigation';
@@ -373,8 +373,8 @@ const s = StyleSheet.create({
   phone: { borderWidth: 1, borderRadius: 20, padding: 1, alignSelf: 'flex-start' },
   profile: { flex: 1, minWidth: 0, paddingTop: 4 },
   avatar: { width: 64, height: 64, borderRadius: 32 },
-  initial: { fontSize: 26, fontWeight: '700' },
-  name: { fontSize: 22, lineHeight: 27, fontWeight: '700', marginTop: 12 },
+  initial: { fontSize: FS.xxl, fontFamily: FONT.bold },
+  name: { fontSize: 22, lineHeight: 28, fontFamily: FONT.bold, marginTop: 12 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, marginTop: -8, marginBottom: 4, alignSelf: 'flex-start', maxWidth: '100%' },
   link: { fontSize: 15, flexShrink: 1 },
   editProfile: { alignSelf: 'flex-start', marginTop: 12 },
@@ -383,7 +383,7 @@ const s = StyleSheet.create({
   rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, height: ROW_HEIGHT },
   rowThumb: { width: 48, height: 48, borderRadius: 10 },
   rowText: { flex: 1, minWidth: 0, gap: 2 },
-  rowTitle: { fontSize: 16, fontWeight: '600' },
+  rowTitle: { fontSize: 16, fontFamily: FONT.semibold },
   rowMeta: { fontSize: 13 },
   eye: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   add: { marginTop: 8 },
@@ -391,17 +391,17 @@ const s = StyleSheet.create({
   type: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 16, minHeight: 76 },
   typeIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   typeText: { flex: 1, minWidth: 0, gap: 2 },
-  typeTitle: { fontSize: 17, fontWeight: '600' },
-  typeLine: { fontSize: 14 },
+  typeTitle: { fontSize: 17, fontFamily: FONT.semibold },
+  typeLine: { fontSize: FS.sm },
   catalog: { maxHeight: 460 },
-  catHead: { fontSize: 13, fontWeight: '600', marginTop: 8 },
+  catHead: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 8 },
   catRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 },
   catThumb: { width: 48, height: 48, borderRadius: 10 },
-  catName: { fontSize: 16, fontWeight: '600' },
+  catName: { fontSize: 16, fontFamily: FONT.semibold },
   themes: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 16 },
   themeCell: { width: '30%', alignItems: 'center', gap: 6 },
   swatch: { width: '100%', aspectRatio: 0.8, borderRadius: 14, padding: 10, justifyContent: 'flex-end', gap: 6 },
   swatchCard: { height: 22, borderRadius: 6 },
   swatchBtn: { height: 14, borderRadius: 5 },
-  themeLabel: { fontSize: 13, fontWeight: '600' },
+  themeLabel: { fontSize: 13, fontFamily: FONT.semibold },
 });

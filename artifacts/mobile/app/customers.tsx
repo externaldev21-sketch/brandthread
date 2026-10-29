@@ -18,7 +18,7 @@ import { usePreviewDemoMode } from '@/hooks/usePreviewDemoMode';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState, OptionSheet, SkeletonLine } from '@/components/ui';
-import { FILL_ELEVATED, TABULAR, TEXT } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, FS, TABULAR } from '@/lib/theme';
 import { radius } from '@/constants/radii';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import {
@@ -44,14 +44,14 @@ const CustomerRow = React.memo(function CustomerRow({ customer: c, topBorder, co
       style={[styles.custRow, topBorder && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
       onPress={() => onOpen(c.id)} accessibilityRole="button" testID="customer-row">
       <View style={styles.nameLine}>
-        <Text style={[TEXT.headline, styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
-        {tag ? <View style={styles.tagChip}><Text style={[TEXT.caption, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text></View> : null}
+        <Text style={[styles.custName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
+        {tag ? <View style={styles.tagChip}><Text style={[styles.tagText, { color: colors.mutedForeground }]} numberOfLines={1}>{tag}</Text></View> : null}
       </View>
-      {location ? <Text style={[TEXT.footnote, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text> : null}
-      <Text style={[TEXT.footnote, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
+      {location ? <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{location}</Text> : null}
+      <Text style={[styles.meta, TABULAR, { color: colors.foreground }]} numberOfLines={1}>{customerSpendLine(c)}</Text>
       {c.notes ? <View style={styles.noteLine}>
-        <Icon name="file-text" size={17} color={colors.mutedForeground} />
-        <Text style={[TEXT.footnote, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
+        <Icon name="file-text" size={14} color={colors.mutedForeground} />
+        <Text style={[styles.meta, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>{c.notes}</Text>
       </View> : null}
     </TouchableOpacity>
   );
@@ -186,7 +186,7 @@ export default function CustomersScreen() {
           <View style={[styles.searchWrap, { backgroundColor: FILL_ELEVATED }]}>
             <Icon name="search" size={17} color={colors.mutedForeground} />
             <TextInput
-              style={[styles.searchInput, TEXT.body, { color: colors.foreground }, WEB_INPUT_RESET]}
+              style={[styles.searchInput, { color: colors.foreground }, WEB_INPUT_RESET]}
               placeholder="Search"
               placeholderTextColor={colors.mutedForeground}
               value={search}
@@ -220,7 +220,7 @@ export default function CustomersScreen() {
             <TouchableOpacity key={key} style={{ minHeight: 44, justifyContent: 'center' }}
               onPress={() => { hapticLight(); setSegment(key); if (key === 'top') setSortBy('spend'); }}
               accessibilityRole="tab" accessibilityState={{ selected: segment === key }}>
-              <Text style={[TEXT.body, { color: segment === key ? colors.foreground : colors.mutedForeground }]}>
+              <Text style={[styles.segmentText, segment === key && styles.segmentTextActive, { color: segment === key ? colors.foreground : colors.mutedForeground }]}>
                 {key === 'all' ? 'All' : key === 'top' ? 'Top 20' : 'Superfans'}
               </Text>
             </TouchableOpacity>
@@ -231,12 +231,12 @@ export default function CustomersScreen() {
             <TouchableOpacity accessibilityRole="button" disabled={granting || !!earlyAccess?.allGranted}
               onPress={() => earlyAccess?.drop ? void giveEarlyAccess() : router.push('/product-launches' as never)}
               style={{ minHeight: 44, justifyContent: 'center' }} testID="superfans-early-access">
-              <Text style={[TEXT.body, { color: colors.foreground }]}>
+              <Text style={[styles.actionText, { color: colors.foreground }]}>
                 {granting ? 'Giving early access…' : earlyAccess?.allGranted ? 'Early access given' : earlyAccess?.drop ? 'Give early access' : 'Schedule a drop'}
               </Text>
             </TouchableOpacity>
-            {earlyAccess?.drop && <Text style={{ color: colors.mutedForeground }}>{earlyAccess.drop.name}</Text>}
-            {grantError && <TouchableOpacity onPress={() => void fetchSuperfans()} accessibilityRole="button"><Text style={[TEXT.body, { color: colors.foreground }]}>Couldn’t load early access. Tap to retry.</Text></TouchableOpacity>}
+            {earlyAccess?.drop && <Text style={[styles.meta, { color: colors.mutedForeground }]}>{earlyAccess.drop.name}</Text>}
+            {grantError && <TouchableOpacity onPress={() => void fetchSuperfans()} accessibilityRole="button"><Text style={[styles.actionText, { color: colors.foreground }]}>Couldn’t load early access. Tap to retry</Text></TouchableOpacity>}
           </View>
         )}
         {loading ? (
@@ -251,14 +251,14 @@ export default function CustomersScreen() {
           </View>
         ) : error ? (
           <ErrorState
-            message="Couldn't load your customers."
+            message="Couldn't load customers. Check your connection and try again."
             onRetry={() => { setLoading(true); void fetchCustomers(search); }}
           />
         ) : sortedCustomers.length === 0 ? (
           // One line, and no action: Dev's call — there's nothing a seller
           // can "do" from an empty customer list.
           <EmptyState
-            title={search.trim() ? 'No customers match your search.' : 'No customers yet.'}
+            title={search.trim() ? 'No matching customers' : 'No customers yet'}
             style={{ marginTop: 48 }}
             testID="customers-empty"
           />
@@ -286,11 +286,18 @@ const styles = StyleSheet.create({
   indexWrap: { position: 'absolute', top: 0, bottom: 0, right: 0, justifyContent: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   searchWrap: { flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1 },
+  // Same sizes as the Products list (components/products/ProductRow.tsx):
+  // name 15 semibold, meta lines 13.
+  searchInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular },
+  segmentText: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.medium },
+  segmentTextActive: { fontFamily: FONT.semibold },
+  actionText: { fontSize: FS.base, lineHeight: 20, fontFamily: FONT.semibold },
   sortBtn: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   custRow: { paddingVertical: 14, gap: 3 },
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  custName: { flexShrink: 1 },
+  custName: { flexShrink: 1, fontSize: FS.base, lineHeight: 20, fontFamily: FONT.semibold },
+  meta: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.regular },
+  tagText: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold },
   tagChip: { marginLeft: 'auto', backgroundColor: FILL_ELEVATED, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 3, maxWidth: 120 },
   noteLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
 });

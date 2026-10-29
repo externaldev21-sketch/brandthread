@@ -120,5 +120,5 @@ const styles = StyleSheet.create({
   cellSm: { width: CELL_SM },
   pressSm: { width: CELL_SM, gap: 4 },
   circleSm: { width: CIRCLE_SM, height: CIRCLE_SM, borderRadius: CIRCLE_SM / 2, borderWidth: 1 },
-  labelSm: { width: CELL_SM, fontSize: 11, lineHeight: 13 },
+  labelSm: { width: CELL_SM, fontSize: 11, lineHeight: 14 },
 });

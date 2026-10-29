@@ -931,7 +931,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   captionsBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },
   deleteBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: RED },
-  modalDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20, marginBottom: SP.md },
+  modalDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 18, marginBottom: SP.md },
   captionInput: { borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, minHeight: 100, textAlignVertical: 'top', marginBottom: SP.md },
   });
 };

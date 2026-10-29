@@ -19,7 +19,7 @@ import { CP, PillButton, tap } from '@/components/create-post/ui';
 import { ReorderStrip } from '@/components/create-post/ReorderStrip';
 import { useApi } from '@/lib/api';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { assetToSlide } from '@/lib/createPost/slides';
 import { publishCreatePost } from '@/lib/createPost/publish';
@@ -397,7 +397,7 @@ const s = StyleSheet.create({
   hintInCard: { paddingHorizontal: 0, marginTop: 0 },
   card: { marginHorizontal: 16, marginTop: 14, padding: 12, borderRadius: 12, backgroundColor: CP.surface, gap: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center' },
-  cardTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14 },
+  cardTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base },
   status: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 11, borderWidth: 1, borderColor: CP.silverDim, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
   videoThumb: { height: 56, borderRadius: 8, backgroundColor: CP.surface2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   slideThumb: { height: 80, borderRadius: 6, overflow: 'hidden', backgroundColor: CP.surface2 },
@@ -407,18 +407,18 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: CP.white },
   chipText: { color: CP.white, fontFamily: FONT.semibold, fontSize: 13 },
   chipTextOn: { color: CP.black },
-  input: { minHeight: 40, borderRadius: 8, backgroundColor: CP.surface2, paddingHorizontal: 10, color: CP.white, fontFamily: FONT.regular, fontSize: 14, outlineStyle: 'none' as any },
+  input: { minHeight: 40, borderRadius: 8, backgroundColor: CP.surface2, paddingHorizontal: 10, color: CP.white, fontFamily: FONT.regular, fontSize: FS.base, outlineStyle: 'none' as any },
   inputError: { borderWidth: 1, borderColor: CP.white },
   caption: { minHeight: 64, paddingTop: 10, textAlignVertical: 'top' },
   creditRow: { flexDirection: 'row', gap: 8 },
   handleBox: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
-  at: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 14 },
-  bare: { flex: 1, minWidth: 0, width: '100%', height: 40, paddingHorizontal: 4, color: CP.white, fontFamily: FONT.regular, fontSize: 14, outlineStyle: 'none' as any },
+  at: { color: CP.silver, fontFamily: FONT.semibold, fontSize: FS.base },
+  bare: { flex: 1, minWidth: 0, width: '100%', height: 40, paddingHorizontal: 4, color: CP.white, fontFamily: FONT.regular, fontSize: FS.sm, outlineStyle: 'none' as any },
   error: { color: CP.white, fontFamily: FONT.medium, fontSize: 12 },
   section: { paddingHorizontal: 16, marginTop: 18, gap: 8 },
   sectionTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: 15 },
   previewRow: { flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 18, padding: 12, borderRadius: 12, backgroundColor: CP.surface },
-  previewTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: 14, marginBottom: 2 },
+  previewTitle: { color: CP.white, fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: 2 },
   notice: { color: CP.white, fontFamily: FONT.medium, fontSize: 13, paddingHorizontal: 16, marginTop: 14 },
   bottom: { paddingHorizontal: 16, paddingTop: 10, backgroundColor: CP.black, flexDirection: 'row' },
 });

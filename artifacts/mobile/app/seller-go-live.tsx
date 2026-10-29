@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     position: 'absolute', top: -6, right: -10, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center',
   },
-  railBadgeText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: 10 },
+  railBadgeText: { color: MEDIA.onFg, fontFamily: FONT.bold, fontSize: FS.xs },
   camBottom: { position: 'absolute', left: 12, right: 12, bottom: 0, gap: 10 },
   camNote: { color: MEDIA.fgMuted, fontFamily: FONT.medium, fontSize: FS.meta, textAlign: 'center' },
   startBtn: { height: 52, borderRadius: 26, backgroundColor: MEDIA.fg, alignItems: 'center', justifyContent: 'center' },

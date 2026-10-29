@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   lineShort: { height: 8, width: 68, borderRadius: 4 },
   lineLong: { height: 8, width: 130, borderRadius: 4 },
   share: { position: 'absolute', right: 16, bottom: 19 },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: 28, lineHeight: 32, textAlign: 'center', paddingHorizontal: 12, marginBottom: 22 },
+  title: { color: FG, fontFamily: FONT.bold, fontSize: 28, lineHeight: 34, textAlign: 'center', paddingHorizontal: 12, marginBottom: 22 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 6, marginBottom: 16 },
   pointText: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: 15, lineHeight: 20 },
   privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 2, marginBottom: 18 },

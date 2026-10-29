@@ -131,6 +131,6 @@ const styles = StyleSheet.create({
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5,
     alignItems: 'center', justifyContent: 'center',
   },
-  countText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold },
+  countText: { fontSize: 11, lineHeight: 14, fontFamily: FONT.bold },
   trailing: { justifyContent: 'center', paddingRight: X_GUTTER - X_SPACE[12] },
 });

@@ -268,7 +268,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   skeleton: { padding: SP.md, gap: SP.sm },
   content: { paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xl },
   readyBadge: { width: 56, height: 56, borderRadius: 28, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-  headTitle: { color: theme.text, fontSize: 28, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4 },
+  headTitle: { color: theme.text, fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.4 },
   headBody: { color: theme.muted, fontSize: FS.base, lineHeight: 22, fontFamily: FONT.regular, marginTop: SP.sm },
   deadline: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
   progress: { flexDirection: 'row', gap: SP.sm, marginTop: SP.lg },

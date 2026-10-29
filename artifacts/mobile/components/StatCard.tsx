@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 6,
   },
-  value: { fontSize: 22, fontWeight: '700', fontFamily: FONT.bold },
+  value: { fontSize: 22, fontFamily: FONT.bold },
   label: { fontSize: 11, fontFamily: FONT.regular },
   change: { fontSize: 11, fontFamily: FONT.medium, marginTop: 2 },
 });

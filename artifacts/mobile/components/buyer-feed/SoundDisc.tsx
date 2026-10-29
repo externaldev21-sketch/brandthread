@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { CachedImage } from '@/components/CachedImage';
-import { ON_DARK } from '@/lib/theme';
+import { ON_DARK, FONT, FS } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 
 export const SOUND_DISC_SIZE = 40;
@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
   },
   inner: { width: 24, height: 24, borderRadius: RADII.pill, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A3A3C' },
   fill: { width: '100%', height: '100%' },
-  initials: { color: ON_DARK, fontSize: 9, fontWeight: '700' },
+  initials: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.bold },
 });

@@ -985,7 +985,7 @@ function SignInLegalNotice() {
   );
   return (
     <Text
-      style={{ fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center', color: theme.muted, marginTop: 4, marginBottom: 4 }}
+      style={{ fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, textAlign: 'center', color: theme.muted, marginTop: 4, marginBottom: 4 }}
       testID="sign-in-legal-notice"
     >
       By continuing, you agree to the {link('Terms of Service', '/terms')} and {link('Community Guidelines', '/community-guidelines')} and acknowledge the {link('Privacy Policy', '/privacy')}.

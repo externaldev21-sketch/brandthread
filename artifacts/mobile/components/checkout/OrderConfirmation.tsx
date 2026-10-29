@@ -494,17 +494,17 @@ const styles = StyleSheet.create({
   orderNumbers: { marginTop: 4, gap: 2 },
   orderNumber: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
   orderNumberPending: { fontFamily: FONT.medium, fontSize: FS.base, marginTop: 4 },
-  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 21, marginTop: 6 },
+  body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 20, marginTop: 6 },
 
   section: { marginBottom: SP.md },
   sectionHeading: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: SP.sm },
 
   row: { flexDirection: 'row', gap: SP.md, paddingVertical: SP.sm + 2 },
-  rowLabel: { width: 118, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  rowLabel: { width: 118, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   rowValue: { flex: 1, minWidth: 0 },
-  rowText: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 },
+  rowText: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18 },
   rowStrong: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 20 },
-  rowSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 2 },
+  rowSub: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginTop: 2 },
 
   sellerHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm + 4 },
   sellerName: { fontFamily: FONT.semibold, fontSize: FS.base, flexShrink: 1 },

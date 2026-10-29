@@ -2097,7 +2097,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     marginHorizontal: 16,
     marginBottom: 14,
   },
-  infoLineText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, lineHeight: 16 },
+  infoLineText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, lineHeight: 14 },
 
   descriptionSection: {
     marginHorizontal: 16,

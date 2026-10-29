@@ -221,5 +221,5 @@ const makeStyles = (ck: CheckoutColors) => StyleSheet.create({
   check: { width: 20, alignItems: 'center' },
   empty: { fontFamily: FONT.regular, fontSize: FS.sm, color: ck.muted, paddingVertical: SP.lg, textAlign: 'center' },
   scrubber: { position: 'absolute', right: 2, top: SP.sm, bottom: SP.lg, width: 20, justifyContent: 'space-around', alignItems: 'center' },
-  letter: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 13, color: ck.muted },
+  letter: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14, color: ck.muted },
 });

@@ -420,7 +420,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: COMP.iconBtn },
   titleText: { flexShrink: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { flexShrink: 1, fontSize: FS.base, lineHeight: 18, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 },
+  name: { flexShrink: 1, fontSize: FS.base, lineHeight: 20, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 },
   members: { fontSize: FS.meta, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   centerPad: { flex: 1, justifyContent: 'center', paddingHorizontal: SP.md },
@@ -437,5 +437,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: SP.md, borderRadius: radius.sm, backgroundColor: theme.accent,
   },
   newPillText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: theme.onAccent },
-  overlayText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 21 },
+  overlayText: { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 20 },
 });

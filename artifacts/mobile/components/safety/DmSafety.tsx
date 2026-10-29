@@ -151,7 +151,7 @@ const st = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: 12, borderTopWidth: 1 },
   icon: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, marginTop: 2 },
+  body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 14, marginTop: 2 },
   btn: { borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 14, height: 34, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });

@@ -445,7 +445,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   streakRow: { flexDirection: 'row', justifyContent: 'space-between' },
   streakDay: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   streakDayText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  streakSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 16 },
+  streakSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 14 },
   sectionTitle: { fontSize: 20, fontFamily: FONT.semibold, marginTop: SP.lg, marginBottom: SP.sm },
   historyList: { marginBottom: SP.sm },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, minHeight: 60 },
@@ -457,6 +457,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },
   ruleDot: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },
-  rulesText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, flex: 1 },
+  rulesText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18, flex: 1 },
   skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, minHeight: 60 },
 });

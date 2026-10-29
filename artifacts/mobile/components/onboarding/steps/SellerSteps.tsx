@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, OptionSheet, type IconName } from '@/components/ui';
 import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { useColors } from '@/hooks/useColors';
-import { FILL_ELEVATED, FONT, TEXT } from '@/lib/theme';
+import { FILL_ELEVATED, FONT, TEXT, FS } from '@/lib/theme';
 import { SPACING } from '@/constants/spacing';
 import { radius } from '@/constants/radii';
 import { COUNTRIES } from '@/lib/addressRegions';
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   previewLogoWrap: { marginTop: -36 },
   previewLogo: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: FILL_ELEVATED },
   previewInitialWrap: { alignItems: 'center', justifyContent: 'center' },
-  previewInitial: { fontSize: 30, lineHeight: 36, fontFamily: FONT.bold },
+  previewInitial: { fontSize: FS.xxl, lineHeight: 36, fontFamily: FONT.bold },
   previewName: { ...TEXT.headline, marginTop: SPACING.sm, paddingHorizontal: SPACING.md },
   previewHandle: { ...TEXT.footnote, marginTop: 2 },
   previewGrid: { flexDirection: 'row', gap: 2, marginTop: SPACING.md, alignSelf: 'stretch', paddingHorizontal: SPACING.md },

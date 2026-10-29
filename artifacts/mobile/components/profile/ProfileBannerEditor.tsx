@@ -40,7 +40,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi, type ProfileBannerCrop } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, MEDIA, SP } from '@/lib/theme';
+import { FONT, MEDIA, SP, FS } from '@/lib/theme';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   cropDim: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.62)' }, // theme-exempt: outside-the-frame dim (TikTok crop)
   cropFrameBorder: { borderWidth: 1, borderColor: MEDIA.foreground },
   cropHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: SP.md },
-  cropHintText: { fontFamily: FONT.semibold, fontSize: 14 },
+  cropHintText: { fontFamily: FONT.semibold, fontSize: FS.base },
   cropBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, minHeight: 52 },
   cropBarSide: { flex: 1, minHeight: 44, justifyContent: 'center' },
   cropBarRight: { alignItems: 'flex-end' },
@@ -603,5 +603,5 @@ const styles = StyleSheet.create({
     marginTop: -EDIT_AVATAR / 2, width: EDIT_AVATAR + 8, height: EDIT_AVATAR + 8, borderRadius: (EDIT_AVATAR + 8) / 2,
     borderWidth: 4, alignItems: 'center', justifyContent: 'center',
   },
-  editAvatarLabel: { fontFamily: FONT.semibold, fontSize: 14, marginTop: SP.sm },
+  editAvatarLabel: { fontFamily: FONT.semibold, fontSize: FS.base, marginTop: SP.sm },
 });

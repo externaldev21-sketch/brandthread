@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   },
   pillDisabled: { backgroundColor: 'rgba(255,255,255,0.06)' },
   pillRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  pillText: { fontSize: 16, lineHeight: 20, fontFamily: FONT.bold, letterSpacing: -0.1 },
+  pillText: { fontSize: 16, lineHeight: 21, fontFamily: FONT.bold, letterSpacing: -0.1 },
 
   fieldWrap: { marginBottom: SPACE.sm },
   field: {

@@ -189,7 +189,7 @@ export function TrendChip({ changePct, invert = false, size = 'sm' }: { changePc
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       {!flat && <Icon name={up ? 'arrow-up-right' : 'arrow-down-right'} size={iconSize} color={color} />}
-      <Text style={{ fontSize: size === 'md' ? FS.xs + 1 : FS.xs, fontFamily: FONT.semibold, color }}>
+      <Text style={{ fontSize: size === 'md' ? FS.meta : FS.xs, fontFamily: FONT.semibold, color }}>
         {up ? '+' : ''}{pct.toFixed(1)}%
       </Text>
     </View>

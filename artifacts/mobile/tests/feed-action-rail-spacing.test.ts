@@ -7,7 +7,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 vi.mock('react-native', () => ({ Pressable: 'Pressable', Text: 'Text', View: 'View', Platform: { OS: 'ios', select: (o: any) => o.default }, StyleSheet: { create: (s: any) => s, hairlineWidth: 0.5 } }));
 vi.mock('react-native-reanimated', () => ({ default: { View: 'View' }, useSharedValue: (v: any) => ({ value: v }), useAnimatedStyle: () => ({}), withSpring: (v: any) => v, withTiming: (v: any) => v, withSequence: (...a: any[]) => a, withDelay: (_: any, v: any) => v, runOnJS: (f: any) => f, Easing: { out: () => 0, cubic: 0 } }));
 vi.mock('@/components/CachedImage', () => ({ CachedImage: 'Image' }));
-vi.mock('@/lib/theme', () => ({ ON_DARK: '#fff', ON_DARK_MUTED: '#ccc' }));
+vi.mock('@/lib/theme', () => ({ ON_DARK: '#fff', ON_DARK_MUTED: '#ccc', FONT: { semibold: 'system-600', bold: 'system-700' }, FS: { xs: 11 } }));
 vi.mock('@/constants/typography', () => ({ TABULAR_NUMS: {} }));
 vi.mock('@/constants/radii', () => ({ RADII: { pill: 999 } }));
 vi.mock('@/components/live/LiveAvatarRing', () => ({ LiveHostRing: 'LiveHostRing' }));

@@ -282,7 +282,7 @@ const makeStyles = (_theme: unknown) => StyleSheet.create({
   row: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, marginBottom: SP.xs },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm, marginBottom: SP.sm },
   cardTitle: { fontFamily: FONT.bold, fontSize: FS.lg },
-  cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.sm },
+  cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, marginBottom: SP.sm },
   note: { fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },
   codeBox: { borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.md, alignItems: 'center', marginBottom: SP.sm },
   code: { fontFamily: FONT.bold, fontSize: FS.xl },

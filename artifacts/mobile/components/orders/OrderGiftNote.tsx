@@ -51,7 +51,7 @@ function makeStyles(theme: Theme) {
     row: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.md, paddingVertical: SP.xs },
     label: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
     value: { flexShrink: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-    message: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, color: theme.text, marginTop: SP.xs },
+    message: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18, color: theme.text, marginTop: SP.xs },
     hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: SP.sm },
   });
 }

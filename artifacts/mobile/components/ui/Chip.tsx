@@ -17,7 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { haptics, hapticToggle, hapticSelection, haptic } from '@/lib/haptics';
 
 
-import { BORDER_SUBTLE, FONT, TEXT_DISABLED } from '@/lib/theme';
+import { BORDER_SUBTLE, FONT, TEXT_DISABLED, FS } from '@/lib/theme';
 
 
 
@@ -121,7 +121,7 @@ export function Chip({
       >
         <View style={[styles.lead, disabled && !!trailingLabel && styles.dim]}>
           {icon && <Icon name={icon} size={12} color={iconColor ?? contentColor} />}
-          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
+          <Text maxFontSizeMultiplier={DENSE_MAX_FONT_MULTIPLIER} style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: FS.base }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
             {label}
           </Text>
         </View>

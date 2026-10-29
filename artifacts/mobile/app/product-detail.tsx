@@ -1444,7 +1444,7 @@ const makeStStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   descHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                      paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
   descTitle:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  descText:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
+  descText:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
   });
 };
 

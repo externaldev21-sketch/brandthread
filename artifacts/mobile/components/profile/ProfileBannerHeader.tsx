@@ -20,7 +20,7 @@ import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-na
 import { CachedImage } from '@/components/CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { FONT, MEDIA, ON_DARK_MUTED, SP } from '@/lib/theme';
+import { FONT, MEDIA, ON_DARK_MUTED, SP, FS } from '@/lib/theme';
 import { hapticSelection } from '@/lib/haptics';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import type { ProfileStat } from './ProfileControls';
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth, borderColor: ON_DARK_MUTED,
   },
-  placeholderText: { fontFamily: FONT.semibold, fontSize: 14, color: ON_DARK_MUTED },
+  placeholderText: { fontFamily: FONT.semibold, fontSize: FS.base, color: ON_DARK_MUTED },
   root: { width: '100%', overflow: 'hidden', backgroundColor: '#000000' }, // theme-exempt: banner backdrop before the first frame
   backdrop: { backgroundColor: '#000000' }, // theme-exempt: banner backdrop
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
@@ -333,19 +333,19 @@ const styles = StyleSheet.create({
   bottomMirrored: { flexDirection: 'row-reverse' },
   identityMirrored: { marginRight: 0, marginLeft: SP.md },
   statsMirrored: { gap: 16 },
-  name: { fontFamily: FONT.bold, fontSize: 26, lineHeight: 31, letterSpacing: -0.4, color: MEDIA.foreground, ...TEXT_SHADOW },
+  name: { fontFamily: FONT.bold, fontSize: FS.xxl, lineHeight: 34, letterSpacing: -0.4, color: MEDIA.foreground, ...TEXT_SHADOW },
   handle: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, color: ON_DARK_MUTED, marginTop: 2, ...TEXT_SHADOW },
   stats: { flexDirection: 'row', alignItems: 'flex-end', gap: 20, marginTop: 12 },
   stat: { alignItems: 'flex-start', minHeight: 40, justifyContent: 'flex-end' },
-  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, color: MEDIA.foreground, fontVariant: ['tabular-nums'], ...TEXT_SHADOW },
-  statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17, color: ON_DARK_MUTED },
+  statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 22, color: MEDIA.foreground, fontVariant: ['tabular-nums'], ...TEXT_SHADOW },
+  statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 18, color: ON_DARK_MUTED },
   pressed: { opacity: 0.6 },
   avatarColumn: { alignItems: 'center' },
   note: {
     maxWidth: 120, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: 14, backgroundColor: '#FFFFFF', // theme-exempt: TikTok's white status bubble
   },
-  noteText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 15, color: '#000000', textAlign: 'center' }, // theme-exempt: on the white bubble
+  noteText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 16, color: '#000000', textAlign: 'center' }, // theme-exempt: on the white bubble
   notePlaceholder: { color: '#6E6E73' }, // theme-exempt: silver prompt on the white bubble
   noteTail: {
     position: 'absolute', bottom: -4, alignSelf: 'center', width: 8, height: 8,

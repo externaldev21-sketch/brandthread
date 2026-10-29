@@ -215,7 +215,7 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   section: { paddingHorizontal: 20, paddingVertical: 14 },
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 14 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 16, marginBottom: 14 },
   currentCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.lg, borderWidth: 1, padding: 14 },
   currentIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   currentLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, marginBottom: 2 },
@@ -229,6 +229,6 @@ const s = StyleSheet.create({
   langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2, textAlign: 'left', writingDirection: 'ltr', alignSelf: 'stretch' },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
   noticeCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: RADIUS.lg, borderWidth: 1, padding: 12, marginBottom: 14 },
-  noticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 17 },
-  footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },
+  noticeText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, lineHeight: 16 },
+  footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 16 },
 });

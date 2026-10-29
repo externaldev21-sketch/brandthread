@@ -395,13 +395,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyerName:  { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   productName: { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
   dateText:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  reviewBody: { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  reviewBody: { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
 
   replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 8, padding: 12, gap: 6 },
   replyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   replyLabel: { fontSize: 11, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   replyActionText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-  replyText:  { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 19 },
+  replyText:  { fontSize: 13, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
 
   replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
   replyBtnText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
@@ -420,6 +420,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   retryBtn:   { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
   retryText:  { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   emptyTitle: { fontSize: 16, fontFamily: FONT.bold, color: FG },
-  emptyBody:  { fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  emptyBody:  { fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18, maxWidth: 280 },
   });
 };

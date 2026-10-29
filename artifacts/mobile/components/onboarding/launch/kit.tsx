@@ -13,7 +13,7 @@
  */
 import React, { forwardRef, useContext, useEffect } from 'react';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
-import { MEDIA } from '@/lib/theme';
+import { MEDIA, FONT, FS } from '@/lib/theme';
 import {
   ActivityIndicator,
   Platform,
@@ -454,11 +454,11 @@ const s = StyleSheet.create({
   header: { height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
   headerSide: { width: 44, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  headerTitle: { fontSize: 17, fontWeight: '600' },
+  headerTitle: { fontSize: 17, fontFamily: FONT.semibold },
   track: { width: '100%', maxWidth: 240, height: 6, borderRadius: 3, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.4, marginTop: 16 },
-  sub: { fontSize: 15, lineHeight: 21, marginTop: 8 },
+  title: { fontSize: FS.h1, lineHeight: 41, fontFamily: FONT.bold, letterSpacing: -0.4, marginTop: 16 },
+  sub: { fontSize: 15, lineHeight: 20, marginTop: 8 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   errorText: { fontSize: 13, lineHeight: 18, flexShrink: 1 },
   field: {
@@ -472,15 +472,15 @@ const s = StyleSheet.create({
   fieldLabel: { fontSize: 12, lineHeight: 16 },
   fieldInput: { fontSize: 17, lineHeight: 22, paddingVertical: Platform.OS === 'web' ? 2 : 0, ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as object : null) },
   pill: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  pillText: { fontSize: 16, fontWeight: '600' },
+  pillText: { fontSize: 16, fontFamily: FONT.semibold },
   option: {
     height: 48, borderWidth: 1, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 44,
   },
   optionIcon: { position: 'absolute', left: 14, width: 22, alignItems: 'center' },
-  optionText: { fontSize: 15, fontWeight: '600' },
+  optionText: { fontSize: 15, fontFamily: FONT.semibold },
   textLink: { alignSelf: 'center', paddingVertical: 8 },
-  textLinkText: { fontSize: 15, fontWeight: '600' },
+  textLinkText: { fontSize: 15, fontFamily: FONT.semibold },
   chip: {
     minHeight: 40, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -492,9 +492,9 @@ const s = StyleSheet.create({
     minHeight: 64, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  radioLabel: { fontSize: 17, fontWeight: '600' },
-  radioSub: { fontSize: 14, lineHeight: 19, marginTop: 2 },
+  radioLabel: { fontSize: 17, fontFamily: FONT.semibold },
+  radioSub: { fontSize: FS.sm, lineHeight: 18, marginTop: 2 },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 12, height: 12, borderRadius: 6 },
-  section: { fontSize: 20, fontWeight: '700', marginTop: 28, marginBottom: 12 },
+  section: { fontSize: 20, fontFamily: FONT.bold, marginTop: 28, marginBottom: 12 },
 });

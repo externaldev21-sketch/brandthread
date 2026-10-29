@@ -252,7 +252,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   cardTitleInset: { paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.xs },
   headline: { alignItems: 'center', marginBottom: SP.lg, gap: 2 },
   headlineLabel: { color: colors.mutedForeground, fontFamily: FONT.medium, fontSize: FS.xs },
-  headlineValue: { color: colors.foreground, fontFamily: FONT.bold, fontSize: 32, letterSpacing: -0.5 },
+  headlineValue: { color: colors.foreground, fontFamily: FONT.bold, fontSize: FS.h1, letterSpacing: -0.5 },
   headlineNote: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   grid: { flexDirection: 'row' },
   metric: { flex: 1, alignItems: 'center', gap: 2 },

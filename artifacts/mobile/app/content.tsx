@@ -540,7 +540,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   statusBadge: { borderRadius: RADIUS.xs, paddingHorizontal: SP.xs + 3, paddingVertical: 3, borderWidth: 1 },
   statusText: { fontSize: FS.xs, fontFamily: FONT.bold },
   postType: { fontSize: FS.xs, fontFamily: FONT.regular, textTransform: 'capitalize' },
-  postCaption: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 17 },
+  postCaption: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   postMetrics: { flexDirection: 'row', gap: SP.sm + 4 },
   metric: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   metricText: { fontSize: FS.xs, fontFamily: FONT.regular },

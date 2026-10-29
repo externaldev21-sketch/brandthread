@@ -27,6 +27,7 @@ import {
   CallScreenShell, ControlButton, ControlCapsule, TopBarIconButton, formatCallDuration,
 } from './CallControls';
 
+import { FONT } from '@/lib/theme';
 export function InCallView() {
   const { theme } = useAppTheme();
   const {
@@ -163,5 +164,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pipFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pipInitials: { color: '#FFFFFF', fontWeight: '700' },
+  pipInitials: { color: '#FFFFFF', fontFamily: FONT.bold },
 });

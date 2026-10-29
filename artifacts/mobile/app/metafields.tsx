@@ -151,7 +151,7 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 6 },
-  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 14 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 16, marginBottom: 14 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
   loadingRow: { alignItems: 'center', paddingVertical: 20 },
   divider: { height: 8 },

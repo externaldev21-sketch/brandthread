@@ -17,7 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { CachedImage as Image } from '@/components/CachedImage';
-import { ON_DARK, ON_DARK_MUTED } from '@/lib/theme';
+import { ON_DARK, ON_DARK_MUTED, FONT, FS } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   },
   avatarBlack: { backgroundColor: '#000' },
   fill: { width: '100%', height: '100%' },
-  avatarText: { fontSize: 15, fontWeight: '700', color: ON_DARK },
+  avatarText: { fontSize: 15, fontFamily: FONT.bold, color: ON_DARK },
   badge: {
     position: 'absolute', left: (RAIL_WIDTH - BADGE) / 2, top: AVATAR - BADGE / 2, width: BADGE, height: BADGE, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center',
@@ -338,18 +338,18 @@ const styles = StyleSheet.create({
   // Sits just below the follow badge's bottom edge (AVATAR + BADGE/2).
   official: {
     position: 'absolute', top: AVATAR + BADGE / 2, width: 64, textAlign: 'center',
-    fontSize: 10, lineHeight: 10, fontWeight: '600', color: SILVER, letterSpacing: 0.2,
+    fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold, color: SILVER, letterSpacing: 0.2,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   action: { minWidth: 44, height: RAIL_LAYOUT.item - RAIL_ITEM_GAP, minHeight: 0, alignItems: 'center', justifyContent: 'flex-start', gap: RAIL_COUNT_GAP },
   pressed: { opacity: 0.7 },
   count: Platform.select({
     web: {
-      fontSize: 13, lineHeight: 15, fontWeight: '600', color: ON_DARK, ...TABULAR_NUMS,
+      fontSize: 13, lineHeight: RAIL_LAYOUT.countLine, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
       textShadow: '0px 1px 2px rgba(0,0,0,0.6)',
     } as object,
     default: {
-      fontSize: 13, lineHeight: 15, fontWeight: '600', color: ON_DARK, ...TABULAR_NUMS,
+      fontSize: 13, lineHeight: RAIL_LAYOUT.countLine, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
       textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
     },
   }) as object,

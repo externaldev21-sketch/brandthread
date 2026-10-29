@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   initials: { alignItems: 'center', justifyContent: 'center' },
   initialsText: { fontFamily: FONT.bold, fontSize: FS.lg },
   title: { fontFamily: FONT.bold, fontSize: FS.lg },
-  body: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.lg, lineHeight: 20 },
+  body: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.lg, lineHeight: 18 },
   rowBtn: {
     height: 52,
     alignItems: 'center',

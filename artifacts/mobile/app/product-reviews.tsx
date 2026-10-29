@@ -220,7 +220,7 @@ const s = StyleSheet.create({
   date: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
   fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
-  body: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20, marginBottom: 8 },
+  body: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 18, marginBottom: 8 },
   photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   photoThumb: { width: 88, height: 110, borderRadius: 6, backgroundColor: CARD_ELEVATED },
 });

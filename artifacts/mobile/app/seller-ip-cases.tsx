@@ -77,5 +77,5 @@ export default function SellerIpCasesScreen() {
 }
 
 const styles = StyleSheet.create({
-  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, marginBottom: SP.md },
+  note: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18, marginBottom: SP.md },
 });

@@ -246,7 +246,7 @@ export function FollowingTrendingCreators({ enabled, viewerId, pageWidth, onOpen
 const styles = StyleSheet.create({
   root: { alignSelf: 'stretch' },
   title: { fontFamily: FONT.bold, fontSize: FS.lg, textAlign: 'center' },
-  sub: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', alignSelf: 'center', maxWidth: 260, marginTop: 6, marginBottom: 20, lineHeight: 20 },
+  sub: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', alignSelf: 'center', maxWidth: 260, marginTop: 6, marginBottom: 20, lineHeight: 18 },
   track: { flexDirection: 'row', gap: 10 },
   card: { borderRadius: RADII.card, overflow: 'hidden', justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.18)' },

@@ -278,7 +278,7 @@ export default function AnalyticsScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:  { flex: 1, backgroundColor: 'transparent' },
-  summarySentence: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 21, marginBottom: SP.md },
+  summarySentence: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20, marginBottom: SP.md },
   content: { paddingTop: SP.md },
 
   statsRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },

@@ -79,5 +79,5 @@ const countBadgeStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   wide: { paddingHorizontal: 4 },
-  label: { fontSize: 11, fontFamily: FONT.bold, lineHeight: 13 },
+  label: { fontSize: 11, fontFamily: FONT.bold, lineHeight: 14 },
 });

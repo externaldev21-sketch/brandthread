@@ -365,7 +365,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { paddingBottom: 80, paddingTop: SP.md },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
+  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 18 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
   importFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
   bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },

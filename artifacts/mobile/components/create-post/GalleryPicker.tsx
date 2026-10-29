@@ -10,7 +10,7 @@ import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, Text, Vie
 import { CachedImage, CachedImage as Image } from '@/components/CachedImage';
 import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeviceMedia } from '@/lib/createPost/useDeviceMedia';
@@ -269,13 +269,13 @@ const s = StyleSheet.create({
   circleOn: { backgroundColor: CP.white },
   circleNum: { color: CP.black, fontFamily: FONT.bold, fontSize: 12 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyTitle: { color: CP.white, fontFamily: FONT.bold, fontSize: 18, textAlign: 'center' },
-  emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: 14, textAlign: 'center', marginTop: 8 },
+  emptyTitle: { color: CP.white, fontFamily: FONT.bold, fontSize: FS.md, textAlign: 'center' },
+  emptyBody: { color: CP.silver, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', marginTop: 8 },
   addMore: { alignItems: 'center', paddingVertical: 16 },
-  addMoreText: { color: CP.silver, fontFamily: FONT.semibold, fontSize: 14 },
+  addMoreText: { color: CP.silver, fontFamily: FONT.semibold, fontSize: FS.base },
   bottom: { backgroundColor: CP.black, paddingTop: 8 },
   trayItem: { flex: 1 },
-  trayDuration: { position: 'absolute', left: 4, bottom: 3, color: CP.white, fontFamily: FONT.semibold, fontSize: 10 },
+  trayDuration: { position: 'absolute', left: 4, bottom: 3, color: CP.white, fontFamily: FONT.semibold, fontSize: FS.xs },
   trayX: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: CP.white, alignItems: 'center', justifyContent: 'center' },
   helper: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: 13, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   buttons: { flexDirection: 'row', gap: 10, paddingHorizontal: 16 },

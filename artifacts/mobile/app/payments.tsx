@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
 
   // Banner
   banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },
-  bannerText: { fontSize: 12, fontFamily: FONT.medium, flex: 1, lineHeight: 17 },
+  bannerText: { fontSize: 12, fontFamily: FONT.medium, flex: 1, lineHeight: 16 },
 
   // Card header row (title + Manage button)
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
 
   // Additional providers
   groupTitle: { fontSize: 15, fontFamily: FONT.semibold, marginTop: 28, marginBottom: 4 },
-  groupSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 17 },
+  groupSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 12, lineHeight: 16 },
   addProviderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 14, borderStyle: 'dashed' },
   addProviderText: { fontSize: 13, fontFamily: FONT.semibold },
 
@@ -677,11 +677,11 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
   progressFill: { height: 6, borderRadius: 3 },
   shipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
-  shipText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
+  shipText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 14 },
 
   // Pre Made note
   premadeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'transparent' },
-  premadeNoteText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 16 },
+  premadeNoteText: { fontSize: 11, fontFamily: FONT.regular, flex: 1, lineHeight: 14 },
 
   // Broadcast button
   broadcastWrap: { marginTop: 14, paddingTop: 14, borderTopWidth: 1 },

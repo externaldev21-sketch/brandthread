@@ -195,7 +195,7 @@ const s = StyleSheet.create({
   addRow: { height: 44, borderWidth: 1, borderRadius: RADII.input, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.md },
   addText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   center: { height: 96, alignItems: 'center', justifyContent: 'center' },
-  empty: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, paddingVertical: SP.lg, textAlign: 'center' },
+  empty: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18, paddingVertical: SP.lg, textAlign: 'center' },
   dropRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   dropName: { fontFamily: FONT.semibold, fontSize: FS.base, lineHeight: 20 },
   dropWhen: { fontFamily: FONT.regular, fontSize: FS.sm },

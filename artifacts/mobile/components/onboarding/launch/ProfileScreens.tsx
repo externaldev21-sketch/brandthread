@@ -24,7 +24,7 @@
  */
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { InertContext } from './motion';
-import { MEDIA } from '@/lib/theme';
+import { MEDIA, FONT, FS } from '@/lib/theme';
 import {
   ActivityIndicator,
   Image,
@@ -687,7 +687,7 @@ const s = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
   chipsTop: { marginTop: 16 },
   list: { marginTop: 16 },
-  footnote: { fontSize: 14, lineHeight: 20, marginTop: 16, textAlign: 'center' },
+  footnote: { fontSize: FS.sm, lineHeight: 18, marginTop: 16, textAlign: 'center' },
   avatarWrap: { alignSelf: 'center', marginTop: 40 },
   avatar: { width: 168, height: 168, borderRadius: 84, overflow: 'hidden', alignItems: 'center' },
   avatarHead: { width: 58, height: 58, borderRadius: 29, marginTop: 30 },
@@ -699,7 +699,7 @@ const s = StyleSheet.create({
   },
   grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, marginBottom: 8 },
   sheetClose: { alignSelf: 'flex-start', paddingVertical: 8 },
-  sheetTitle: { fontSize: 22, fontWeight: '700', marginTop: 4, marginBottom: 16 },
+  sheetTitle: { fontSize: 22, fontFamily: FONT.bold, marginTop: 4, marginBottom: 16 },
   sheetTitleCenter: { fontSize: 17, textAlign: 'center', marginTop: 8 },
   sheetGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, overflow: 'hidden', marginBottom: 8 },
   sheetRow: { minHeight: 52, justifyContent: 'center', paddingHorizontal: 16 },
@@ -713,7 +713,7 @@ const s = StyleSheet.create({
   sizesCount: { fontSize: 15 },
   okBtn: { minWidth: 96, height: 44 },
   sizeBlock: { marginTop: 24 },
-  sizeQ: { fontSize: 16, fontWeight: '700' },
+  sizeQ: { fontSize: 16, fontFamily: FONT.bold },
   sizeRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
   sizeValue: { fontSize: 17 },
   sizeExample: { fontSize: 12, marginTop: 6 },
@@ -721,6 +721,6 @@ const s = StyleSheet.create({
   bellTitle: { marginTop: 20 },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 4, padding: 16, marginTop: 8 },
   cardStep: { fontSize: 12 },
-  cardTitle: { fontSize: 20, fontWeight: '700', marginTop: 8 },
-  cardBody: { fontSize: 15, lineHeight: 21, marginTop: 8 },
+  cardTitle: { fontSize: 20, fontFamily: FONT.bold, marginTop: 8 },
+  cardBody: { fontSize: 15, lineHeight: 20, marginTop: 8 },
 });

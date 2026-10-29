@@ -105,6 +105,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   chipTextSelected: { color: theme.text },
   input: { backgroundColor: theme.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   inputError: { borderColor: theme.error },
-  error: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.error, lineHeight: 18 },
-  hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
+  error: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.error, lineHeight: 14 },
+  hint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 14 },
 });

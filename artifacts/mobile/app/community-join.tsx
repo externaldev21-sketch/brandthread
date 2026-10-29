@@ -175,6 +175,6 @@ const styles = StyleSheet.create({
   name: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.3, textAlign: 'center', flexShrink: 1 },
   meta: { fontFamily: FONT.regular, fontSize: FS.sm },
   desc: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', marginTop: SP.xs },
-  note: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 19, textAlign: 'center', marginTop: SP.sm },
+  note: { fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 18, textAlign: 'center', marginTop: SP.sm },
   full: { width: '100%', marginTop: SP.sm },
 });

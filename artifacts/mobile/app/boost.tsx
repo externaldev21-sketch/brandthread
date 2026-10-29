@@ -1316,7 +1316,7 @@ const s = StyleSheet.create({
 
   // Step headings
   stepHeading: { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: SP.xs },
-  stepSub:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.lg, lineHeight: 20 },
+  stepSub:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.lg, lineHeight: 18 },
 
   // Post grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
@@ -1474,5 +1474,5 @@ const s = StyleSheet.create({
     marginBottom: SP.lg,
   },
   successTitle: { fontFamily: FONT.bold, fontSize: FS.xxl, color: FG, marginBottom: SP.sm, textAlign: 'center' },
-  successSub:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  successSub:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 18 },
 });

@@ -775,7 +775,7 @@ const createStyles = (theme: AppThemePreset) => {
   pastDueIcon:        { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${RED}29` },
   pastDueCopy:        { flex: 1, gap: 4 },
   pastDueTitle:       { color: RED, fontSize: FS.sm, fontFamily: FONT.semibold },
-  pastDueBody:        { color: FG, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
+  pastDueBody:        { color: FG, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 14 },
   pastDueButton:      { marginTop: SP.sm },
   billingRow:         { flexDirection: 'row', justifyContent: 'space-between', padding: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   billingLabel:       { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },

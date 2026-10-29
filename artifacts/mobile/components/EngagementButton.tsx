@@ -398,11 +398,11 @@ const ebStyles = StyleSheet.create({
   // `StyleSheet.create` types don't know the property, hence the cast.
   count: Platform.select({
     web: {
-      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
+      fontSize: 12, lineHeight: 16, fontFamily: FONT.semibold, textAlign: 'center',
       textShadow: '0px 1px 1px rgba(0,0,0,0.9), 0px 1px 6px rgba(0,0,0,0.55)',
     } as object,
     default: {
-      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
+      fontSize: 12, lineHeight: 16, fontFamily: FONT.semibold, textAlign: 'center',
       textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
     },
   }),

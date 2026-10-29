@@ -12,6 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { isExpoGo } from '@/lib/expoGoRuntime';
 import { isWebSubscribeFlagOn, shouldShowWebSubscribeLink, webPricingUrl } from '@/lib/webSubscribeLink';
 
+import { FONT } from '@/lib/theme';
 async function readStorefrontCountry(): Promise<string | null> {
   if (Platform.OS !== 'ios' || isExpoGo()) return null;
   try {
@@ -56,5 +57,5 @@ export function SubscribeOnWebLink({ testID = 'subscribe-on-web-link' }: { testI
 
 const styles = StyleSheet.create({
   row: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-  label: { fontSize: 15, fontWeight: '600', textDecorationLine: 'underline' },
+  label: { fontSize: 15, fontFamily: FONT.semibold, textDecorationLine: 'underline' },
 });

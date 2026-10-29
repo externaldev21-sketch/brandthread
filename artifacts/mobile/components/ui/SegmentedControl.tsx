@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   indicator: { position: 'absolute', left: PILL_PADDING },
   segment: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.xs },
   segmentCompact: { paddingHorizontal: 6 },
-  compactLabel: { fontSize: 12, lineHeight: 15 },
+  compactLabel: { fontSize: 12, lineHeight: 16 },
 
   // flexShrink/minWidth: 0 so that when a parent gives this a bounded
   // width (the buyer feed top bar's absolutely-positioned wrap — see
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   // feed's top-row icons on 360pt-wide phones.
   underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, flexShrink: 1, minWidth: 0 },
   underlineLabel: {
-    fontSize: 17, lineHeight: 21,
+    fontSize: 17, lineHeight: 22,
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   // `left: 0` is load-bearing, not decorative: on web, an absolutely

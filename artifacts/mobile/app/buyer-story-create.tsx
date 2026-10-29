@@ -1737,7 +1737,7 @@ export default function StoryComposer() {
                 color: createColor,
                 fontSize: autoSize,
                 textAlign: createAlign,
-                fontWeight: font.weight,
+                fontWeight: font.weight, // type-exempt: the story's chosen text font (user content)
                 fontStyle: font.italic ? 'italic' : 'normal',
                 letterSpacing: font.tracking ?? 0,
               },
@@ -1755,7 +1755,7 @@ export default function StoryComposer() {
         {/* Small toolbar: font cycle, alignment, text color */}
         <View style={[styles.createToolbar, { bottom: insets.bottom + 128 }]}>
           <TouchableOpacity style={styles.createToolBtn} onPress={() => { haptics.selection(); setCreateFontIdx((i) => (i + 1) % FONT_PRESETS.length); }} accessibilityLabel="Cycle font style" accessibilityRole="button">
-            <Text style={[styles.createToolAa, { fontWeight: font.weight, fontStyle: font.italic ? 'italic' : 'normal' }]}>Aa</Text>
+            <Text style={[styles.createToolAa, { fontWeight: font.weight, fontStyle: font.italic ? 'italic' : 'normal' }]}>Aa</Text>{/* type-exempt: preview of a story font */}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.createToolBtn}
@@ -2608,7 +2608,7 @@ function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; o
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   webFallback: { alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: 32 },
-  webFallbackText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  webFallbackText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 18, maxWidth: 280 },
   permBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.md },
   permBtnText: { fontFamily: FONT.semibold, fontSize: FS.base },
 

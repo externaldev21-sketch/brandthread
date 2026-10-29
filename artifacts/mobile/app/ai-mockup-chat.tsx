@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '85%', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   mockupImage: { width: 240, height: 240, borderRadius: 8, marginTop: 10 },
   imageActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   retryBtn: { alignSelf: 'flex-start', marginTop: 10 },

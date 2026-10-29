@@ -272,7 +272,7 @@ export function renderLayer(
           fill={d.color ?? d.textColor ?? FG}
           fontSize={(d.fontSize ?? 24) * Math.min(xScale, yScale)}
           textAnchor="middle"
-          fontWeight={d.bold ? 'bold' : 'normal'}
+          fontWeight={d.bold ? 'bold' : 'normal'} // type-exempt: the seller's design text layer (user content)
           fontStyle={d.italic ? 'italic' : 'normal'}
           transform={transformAttr}
           filter={filterRef}

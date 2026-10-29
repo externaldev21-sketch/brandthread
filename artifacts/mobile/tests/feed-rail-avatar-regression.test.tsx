@@ -19,7 +19,7 @@ vi.mock('react-native-reanimated', () => ({
   Easing: { out: (fn: unknown) => fn, cubic: (value: number) => value },
 }));
 vi.mock('@/components/CachedImage', () => ({ CachedImage: 'Image' }));
-vi.mock('@/lib/theme', () => ({ ON_DARK: '#fff', ON_DARK_MUTED: '#ccc' }));
+vi.mock('@/lib/theme', () => ({ ON_DARK: '#fff', ON_DARK_MUTED: '#ccc', FONT: { semibold: 'system-600', bold: 'system-700' }, FS: { xs: 11 } }));
 vi.mock('@/constants/typography', () => ({ TABULAR_NUMS: {} }));
 vi.mock('@/components/live/LiveAvatarRing', () => ({ LiveHostRing: 'LiveHostRing' }));
 vi.mock('@/lib/live/useLiveDirectory', () => ({ useLiveStreamForHost: () => null }));

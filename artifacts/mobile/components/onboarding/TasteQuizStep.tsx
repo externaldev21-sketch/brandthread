@@ -33,6 +33,7 @@ import { QUIZ_MIN_PRODUCTS, styleIdentity, type QuizProduct, type QuizSwipe, typ
 import { PillButton, PressableScale } from './OnboardingUI';
 import { SPACE, useOnboardingMotion } from './onboardingTokens';
 
+import { FONT, FS } from '@/lib/theme';
 export interface TasteQuizResult {
   swipes: QuizSwipe[];
   identity: StyleIdentity | null;
@@ -297,9 +298,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingHorizontal: SPACE.sm, paddingVertical: SPACE.xs, borderRadius: 12,
     backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
   },
-  pillTitle: { fontSize: 13, fontWeight: '600', color: theme.text },
+  pillTitle: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
   pillSub: { fontSize: 12, color: theme.muted, marginTop: 1, fontVariant: ['tabular-nums'] },
-  skip: { fontSize: 15, fontWeight: '600', color: theme.muted },
+  skip: { fontSize: 15, fontFamily: FONT.semibold, color: theme.muted },
   stackArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: {
     position: 'absolute', borderRadius: 16, overflow: 'hidden',
@@ -307,15 +308,15 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   cardBehind: { transform: [{ scale: 0.95 }], opacity: 0.6 },
   caption: { height: CAPTION_H, paddingHorizontal: SPACE.md, justifyContent: 'center' },
-  brand: { fontSize: 12, color: theme.muted, fontWeight: '500' },
-  productName: { fontSize: 15, color: theme.text, fontWeight: '600', marginTop: 2 },
+  brand: { fontSize: 12, color: theme.muted, fontFamily: FONT.medium },
+  productName: { fontSize: 15, color: theme.text, fontFamily: FONT.semibold, marginTop: 2 },
   stamp: {
     position: 'absolute', top: SPACE.lg, paddingHorizontal: SPACE.sm, paddingVertical: SPACE.xxs,
     borderWidth: 2, borderColor: '#FFFFFF', borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.55)',
   },
   stampLike: { left: SPACE.lg, transform: [{ rotate: '-12deg' }] },
   stampPass: { right: SPACE.lg, transform: [{ rotate: '12deg' }] },
-  stampText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+  stampText: { color: '#FFFFFF', fontSize: 20, fontFamily: FONT.bold, letterSpacing: 2 },
   buttons: { flexDirection: 'row', justifyContent: 'center', gap: SPACE.xl, marginTop: SPACE.md },
   roundBtn: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
@@ -327,8 +328,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderRadius: 20, padding: SPACE.lg, backgroundColor: theme.card,
     borderWidth: 1, borderColor: theme.border,
   },
-  identityLabel: { fontSize: 13, fontWeight: '600', color: theme.muted, textTransform: 'uppercase', letterSpacing: 1.2 },
-  identityTitle: { fontSize: 40, lineHeight: 44, fontWeight: '700', color: theme.text, marginTop: SPACE.xs, letterSpacing: -1 },
+  identityLabel: { fontSize: 13, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1.2 },
+  identityTitle: { fontSize: FS.h1, lineHeight: 41, fontFamily: FONT.bold, color: theme.text, marginTop: SPACE.xs, letterSpacing: -1 },
   thumbRow: { flexDirection: 'row', gap: SPACE.xs, marginTop: SPACE.lg },
   thumb: { flex: 1, aspectRatio: 0.8, borderRadius: 10, backgroundColor: theme.surface },
   resultActions: { gap: SPACE.sm },

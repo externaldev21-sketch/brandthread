@@ -424,7 +424,7 @@ export default function StoreGenerateScreen() {
             <Text style={[st.typoSample, {
               fontStyle: value === 'editorial' || value === 'luxury' ? 'italic' : 'normal',
               letterSpacing: value === 'technical' || value === 'minimal' ? 1.5 : 0,
-              fontWeight: value === 'bold' ? '800' : '400',
+              fontWeight: value === 'bold' ? '800' : '400', // type-exempt: storefront typography sample
               textTransform: value === 'bold' ? 'uppercase' : 'none',
             }]}>{sample}</Text>
           </BrandthreadCard>
@@ -1077,7 +1077,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
     letterSpacing: -0.3,
   },
-  stepSubheading: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
+  stepSubheading: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
   sectionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.2 },
   // Chip grid
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
@@ -1163,7 +1163,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   typoCardLeft: { gap: 2 },
   typoCardLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   typoCardFonts: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  typoSample: { fontSize: FS.sm, color: SUBTLE, lineHeight: 20 },
+  typoSample: { fontSize: FS.sm, color: SUBTLE, lineHeight: 18 },
   // Homepage priority
   priorityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   priorityCardWrapper: { width: '48%' },
@@ -1208,13 +1208,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
   },
   aiToolChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-  aiNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
+  aiNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 14 },
   aiSuggestionCard: {
     marginTop: SP.sm, padding: SP.md, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
   },
   aiSuggestionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT, marginBottom: 4 },
-  aiSuggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  aiSuggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
   // Target customers age
   ageRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   ageInputWrap: { flex: 1, gap: SP.xs },

@@ -11,7 +11,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { Icon } from '@/components/ui/Icon';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useDeviceMedia } from '@/lib/createPost/useDeviceMedia';
 import { assetToSlide } from '@/lib/createPost/slides';
@@ -226,7 +226,7 @@ const s = StyleSheet.create({
   nextBtn: { minWidth: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
   nextText: { fontFamily: FONT.bold, fontSize: 17 },
   preview: { height: 332, alignItems: 'center', justifyContent: 'center' },
-  previewHint: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: 14 },
+  previewHint: { color: CP.silverDim, fontFamily: FONT.regular, fontSize: FS.sm },
   deniedWrap: { alignItems: 'center', paddingHorizontal: 24 },
   recentsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, height: 48 },
   recents: { flexDirection: 'row', alignItems: 'center', gap: 4 },

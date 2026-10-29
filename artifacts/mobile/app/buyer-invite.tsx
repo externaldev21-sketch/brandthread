@@ -228,7 +228,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
 
   hero: { alignItems: 'center', paddingHorizontal: SP.xl, paddingTop: SP.lg, paddingBottom: SP.lg, gap: SP.sm },
   heroTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, textAlign: 'center' },
-  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20 },
+  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 },
 
   codeCard: {
     marginHorizontal: SP.md,
@@ -258,7 +258,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   stepNumText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
   stepTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  stepBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 19 },
+  stepBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 18 },
 
   tiles: { flexDirection: 'row', gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.lg },
   tile: {

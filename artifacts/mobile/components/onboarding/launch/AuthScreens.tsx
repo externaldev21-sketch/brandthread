@@ -16,6 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatDobInput } from '@/lib/ageGate';
 import { Field, FieldError, FieldHint, OnbHeader, OnbScreen, PillButton, ScalePressable, Sub, TextLink, Title } from './kit';
 
+import { FONT, FS } from '@/lib/theme';
 // ─── Birthday ────────────────────────────────────────────────────────────────
 
 export function BirthdayScreen({
@@ -164,7 +165,7 @@ export function CodeScreen({
     <OnbScreen testID="onboarding-code" header={<OnbHeader onBack={onBack} />}>
       <Title style={s.center}>Check your inbox</Title>
       <Sub style={s.center}>
-        We’ve just sent a 6-digit code to{'\n'}<Text style={{ color: theme.text, fontWeight: '600' }}>{email}</Text>.
+        We’ve just sent a 6-digit code to{'\n'}<Text style={{ color: theme.text, fontFamily: FONT.semibold }}>{email}</Text>.
       </Sub>
       <TextLink testID="onboarding-code-edit-email" label="Wrong email? Edit" onPress={onEditEmail} muted />
       <Sub style={s.center}>
@@ -281,8 +282,8 @@ export function DetailsScreen({
 const s = StyleSheet.create({
   inlineButton: { marginTop: 24 },
   smallTitle: { fontSize: 22, lineHeight: 28, marginTop: 12 },
-  smallSub: { fontSize: 14, lineHeight: 19, marginTop: 4 },
+  smallSub: { fontSize: FS.sm, lineHeight: 18, marginTop: 4 },
   center: { textAlign: 'center' },
   code: { marginTop: 28 },
-  resendWait: { fontSize: 14, textAlign: 'center', marginTop: 16 },
+  resendWait: { fontSize: FS.sm, textAlign: 'center', marginTop: 16 },
 });

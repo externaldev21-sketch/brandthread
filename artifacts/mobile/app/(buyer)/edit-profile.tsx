@@ -48,7 +48,7 @@ import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
-import { SP, FONT, TEXT_DISABLED } from '@/lib/theme';
+import { SP, FONT, TEXT_DISABLED, FS } from '@/lib/theme';
 
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.lg },
   errorTitle: { fontSize: 16, fontFamily: FONT.semibold, textAlign: 'center' },
-  errorBody: { fontSize: 14, fontFamily: FONT.regular, textAlign: 'center' },
+  errorBody: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center' },
   saveText: { fontSize: 15, fontFamily: FONT.semibold },
   sectionLabel: { fontSize: 13, fontFamily: FONT.semibold, paddingHorizontal: 20, paddingTop: 16 },
   sectionHint: { fontSize: 13, fontFamily: FONT.regular, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },

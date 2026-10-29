@@ -236,5 +236,5 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   wide: { marginTop: SP.sm },
   confirm: { flex: 1, paddingHorizontal: SP.md },
   confirmBody: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  problem: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 19, maxWidth: 300 },
+  problem: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18, maxWidth: 300 },
 });

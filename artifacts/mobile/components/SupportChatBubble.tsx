@@ -424,7 +424,7 @@ const s = StyleSheet.create({
   bubbleUser:  { borderBottomRightRadius: 4 },
   bubbleAI:    { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderBottomLeftRadius: 4 },
   bubbleError: { borderColor: 'rgba(239,68,68,0.40)', backgroundColor: 'rgba(239,68,68,0.08)' },
-  bubbleText:  { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  bubbleText:  { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   bubbleTextUser: { color: '#000', fontFamily: FONT.medium },
   bubbleTextAI:   { color: FG },
 

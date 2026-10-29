@@ -70,6 +70,6 @@ const s = StyleSheet.create({
   bubble: { maxWidth: '80%', borderRadius: RADIUS.lg, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   bubbleReceived: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
   bubbleSent: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  bubbleText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  bubbleText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 18 },
   footer: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm },
 });

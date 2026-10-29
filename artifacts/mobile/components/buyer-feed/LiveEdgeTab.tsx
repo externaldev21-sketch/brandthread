@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { hapticLight } from '@/lib/haptics';
-import { CREATE_CANVAS, ON_DARK } from '@/lib/theme';
+import { CREATE_CANVAS, ON_DARK, FONT } from '@/lib/theme';
 
 /** Full width of the expanded LIVE button. */
 export const LIVE_EDGE_WIDTH = 84;
@@ -318,9 +318,9 @@ const styles = StyleSheet.create({
   },
   restLabel: {
     color: ON_DARK,
-    fontSize: 9.5,
+    fontSize: 9.5, // type-exempt: the narrow LIVE edge tab's pinned label (tests/live-edge-tab-label.test.ts)
     lineHeight: 14,
-    fontWeight: '800',
+    fontWeight: '800', // type-exempt: the narrow LIVE edge tab's pinned label (tests/live-edge-tab-label.test.ts)
     letterSpacing: 0.8,
     flexShrink: 0,
     overflow: 'visible',
@@ -333,5 +333,5 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FF3B30' },
-  label: { color: ON_DARK, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
+  label: { color: ON_DARK, fontSize: 12, fontFamily: FONT.bold, letterSpacing: 0.6 },
 });

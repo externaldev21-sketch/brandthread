@@ -256,7 +256,7 @@ const createStyles = (theme: AppThemePreset) => {
     root: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: SP.md, paddingBottom: SP.lg },
     hero: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
-    heroAmount: { fontVariant: ['tabular-nums'],  color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5 },
+    heroAmount: { fontVariant: ['tabular-nums'],  color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5 }, // type-exempt: hero amount, same size as Payouts' balance
     pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: border },
     pillText: { color: text, fontSize: FS.xs, fontFamily: FONT.medium },
     group: { backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, paddingHorizontal: SP.md, marginBottom: SP.md },

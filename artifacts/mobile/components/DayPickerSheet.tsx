@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { parseDayKey, toDayKey, formatDayKey } from '@/lib/discountDates';
 
+import { FONT } from '@/lib/theme';
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -149,16 +150,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1,
   },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  title: { fontSize: 17, fontFamily: FONT.bold },
   calSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  monthTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  monthTitle: { fontSize: 16, fontFamily: FONT.semibold },
   weekRow: { flexDirection: 'row' },
   dayCell: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center' },
-  weekLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  weekLabel: { fontSize: 11, fontFamily: FONT.semibold },
   dayCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  dayText: { fontSize: 13, fontFamily: FONT.regular },
   bottomBar: { borderTopWidth: 1, paddingHorizontal: 20, paddingTop: 14 },
   actions: { flexDirection: 'row', gap: 10 },
   flex1: { flex: 1 },

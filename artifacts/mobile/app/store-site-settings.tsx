@@ -24,7 +24,7 @@ import { ShareStoreToast, useToast } from '@/components/store/ShareStoreSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useStoreSite } from '@/hooks/useStoreSite';
 import { useTabBarClearance } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FILL_ELEVATED } from '@/lib/theme';
+import { FILL_ELEVATED, FONT } from '@/lib/theme';
 import { MAX_STORE_SITE_LINKS } from '@/lib/storeSiteDesign';
 import { normalizeUrlInput } from '@/lib/growthValidation';
 import { addBioLink, deleteBioLink, patchBioLink, saveBio, type BioLink } from '@/services/growthService';
@@ -234,13 +234,13 @@ function EditSheet({ editing, socials, onClose, onSaved, onError, ensurePage }: 
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  section: { fontSize: 17, fontWeight: '600', marginTop: 24, marginBottom: 4 },
+  section: { fontSize: 17, fontFamily: FONT.semibold, marginTop: 24, marginBottom: 4 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: FILL_ELEVATED, borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet },
   grabberWrap: { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
   grabber: { width: 36, height: 5, borderRadius: 3, opacity: 0.5 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, minHeight: 48 },
-  sheetTitle: { fontSize: 20, fontWeight: '700' },
+  sheetTitle: { fontSize: 20, fontFamily: FONT.bold },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   form: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   // Inputs sit on the #1C1C1E sheet, the same fill as the field: a hairline outline keeps them visible.
