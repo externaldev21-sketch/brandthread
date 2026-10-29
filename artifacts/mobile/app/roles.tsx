@@ -79,8 +79,8 @@ export default function RolesScreen() {
             <TouchableOpacity
               onPress={() => {
                 emitHaptic('select');
+                // The team screen opens from the + beside this; here, only the explainer.
                 Alert.alert('Roles', 'Permissions are enforced per role on the server — team members only see and do what their role allows.', [
-                  { text: 'Manage team', onPress: () => router.push('/team' as never) },
                   { text: 'OK', style: 'cancel' },
                 ]);
               }}
@@ -96,12 +96,14 @@ export default function RolesScreen() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.toolbarRow}>
+          {/* The filter icon opens the filter; this pill only shows it and clears it. */}
           <TouchableOpacity
-            onPress={filter === 'all' ? openFilter : () => { emitHaptic('select'); setFilter('all'); }}
+            onPress={() => { emitHaptic('select'); setFilter('all'); }}
+            disabled={filter === 'all'}
             activeOpacity={0.7}
             style={[styles.allPill, { backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
-            accessibilityRole="button"
-            accessibilityLabel={filter === 'all' ? 'Filter roles' : `Filter: ${roleFilterLabel(filter)}. Tap to clear`}
+            accessibilityRole={filter === 'all' ? 'text' : 'button'}
+            accessibilityLabel={filter === 'all' ? roleFilterLabel(filter) : `Filter: ${roleFilterLabel(filter)}. Tap to clear`}
           >
             <Text style={[styles.allPillText, { color: colors.foreground }]}>{roleFilterLabel(filter)}</Text>
             {filter !== 'all' && <Feather name="x" size={12} color={colors.foreground} />}

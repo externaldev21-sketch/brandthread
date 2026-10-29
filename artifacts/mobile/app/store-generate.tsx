@@ -857,12 +857,7 @@ export default function StoreGenerateScreen() {
             </TouchableOpacity>
           </View>
         </BrandthreadCard>
-
-        <PrimaryButton
-          label="Generate my store →"
-          onPress={handleGenerate}
-          style={st.generateBtn}
-        />
+        {/* "Generate →" in the bottom nav is the one generate control. */}
       </View>
     );
   };
@@ -954,16 +949,8 @@ export default function StoreGenerateScreen() {
 
       {/* Bottom nav */}
       <View style={[st.bottomNav, { paddingBottom: insets.bottom + SP.sm }]}>
-        <View style={st.navSide}>
-          <TouchableOpacity
-            onPress={handleBack}
-            style={st.navBackBtn}
-            activeOpacity={0.7}
-          >
-            <Icon name="arrow-left" size={ICON.sm} color={FG} />
-            <Text style={st.navBackText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Back is the header's arrow; this side only balances the step label. */}
+        <View style={st.navSide} />
 
         <Text style={st.navStepText}>Step {step} of {TOTAL_STEPS}</Text>
 
@@ -1305,7 +1292,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reviewEditText: { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   reviewSwatches: { flexDirection: 'row', gap: SP.xs, marginTop: SP.xs },
   reviewSwatch: { width: 20, height: 20, borderRadius: 4 },
-  generateBtn: { marginTop: SP.sm },
   // Bottom nav
   bottomNav: {
     flexDirection: 'row',
@@ -1320,8 +1306,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Equal-width sides keep the step label centered whatever the buttons' widths.
   navSide: { flex: 1, alignItems: 'flex-start' },
   navSideEnd: { alignItems: 'flex-end' },
-  navBackBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, padding: SP.xs },
-  navBackText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   navStepText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   navContinueBtn: { borderRadius: RADIUS.md, overflow: 'hidden' },
   navContinueGrad: {

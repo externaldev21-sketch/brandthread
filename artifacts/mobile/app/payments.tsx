@@ -495,12 +495,9 @@ export default function PaymentsScreen() {
                 No payout account on file
               </Text>
             </View>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/payouts' as never)}>
-              <Text style={[styles.viewPayoutsLink, { color: primary }]}>Add account</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* View payouts row */}
+          {/* View payouts row — the one way into /payouts, where the account is added. */}
           <TouchableOpacity
             style={[styles.listRow, { borderTopColor: colors.border }]}
             activeOpacity={0.7}
@@ -634,7 +631,6 @@ const styles = StyleSheet.create({
   payoutInfo: { flex: 1 },
   payoutLabel: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
   payoutAccount: { fontVariant: ['tabular-nums'],  fontSize: 12, fontFamily: FONT.semibold },
-  viewPayoutsLink: { fontSize: 12, fontFamily: FONT.semibold },
 
 
   // Additional providers

@@ -521,9 +521,7 @@ export default function FriendsScreen() {
         <View style={{ marginBottom: SPACING.sm }}>
           <View style={s.sectionHeader}>
             <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Following</Text>
-            <PressableScale onPress={() => router.push('/buyer-friend-requests' as never)}>
-              <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
-            </PressableScale>
+            {/* Friend requests open from the header's user-plus; no second "See all" to the same screen. */}
           </View>
           <ScrollView
             horizontal

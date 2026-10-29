@@ -527,15 +527,6 @@ function Pill({ icon, label }: { icon: IconName; label: string }) {
   );
 }
 
-function MoreButton({ onPress, label }: { onPress: () => void; label: string }) {
-  const { theme } = useAppTheme();
-  return (
-    <PressableScale onPress={onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={label} style={{ width: 36, height: 32, alignItems: 'flex-end', justifyContent: 'center' }}>
-      <Icon name="more-horizontal" size={ICON_SIZE.md} color={theme.text} />
-    </PressableScale>
-  );
-}
-
 function CopyButton({ text, label }: { text: string; label: string }) {
   const { theme } = useAppTheme();
   const [copied, setCopied] = useState(false);
@@ -1030,48 +1021,20 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
     setRefundOpen(true);
   }
 
+  // Header ⋯: the order-level actions, each in this one place. Fulfill /
+  // Create shipping label (Unfulfilled card), Refund (Paid card), Message
+  // buyer (Customer card) and Share invoice (header share icon) each have
+  // their own visible control, so they are not repeated here, and the
+  // section cards carry no second ⋯ menu.
   function showMoreActions() {
     const buttons: ActionSheetButton[] = [];
-    if (fulfillable) {
-      buttons.push({ text: toFulfill.length > 1 ? 'Fulfill items' : 'Fulfill item', onPress: openFulfill });
-      buttons.push({ text: 'Create shipping label', onPress: () => router.push(labelHref as never) });
-    }
     if (!readOnly && order!.status === 'new') buttons.push({ text: 'Mark as processing', onPress: () => handleStatus('processing') });
     if (!readOnly && order!.status === 'processing') buttons.push({ text: 'Mark as ready to ship', onPress: () => handleStatus('fulfilled') });
     if (!readOnly && order!.status === 'shipped') buttons.push({ text: 'Update delivery status', onPress: () => setDeliveryStatusOpen(true) });
     buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
-    if (order!.customer.buyerUserId) buttons.push({ text: 'Message buyer', onPress: handleMessageBuyer });
-    if (canRefund) buttons.push({ text: 'Refund', onPress: openRefund });
-    buttons.push({ text: 'Share invoice', onPress: shareOrderInvoice });
     if (cancellable) buttons.push({ text: 'Cancel order', style: 'destructive', onPress: () => setShowCancelModal(true) });
     buttons.push({ text: 'Close', style: 'cancel' });
     showActionSheet(orderTitle(order!.orderNumber), undefined, buttons);
-  }
-
-  function showPaidActions() {
-    const buttons: ActionSheetButton[] = [];
-    if (canRefund) buttons.push({ text: 'Refund', onPress: openRefund });
-    buttons.push({ text: 'Share invoice', onPress: shareOrderInvoice });
-    buttons.push({ text: 'Close', style: 'cancel' });
-    showActionSheet(paymentPillLabel(order!), undefined, buttons);
-  }
-
-  function showUnfulfilledActions() {
-    const buttons: ActionSheetButton[] = [];
-    if (!readOnly && order!.status === 'new') buttons.push({ text: 'Mark as processing', onPress: () => handleStatus('processing') });
-    if (!readOnly && order!.status === 'processing') buttons.push({ text: 'Mark as ready to ship', onPress: () => handleStatus('fulfilled') });
-    buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
-    if (cancellable) buttons.push({ text: 'Cancel order', style: 'destructive', onPress: () => setShowCancelModal(true) });
-    buttons.push({ text: 'Close', style: 'cancel' });
-    showActionSheet('Unfulfilled', undefined, buttons);
-  }
-
-  function showFulfilledActions() {
-    const buttons: ActionSheetButton[] = [];
-    if (!readOnly && order!.status === 'shipped') buttons.push({ text: 'Update delivery status', onPress: () => setDeliveryStatusOpen(true) });
-    buttons.push({ text: 'Print packing slip', onPress: printPackingSlip });
-    buttons.push({ text: 'Close', style: 'cancel' });
-    showActionSheet('Fulfilled', undefined, buttons);
   }
 
   const pinnedNotes = order.notes.filter(n => n.isPinned);
@@ -1197,7 +1160,6 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
                 <Pill icon="check-square" label={`${order.status === 'delivered' ? 'Delivered' : 'Fulfilled'} (${group.quantity})`} />
                 {groups.length > 1 ? <Text style={s.blockHeadMeta}>{`${orderTitle(order.orderNumber)}-F${index + 1}`}</Text> : null}
               </View>
-              <MoreButton onPress={showFulfilledActions} label="Fulfillment actions" />
             </View>
             <Text style={s.blockSub}>
               {[shippedAt || group.items[0]?.deliveredAt ? fmtStamp((shippedAt ?? group.items[0]?.deliveredAt)!) : null, 'Shipping'].filter(Boolean).join(' • ')}
@@ -1229,7 +1191,6 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
                 icon={closed ? 'x-circle' : 'package'}
                 label={closed ? `Cancelled (${removedLines.reduce((n, li) => n + li.quantity, 0)})` : `Unfulfilled (${unfulfilledQty})`}
               />
-              {!closed ? <MoreButton onPress={showUnfulfilledActions} label="Unfulfilled item actions" /> : null}
             </View>
             {order.status === 'cancelled' && order.cancellation ? (
               <Text style={s.blockSub}>
@@ -1269,7 +1230,6 @@ export default function OrderDetailScreen({ orderId, embedded = false }: { order
         <Block testID="order-paid-block">
           <View style={s.blockHead}>
             <Pill icon="file-text" label={paymentPillLabel(order)} />
-            <MoreButton onPress={showPaidActions} label="Payment actions" />
           </View>
           <Text style={s.itemCount}>{plural(itemCount, 'item')}</Text>
           <InfoRow label="Subtotal" value={usd(order.payment.subtotalCents)} />

@@ -1399,14 +1399,8 @@ function StoreTab({
             <Text style={st.descText}>{product.description}</Text>
           ) : null}
 
-          {/* Seller card */}
-          <NavigationCard
-            icon="user"
-            label="Seller"
-            description={product.vendor ?? 'View seller profile'}
-            onPress={() => router.push(('/product-store?id=' + product.id) as never)}
-            accent={theme.accent}
-          />
+          {/* No "Seller" card here: it opened this same store preview, which
+              "Open Full Preview" below already does (vendor is in Overview). */}
         </View>
       </BrandthreadCard>
 

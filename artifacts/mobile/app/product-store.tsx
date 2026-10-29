@@ -426,11 +426,11 @@ export default function ProductStoreScreen() {
               </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                 style={s.msgIconBtn}
+                // Message seller is the mail icon beside this; the menu holds the rest.
                 onPress={() => Alert.alert(
                   sellerName,
                   '',
                   [
-                    { text: 'Message seller', onPress: handleMessageSeller },
                     { text: 'Report seller', style: 'destructive', onPress: handleReportSeller },
                     { text: 'Cancel', style: 'cancel' },
                   ]
@@ -552,14 +552,8 @@ export default function ProductStoreScreen() {
           </View>
         )}
 
-        {/* 7. CTA buttons (in scroll) */}
+        {/* 7. CTA buttons (in scroll). Add to bag is the sticky bar's button. */}
         <View style={s.ctaRow}>
-          <PrimaryButton
-            label="Add to bag"
-            onPress={handleAddToCart}
-            icon="shopping-bag"
-            style={s.ctaPrimary}
-          />
           <SecondaryButton
             label="Buy now"
             onPress={handleBuyNow}
@@ -964,9 +958,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'column',
     gap: SP.sm,
     marginBottom: SP.md,
-  },
-  ctaPrimary: {
-    width: '100%',
   },
   ctaSecondary: {
     width: '100%',

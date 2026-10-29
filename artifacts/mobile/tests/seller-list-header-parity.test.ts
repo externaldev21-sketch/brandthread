@@ -58,9 +58,11 @@ describe('Title dropdown replaces the Alert.alert title menu', () => {
     // clear about what they switched, so the title dropdown is gone and
     // Collections / Returns are labelled rows in each screen's ••• menu.
     expect(productsSource).not.toMatch(/titleMenu=\{/);
-    expect(productsSource).toContain("{ text: 'Collections', onPress: () => router.push('/store-collections' as never) }");
+    expect(productsSource).toContain("{ label: 'Collections', icon: 'layers', onPress: () => router.push('/store-collections' as never) }");
     expect(ordersSource).not.toMatch(/titleMenu=\{/);
-    expect(ordersSource).toContain("{ text: 'Returns', onPress: () => setActiveFilter('returned') }");
+    // Returns has one home: the filter sheet (ALL_FILTERS), not a second ••• row.
+    expect(ordersSource).toContain("{ key: 'returned', label: 'Returns' }");
+    expect(ordersSource).not.toContain("setActiveFilter('returned')");
   });
 
   it('one filter button: sort lives in the filter sheet, not a second header icon', () => {

@@ -480,7 +480,7 @@ describe('buyer profile tabs', () => {
     }
   });
 
-  it('owner mode: Posts · Reposts · Saved · Liked, and the ... menu holds Edit, Share, Orders and View as visitor', async () => {
+  it('owner mode: Posts · Reposts · Saved · Liked, and the ... menu holds Orders and View as visitor', async () => {
     renderer = await renderScreen();
     const tabLabels = renderer.root.findAll(
       node => node.props.accessibilityRole === 'tab' && typeof node.props.onPress === 'function',
@@ -492,7 +492,7 @@ describe('buyer profile tabs', () => {
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
     )[0];
     await act(async () => { menuButton.props.onPress(); });
-    for (const key of ['edit-profile', 'share', 'orders', 'view-as-visitor']) {
+    for (const key of ['orders', 'view-as-visitor']) {
       expect(renderer.root.findAll(node => node.props.testID === `profile-menu-sheet-${key}`).length, key).toBeGreaterThan(0);
     }
     const row = renderer.root.findAll(
@@ -607,12 +607,8 @@ describe('buyer profile tabs', () => {
     expect(renderer.root.findAllByProps({ testID: 'account-switcher-sheet' }).length).toBe(1);
 
     routerMock.push.mockReset();
-    const menuButton = renderer.root.findAll(
-      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
-    )[0];
-    await act(async () => { menuButton.props.onPress(); });
     const editProfileBtns = renderer.root.findAll(
-      node => node.props.testID === 'profile-menu-sheet-edit-profile'
+      node => node.props.testID === 'profile-edit-button'
         && typeof node.props.onPress === 'function',
     );
     expect(editProfileBtns.length).toBeGreaterThan(0);
@@ -623,12 +619,8 @@ describe('buyer profile tabs', () => {
   it('opens the real share sheet (QR, copy link, native share) from Share profile', async () => {
     renderer = await renderScreen();
     expect(renderer.root.findAll((node) => node.props.testID === 'share-profile-sheet')).toHaveLength(0);
-    const menuButton = renderer.root.findAll(
-      node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
-    )[0];
-    await act(async () => { menuButton.props.onPress(); });
     const shareBtn = renderer.root.findAll(
-      node => node.props.testID === 'profile-menu-sheet-share'
+      node => node.props.testID === 'profile-share-button'
         && typeof node.props.onPress === 'function',
     )[0];
     expect(shareBtn).toBeTruthy();
@@ -844,12 +836,13 @@ describe('buyer profile — Instagram layout', () => {
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
     )[0];
     await act(async () => { menuButton.props.onPress(); });
-    const editRow = renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-edit-profile' && typeof node.props.onPress === 'function')[0];
-    await act(async () => { editRow.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+    // One control per action: Edit / Share / Discover people are not repeated in the ••• sheet.
+    for (const absent of ['edit-profile', 'share', 'find-friends']) {
+      expect(renderer.root.findAll((node) => node.props.testID === `profile-menu-sheet-${absent}`), absent).toHaveLength(0);
+    }
   });
 
-  it('••• menu includes account actions, Find friends, visitor view, Orders, Closet and Tagged posts', async () => {
+  it('••• menu holds only actions without another home: Notifications, visitor view, Orders, Closet and Tagged posts', async () => {
     renderer = await renderScreen();
     const menuButton = renderer.root.findAll(
       node => node.props.accessibilityLabel === 'Profile options' && typeof node.props.onPress === 'function',
@@ -858,8 +851,8 @@ describe('buyer profile — Instagram layout', () => {
     const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
       && node.props.testID.startsWith('profile-menu-sheet-') && node.props.testID !== 'profile-menu-sheet-close' && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
     const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];
-    expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor', 'orders', 'closet', 'tagged']);
-    expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-find-friends')).not.toHaveLength(0);
+    expect(keys).toEqual(['notifications', 'view-as-visitor', 'orders', 'closet', 'tagged']);
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-orders')).not.toHaveLength(0);
     const notifications = rows.find((node) => node.props.testID === 'profile-menu-sheet-notifications')!;
     await act(async () => { notifications.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-notifications');

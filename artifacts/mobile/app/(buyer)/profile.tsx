@@ -9,8 +9,9 @@ import { openContextMenu, anchorFromEvent, type MenuAnchor } from '@/lib/context
  *    (`ProfileVideoHeader`); with no video the same layout sits on the plain
  *    background;
  *  - Posts · Followers · Following as number-over-label columns;
- *  - Edit profile · Notifications · Share profile live in the ••• sheet
- *    (Instagram's profile action sheet); no button row under the bio;
+ *  - Edit profile · Share profile · Discover people live only in the button
+ *    row under the bio; the ••• sheet keeps the rest (Notifications, View as
+ *    visitor, Orders, Closet, Tagged posts) — one control per action;
  *  - Story Highlights row (circles + "New");
  *  - the Thread Cash streak card;
  *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
@@ -1081,7 +1082,7 @@ export default function ProfileScreen() {
     </ProfileMeta>
   ) : null;
   // Banner layout: the @username ▾ account switcher leads the top bar (Edit
-  // profile lives only in the ••• menu).
+  // profile lives only in the button row under the bio).
   const bannerTopBar = (
     <>
       <View style={topBarStyles.bannerLeft}>
@@ -1261,10 +1262,8 @@ export default function ProfileScreen() {
       {/* "Add banner" on the placeholder: the same Edit banner sheet as Edit profile. */}
       {bannerFlow.sheet}
 
-      {/* ••• (Instagram's profile action sheet): Edit profile · Notifications ·
-          Share profile, then Find friends + the existing extras below a
-          separator. These replaced the Edit / Share / add-friend button row
-          under the bio. */}
+      {/* ••• sheet: only actions without a home elsewhere on this screen.
+          Edit / Share / Discover people live in the button row under the bio. */}
       <ProfileMenuSheet
         visible={menuOpen}
         anchor={menuAnchor}
@@ -1272,15 +1271,12 @@ export default function ProfileScreen() {
         appearance="list"
         onClose={() => setMenuOpen(false)}
         items={buyerOwnMenuItems({
-          onEditProfile: () => router.push('/(buyer)/edit-profile'),
           onNotifications: () => router.push('/buyer-notifications' as any),
-          onShareProfile: caps.showShare ? handleShareProfile : null,
-          onFindFriends: () => router.push('/(buyer)/friends' as any),
           onViewAsVisitor: caps.showViewAsVisitor && user?.id
             ? () => router.push(viewAsVisitorHref('buyer', user.id) as never)
             : null,
         }).concat([
-          { key: 'orders', label: 'Orders', icon: 'package', onPress: () => router.navigate('/(buyer)/orders' as never) },
+          { key: 'orders', label: 'Orders', icon: 'package', separatorBefore: true, onPress: () => router.navigate('/(buyer)/orders' as never) },
           { key: 'closet', label: 'Closet', icon: 'layers', onPress: () => router.push('/closet' as never) },
           { key: 'tagged', label: 'Tagged posts', icon: 'tag', onPress: () => handleTabPress('Tagged') },
         ])}

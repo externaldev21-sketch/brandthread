@@ -1722,16 +1722,10 @@ export default function BuyerProductDetailScreen() {
             )}
           </View>
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          <TouchableOpacity
-            onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
-            accessibilityRole="link"
-            accessibilityLabel={`Sold by ${product.sellerName}`}
-            hitSlop={{ top: 6, bottom: 6 }}
-            style={s.soldByRow}
-            testID="product-sold-by"
-          >
+          {/* The seller's shop opens from "Visit shop" in the seller block below. */}
+          <View style={s.soldByRow} testID="product-sold-by">
             <Text style={s.soldByText}>Sold by <Text style={s.soldByName}>{product.sellerName}</Text></Text>
-          </TouchableOpacity>
+          </View>
 
           <ShippingEstimateRow product={product} subtotalCents={variantPrice * qty} />
 
@@ -1836,7 +1830,8 @@ export default function BuyerProductDetailScreen() {
                   product={product}
                   option={option}
                   selections={selections}
-                  onSelect={handleSelect} onSizeGuide={hasSizeGuide ? () => setSizeGuideOpen(true) : undefined}
+                  // Size guide is the one link under the options, not one per option too.
+                  onSelect={handleSelect}
                 />
                 )}
                 {isUnselected && (
@@ -1962,14 +1957,15 @@ export default function BuyerProductDetailScreen() {
           <View style={s.divider} />
           {/* Seller — Depop's "Sold by" block (mobbin.com/flows/
               c76a3a77-0de3-489e-921a-5633d26a63bc): avatar row, then Visit
-              shop / Message seller as two equal buttons. */}
-          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
+              shop / Message seller as two equal buttons. "Visit shop" is the
+              one way to the seller's profile on this screen. */}
+          <View style={s.sellerCard} testID="product-seller-link">
             <Avatar name={product.sellerName} uri={product.sellerAvatarUri} size={48} />
             <View style={{ flex: 1 }}>
               <Text style={s.sellerHandle} numberOfLines={1}>Sold by</Text>
               <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
             </View>
-          </TouchableOpacity>
+          </View>
           <View style={s.sellerActions}>
             <View style={s.halfBtn}>
               <Button

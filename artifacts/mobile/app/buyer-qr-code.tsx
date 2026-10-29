@@ -68,10 +68,8 @@ export default function BuyerQRCode() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader
-        title="QR code"
-        actions={canonicalUrl ? [{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }] : undefined}
-      />
+      {/* Sharing is the "Share" button under the card, not a header icon too. */}
+      <ScreenHeader title="QR code" />
 
       <View style={s.body}>
         {/* Card */}

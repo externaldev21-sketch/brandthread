@@ -908,11 +908,8 @@ export default function BuyerStoryViewer() {
               setIsPaused(true);
               const author = { userId: currentStory.authorId, name: currentStory.authorName };
               const resume = () => setIsPaused(false);
+              // Tagged people opens from the @ chip on the story itself.
               const buttons = [
-                ...(slidePeople.length > 0 ? [{
-                  text: 'Tagged people',
-                  onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
-                }] : []),
                 {
                   text: `Mute ${currentStory.authorName}`,
                   onPress: async () => {
@@ -1034,10 +1031,6 @@ export default function BuyerStoryViewer() {
                 haptic('sheet');
                 setIsPaused(true);
                 showAlert('Your story', undefined, [
-                  ...(slidePeople.length > 0 ? [{
-                    text: 'Tagged people',
-                    onPress: () => { setIsPaused(false); setTaggedSheetOpen(true); },
-                  }] : []),
                   ...(currentSlide.imageUri && currentSlide.type !== 'text' ? [{
                     text: 'Save to device',
                     onPress: async () => {

@@ -426,8 +426,8 @@ describe("buyer-other-profile.tsx — the shared \"...\" sheet, mute / restrict 
     const shell = renderer.root.findAll((n) => typeof n.props.onRefresh === "function")[0];
     await act(async () => { await shell.props.onRefresh(); await flush(); });
     expect(renderer.root.findAllByProps({ testID: "buyer-other-profile-more" })).toHaveLength(0);
-    const more = renderer.root.findAll((n) => n.props.accessibilityLabel === "More options" && "disabled" in n.props)[0];
-    expect(more.props.disabled).toBe(true);
+    // No second "More" button repeats the "..." (one control per action).
+    expect(renderer.root.findAll((n) => n.props.accessibilityLabel === "More options")).toHaveLength(0);
     // The in-grid Retry stays the error affordance (no full-screen error over a loaded profile).
     expect(renderer.root.findAllByProps({ testID: "profile-grid-error" }).length).toBeGreaterThan(0);
     expect(renderer.root.findAllByProps({ testID: "buyer-other-profile-error" })).toHaveLength(0);

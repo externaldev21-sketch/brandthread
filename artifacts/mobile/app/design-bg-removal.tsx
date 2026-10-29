@@ -478,9 +478,9 @@ export default function DesignBgRemovalScreen() {
     const frame = { width: photoRect.w, height: photoRect.h };
     if (phase === 'loaded') {
       stageBody = (
-        <PressableScale onPress={pickPhoto} style={s.fillCenter} activeScale={0.995} accessibilityRole="button" accessibilityLabel="Replace photo" testID="bg-removal-stage">
+        <View style={s.fillCenter} testID="bg-removal-stage">
           <Image source={{ uri: source.uri }} style={[frame, s.photoRound]} resizeMode="cover" />
-        </PressableScale>
+        </View>
       );
     } else if (phase === 'processing' || (phase === 'done' && !sweepDone)) {
       stageBody = (
@@ -505,13 +505,13 @@ export default function DesignBgRemovalScreen() {
           <AiGeneratedBadge />
         </View>
       ) : (
-        <PressableScale onPress={pickPhoto} style={s.fillCenter} activeScale={0.995} accessibilityRole="button" accessibilityLabel="Replace photo" testID="bg-removal-stage">
+        <View style={s.fillCenter} testID="bg-removal-stage">
           <View ref={canvasRef} collapsable={false} style={[frame, s.photoRound, s.clip]}>
             {renderBackdrop()}
             <Image source={{ uri: cutout }} style={frame} resizeMode="cover" />
             <AiGeneratedBadge />
           </View>
-        </PressableScale>
+        </View>
       );
     }
   }
@@ -560,11 +560,14 @@ export default function DesignBgRemovalScreen() {
             showsHorizontalScrollIndicator={false}
             style={s.stripList}
             contentContainerStyle={s.strip}
-            ListHeaderComponent={
+            // One picker per phase: before a photo, the "Choose a photo"
+            // button (the drop zone is its empty state); after, this + tile.
+            // The stage itself isn't a hidden second "replace" target.
+            ListHeaderComponent={phase === 'empty' ? null : (
               <PressableScale onPress={pickPhoto} style={[s.tile, s.tilePlus]} accessibilityRole="button" accessibilityLabel="Add photo" testID="bg-removal-add-photo" disabled={stripLocked}>
                 <Icon name="plus" size={ICON.lg} color={FG} />
               </PressableScale>
-            }
+            )}
             renderItem={({ item }) => (
               <PressableScale onPress={() => pickRecent(item)} style={[s.tile, source?.uri === item.uri && s.tileActive]} accessibilityRole="button" accessibilityLabel="Use this photo" disabled={stripLocked}>
                 <Image source={{ uri: item.uri }} style={s.tileImg} resizeMode="cover" />

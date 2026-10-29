@@ -169,17 +169,17 @@ export default function MyStoreScreen() {
       {header}
       <ScrollView contentContainerStyle={[s.body, { paddingBottom: 24 + bottomInset }]} showsVerticalScrollIndicator={false}>
         <View style={s.top}>
-          <Pressable
-            onPress={() => { if (link.url) openShareStoreSheet(); }}
+          {/* Share is the header's share icon and Edit profile its button below:
+              the preview and the avatar/name are not second copies of them. */}
+          <View
             style={[s.phone, { borderColor: theme.borderSubtle }]}
-            accessibilityRole="button"
             accessibilityLabel="Your store"
             testID="my-store-preview"
           >
             {site ? <StoreSiteThumbnail site={site} width={PREVIEW_W} height={PREVIEW_H} radius={18} /> : <View style={{ width: PREVIEW_W, height: PREVIEW_H }} />}
-          </Pressable>
+          </View>
           <View style={s.profile}>
-            <Pressable onPress={() => router.push('/store-profile' as never)} accessibilityRole="button" accessibilityLabel="Edit profile" testID="my-store-profile">
+            <View testID="my-store-profile">
               {site?.logoUrl
                 ? <Image source={{ uri: site.logoUrl }} style={[s.avatar, { backgroundColor: FILL_ELEVATED }]} />
                 : (
@@ -188,7 +188,7 @@ export default function MyStoreScreen() {
                   </View>
                 )}
               <Text style={[s.name, { color: theme.text }]} numberOfLines={2}>{name}</Text>
-            </Pressable>
+            </View>
             <Button label="Edit profile" variant="secondary" size="small" onPress={() => router.push('/store-profile' as never)} style={s.editProfile} testID="my-store-edit-profile" />
           </View>
         </View>

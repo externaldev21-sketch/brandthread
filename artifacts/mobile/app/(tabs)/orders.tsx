@@ -1177,14 +1177,12 @@ export default function OrdersScreen() {
   const bulkOptions = useMemo(() => {
     const selectAll = { id: 'select_all', label: `Select all shown (${filtered.length})`, icon: 'check-square' as const };
     if (selectedIds.length === 0) return [selectAll];
+    // Ready / Fulfill / Export / Clear are buttons on the bulk bar itself;
+    // its "More" sheet carries only what the bar doesn't.
     return [
       { id: 'processing', label: 'Mark processing', icon: 'clock' as const },
       { id: 'packed', label: 'Mark packed', icon: 'box' as const },
-      { id: 'ready', label: 'Mark ready to ship', icon: 'package' as const },
-      { id: 'ship', label: 'Ship (add tracking or buy labels)', icon: 'send' as const },
-      { id: 'export', label: 'Export selected (CSV)', icon: 'download' as const },
       selectAll,
-      { id: 'clear', label: 'Clear selection', icon: 'x' as const },
     ];
   }, [filtered.length, selectedIds.length]);
   const handleBulkOption = useCallback((id: string) => {
@@ -1193,18 +1191,17 @@ export default function OrdersScreen() {
       case 'select_all': setSelectedIds(filtered.map(o => o.id)); break;
       case 'processing': handleBulkMarkProcessing(); break;
       case 'packed': handleBulkMarkPacked(); break;
-      case 'ready': handleBulkMarkReady(); break;
-      case 'ship': handleBulkFulfill(); break;
-      case 'export': void handleExportCsv(); break;
-      case 'clear': setSelectedIds([]); break;
     }
-  }, [filtered, handleBulkMarkProcessing, handleBulkMarkPacked, handleBulkMarkReady, handleBulkFulfill, handleExportCsv]);
+  }, [filtered, handleBulkMarkProcessing, handleBulkMarkPacked]);
 
+  // Returns lives in the filter sheet; with a selection, Export and the bulk
+  // sheet live on the bulk bar — the header ••• doesn't repeat them.
   const handleMoreMenu = useCallback((event?: unknown) => {
     openPullDownMenu(event, [
-      { label: 'Returns', icon: 'corner-up-left', onPress: () => setActiveFilter('returned') },
-      { label: selectedIds.length ? `Export selected (${selectedIds.length})` : 'Export CSV', icon: 'download', onPress: handleExportCsv },
-      { label: 'Bulk Actions', icon: 'check-square', onPress: handleBulkMenu },
+      ...(selectedIds.length ? [] : [
+        { label: 'Export CSV', icon: 'download' as const, onPress: handleExportCsv },
+        { label: 'Bulk Actions', icon: 'check-square' as const, onPress: handleBulkMenu },
+      ]),
       { label: 'Refresh', icon: 'refresh-cw', onPress: onRefresh },
     ]);
   }, [onRefresh, handleExportCsv, handleBulkMenu, selectedIds.length]);

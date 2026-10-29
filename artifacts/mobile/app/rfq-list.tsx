@@ -10,7 +10,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState, StatusBadge, PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { getRfqs, cancelRfq, type Rfq, type RfqStatus } from '@/services/manufacturerRfq';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
@@ -111,11 +111,6 @@ export default function RfqListScreen() {
           )
         }
       />
-      {rfqs.length > 0 && (
-        <View style={s.fabWrap}>
-          <PrimaryButton label="Post a new RFQ" icon="plus" onPress={() => router.push('/rfq-post' as never)} />
-        </View>
-      )}
     </View>
   );
 }
@@ -133,5 +128,4 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   countText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, fontVariant: ['tabular-nums'] },
   withdrawBtn: { alignSelf: 'flex-start', marginTop: SP.xs },
   withdrawText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
-  fabWrap: { padding: SP.md, borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background },
 });
