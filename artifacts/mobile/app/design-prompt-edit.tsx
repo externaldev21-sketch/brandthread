@@ -8,7 +8,7 @@ import { mediaLibraryUnavailableMessage } from '@/lib/mediaLibraryCompat';
  * designService.applyPromptEdit. Source images come from the device or the
  * seller's Brand Assets; results are saved to Photos / Brand Assets for real.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -65,6 +65,8 @@ export default function DesignPromptEditScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<AIGenerationResult | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  // Sync guard: a double tap on Generate / Try again would bill two AI edits.
+  const generatingRef = useRef(false);
 
   async function pickImage() {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -73,6 +75,8 @@ export default function DesignPromptEditScreen() {
     });
     if (!res.canceled && res.assets[0]) {
       setImageUri(res.assets[0].uri);
+      // A result from the previous image would otherwise be compared against the new one.
+      setResult(null);
     }
   }
 
@@ -142,6 +146,8 @@ export default function DesignPromptEditScreen() {
       Alert.alert('Add a prompt', 'Describe the edit you want to make.');
       return;
     }
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setIsGenerating(true);
     try {
       const res = await applyPromptEdit({
@@ -155,6 +161,7 @@ export default function DesignPromptEditScreen() {
     } catch (err) {
       showAlert('Edit failed', aiToolErrorMessage(err, 'Could not apply this edit. Please try again.'));
     } finally {
+      generatingRef.current = false;
       setIsGenerating(false);
     }
   }

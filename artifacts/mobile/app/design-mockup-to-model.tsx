@@ -47,6 +47,7 @@ import {
 } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { withCoverFirst } from '@/lib/photoOrder';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { tipTargetProps, useTipTarget } from '@/components/first-run-tips/tipTargets';
 import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
@@ -202,10 +203,12 @@ export default function MockupToModelScreen() {
         uri,
         altText: 'AI-generated model photo',
         isCover: true,
-        sortOrder: existing.length,
+        sortOrder: 0,
         createdAt: new Date().toISOString(),
       };
-      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
+      // New photo goes first: the cover is media[0] (lib/photoOrder), and an
+      // appended isCover:true left the old cover winning find(m => m.isCover).
+      const updated = await updateProduct(product.id, { media: withCoverFirst([newMedia, ...existing]) });
       if (updated) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('Set', `"${product.name ?? 'Product'}" now uses this as its product photo.`);
@@ -280,6 +283,10 @@ export default function MockupToModelScreen() {
       );
       return;
     }
+
+    // A batch already started (double tap before the results screen renders):
+    // starting another would abort it and resend every paid request.
+    if (batchAbortRef.current) return;
 
     mockupUriRef.current = mockupUri;
     refUrisRef.current = [...refUris];

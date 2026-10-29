@@ -12,7 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, useWindowDimensions,
+  ActivityIndicator, Modal, Pressable, useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -222,6 +222,40 @@ export default function DesignVersionsScreen() {
           }
         />
       )}
+
+      {/* Version preview — renders the snapshot's own layers */}
+      <Modal visible={!!previewing} transparent animationType="fade" onRequestClose={() => setPreviewing(null)}>
+        <Pressable
+          style={[styles.previewOverlay, { backgroundColor: `${theme.background}E6`, paddingBottom: insets.bottom + SP.md }]}
+          onPress={() => setPreviewing(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close preview"
+        >
+          {previewing && (
+            <View style={styles.previewInner}>
+              <DesignLayerCompositor
+                project={previewing.snapshot}
+                displaySize={Math.min(windowWidth - SP.md * 2, 420)}
+                borderRadius={RADIUS.md}
+              />
+              <Text style={styles.versionLabel}>{previewing.label}</Text>
+              <Text style={styles.versionDate}>
+                {formatDate(previewing.createdAt)} · {previewing.snapshot.layers?.length ?? 0} layer{(previewing.snapshot.layers?.length ?? 0) === 1 ? '' : 's'}
+              </Text>
+              <View style={styles.versionActions}>
+                <TouchableOpacity onPress={() => { const v = previewing; setPreviewing(null); handleRestore(v); }} style={styles.actionBtn} hitSlop={ACTION_HIT} accessibilityRole="button" accessibilityLabel={`Restore ${previewing.label}`}>
+                  <Feather name="rotate-ccw" size={14} color={PURPLE_LIGHT} />
+                  <Text style={[styles.actionText, { color: PURPLE_LIGHT }]}>Restore</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setPreviewing(null)} style={styles.actionBtn} hitSlop={ACTION_HIT} accessibilityRole="button" accessibilityLabel="Close preview">
+                  <Feather name="x" size={14} color={MUTED} />
+                  <Text style={[styles.actionText, { color: MUTED }]}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -249,5 +283,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginTop: SP.md, paddingHorizontal: SP.sm,
   },
   autosaveText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+
+  previewOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.md },
+  previewInner: { alignItems: 'center', gap: SP.sm },
   });
 };
