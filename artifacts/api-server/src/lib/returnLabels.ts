@@ -8,7 +8,7 @@
  * carrier's first scan of that label (Shippo tracking webhook), instead of
  * being issued at approval.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, orders, returns, shippingLabels } from "@workspace/db";
 import { createShipment, findTransaction, purchaseTransaction, type ShippoRate } from "./shippo";
 import { recordLabelPurchased, recoverLabelCost } from "./money/escrow";
@@ -213,7 +213,8 @@ export async function handleReturnLabelTracking(labelId: string, status: string)
   const scanned = isFirstScan(status);
   const [ret] = await db.update(returns).set({
     returnTrackingStatus: status,
-    ...(scanned ? { firstScanAt: new Date() } : {}),
+    // Keep the FIRST scan's time: later scans (out_for_delivery, delivered) must not move it.
+    ...(scanned ? { firstScanAt: sql`coalesce(${returns.firstScanAt}, now())` } : {}),
     updatedAt: new Date(),
   }).where(eq(returns.id, label.returnId)).returning();
   if (!ret || !scanned || !ret.refundOnScan || ret.status !== "approved") return { refunded: false };

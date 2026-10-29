@@ -33,6 +33,7 @@ import {
 import { eq, and, inArray, gte, sql, desc, ne, isNotNull } from "drizzle-orm";
 import { logger } from "../logger";
 import { privateAuthorVisibleTo } from "../privateAccount";
+import { publicPostCondition } from "../postVisibility";
 import { getUserAppSettings } from "../userAppSettingsStore";
 import {
   DEFAULT_EVENT_WEIGHTS, DEFAULT_RANKING_CONFIG, getRankingConfig, getRankingConfigSync,
@@ -417,6 +418,9 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
         eq(posts.surface, "thread"),
         eq(posts.postStatus, "published"),
         gte(posts.createdAt, followedSince),
+        // Held/removed by moderation, per-post private, or a suspended/deleted
+        // author: never a For You candidate (the feed route serves ids as-is).
+        publicPostCondition(now, userId),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(150),
@@ -428,6 +432,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
         eq(posts.postStatus, "published"),
         gte(posts.createdAt, freshSince),
         privateAuthorVisibleTo(userId, posts.userId),
+        publicPostCondition(now, userId),
       ))
       .orderBy(desc(posts.createdAt))
       .limit(200),
@@ -459,6 +464,7 @@ async function candidatePosts(userId: string, followedIds: string[]): Promise<Ra
       eq(posts.postStatus, "published"),
       privateAuthorVisibleTo(userId, posts.userId),
       gte(posts.createdAt, similarSince),
+      publicPostCondition(now, userId),
     ))
     .orderBy(desc(posts.createdAt))
     .limit(100);

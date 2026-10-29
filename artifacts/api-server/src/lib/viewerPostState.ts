@@ -9,7 +9,7 @@ import { db, interactions, savedItems } from "@workspace/db";
  * make the next tap send a no-op "add" while the UI counted +1, and left the
  * viewer unable to ever unlike/unsave.
  *
- * Three indexed lookups regardless of page size (no N+1). Signed-out viewers
+ * Two indexed lookups regardless of page size (no N+1). Signed-out viewers
  * get all-false without touching the database.
  */
 export type ViewerPostState = { likedByMe: boolean; savedByMe: boolean; repostedByMe: boolean };
