@@ -69,4 +69,19 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).not.toContain('switcher: {');
     expect(sellerProfile).not.toContain('brandNameTitle: {');
   });
+
+  it('keeps both own-profile headers to the name switcher + icons: no edit pencil, name one step under FS.md', () => {
+    const topBar = readFileSync(resolve(process.cwd(), 'components/profile/ProfileTopBar.tsx'), 'utf8');
+    // Dev: the switcher name read too big; FS.base is one step under FS.md (17).
+    expect(topBar).toMatch(/switcherText: \{ fontFamily: FONT\.semibold, fontSize: FS\.base,/);
+    // The name stays the account switcher, chevron and all.
+    expect(topBar).toContain('<Icon name="chevron-down"');
+    for (const file of ['app/(tabs)/profile.tsx', 'app/(buyer)/profile.tsx']) {
+      const src = readFileSync(resolve(process.cwd(), file), 'utf8');
+      expect(src).toContain('<ProfileAccountSwitcher');
+      // Edit profile's one home is the labelled button under the bio.
+      expect(src).not.toMatch(/<ProfileTopBarIcon name="edit-[23]"/);
+      expect(src).not.toContain('profile-banner-edit');
+    }
+  });
 });
