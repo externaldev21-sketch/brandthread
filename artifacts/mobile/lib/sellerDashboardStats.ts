@@ -42,7 +42,7 @@ import { computeMetricChange, type MetricChange } from './sellerMetricChange';
 
 export interface DashboardDeltaLine {
   direction: MetricChange['direction'];
-  /** e.g. "+$120.00 (8.2%) vs last period", "No change vs last period", "+4 vs last period" for a brand-new comparison base. */
+  /** e.g. "$120.00 (8.2%) vs last period", "No change vs last period", "4 vs last period" for a brand-new comparison base (unsigned; `direction` carries the sign). */
   label: string;
 }
 
@@ -86,7 +86,6 @@ export function hasNoActionNeeded(counts: DashboardActionCounts): boolean {
   return counts.toShip <= 0 && counts.toAnswer <= 0 && counts.lowStock <= 0 && counts.returns <= 0;
 }
 
-/** Real return count from already-fetched order rows (`order.returns` is populated by the orders API). */
 /**
  * "N returns to review": buyer return requests still awaiting the seller's
  * decision (GET /api/returns, status 'pending'). This used to count

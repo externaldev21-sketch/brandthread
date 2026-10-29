@@ -88,7 +88,9 @@ export type ShareLinkTarget =
   | { kind: 'giveaway'; code: string; href: string }
   | { kind: 'invite'; code: string; href: string };
 
-const HOSTS = /^(?:https?:\/\/(?:www\.)?brandthread\.app|brandthread:\/\/\/?)/i;
+// The https host must end at a path/query/fragment boundary, so look-alike
+// hosts (brandthread.app.evil.example, brandthread.app@evil) never match.
+const HOSTS = /^(?:https?:\/\/(?:www\.)?brandthread\.app(?=[/?#]|$)|brandthread:\/\/\/?)/i;
 
 function safeDecode(value: string): string | null {
   try {
@@ -106,8 +108,10 @@ function safeDecode(value: string): string | null {
 export function parseShareLink(raw: string | null | undefined): ShareLinkTarget | null {
   if (!raw || typeof raw !== 'string') return null;
   let input = raw.trim();
-  if (input.toLowerCase().startsWith(SHARE_ORIGIN.toLowerCase())) input = input.slice(SHARE_ORIGIN.length);
-  else if (HOSTS.test(input)) input = input.replace(HOSTS, '/');
+  const afterOrigin = input.charAt(SHARE_ORIGIN.length);
+  if (input.toLowerCase().startsWith(SHARE_ORIGIN.toLowerCase()) && (afterOrigin === '' || '/?#'.includes(afterOrigin))) {
+    input = input.slice(SHARE_ORIGIN.length);
+  } else if (HOSTS.test(input)) input = input.replace(HOSTS, '/');
   else if (!input.startsWith('/')) return null;
   input = input.replace(/[?#].*$/, '');
   const decoded = input.split('/').filter(Boolean).map(safeDecode);

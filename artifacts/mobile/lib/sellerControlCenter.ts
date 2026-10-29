@@ -124,7 +124,7 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'analytics', label: 'Analytics', icon: 'bar-chart-2', route: '/(tabs)/analytics', description: 'Sales, traffic and insights' },
       // Gated behind SELLER_ACTIVITY_ROUTE_LIVE — see that file's doc for why.
       ...(SELLER_ACTIVITY_ROUTE_LIVE
-        ? [{ id: 'activity', label: 'Activity', icon: 'activity', route: '/seller-activity', description: 'Recent orders, messages and updates' }]
+        ? [{ id: 'activity', label: 'Activity', icon: 'activity', route: '/seller-activity', description: 'Likes, comments, mentions and new followers' }]
         : []),
       { id: 'content',   label: 'Content',   icon: 'film',        route: '/content', description: 'Posts, drafts and scheduled' },
       { id: 'messages',  label: 'Messages',  icon: 'message-circle', route: '/seller-inbox', description: 'Reply to buyer DMs', badgeKey: 'messages' },

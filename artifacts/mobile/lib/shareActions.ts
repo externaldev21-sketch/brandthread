@@ -37,7 +37,11 @@ export async function copyLink(url: string): Promise<boolean> {
 export async function copyText(text: string, done = 'Copied', failed = 'Couldn’t copy'): Promise<boolean> {
   try {
     if (Platform.OS === 'web') {
-      await (navigator as Navigator | undefined)?.clipboard?.writeText?.(text);
+      // No Clipboard API (insecure origin, old browser): nothing was copied,
+      // so say so instead of confirming "Copied".
+      const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+      if (!clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await clipboard.writeText(text);
     } else {
       const Clipboard = await import('expo-clipboard');
       await Clipboard.setStringAsync(text);
