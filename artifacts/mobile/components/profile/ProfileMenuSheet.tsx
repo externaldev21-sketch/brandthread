@@ -11,6 +11,9 @@
  * readers.
  */
 import React from 'react';
+import { Pressable } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { IconName } from '@/components/ui/Icon';
 import type { MenuAnchor } from '@/lib/contextMenu';
 import { MenuSheet, type MenuSheetItem } from '@/components/ui/MenuSheet';
@@ -37,6 +40,7 @@ export function ProfileMenuSheet({
   testID?: string;
   appearance?: 'default' | 'list';
 }) {
+  const { theme } = useAppTheme();
   const everyday: MenuSheetItem[] = items.filter(i => !i.destructive);
   const destructive: MenuSheetItem[] = items.filter(i => i.destructive);
   const extrasStart = everyday.findIndex(i => i.key === 'find-friends');
@@ -47,6 +51,24 @@ export function ProfileMenuSheet({
     <MenuSheet
       visible={visible}
       onClose={onClose}
+      header={
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close profile options"
+          testID={`${testID}-close`}
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            alignSelf: 'flex-start',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Feather name="x" size={24} color={theme.text} />
+        </Pressable>
+      }
       sections={sections}
       accessibilityLabel={title ? `${title} options` : 'Profile options'}
       testID={testID}

@@ -856,7 +856,7 @@ describe('buyer profile — Instagram layout', () => {
     )[0];
     await act(async () => { menuButton.props.onPress(); });
     const rows = renderer.root.findAll((node) => typeof node.props.testID === 'string'
-      && node.props.testID.startsWith('profile-menu-sheet-') && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
+      && node.props.testID.startsWith('profile-menu-sheet-') && node.props.testID !== 'profile-menu-sheet-close' && typeof node.props.onPress === 'function' && typeof node.type !== 'string');
     const keys = [...new Set(rows.map((node) => node.props.testID.replace('profile-menu-sheet-', '')))];
     expect(keys).toEqual(['edit-profile', 'notifications', 'share', 'find-friends', 'view-as-visitor', 'orders', 'closet', 'tagged']);
     expect(renderer.root.findAll((node) => node.props.testID === 'profile-menu-sheet-separator-find-friends')).not.toHaveLength(0);
