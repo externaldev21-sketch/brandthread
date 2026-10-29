@@ -6,15 +6,16 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 describe('broken controls and error-state regressions', () => {
   it('keeps manufacturer discovery controls functional and accessible', () => {
-    // The hub landing's two top actions replaced the old header "+" and the
-    // Discover tab's search/filter toggles (redesign: find-by-category).
+    // The hub landing's top action plus the "Your manufacturers" Find button
+    // replaced the old header "+" and the Discover tab's search/filter
+    // toggles (redesign: find-by-category).
     const hub = read('app/manufacturer-hub.tsx');
     const find = read('app/manufacturer-find.tsx');
     const results = read('app/manufacturer-category.tsx');
 
     for (const source of [hub, find, results]) expect(source).not.toContain('onPress={() => {}}');
     expect(hub).toContain('label="Find a manufacturer"');
-    expect(hub).toContain("label=\"Invite your factory\" icon=\"user-plus\" variant=\"secondary\" fullWidth onPress={() => router.push('/invite-manufacturer' as never)}");
+    expect(hub).toContain("label=\"Invite your factory\" icon=\"user-plus\" variant=\"secondary\" size=\"small\" fullWidth onPress={() => router.push('/invite-manufacturer' as never)}");
     // Search is a labelled field on both find screens (SearchBar announces its placeholder).
     expect(find).toContain('<SearchBar value={query} onChange={setQuery} placeholder="Search manufacturers or categories"');
     expect(results).toContain('<SearchBar value={query} onChange={onSearch}');

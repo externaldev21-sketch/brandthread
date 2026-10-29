@@ -185,6 +185,35 @@ describe("Task 252 manufacturer route integration", () => {
     expect(facets.categories.find((row) => row.key === "denim")!.count).toBeGreaterThanOrEqual(1);
   });
 
+  it("serves the hub grid's card fields and pages the directory without repeats", async () => {
+    // Same createdAt and sort keys, so only the id tiebreaker orders them.
+    const createdAt = new Date("2026-01-01T00:00:00Z");
+    const seeded = [];
+    for (const index of [0, 1, 2, 3, 4]) {
+      seeded.push(await seedManufacturer({
+        businessName: `${prefix} Grid ${index}`, specialty: "Cut and sew, Knitwear", yearsInBusiness: 5,
+        photos: [`/objects/grid-${index}.jpg`], verifiedAt: createdAt, createdAt,
+      }));
+    }
+    const q = encodeURIComponent(`${prefix} Grid`);
+    const pages: Array<Array<Record<string, unknown>>> = [];
+    for (const offset of [0, 2, 4]) {
+      const res = await request(`/api/manufacturers/public?q=${q}&limit=2&offset=${offset}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-pagination-returned")).toBe(offset === 4 ? "1" : "2");
+      pages.push(await res.json() as Array<Record<string, unknown>>);
+    }
+    const ids = pages.flat().map((row) => row.id);
+    expect(new Set(ids).size).toBe(5);
+    expect([...ids].sort()).toEqual(seeded.map((row) => row.id).sort());
+    expect(pages[0][0]).toMatchObject({
+      businessName: expect.stringContaining(`${prefix} Grid`),
+      photos: [expect.stringMatching(/^https:\/\/objects\.test\/objects\/grid-\d\.jpg$/)],
+      rating: null, reviewCount: 0, yearsInBusiness: 5, isVerified: true,
+      specialty: "Cut and sew, Knitwear", categories: expect.arrayContaining(["knitwear"]),
+    });
+  });
+
   it("creates seller quote requests, validates active manufacturers, isolates sellers, and updates owned requests", async () => {
     const mfr = await seedManufacturer();
     auth.userId = users.sellerA;
