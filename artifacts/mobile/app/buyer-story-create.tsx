@@ -1808,7 +1808,7 @@ export default function StoryComposer() {
     haptic('select');
     const tools: { text: string; onPress: () => void; style?: 'destructive' }[] = [];
     if (media?.kind === 'photo' && !isReshare) tools.push({ text: 'Crop', onPress: () => setCropPending(true) });
-    tools.push({ text: 'Mention someone', onPress: () => setMentionPickerOpen(true) });
+    // Mention is a sticker (the Stickers sheet), as on Instagram; not repeated here.
     if (strokes.length > 0) {
       tools.push({ text: 'Undo last drawing', onPress: () => setStrokes((prev) => prev.slice(0, -1)) });
       tools.push({ text: 'Clear drawing', style: 'destructive', onPress: () => setStrokes([]) });

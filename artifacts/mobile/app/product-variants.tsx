@@ -415,9 +415,7 @@ export default function ProductVariantsScreen() {
                 </View>
               ))}
             </BrandthreadCard>
-            {dirtyIds.length > 0 && (
-              <PrimaryButton label={`Save ${dirtyIds.length} change${dirtyIds.length === 1 ? '' : 's'}`} onPress={saveVariants} loading={busy === 'save'} style={st.fullBtn} />
-            )}
+            {/* Saving is the header's "Save N" button. */}
           </>
         )}
 

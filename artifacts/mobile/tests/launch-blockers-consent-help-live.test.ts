@@ -82,7 +82,9 @@ describe('public Support URL (BT-374)', () => {
   it('help shows the support email and never sends a signed-out ticket to the API', () => {
     const help = source('app/help.tsx');
     expect(help).toContain("const SUPPORT_EMAIL = 'support@brandthread.app'");
-    expect(help).toContain('Email {SUPPORT_EMAIL}');
+    // The address is shown as text; the "Email Us" tile is the one mailto control.
+    expect(help).toContain('{SUPPORT_EMAIL}</Text>');
+    expect(help.match(/openURL\(`mailto:\$\{SUPPORT_EMAIL\}`\)/g)).toHaveLength(1);
     expect(help).not.toContain("openURL('https://brandthread.app/help')");
     const submit = help.slice(help.indexOf('async function handleSubmitTicket'));
     expect(submit.indexOf('if (!isSignedIn)')).toBeGreaterThan(-1);

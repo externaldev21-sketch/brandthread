@@ -70,13 +70,10 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Accounts Center', description: 'Password, security, personal details', aliases: ['password', 'email', 'phone', 'sign in', 'security', 'account ownership', 'personal details'], icon: 'user', route: '/buyer-account-center', audience: 'buyer', showDescription: true },
       { label: 'Edit profile', description: 'Name, photo, bio, and public profile', aliases: ['profile', 'name', 'photo', 'bio'], icon: 'edit-3', route: '/(buyer)/edit-profile', audience: 'buyer' },
       { label: 'Share profile', description: 'Send your profile link or card', aliases: ['share', 'link', 'profile link'], icon: 'share-2', action: 'share-profile', audience: 'buyer' },
-      { label: 'Start selling', description: 'Open a store with this login', aliases: ['sell', 'seller account', 'open a store', 'brand', 'account type', 'role', 'buyer seller'], icon: 'shopping-bag', route: '/account-type-settings?add=seller', audience: 'buyer' },
       { label: 'QR code', description: 'Share your Brandthread profile', aliases: ['qr', 'scan'], icon: 'grid', route: '/buyer-qr-code', audience: 'buyer' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/login-activity', audience: 'buyer', searchOnly: true },
       { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared', searchOnly: true },
       { label: 'Delete account', description: 'Permanently erase your account and private data', aliases: ['remove account', 'close account'], icon: 'trash-2', action: 'delete-account', destructive: true, audience: 'shared', searchOnly: true },
-      { label: 'Invite friends', description: 'Give $5, get $5 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
-      { label: 'Following brands', description: 'Brands and creators you follow', aliases: ['following', 'brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
     ],
   },
   {
@@ -89,7 +86,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Archive', description: 'Archived posts and stories', aliases: ['archived'], icon: 'archive', route: '/buyer-archive', audience: 'buyer' },
       { label: 'Your activity', description: 'Likes, comments, searches, and time spent', aliases: ['activity', 'history'], icon: 'activity', route: '/buyer-your-activity', audience: 'buyer' },
       { label: 'Highlights', description: 'Story highlights on your profile', aliases: ['highlight', 'stories'], icon: 'image', route: '/buyer-highlights-manager', audience: 'buyer' },
-      { label: 'Following', description: 'Brands and creators you follow', aliases: ['following', 'brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
+      { label: 'Following', description: 'Brands and creators you follow', aliases: ['following', 'brands', 'following brands'], icon: 'users', route: '/(buyer)/following', audience: 'buyer' },
       { label: 'Friends', description: 'Your friends on Brandthread', aliases: ['friend', 'people'], icon: 'user-check', route: '/(buyer)/friends', audience: 'buyer' },
       { label: 'Groups', description: 'Community group chats you joined', aliases: ['community', 'group chats', 'groups'], icon: 'message-square', route: '/community', audience: 'buyer' },
       { label: 'Invite friends', description: 'Give $5, get $5 Thread Cash', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'buyer' },
@@ -101,9 +98,6 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Account privacy', description: 'Account privacy and who can see your content', aliases: ['privacy', 'private account', 'visibility', 'public'], icon: 'lock', route: '/buyer-privacy-settings', audience: 'buyer' },
       { label: 'Close Friends', description: 'The people who see your close friends posts', aliases: ['close friends'], icon: 'star', route: '/buyer-close-friends', audience: 'buyer' },
-      { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
-      { label: 'Who can message and see me', description: 'Who can message you, and blocked accounts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
-      { label: 'Content you see', description: 'Hidden words and muted accounts', aliases: ['favorites', 'content preferences', 'suggested', 'sensitive content'], icon: 'sliders', route: '/buyer-settings-detail?section=content', audience: 'buyer' },
       { label: 'AI data sharing', description: 'Whether Brandthread AI may send your content to its AI providers', aliases: ['ai', 'openai', 'consent', 'data sharing'], icon: 'cpu', route: '/ai-data-sharing', audience: 'buyer' },
       { label: 'Blocked', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Follow requests', description: 'Confirm or delete requests to follow your private account', aliases: ['requests', 'follow requests', 'private account'], icon: 'user-plus', route: '/buyer-friend-requests', audience: 'buyer' },
@@ -112,7 +106,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'How others can interact with you',
     items: [
-      { label: 'Messages and story replies', description: 'Who can message you, and blocked accounts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can', 'story replies'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
+      { label: 'Messages and story replies', description: 'Who can message you, and blocked accounts', aliases: ['messages', 'tags', 'mentions', 'comments', 'sharing', 'who can', 'story replies', 'who can message', 'see me'], icon: 'message-circle', route: '/buyer-settings-detail?section=messages', audience: 'buyer' },
       { label: 'Restricted', description: 'Accounts with limited interaction with you', aliases: ['restrict', 'restricted'], icon: 'user-x', route: '/buyer-restricted', audience: 'buyer' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'hidden words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
     ],
@@ -150,7 +144,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'For professionals',
     items: [
-      { label: 'Account type', description: 'Switch between buyer and seller account experiences', aliases: ['role', 'buyer seller', 'account role', 'seller', 'sell', 'switch'], icon: 'layers', route: '/account-type-settings', audience: 'buyer' },
+      { label: 'Account type', description: 'Switch between buyer and seller account experiences', aliases: ['role', 'buyer seller', 'account role', 'seller', 'sell', 'switch', 'start selling', 'seller account', 'open a store', 'brand'], icon: 'layers', route: '/account-type-settings', audience: 'buyer' },
       { label: 'Creator program', description: 'Earn from the brands you share', aliases: ['creator', 'affiliate', 'commission'], icon: 'link', route: '/creator-program', audience: 'buyer' },
       { label: 'Freelancer jobs', description: 'Design and photo jobs from brands', aliases: ['freelance', 'jobs', 'gigs', 'work'], icon: 'briefcase', route: '/freelancer-jobs', audience: 'buyer' },
     ],
@@ -160,33 +154,16 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Help', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Report a problem', description: 'Tell us about a bug or an issue', aliases: ['bug', 'issue', 'feedback'], icon: 'alert-triangle', route: '/buyer-problem-report', audience: 'buyer' },
-      { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'download'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
-      { label: 'About Brandthread', description: 'App version, terms, and policies', aliases: ['about', 'version', 'terms'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
-      { label: 'About', description: 'App version, terms, and policies', aliases: ['about', 'version', 'legal'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
+      { label: 'About Brandthread', description: 'App version, terms, and policies', aliases: ['about', 'version', 'terms', 'legal'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'buyer' },
       ...LEGAL_ITEMS,
     ],
   },
   {
+    // Instagram ends with Login › Log out. The legal pages live in About
+    // (and search); Delete account lives in Accounts Center (and search).
     title: 'Login',
     items: [
-      { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
-      { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
-      { label: 'Privacy Policy', description: 'How we collect, use, and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'file-text', route: '/privacy', audience: 'shared' },
-      { label: 'Refund Policy', description: 'Cancellations, returns, and refunds', aliases: ['refund', 'refunds', 'returns', 'cancellation', 'buyer protection', 'legal'], icon: 'file-text', route: '/refund-policy', audience: 'shared' },
-      { label: 'Seller Agreement', description: 'Fees, payouts, and rules for selling on Brandthread', aliases: ['seller terms', 'selling', 'fees', 'payouts', 'legal'], icon: 'file-text', route: '/seller-agreement', audience: 'shared' },
-    ],
-  },
-  {
-    title: 'Log out',
-    items: [
-      { label: 'Sign out', description: 'Sign out of this Brandthread account', aliases: ['log out', 'logout'], icon: 'log-out', action: 'sign-out', audience: 'shared' },
-    ],
-  },
-  {
-    title: 'Danger zone',
-    items: [
-      { label: 'Delete account', description: 'Permanently erase your account and private data', aliases: ['remove account', 'close account'], icon: 'trash-2', action: 'delete-account', destructive: true, audience: 'shared' },
-      { label: 'Log out', description: 'Sign out of this Brandthread account', aliases: ['log out', 'logout', 'sign out'], icon: 'log-out', action: 'sign-out', destructive: true, audience: 'shared' },
+      { label: 'Log out', description: 'Sign out of this Brandthread account', aliases: ['log out', 'logout', 'sign out'], icon: 'log-out', action: 'sign-out', audience: 'shared' },
     ],
   },
 ];
@@ -197,7 +174,8 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
  * App settings, then Store settings in Shopify's order and names, then the
  * Brandthread-only groups. Store feature shortcuts that already live on the
  * seller tabs/dashboard (Design Studio, Marketing, Analytics, etc.) are not
- * duplicated here.
+ * duplicated here, and each destination is one row: no group repeats a row
+ * of another (Edit profile is the account row at the top of the screen).
  */
 export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
@@ -207,16 +185,14 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'biometric unlock', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'languages', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
       { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
+      { label: 'Sounds & haptics', description: 'Turn haptics on or off', aliases: ['haptics', 'vibration', 'vibrate', 'sounds', 'feedback', 'taptic'], icon: 'smartphone', route: '/sounds-haptics', audience: 'shared' },
     ],
   },
   {
     title: 'Store settings',
     items: [
       { label: 'Store details', description: 'Manage your brand setup and general preferences', aliases: ['general', 'brand setup', 'business details'], icon: 'briefcase', route: '/general-settings', audience: 'seller' },
-      { label: 'Store settings', description: 'Storefront identity, localization, and checkout', aliases: ['store', 'storefront', 'shop', 'checkout'], icon: 'home', route: '/store-settings', audience: 'seller' },
       { label: 'Store website', description: 'Your store link, design, links and socials', aliases: ['website', 'link in bio', 'store link', 'customize', 'design'], icon: 'globe', route: '/my-store', audience: 'seller' },
-      { label: 'Store builder', description: 'Customize your storefront layout', aliases: ['builder', 'layout', 'storefront'], icon: 'layout', route: '/store-builder', audience: 'seller' },
-      { label: 'Storefront theme', description: 'Colors and presentation of your public store', aliases: ['storefront theme', 'colors'], icon: 'droplet', route: '/store-theme-picker', audience: 'seller' },
       { label: 'Plan', description: 'Manage your Brandthread seller plan', aliases: ['plan', 'subscription', 'membership', 'upgrade'], icon: 'star', route: '/subscription', audience: 'seller' },
       { label: 'Compare plans', description: 'See all available Brandthread plans', aliases: ['plans', 'upgrade', 'compare'], icon: 'trending-up', route: '/plans', audience: 'seller', searchOnly: true },
       { label: 'Billing', description: 'Past invoices and charges', aliases: ['invoices', 'charges', 'receipts', 'billing history'], icon: 'clipboard', route: '/billing', audience: 'seller' },
@@ -226,14 +202,12 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Security', description: 'Account protection and verification', aliases: ['security', 'protection', 'verification', 'activity log'], icon: 'lock', route: '/security', audience: 'seller' },
       { label: 'Payments', description: 'Accepted payment methods for your store', aliases: ['payments', 'checkout payments', 'payment settings'], icon: 'credit-card', route: '/payments', audience: 'seller' },
       { label: 'Payouts', description: 'Manage your bank account and payout history', aliases: ['money', 'bank', 'withdrawals', 'stripe'], icon: 'dollar-sign', route: '/payouts', audience: 'seller' },
-      { label: 'Checkout', description: 'Storefront identity, localization, and checkout', aliases: ['store', 'storefront', 'shop', 'checkout', 'guest checkout', 'store settings'], icon: 'shopping-cart', route: '/store-settings', audience: 'seller' },
-      { label: 'Shipping and delivery', description: 'Configure rates, zones, and carriers', aliases: ['shipping', 'delivery', 'rates', 'carriers'], icon: 'truck', route: '/shipping-delivery', audience: 'seller' },
-      { label: 'Shipping and fulfillment', description: 'Fulfillment and shipping method settings', aliases: ['fulfillment', 'methods', 'shipping methods'], icon: 'send', route: '/shipping', audience: 'seller', searchOnly: true },
+      { label: 'Checkout', description: 'Storefront identity, localization, and checkout', aliases: ['store', 'storefront', 'shop', 'checkout', 'guest checkout', 'store settings', 'localization'], icon: 'shopping-cart', route: '/store-settings', audience: 'seller' },
+      { label: 'Shipping and delivery', description: 'Configure rates, zones, and carriers', aliases: ['shipping', 'delivery', 'rates', 'carriers', 'fulfillment', 'methods', 'shipping methods'], icon: 'truck', route: '/shipping-delivery', audience: 'seller' },
       { label: 'Taxes and duties', description: 'Tax rules and collection', aliases: ['tax', 'duties', 'vat'], icon: 'percent', route: '/taxes-duties', audience: 'seller' },
       { label: 'Locations', description: 'Manage pickup and business locations', aliases: ['locations', 'pickup'], icon: 'map-pin', route: '/locations', audience: 'seller' },
       { label: 'Apps', description: 'Connect Shopify, email marketing, and other tools', aliases: ['shopify', 'import', 'connect', 'apps', 'integrations'], icon: 'grid', route: '/integrations', audience: 'seller' },
       { label: 'Email marketing', description: 'Klaviyo and other marketing connections', aliases: ['klaviyo', 'email', 'marketing'], icon: 'mail', route: '/integrations/klaviyo', audience: 'seller', searchOnly: true },
-      { label: 'Fulfillment connections', description: 'Fulfill orders through Shopify — Tapstitch, Printful, Printify', aliases: ['shopify', 'tapstitch', 'printful', 'printify', 'fulfillment', 'dropship'], icon: 'truck', route: '/integrations/shopify-fulfillment', audience: 'seller', searchOnly: true },
       { label: 'Domains', description: 'Custom domain settings', aliases: ['domain', 'custom url'], icon: 'globe', route: '/store-domain', audience: 'seller' },
       { label: 'Notifications', description: 'Choose push and email alerts for orders and store activity', aliases: ['alerts', 'push', 'email', 'orders', 'push notifications'], icon: 'bell', route: '/notifications-settings', audience: 'seller' },
       { label: 'Customer privacy', description: 'How customer data is collected and used', aliases: ['gdpr', 'ccpa', 'customer data'], icon: 'eye-off', route: '/customer-privacy', audience: 'seller' },
@@ -256,61 +230,22 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Account',
     items: [
-      { label: 'Edit seller profile', description: 'Update your brand name, photo, bio, and public profile', aliases: ['profile', 'brand details', 'seller profile'], icon: 'user', route: '/edit-profile', audience: 'seller' },
       { label: 'Login methods', description: 'Password, connected accounts, and two-factor authentication', aliases: ['password', '2fa', 'two factor'], icon: 'key', route: '/login-methods', audience: 'seller' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/login-activity', audience: 'seller' },
       { label: 'AI assistant', description: 'Assistant, data sources, and confirmations', aliases: ['ai', 'assistant', 'copilot'], icon: 'zap', route: '/ai-settings', audience: 'seller' },
       { label: 'AI credits', description: 'Balance, credit packs and usage history', aliases: ['credits', 'ai', 'top up', 'usage'], icon: 'cpu', route: '/ai-credits', audience: 'seller' },
-      { label: 'Switch to buyer', description: 'Browse and shop as a buyer with this account', aliases: ['switch', 'buyer mode', 'account type'], icon: 'refresh-cw', route: '/account-type-settings', audience: 'seller' },
-    ],
-  },
-  {
-    title: 'Shipping',
-    items: [
-      { label: 'Shipping and delivery', description: 'Configure rates, zones, and carriers', aliases: ['shipping', 'delivery', 'rates', 'carriers'], icon: 'truck', route: '/shipping-delivery', audience: 'seller' },
-      { label: 'Shipping methods', description: 'Fulfillment and shipping method settings', aliases: ['fulfillment', 'methods'], icon: 'send', route: '/shipping', audience: 'seller' },
-    ],
-  },
-  {
-    title: 'Taxes',
-    items: [
-      { label: 'Taxes and duties', description: 'Tax rules and collection', aliases: ['tax', 'duties', 'vat'], icon: 'percent', route: '/taxes-duties', audience: 'seller' },
-    ],
-  },
-  {
-    title: 'Team/staff',
-    items: [
-      { label: 'Team and permissions', description: 'Invite collaborators and manage roles', aliases: ['team', 'collaborators', 'staff'], icon: 'users', route: '/team', audience: 'seller' },
-      { label: 'Users', description: 'People with access to your store', aliases: ['users', 'staff'], icon: 'user', route: '/users', audience: 'seller' },
-      { label: 'Roles', description: 'Define what each teammate can do', aliases: ['roles', 'permissions'], icon: 'shield', route: '/roles', audience: 'seller' },
-    ],
-  },
-  {
-    title: 'Plan/subscription',
-    items: [
-      { label: 'Subscription', description: 'Manage your Brandthread seller plan', aliases: ['plan', 'billing', 'membership'], icon: 'star', route: '/subscription', audience: 'seller' },
-      { label: 'Compare plans', description: 'See all available Brandthread plans', aliases: ['plans', 'upgrade', 'compare'], icon: 'trending-up', route: '/plans', audience: 'seller' },
-      { label: 'AI credits', description: 'Balance, credit packs and usage history', aliases: ['credits', 'ai', 'top up', 'usage'], icon: 'zap', route: '/ai-credits', audience: 'seller' },
+      { label: 'Switch to buyer', description: 'Browse and shop as a buyer with this account', aliases: ['switch', 'buyer mode', 'account type', 'shop', 'buyer account', 'shop as a buyer'], icon: 'refresh-cw', route: '/account-type-settings', audience: 'seller' },
     ],
   },
   {
     title: 'Integrations',
     items: [
-      { label: 'Integrations', description: 'Connect Shopify, email marketing, and other tools', aliases: ['shopify', 'import', 'connect', 'apps'], icon: 'link', route: '/integrations', audience: 'seller' },
-      { label: 'Email marketing', description: 'Klaviyo and other marketing connections', aliases: ['klaviyo', 'email', 'marketing'], icon: 'mail', route: '/integrations/klaviyo', audience: 'seller' },
       { label: 'Fulfillment connections', description: 'Fulfill orders through Shopify — Tapstitch, Printful, Printify', aliases: ['shopify', 'tapstitch', 'printful', 'printify', 'fulfillment', 'dropship'], icon: 'truck', route: '/integrations/shopify-fulfillment', audience: 'seller' },
-    ],
-  },
-  {
-    title: 'Notifications',
-    items: [
-      { label: 'Notifications', description: 'Choose push and email alerts for orders and store activity', aliases: ['alerts', 'push', 'email', 'orders'], icon: 'bell', route: '/notifications-settings', audience: 'seller' },
     ],
   },
   {
     title: 'Privacy & safety',
     items: [
-      { label: 'Customer privacy', description: 'How customer data is collected and used', aliases: ['gdpr', 'ccpa', 'customer data'], icon: 'lock', route: '/customer-privacy', audience: 'seller' },
       { label: 'Close Friends', description: 'Your top buyers and the people who see your Close Friends stories', aliases: ['close friends', 'top buyers', 'vip'], icon: 'star', route: '/seller-close-friends', audience: 'seller' },
       { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
       { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'shield', route: '/muted-words', audience: 'shared' },
@@ -322,16 +257,6 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     ],
   },
   {
-    title: 'Appearance',
-    items: [
-      { label: 'Appearance', description: 'App theme and app icon', aliases: ['theme', 'color', 'dark mode', 'appearance', 'app icon', 'home screen icon'], icon: 'droplet', route: '/appearance', audience: 'shared' },
-      { label: 'App Lock', description: 'Require Face ID, Touch ID, or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
-      { label: 'Language', description: 'Choose your preferred app language', aliases: ['language', 'locale'], icon: 'globe', route: '/languages', audience: 'shared' },
-      { label: 'Tips', description: 'Replay first-run tips, or turn them off', aliases: ['tips', 'tutorial', 'walkthrough', 'replay tips', 'skip tips', 'coach marks', 'gestures'], icon: 'help-circle', route: '/first-run-tips-settings', audience: 'shared' },
-      { label: 'Sounds & haptics', description: 'Turn haptics on or off', aliases: ['haptics', 'vibration', 'vibrate', 'sounds', 'feedback', 'taptic'], icon: 'smartphone', route: '/sounds-haptics', audience: 'shared' },
-    ],
-  },
-  {
     title: 'Help',
     items: [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
@@ -339,12 +264,6 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Invite friends', description: 'Give $5, get $5 purchase-only Thread Cash; share your referral code and see rewards', aliases: ['invite', 'referral'], icon: 'gift', route: '/buyer-invite', audience: 'seller' },
       { label: 'About Brandthread', description: 'App version, terms, policies, and licenses', aliases: ['about', 'version', 'legal', 'licenses'], icon: 'info', route: '/buyer-settings-detail?section=about', audience: 'seller' },
       ...LEGAL_ITEMS,
-    ],
-  },
-  {
-    title: 'Switch mode',
-    items: [
-      { label: 'Shop as a buyer', description: 'A buyer profile with this login', aliases: ['switch', 'buyer mode', 'account type', 'shop', 'buyer account'], icon: 'shopping-cart', route: '/account-type-settings?add=buyer', audience: 'seller' },
     ],
   },
   {

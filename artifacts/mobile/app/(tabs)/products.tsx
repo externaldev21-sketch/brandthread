@@ -208,7 +208,6 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEd
     { label: 'Variants & stock', icon: 'layers', onPress: () => { closeSheet(); router.push(('/product-variants?productId=' + p.id) as never); } },
     { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
-    { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
     { label: 'Search listing (SEO)', icon: 'search', onPress: () => { closeSheet(); router.push(('/product-seo?productId=' + p.id) as never); } },
     { label: 'Details and colour photos', icon: 'info', onPress: () => { closeSheet(); router.push(('/product-page-details?productId=' + p.id) as never); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },

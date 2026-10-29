@@ -37,9 +37,10 @@ export function ProfileMenuSheet({
   testID?: string;
   appearance?: 'default' | 'list';
 }) {
-  const everyday: MenuSheetItem[] = items.filter(i => !i.destructive);
+  const everyday = items.filter(i => !i.destructive);
   const destructive: MenuSheetItem[] = items.filter(i => i.destructive);
-  const extrasStart = everyday.findIndex(i => i.key === 'find-friends');
+  // The first row flagged `separatorBefore` starts a second everyday block.
+  const extrasStart = everyday.findIndex((i, index) => index > 0 && i.separatorBefore);
   const sections = extrasStart < 0
     ? [everyday, destructive]
     : [everyday.slice(0, extrasStart), everyday.slice(extrasStart), destructive];

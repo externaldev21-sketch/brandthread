@@ -290,10 +290,7 @@ export default function ManufacturerProfileScreen() {
             <Icon name="inbox" size={ICON.md} color={PURPLE_LIGHT} />
             <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Messages</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleQuote} style={s.qaBtn} activeOpacity={0.8}>
-            <Icon name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
-            <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Quote</Text>
-          </TouchableOpacity>
+          {/* Quotes: the sticky "Request a quote" button below is the one entry. */}
         </View>
 
         <View style={s.content}>

@@ -576,16 +576,8 @@ export default function BuyerOtherProfileScreen() {
           testID="buyer-profile-message"
         />
       </View>
-      <View style={styles.actionRow}>
-        <ProfileButton
-          label="Stories"
-          icon="circle"
-          onPress={openStories}
-          disabled={storyIds.length === 0}
-          accessibilityLabel={storyIds.length > 0 ? `View ${displayName}'s story` : 'No active stories'}
-        />
-        <ProfileButton label="More" icon="more-horizontal" onPress={() => setMoreSheetOpen(true)} disabled={loadFailed} accessibilityLabel="More options" />
-      </View>
+      {/* Stories open from the avatar ring and the options sheet from the
+          top-bar "..." — no second button row repeating them. */}
       <GiveawayProfileCard sellerId={canonicalUserId} enabled={canonicalReady && !iBlockedThem && !previewAsVisitor} />
     </>
   );

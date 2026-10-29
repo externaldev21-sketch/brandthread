@@ -90,7 +90,7 @@ describe('seller: Shopify Settings order', () => {
     expect(SELLER_SETTINGS_CATALOG.slice(0, 2).map((g) => g.title)).toEqual(['App settings', 'Store settings']);
     const store = SELLER_SETTINGS_CATALOG[1].items.filter((i) => !i.searchOnly).map((i) => i.label);
     expect(store).toEqual([
-      'Store details', 'Plan', 'Billing', 'Users', 'Roles', 'Security', 'Payments', 'Payouts', 'Checkout',
+      'Store details', 'Store website', 'Plan', 'Billing', 'Users', 'Roles', 'Security', 'Payments', 'Payouts', 'Checkout',
       'Shipping and delivery', 'Taxes and duties', 'Locations', 'Apps', 'Domains', 'Notifications',
       'Customer privacy', 'Policies',
     ]);
@@ -99,16 +99,26 @@ describe('seller: Shopify Settings order', () => {
   it('keeps every destination it had before', () => {
     const routes = new Set(routesOf(SELLER_SETTINGS_CATALOG));
     for (const r of [
-      '/edit-profile', '/login-methods', '/login-activity', '/security', '/ai-settings', '/general-settings',
+      '/login-methods', '/login-activity', '/security', '/ai-settings', '/general-settings',
       '/store-settings', '/store-builder', '/store-theme-picker', '/design-brand-assets', '/store-domain', '/discounts',
       '/locations', 'action:account-scope', '/vacation-mode', '/payouts', '/billing', '/payments', '/shipping-delivery',
-      '/shipping', '/taxes-duties', '/team', '/users', '/roles', '/subscription', '/plans', '/ai-credits',
+      // '/shipping' is the same screen as '/shipping-delivery' (a re-export), listed once.
+      '/taxes-duties', '/team', '/users', '/roles', '/subscription', '/plans', '/ai-credits',
       '/integrations', '/integrations/klaviyo', '/integrations/shopify-fulfillment', '/notifications-settings',
       '/customer-privacy', '/buyer-blocked', '/muted-words', '/admin-reports', '/admin-promotions', '/admin-invites',
       '/appearance', '/biometric-unlock', '/languages', '/first-run-tips-settings', '/help', '/seller-data-export',
       '/buyer-settings-detail?section=about', '/buyer-invite', '/account-type-settings', 'action:sign-out',
       'action:delete-account',
     ]) expect(routes.has(r), r).toBe(true);
+    // Edit profile is the account row at the top of the screen, not a second catalog row.
+    expect(read('app/seller-settings.tsx')).toContain("onPress={() => router.push('/edit-profile' as never)}");
+  });
+
+  it('lists each destination once: no group repeats another group\'s row', () => {
+    for (const catalog of [BUYER_SETTINGS_CATALOG, SELLER_SETTINGS_CATALOG]) {
+      const routes = routesOf(catalog);
+      expect(routes.filter((r, i) => routes.indexOf(r) !== i)).toEqual([]);
+    }
   });
 
   it('seller-settings draws the list through settingsGroupsFor (search-only rows stay hidden until searched)', () => {

@@ -299,13 +299,10 @@ export default function ContentScreen() {
       <ScreenHeader
         title="Content"
         onBack={onBack}
+        // New posts start from the "Create new" type cards below (they pass
+        // the post type), not a header + as well.
         actions={[
           { icon: 'bar-chart-2', onPress: () => router.navigate('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
-          {
-            icon: 'plus',
-            onPress: () => { router.push('/create-post' as never); },
-            accessibilityLabel: 'Create a new post',
-          },
         ]}
       />
 

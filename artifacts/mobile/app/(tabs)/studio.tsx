@@ -253,25 +253,12 @@ export default function StudioScreen() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-      {/* Shared page header — identical large-title size/weight/offset to every other
-          tab-root page. "My Projects" moves into belowTitle since it's a labeled
-          pill button, not a simple icon action. */}
+      {/* Shared page header — identical large-title size/weight/offset to every
+          other tab-root page. Projects open from "Recent projects · View all". */}
       <Header
         title="Studio"
         largeTitle
         showBack={false}
-        belowTitle={(
-          <TouchableOpacity
-            style={s.myProjectsBtn}
-            onPress={() => router.push('/design' as never)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            hitSlop={{ top: 8, bottom: 8 }}
-          >
-            <Icon name="folder" size={14} color={theme.accentLight} />
-            <Text style={s.myProjectsBtnText}>My Projects</Text>
-          </TouchableOpacity>
-        )}
       />
       <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingBottom: tabBarClearance }]}>
 
@@ -489,25 +476,6 @@ const makeStyles = (theme: any) => {
     paddingBottom: 120,
   },
 
-  myProjectsBtn: {
-    // Sized to its label — without this the pill stretched the full header
-    // width and read as a bar rather than a button.
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.sm + SP.xs,
-    paddingVertical: SP.sm,
-    borderRadius: radius.sm,
-    backgroundColor: accentDim,
-    borderWidth: 1,
-    borderColor: accent + '44',
-  },
-  myProjectsBtnText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: accentLight,
-  },
   planErrorBanner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -170,8 +170,6 @@ export default function BuyerPersonalDetails() {
           {FIELDS.map((field, i) => {
             const isEditable = field.editable !== false;
             const isBirthday = field.key === 'birthday';
-            const isPhone = field.key === 'phone';
-            const hasPhone = !!user?.primaryPhoneNumber;
             const value = getValue(field.key);
             const row = (
               <View style={s.row}>
@@ -207,15 +205,7 @@ export default function BuyerPersonalDetails() {
                   >
                     {row}
                   </Pressable>
-                ) : isPhone ? (
-                  <Pressable
-                    onPress={() => router.push('/change-phone' as never)}
-                    accessibilityRole="button"
-                    accessibilityLabel={hasPhone ? `Phone, ${value}. Change phone number` : 'Phone, not added. Add phone number'}
-                  >
-                    {row}
-                  </Pressable>
-                ) : row}
+                ) : row /* Phone changes through the "Change phone number" row below. */}
                 {error?.field === field.key && (
                   <Text style={s.fieldError} accessibilityLiveRegion="polite">{error.message}</Text>
                 )}

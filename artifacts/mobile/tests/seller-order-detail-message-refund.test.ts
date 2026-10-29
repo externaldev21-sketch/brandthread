@@ -33,10 +33,10 @@ describe('order detail: Message Buyer action', () => {
     expect(source).toContain("router.push(`/seller-conversation?id=${encodeURIComponent(conv.id)}` as never)");
   });
 
-  it('is a row in the Customer block (and in the ⋯ menu), disabled while opening or with no buyer account', () => {
+  it('is one row in the Customer block (not repeated in the ⋯ menu), disabled while opening or with no buyer account', () => {
     expect(source).toContain("title={messagingBuyer ? 'Opening…' : 'Message buyer'}");
     expect(source).toContain('disabled={messagingBuyer || !order.customer.buyerUserId}');
-    expect(source).toContain("buttons.push({ text: 'Message buyer', onPress: handleMessageBuyer });");
+    expect(source).not.toContain("buttons.push({ text: 'Message buyer'");
   });
 
   it('never hardcodes a brand color for the conversation participants — monochrome only', () => {

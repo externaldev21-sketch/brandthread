@@ -95,6 +95,8 @@ export function OrderProgressTimeline({
   trackingStatus?: TrackingStatus;
   trackingCarrier?: string;
   trackingNumber?: string;
+  /** Renders the tappable tracking chip; omit when the screen already has a
+   *  "Track on carrier" control so tracking keeps one home. */
   onTrackPress?: () => void;
 }) {
   const { theme } = useAppTheme();
@@ -192,7 +194,7 @@ export function OrderProgressTimeline({
                 <Text style={[styles.stepTimestamp, { color: theme.muted }]}>{estimate}</Text>
               ) : null}
 
-              {step.key === 'shipped' && (done || active) && trackingNumber ? (
+              {step.key === 'shipped' && (done || active) && trackingNumber && onTrackPress ? (
                 <TouchableOpacity
                   style={[styles.trackChip, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
                   onPress={onTrackPress}

@@ -84,8 +84,8 @@ export default function CommunityChatScreen() {
     if (!community) return;
     hapticSelection();
     showActionSheet(community.name, undefined, [
+      // Members open from the group's name in the header (WhatsApp / Instagram), not here too.
       { text: community.muted ? 'Unmute notifications' : 'Mute notifications', onPress: () => { void chat.setMuted(!community.muted); } },
-      { text: 'Members', onPress: openMembers },
       ...(community.kind === 'user'
         ? [{
             text: 'Report group',
@@ -100,7 +100,7 @@ export default function CommunityChatScreen() {
       { text: 'Leave group', style: 'destructive' as const, onPress: confirmLeave },
       { text: 'Cancel', style: 'cancel' as const },
     ]);
-  }, [chat, community, confirmLeave, openMembers, router]);
+  }, [chat, community, confirmLeave, router]);
 
   // ─── Message menu (long-press) ────────────────────────────────────────────
   const closeMenu = useCallback(() => { setMenuMsg(null); setMenuAnchor(null); }, []);

@@ -331,14 +331,10 @@ export default function DesignGarmentScreen() {
 
   return (
     <View style={gs.root}>
+      {/* "Open in Editor" beside Save Placement is the one editor control. */}
       <ScreenHeader
         title="Garment Design"
         onBack={() => goBackOr(router)}
-        actions={[{
-          icon: 'edit-2',
-          onPress: openInEditor,
-          accessibilityLabel: 'Open in editor',
-        }]}
       />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>

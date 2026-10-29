@@ -318,9 +318,8 @@ export default function HelpScreen() {
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} accessibilityRole="link" testID="help-support-email">
-          <Text style={s.supportEmail}>Email {SUPPORT_EMAIL}</Text>
-        </TouchableOpacity>
+        {/* The address as text; "Email Us" above is the one mail control. */}
+        <Text style={s.supportEmail} selectable testID="help-support-email">{SUPPORT_EMAIL}</Text>
 
         {/* Support ticket form */}
         <View onLayout={(e) => setContactY(e.nativeEvent.layout.y)}>

@@ -1353,22 +1353,21 @@ interface MoreOptionsSheetProps {
   onShare: () => void;
   onDuplicate: () => void;
   onRename: () => void;
-  onDelete: () => void;
   sharing: boolean;
 }
 
-function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare, onDuplicate, onRename, onDelete, sharing }: MoreOptionsSheetProps) {
+function MoreOptionsSheet({ visible, count, onClose, onStack, onPreview, onShare, onDuplicate, onRename, sharing }: MoreOptionsSheetProps) {
   const insets = useSafeAreaInsets();
   const { modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout } = useSheetTransition(visible, onClose);
   if (!modalVisible) return null;
 
+  // Delete is the selection bar's own "Delete" button, not a row here too.
   const ROWS: { key: string; icon: IconName; label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }[] = [
     { key: 'stack', icon: 'layers', label: 'Stack', onPress: onStack, disabled: count < 2 },
     { key: 'preview', icon: 'eye', label: 'Preview', onPress: onPreview, disabled: count !== 1 },
     { key: 'share', icon: 'share', label: sharing ? 'Sharing…' : 'Share', onPress: onShare, disabled: count !== 1 || sharing },
     { key: 'duplicate', icon: 'copy', label: 'Duplicate', onPress: onDuplicate, disabled: count === 0 },
     { key: 'rename', icon: 'edit-2', label: 'Rename', onPress: onRename, disabled: count !== 1 },
-    { key: 'delete', icon: 'trash-2', label: 'Delete', onPress: onDelete, disabled: count === 0, destructive: true },
   ];
 
   return (
@@ -2104,7 +2103,6 @@ export default function DesignGalleryScreen() {
         onShare={handleShareSelected}
         onDuplicate={async () => { setMoreOptionsVisible(false); await bulkDuplicate(); }}
         onRename={handleRenameSelected}
-        onDelete={confirmBulkDelete}
         sharing={sharing}
       />
 

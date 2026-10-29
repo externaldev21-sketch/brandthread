@@ -543,7 +543,9 @@ export default function BuyerDropDetail() {
               <TouchableOpacity style={styles.roundButton} onPress={handleShare} hitSlop={4} accessibilityLabel="Share this drop">
                 <Icon name="share" size={18} color={ON_DARK} />
               </TouchableOpacity>
-              {!showRecap && (
+              {/* Before launch the "Notify me" button is the alert toggle; the
+                  bell only appears once it becomes "Shop the drop". */}
+              {!showRecap && isLive && (
                 <TouchableOpacity style={styles.roundButton} onPress={toggleNotification} hitSlop={4} accessibilityLabel="Toggle drop alert">
                   <Icon name={subscribed ? 'bell-off' : 'bell'} size={19} color={ON_DARK} />
                 </TouchableOpacity>

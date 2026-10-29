@@ -1224,7 +1224,8 @@ export default function BuyerOrderDetailScreen() {
               trackingStatus={order.trackingStatus}
               trackingCarrier={order.trackingCarrier}
               trackingNumber={order.trackingNumber}
-              onTrackPress={handleTrackOnCarrier}
+              // No onTrackPress: the Tracking section's "Track on carrier"
+              // button is the one tracking control on this screen.
             />
           </BrandthreadCard>
         </View>
@@ -1457,9 +1458,10 @@ export default function BuyerOrderDetailScreen() {
             <CancelDeadlineNote deadline={order.buyerCancelDeadline} />
             </>
           )}
-          {returnRequest || isReturnEligible(order.status) ? (
+          {/* Once a return exists, its status card above is the one way in. */}
+          {!returnRequest && isReturnEligible(order.status) ? (
             <SecondaryButton
-              label={returnRequest ? 'View return' : 'Request return'}
+              label="Request return"
               icon="refresh-ccw"
               onPress={() => { handleRequestReturn(); }}
             />

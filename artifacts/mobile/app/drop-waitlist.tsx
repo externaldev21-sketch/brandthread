@@ -329,7 +329,6 @@ export default function DropWaitlistScreen() {
                 onPress={shareImage}
                 disabled={sharing}
               />
-              <Tile styles={styles} theme={theme} icon="link" label="Copy link" onPress={() => copyLink()} disabled={!publicUrl} />
             </View>
           </View>
         </ScrollView>

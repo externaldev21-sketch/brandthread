@@ -625,8 +625,8 @@ export default function BuyerPostViewer() {
       <ScreenHeader
         title={authorName}
         onBack={() => goBackOr(router)}
+        // Share is the action row's / rail's share button, not a header icon too.
         actions={[
-          { icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' },
           // Owner ••• sheet (Instagram): Pin to your profile / Unpin from profile.
           ...(canPin || fits.openMenu ? [{
             icon: 'more-horizontal' as const,
@@ -756,17 +756,7 @@ export default function BuyerPostViewer() {
             </TouchableOpacity>
           ) : null}
           <View style={{ flex: 1 }} />
-          {!isOwner && (
-            <TouchableOpacity
-              style={s.engageBtn}
-              onPress={() => {
-                router.push(`/buyer-report?targetType=post&targetId=${params.postId ?? ''}&targetLabel=${encodeURIComponent(caption || 'Post')}&targetUserId=${post?.authorId ?? ''}` as never);
-              }}
-              accessibilityLabel="Report post"
-            >
-              <Icon name="flag" size={22} color={FG} />
-            </TouchableOpacity>
-          )}
+          {/* Report lives in the share sheet (TikTok's), not a second flag here. */}
           {!useRail ? (
             <TouchableOpacity style={s.engageBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share post" testID="viewer-share">
               <Icon name="share-2" size={22} color={FG} />

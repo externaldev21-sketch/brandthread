@@ -346,10 +346,9 @@ export default function DesignBrandAssetsScreen() {
 
   return (
     <View style={bas.root}>
-      <ScreenHeader
-        title="Brand Assets"
-        actions={[{ icon: 'plus', onPress: handleAddAsset, accessibilityLabel: 'Add asset' }]}
-      />
+      {/* Adding is the "Upload asset" button (or the empty state's), which also
+          shows upload progress; no header + repeating it. */}
+      <ScreenHeader title="Brand Assets" />
 
       {/* ── SEARCH ── */}
       <View style={bas.searchWrap}>
