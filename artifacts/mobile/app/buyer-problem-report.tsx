@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 
 import { CachedImage as Image } from '@/components/CachedImage';
 
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 
 import { apiErrorMessage } from '@/lib/safety';
+import { showAlert } from '@/lib/actionSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,7 +70,7 @@ export default function BuyerProblemReportScreen() {
 
   async function pickEvidence() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission required', 'Please allow access to your photo library.'); return; }
+    if (!perm.granted) { showAlert('Permission required', 'Please allow access to your photo library.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       // Uploaded through POST /api/returns/evidence, which takes JPEG, PNG or WebP photos.
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -95,9 +96,10 @@ export default function BuyerProblemReportScreen() {
   const isGeneralReport = !orderId;
 
   async function handleSubmit() {
-    if (!problemType) { Alert.alert('Select Issue Type', 'Please select what kind of problem you experienced.'); return; }
-    if (!description.trim()) { Alert.alert('Add Details', 'Please describe the problem.'); return; }
-    if (!isGeneralReport && !order) return;
+    if (!problemType) { showAlert('Select Issue Type', 'Please select what kind of problem you experienced.'); return; }
+    if (!description.trim()) { showAlert('Add Details', 'Please describe the problem.'); return; }
+    if (submitting) return;
+    if (!isGeneralReport && !order) { showAlert("Couldn't load this order", 'Go back and open the report from the order again.'); return; }
     setSubmitting(true);
     try {
       // One support ticket (POST /api/support/problem-reports) with the app/device
@@ -119,7 +121,7 @@ export default function BuyerProblemReportScreen() {
       });
       setSubmitted(true);
     } catch (error) {
-      Alert.alert('Could not submit your report', apiErrorMessage(error, 'Please check your connection and try again.'));
+      showAlert('Could not submit your report', apiErrorMessage(error, 'Please check your connection and try again.'));
     }
     setSubmitting(false);
   }
@@ -133,7 +135,7 @@ export default function BuyerProblemReportScreen() {
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <View style={s.successIcon}><Icon name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
-        <Text style={s.successSub}>{isGeneralReport ? 'Your problem report has been received. Our team will review it and reach out if needed.' : 'Your report was sent to the seller and our support team. We\'ll reach out if we need more details.'}</Text>
+        <Text style={s.successSub}>{isGeneralReport ? 'Your problem report has been received. Our team will review it and reach out if needed.' : 'Your report was sent to our support team. We\'ll reach out if we need more details.'}</Text>
         <PrimaryButton label="Done" onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );
@@ -223,10 +225,20 @@ export default function BuyerProblemReportScreen() {
                 onValueChange={setContactedSeller}
               />
             </View>
-            {!contactedSeller && (
+            {!contactedSeller && order && (
               <TouchableOpacity
                 style={s.contactBtn}
-                onPress={() => router.push(('/buyer-conversation?participantId=' + order?.sellerId + '&type=buyer_to_seller_order') as never)}
+                onPress={() => {
+                  if (!order) return;
+                  router.push((
+                    '/buyer-conversation?participantId=' + encodeURIComponent(order.sellerId) +
+                    '&participantName=' + encodeURIComponent(order.sellerName) +
+                    '&participantAccountType=seller' +
+                    '&type=buyer_to_seller_order' +
+                    '&contextOrderId=' + encodeURIComponent(order.id) +
+                    '&contextOrderNumber=' + encodeURIComponent(order.orderNumber)
+                  ) as never);
+                }}
                 activeOpacity={0.8}
               >
                 <Icon name="message-circle" size={14} color={PURPLE_LIGHT} />
