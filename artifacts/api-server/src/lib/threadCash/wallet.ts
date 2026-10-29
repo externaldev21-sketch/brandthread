@@ -1005,12 +1005,16 @@ async function sendableBalanceCents(executor: DbExecutor, buyerId: string): Prom
       balance: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}), 0)`,
       received: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.source} = 'send_received'), 0)`,
       spent: sql<string>`COALESCE(SUM(-${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} < 0 AND ${threadCashEntries.source} <> 'funding_shift'), 0)`,
+      // A debit that was handed back (cancelled redemption or send, expired
+      // send, refunded checkout spend) was never spent: without netting it,
+      // redeem-then-cancel would "clean" received money and make it sendable.
+      reversed: sql<string>`COALESCE(SUM(${threadCashEntries.amountCents}) FILTER (WHERE ${threadCashEntries.amountCents} > 0 AND (${threadCashEntries.source} IN ('redemption_cancelled', 'send_cancelled', 'send_expired') OR (${threadCashEntries.source} = 'refund_credit' AND ${threadCashEntries.referenceId} LIKE 'refund:%'))), 0)`,
     })
     .from(threadCashEntries)
     .where(eq(threadCashEntries.buyerId, buyerId));
   const balance = Number(row?.balance ?? 0);
   const received = Number(row?.received ?? 0);
-  const spent = Number(row?.spent ?? 0);
+  const spent = Math.max(0, Number(row?.spent ?? 0) - Number(row?.reversed ?? 0));
   const heldReceived = Math.max(0, received - spent);
   return Math.max(0, balance - heldReceived);
 }
@@ -1433,15 +1437,15 @@ export async function cancelPendingThreadCashForAccount(tx: DbExecutor, clerkId:
       eq(threadCashTransfers.status, "pending"),
       sql`(${threadCashTransfers.senderId} = ${clerkId} OR ${threadCashTransfers.recipientId} = ${clerkId})`,
     ))
-    .returning({ id: threadCashTransfers.id, senderId: threadCashTransfers.senderId, amountCents: threadCashTransfers.amountCents });
-  if (cancelled.length > 0) {
-    await tx.insert(threadCashEntries).values(cancelled.map((t) => ({
+    .returning();
+  for (const t of cancelled) {
+    // Back to exactly the funds the send used (paid stays paid), as cancelThreadCash does.
+    await insertRestoreEntry(tx, {
       buyerId: t.senderId,
-      amountCents: t.amountCents,
       source: "send_cancelled",
       referenceId: t.id,
       note: `Cancelled Thread Cash send of $${(t.amountCents / 100).toFixed(2)}`,
-    })));
+    }, await sentSplit(tx, t));
   }
   return cancelled.length;
 }

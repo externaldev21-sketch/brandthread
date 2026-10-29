@@ -28,7 +28,7 @@ import {
 type DbExecutor = Pick<typeof db, "select" | "insert" | "update" | "execute">;
 
 /** Ledger sources that are platform-funded reward credit, counted against the budget. */
-export const REWARD_SOURCES = ["daily_checkin", "streak_bonus", "referral", "admin_adjustment"] as const;
+export const REWARD_SOURCES = ["daily_checkin", "streak_bonus", "referral", "admin_adjustment", "weekly_quests"] as const;
 
 /** Order statuses that never count toward GMV. */
 const NON_GMV_ORDER_STATUSES = ["cancelled", "refunded", "refund_pending"];

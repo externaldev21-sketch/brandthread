@@ -1,7 +1,8 @@
 /**
  * Seller Thread Cash cash-out: converts a seller's earned Thread Cash
- * (from Live gifts and message payments — see thread_cash_entries sources
- * 'live_gift' / 'send_received') into real money in their Stripe Connect
+ * (paid-funded Live gifts — thread_cash_entries source 'live_gift' with
+ * funding 'paid'; peer sends and promo credit are never cashable, see
+ * ./funding.ts) into real money in their Stripe Connect
  * payout balance, exactly like `checkoutTopup.ts`'s buyer-side top-up: a
  * platform-funded Stripe Transfer to the seller's connected account,
  * recorded in the double-entry ledger, idempotency-keyed so a retried
@@ -167,8 +168,12 @@ export async function cashOutThreadCash(
       sellerId,
       stripeObjectId: transfer.id,
       memo: "Seller cashed out Thread Cash to their payout balance",
+      // The cashed-out Thread Cash is no longer owed (liability −X), the
+      // seller receives the payout, and any cash-out fee stays with the
+      // platform on thread_cash_seller_cash_out (lib/threadCash/liability.ts).
       postings: [
-        { account: "thread_cash_seller_cash_out", amountCents: -payoutCents },
+        { account: "thread_cash_liability", amountCents: -threadCashCents },
+        { account: "thread_cash_seller_cash_out", partyId: sellerId, amountCents: threadCashCents - payoutCents },
         { account: "seller_paid_out", partyId: sellerId, amountCents: payoutCents },
       ],
     });

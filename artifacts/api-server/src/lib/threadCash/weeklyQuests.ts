@@ -157,6 +157,14 @@ export async function claimWeeklyQuests(buyerId: string, now = new Date()): Prom
   await assertThreadCashEarnAllowed();
   const row = await db.transaction(async (tx) => {
     await assertThreadCashNotFrozen(tx, buyerId);
+    const idempotencyKey = weeklyQuestIdempotencyKey(buyerId, status.weekKey);
+    const [already] = await tx.select({ id: threadCashEntries.id }).from(threadCashEntries)
+      .where(eq(threadCashEntries.idempotencyKey, idempotencyKey)).limit(1);
+    if (already) return undefined;
+    // Budget first, then the reward row (same order as every other reward):
+    // weekly_quests counts toward the budget (earnGate REWARD_SOURCES), so
+    // checking after the insert would count this reward against itself.
+    await reserveRewardsBudget(tx, status.rewardCents);
     const [entry] = await tx
     .insert(threadCashEntries)
     .values({
@@ -165,13 +173,12 @@ export async function claimWeeklyQuests(buyerId: string, now = new Date()): Prom
       source: WEEKLY_QUEST_SOURCE,
       referenceId: status.weekKey,
       note: `Weekly quests (${status.weekKey})`,
-      idempotencyKey: weeklyQuestIdempotencyKey(buyerId, status.weekKey),
+      idempotencyKey,
     })
     .onConflictDoNothing()
     .returning({ id: threadCashEntries.id, amountCents: threadCashEntries.amountCents });
     if (entry) {
-      // Commit the reward, existing budget guard and liability together.
-      await reserveRewardsBudget(tx, entry.amountCents);
+      // Commit the reward, the budget reservation and the liability together.
       await postRewardIssued(tx, { entryId: entry.id, buyerId, amountCents: entry.amountCents, source: WEEKLY_QUEST_SOURCE });
     }
     return entry;
