@@ -2,7 +2,7 @@
  * Annual billing for seller plans — item 116: "2 months free".
  *
  * Yearly price = 10 × the monthly price (12 months for the price of 10):
- *   starter $290/yr · growth $790/yr · pro $1,990/yr
+ *   starter $199.90/yr · growth $490/yr · pro $1,290/yr (default catalogue prices)
  * Stripe Prices are found or created by lookup key (brandthread_<plan>_annual)
  * exactly like the monthly ones, with recurring.interval "year". Native
  * stores (App Store / Google Play via RevenueCat) need products with the same

@@ -11,7 +11,7 @@
  * Shippo is reached through the connector proxy (lib/shippo.ts), so its API
  * key never leaves the server.
  */
-import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db, orderItems, orders, orderTrackingEvents, shippingLabels } from "@workspace/db";
 import { getTrack, registerTrack, shippoCarrierToken, type ShippoTrack, type ShippoTrackStatus } from "../shippo";
 import { logger } from "../logger";
@@ -165,7 +165,9 @@ export async function pollShippedOrders(options: { now?: Date; limit?: number; f
     eq(orders.status, "shipped"),
     isNull(orders.deliveredAt),
     or(isNull(orders.trackingPolledAt), lt(orders.trackingPolledAt, new Date(now.valueOf() - 3_600_000))),
-  )).orderBy(asc(orders.trackingPolledAt)).limit(options.limit ?? 100);
+  // Never-polled orders first: Postgres sorts NULL last in ASC, so a backlog
+  // of re-polls would otherwise starve every newly shipped order.
+  )).orderBy(sql`${orders.trackingPolledAt} ASC NULLS FIRST`).limit(options.limit ?? 100);
   for (const { id } of due) await syncOrderTracking(id, options.fetchTrack);
   return due.length;
 }
