@@ -34,3 +34,9 @@ Evaluate inactive-screen optimizations by return-navigation latency as well as b
 **Why:** Production-web profiling found that suspension could trade background savings for a burst of layout measurements when a retained feed resumed. Native and browser retention costs were not interchangeable.
 
 **How to apply:** Compare cold, warm and first-return interactions on the same runtime and scenario. Keep native transition coordination separate from browser DOM retention, and report regressions rather than assuming freezing is always a speedup.
+
+Menu actions that navigate away from a retained tab must wait until the modal's hidden state has committed, not merely until its owner requests closing.
+
+**Why:** Freezing the originating tab during navigation can preserve its modal portal over the destination, leaving a dimmed or blank-looking screen that intercepts all taps.
+
+**How to apply:** Queue navigation actions through the sheet dismissal lifecycle. Verify the destination is actually clickable, not just that its URL changed.

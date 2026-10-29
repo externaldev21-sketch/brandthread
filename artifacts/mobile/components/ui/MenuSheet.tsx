@@ -60,18 +60,36 @@ export function MenuSheet({
   // Mounted on first open, then kept so the close can animate. Menus that
   // live in every feed cell cost nothing until someone opens one.
   const opened = useRef(visible);
+  const pendingAction = useRef<(() => void) | null>(null);
   if (visible) opened.current = true;
   if (!opened.current) return null;
+  const menuSections = (sections ?? (items ? [items] : [])).map(section =>
+    section.map(item => item.keepOpen ? item : {
+      ...item,
+      onPress: () => {
+        pendingAction.current = item.onPress;
+        onClose();
+      },
+      keepOpen: true,
+    }),
+  );
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
+      onDismissed={() => {
+        const action = pendingAction.current;
+        pendingAction.current = null;
+        // Navigation can freeze the originating tab. Let the modal's
+        // hidden state commit before leaving so its portal cannot trap taps.
+        action?.();
+      }}
       title={title}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? title ?? 'More options'}
     >
       {header}
-      <MenuBlocks sections={sections ?? (items ? [items] : [])} onClose={onClose} testID={testID} />
+      <MenuBlocks sections={menuSections} onClose={onClose} testID={testID} />
     </Sheet>
   );
 }

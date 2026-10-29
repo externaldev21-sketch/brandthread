@@ -32,7 +32,7 @@
  * Web: RN Web's Modal already traps focus and closes on Escape (it calls
  * `onRequestClose`), so both come for free from the Modal wrapper.
  */
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { a11yModalProps } from '@/lib/a11y/modal';
 import {
   ActivityIndicator, Dimensions, Modal, Platform, Pressable, StyleSheet, Text, View,
@@ -86,6 +86,8 @@ export interface SheetProps {
   /** Called on backdrop tap, close button, Escape (web), back (Android), and
    *  after a swipe-dismiss finishes. Set your `visible` false here. */
   onClose: () => void;
+  /** Runs after the modal has committed its hidden state. */
+  onDismissed?: () => void;
   /** Left-aligned title. Omit for a chrome-free sheet (grabber only). */
   title?: string;
   /** Opt-in centered title; existing sheets retain their left-aligned header. */
@@ -179,7 +181,7 @@ export function SheetGrabber() {
 }
 
 export function Sheet({
-  visible, onClose, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
+  visible, onClose, onDismissed, title, centerTitle = false, headerRight, headerLeft, onDone, primaryAction, secondaryAction, footer,
   children, scrollable = true, padded = true, maxHeightRatio = 0.92, avoidKeyboard = true,
   testID, reduceMotion, accessibilityLabel, contentContainerStyle, detents = false, fullHeight: fillHeight = false, surfaceStyle, showGrabber = true,
 }: SheetProps) {
@@ -194,6 +196,15 @@ export function Sheet({
     modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout, scrollOffset, bodyOverflows,
     contentScrollEnabled, footerStyle,
   } = useSheetTransition(visible, onClose, { reduceMotion, detents: detents ? { fullHeight } : undefined });
+  const wasModalVisible = useRef(false);
+  useEffect(() => {
+    if (modalVisible) {
+      wasModalVisible.current = true;
+    } else if (wasModalVisible.current) {
+      wasModalVisible.current = false;
+      onDismissed?.();
+    }
+  }, [modalVisible, onDismissed]);
 
   // Native: the whole sheet is draggable, coordinated with the body's own
   // scroll (the sheet only moves while the body is at its top). Web: the
