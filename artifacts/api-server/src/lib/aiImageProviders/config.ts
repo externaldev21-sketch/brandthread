@@ -34,18 +34,22 @@ const TOOL_ENV_PREFIX: Record<AiTool, string> = {
 const DEFAULT_PROVIDER: ProviderId = "openai";
 const DEFAULT_PIPELINE: PipelineId = "single-stage";
 
+export const PROVIDER_IDS: readonly ProviderId[] = [
+  "openai",
+  "fashn-direct",
+  "fal-fashn",
+  "fal-kling",
+  "fal-nano-banana",
+  "fal-qwen",
+];
+
+export function isProviderId(value: unknown): value is ProviderId {
+  return typeof value === "string" && (PROVIDER_IDS as readonly string[]).includes(value);
+}
+
 function readEnvProvider(name: string): ProviderId | undefined {
   const value = process.env[name];
-  if (!value) return undefined;
-  const valid: ProviderId[] = [
-    "openai",
-    "fashn-direct",
-    "fal-fashn",
-    "fal-kling",
-    "fal-nano-banana",
-    "fal-qwen",
-  ];
-  return (valid as string[]).includes(value) ? (value as ProviderId) : undefined;
+  return isProviderId(value) ? value : undefined;
 }
 
 function readEnvPipeline(name: string): PipelineId | undefined {
