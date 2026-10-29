@@ -66,13 +66,13 @@ export function emailLimitBody(plan: SellerPlanId, cap: number, used: number, re
   };
 }
 
-/** null when the campaign fits this month's allowance, else the 403 body. */
 /** The seller's plan and this month's cap; no paid plan means no marketing email. */
 async function sellerEmailCap(sellerId: string) {
   const { planId: plan, paid } = await getVerifiedPlanAccess(sellerId);
   return { plan, cap: paid ? monthlyEmailCap(plan) : 0 };
 }
 
+/** null when the campaign fits this month's allowance, else the 403 body. */
 export async function checkMonthlyEmailAllowance(sellerId: string, recipients: number, now = new Date()) {
   const { plan, cap } = await sellerEmailCap(sellerId);
   if (cap === null) return null;
