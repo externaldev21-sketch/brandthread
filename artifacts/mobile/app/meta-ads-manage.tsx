@@ -236,6 +236,7 @@ export default function MetaAdsManageScreen() {
             style={{ marginTop: SP.xl }}
           />
         )}
+        {connState !== 'not_configured' && <ScreenExplainer id="explain-meta-ads" />}
       </BrandthreadScreen>
     );
   }

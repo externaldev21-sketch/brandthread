@@ -32,7 +32,7 @@ const SELLER = [
   ['seller-orders', '/orders'],
   ['explain-store-builder', '/store-builder'],
   ['explain-boost', '/boost'],
-  ['explain-meta-ads', '/meta-ads-manage?demo=1'],
+  ['explain-meta-ads', '/meta-ads-manage'],
   ['explain-popup-mode', '/popup-mode'],
   ['explain-payouts', '/payouts'],
   ['explain-plans', '/plans'],
@@ -53,7 +53,7 @@ const BUYER = [
   ['buyer-discover', '/discover'],
   ['explain-thread-cash', '/thread-cash'],
   ['explain-bag', '/cart'],
-  ['explain-checkout', '/buyer-checkout?demo=1'],
+  ['explain-checkout', '/buyer-checkout'],
   ['explain-buyer-orders', '/orders'],
   ['explain-live-feed', '/live-feed'],
   ['explain-buyer-drops', '/buyer-drops'],
@@ -63,7 +63,7 @@ const DISMISS = ['ok', 'close', 'outside'];
 
 const sheetSel = (id) => `[data-testid="first-run-tip-explainer-${id}"]`;
 
-async function waitForSheet(page, id, timeout = 8000) {
+async function waitForSheet(page, id, timeout = 12_000) {
   return page.locator(sheetSel(id)).first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 }
 
@@ -131,6 +131,14 @@ async function main() {
       await page.route(/\/auth\/me(\?|$)/, (r) => r.fulfill({
         json: { ...respond({ method: 'GET', path: '/auth/me', query: {}, role }), ageBand: '18_plus' },
       }));
+      // Checkout renders its real page only when live (build with
+      // EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_demo).
+      await page.route(/\/api\/public\/checkout-config/, (r) => r.fulfill({ json: { live: true } }));
+      // Warm-up: the home screen's own first-run tip shows on the very first
+      // load and the harness's first client-side push can race it. A fresh
+      // user has always seen home before any other screen anyway.
+      await openScreen(page, activity, origin, role, '/');
+      await page.waitForTimeout(3000);
       for (const [i, [id, route]] of list.entries()) {
         // After the gallery's explainer, open a new canvas from it: the
         // canvas has its own explainer for the tools.
