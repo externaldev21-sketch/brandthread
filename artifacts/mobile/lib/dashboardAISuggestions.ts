@@ -35,7 +35,7 @@ function str(v: unknown): string {
 /**
  * In-app routes only: "/(tabs)/products", "/(tabs)/orders" — never "//host" or
  * a URL. A path of a removed screen that older servers still send (e.g.
- * "/inventory") opens its new home (lib/navigation/legacyRoutes) directly.
+ * the old inventory screen) opens its new home (lib/navigation/legacyRoutes) directly.
  */
 export function safeSuggestionRoute(route: unknown): string | undefined {
   const r = str(route);
