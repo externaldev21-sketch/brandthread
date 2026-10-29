@@ -1281,7 +1281,9 @@ export default function BuyerProductDetailScreen() {
     try {
       const row = await api.publicProducts.get(productId);
       if (!row || row.error) return;
-      const next = adaptApiProductToBuyerProduct(row);
+      // Same colour photos as the first load, or every refresh would read as
+      // a change and strip the photo swatches.
+      const next = withColorPhotos(adaptApiProductToBuyerProduct(row), readProductPageDetails(row).colorImages);
       setProduct(prev => {
         if (!prev || prev.id !== next.id) return prev;
         return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
@@ -1565,9 +1567,17 @@ export default function BuyerProductDetailScreen() {
     if (!variant) return;
     // One haptic per add (the Success one below), per the haptics rule.
     setAddingToCart(true);
-    const result = editCartItemId
-      ? await replaceCartItemVariant(editCartItemId, product!, variant, qty)
-      : await addToCart({ product: product!, variant, quantity: qty, attribution });
+    let result: Awaited<ReturnType<typeof addToCart>>;
+    try {
+      result = editCartItemId
+        ? await replaceCartItemVariant(editCartItemId, product!, variant, qty)
+        : await addToCart({ product: product!, variant, quantity: qty, attribution });
+    } catch {
+      // A failed cart read/save must not leave the button spinning forever.
+      setAddingToCart(false);
+      Alert.alert("Couldn't add to bag", 'Try again.');
+      return;
+    }
     setAddingToCart(false);
     if (result.success) {
       // Item 131: the button itself says "In bag ✓" for 2s, then goes back

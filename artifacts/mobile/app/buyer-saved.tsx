@@ -198,6 +198,9 @@ export default function BuyerSaved() {
         Alert.alert('Unavailable', 'This item is no longer available to buy.');
         return;
       }
+      // Several sizes/colours: the buyer picks one on the product page
+      // instead of being sold whichever variant happens to be first in stock.
+      if (product.variants.length > 1) { setActionsFor(null); openItem(item); return; }
       const cart = await getCart();
       await createBuyNowSession(product, variant, 1, cart);
       setActionsFor(null);
@@ -218,6 +221,7 @@ export default function BuyerSaved() {
         Alert.alert('Unavailable', 'This item is no longer available to add to bag.');
         return;
       }
+      if (product.variants.length > 1) { setActionsFor(null); openItem(item); return; }
       const result = await addToCart({ product, variant, quantity: 1 });
       if (result.success) {
         haptic('addToBag');

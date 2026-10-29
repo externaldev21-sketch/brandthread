@@ -94,7 +94,6 @@ export default function BuyerRefundRequestScreen() {
     }
   }
 
-  const [reloadTick, setReloadTick] = useState(0);
   useEffect(() => {
     if (isMissingParam(orderId)) { setLoading(false); return; }
     let active = true;
@@ -211,23 +210,6 @@ export default function BuyerRefundRequestScreen() {
           <Text style={s.successNote}>We'll notify you when there's an update on your order.</Text>
           <PrimaryButton label="Back to order" onPress={() => goBackOr(router)} style={s.doneBtn} />
         </View>
-      </View>
-    );
-  }
-
-  if (!order) {
-    return (
-      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-        <ScreenHeader title="Request a refund" />
-        <EmptyState
-          icon="package"
-          title="Couldn’t load this order"
-          description="Check your connection and try again."
-          action={orderId
-            ? { label: 'Try again', onPress: () => setReloadTick(n => n + 1) }
-            : { label: 'Go back', onPress: () => goBackOr(router) }}
-          secondaryAction={orderId ? { label: 'Go back', onPress: () => goBackOr(router) } : undefined}
-        />
       </View>
     );
   }
