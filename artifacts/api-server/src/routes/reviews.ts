@@ -263,6 +263,13 @@ router.post("/", requireAuth, rateLimit("review"), validateInput({ body: createR
   if (!orderId) {
     return res.status(400).json({ error: "orderId is required" });
   }
+  // Both are uuid columns: a malformed id can't match (and must not reach the query).
+  if (!UUID_RE.test(orderId)) {
+    return res.status(403).json({ error: "Not eligible to review this order" });
+  }
+  if (productId && !UUID_RE.test(productId)) {
+    return res.status(400).json({ error: "Product is not on this order" });
+  }
 
   const bodyCheck = normalizeReviewBody(body);
   if (!bodyCheck.ok) return res.status(400).json({ error: bodyCheck.error });

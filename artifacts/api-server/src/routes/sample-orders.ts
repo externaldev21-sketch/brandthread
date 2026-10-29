@@ -39,9 +39,17 @@ import { acceptUploadSession } from "../lib/uploadSessions";
 import { emailManufacturerOrderPaid, inBackground } from "../lib/manufacturerNotifications";
 import { achEligible, b2bFees, manufacturerNetCents } from "@workspace/manufacturer-flow";
 import { B2bRefundError, refundSampleOrder } from "../lib/b2b/refunds";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
+
+// sample_orders.id is a uuid: a malformed id can't name an order (and must not
+// reach the query, where it would fail as a 500).
+router.param("id", (req, res, next, id) => {
+  if (!isUuid(id)) { res.status(404).json({ error: "Order not found" }); return; }
+  next();
+});
 
 const objectStorage = new ObjectStorageService();
 
@@ -555,10 +563,19 @@ router.patch("/:id/sample-detail", async (req, res) => {
     if (status !== expectedStatus) {
       res.status(400).json({ error: "Invalid seller decision transition." }); return;
     }
-    let details: { review?: unknown; revisions?: unknown[] } = {};
-    try { details = JSON.parse(auth.order!.notes ?? "{}"); } catch { /* retain legacy notes separately */ }
+    // Notes hold the structured detail as JSON. Plain-text notes from an
+    // older order (or JSON that isn't an object) are kept as `legacyNotes`
+    // instead of being overwritten.
+    let details: { review?: unknown; revisions?: unknown[]; legacyNotes?: string } = {};
+    const notes = auth.order!.notes;
+    if (notes) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(notes); } catch { parsed = undefined; }
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) details = parsed as typeof details;
+      else details = { legacyNotes: notes };
+    }
     if (review) details.review = review;
-    if (revision) details.revisions = [...(details.revisions ?? []), revision];
+    if (revision) details.revisions = [...(Array.isArray(details.revisions) ? details.revisions : []), revision];
     const [updated] = await db.update(sampleOrders)
       .set({
         status: expectedStatus,
@@ -690,10 +707,13 @@ router.patch("/:id/advance", async (req, res) => {
 router.patch("/:id/tracking", async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
-    const { trackingNumber, carrier } = req.body;
+    const { trackingNumber, carrier } = req.body ?? {};
 
-    if (!trackingNumber) {
+    if (typeof trackingNumber !== "string" || !trackingNumber.trim()) {
       res.status(400).json({ error: "trackingNumber required" }); return;
+    }
+    if (carrier !== undefined && carrier !== null && typeof carrier !== "string") {
+      res.status(400).json({ error: "carrier must be text" }); return;
     }
 
     const [row] = await db

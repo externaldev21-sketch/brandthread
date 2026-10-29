@@ -19,6 +19,7 @@ import { notifySellerReturnRequested } from "../lib/orderNotifications";
 import { normalizeUploadedImage } from "../lib/productImageResize";
 import { finishListPage, parseListPage } from "../lib/pagination";
 import { acceptUploadSession } from "../lib/uploadSessions";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -90,7 +91,7 @@ router.post(
       return;
     }
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_EVIDENCE_BYTES) {
-      res.status(400).json({ error: "Photos must be no larger than 8 MB." });
+      res.status(400).json({ error: "Photos must be no larger than 20 MB." });
       return;
     }
     if (!hasImageSignature(bytes, contentType)) {
@@ -226,14 +227,19 @@ router.post("/", validateInput({ body: createReturnBody }), async (req, res) => 
     }
     // Only photos this buyer uploaded through POST /evidence can be attached.
     const evidence = (evidenceUrls as string[] | undefined) ?? [];
-    if (evidence.length > MAX_EVIDENCE_PHOTOS || evidence.some((url) => !url.startsWith(evidencePrefix(clerkUserId)))) {
+    // `..` would climb out of the buyer's own prefix after the check.
+    if (evidence.length > MAX_EVIDENCE_PHOTOS
+      || evidence.some((url) => !url.startsWith(evidencePrefix(clerkUserId)) || url.includes(".."))) {
       return res.status(400).json({ error: "Attach up to 5 photos uploaded with this return request" });
     }
     if (requestedItems !== undefined && !Array.isArray(requestedItems)) {
       return res.status(400).json({ error: "requestedItems must be an array" });
     }
 
-    // 2. Look up the order
+    // 2. Look up the order (orders.id is a uuid: anything else can't match)
+    if (!isUuid(orderId)) {
+      return res.status(404).json({ error: "Order not found" });
+    }
     const [order] = await db
       .select({
         id: orders.id,
@@ -264,23 +270,7 @@ router.post("/", validateInput({ body: createReturnBody }), async (req, res) => 
       });
     }
 
-    // 5. Check for existing return request
-    const [existingReturn] = await db
-      .select({ id: returns.id })
-      .from(returns)
-      .where(
-        and(
-          eq(returns.orderId, orderId),
-          // status NOT IN ('denied') — meaning active return exists
-          sql`${returns.status} NOT IN ('denied')`
-        )
-      );
-
-    if (existingReturn) {
-      return res.status(409).json({ error: "A return request already exists for this order" });
-    }
-
-    // 6. The returned items come from the order itself (names, variants and
+    // 5. The returned items come from the order itself (names, variants and
     //    prices the buyer actually paid) — never from client-sent prices.
     const lines = await db
       .select({ id: orderItems.id, productName: orderItems.productName, variantLabel: orderItems.variantLabel, quantity: orderItems.quantity, priceCents: orderItems.priceCents })
@@ -300,25 +290,46 @@ router.post("/", validateInput({ body: createReturnBody }), async (req, res) => 
       unitPriceCents: line.priceCents,
     }));
 
-    // 7. Insert the return
+    // 6. Insert the return — unless an active one exists. The order row is
+    //    locked first so two simultaneous submits can't both pass the check.
     const id = crypto.randomUUID();
-    const [created] = await db
-      .insert(returns)
-      .values({
-        id,
-        orderId,
-        buyerId: clerkUserId,
-        sellerId: order.ownerId,
-        reason,
-        notes: notes ?? null,
-        resolutionRequested: resolutionRequested ?? "refund",
-        status: "pending",
-        evidenceUrls: evidence,
-        requestedItems: items,
-      })
-      .returning();
+    const created = await db.transaction(async (tx) => {
+      await tx.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId)).for("update");
+      const [existingReturn] = await tx
+        .select({ id: returns.id })
+        .from(returns)
+        .where(
+          and(
+            eq(returns.orderId, orderId),
+            // status NOT IN ('denied') — meaning active return exists
+            sql`${returns.status} NOT IN ('denied')`
+          )
+        )
+        .limit(1);
+      if (existingReturn) return null;
+      const [row] = await tx
+        .insert(returns)
+        .values({
+          id,
+          orderId,
+          buyerId: clerkUserId,
+          sellerId: order.ownerId,
+          reason,
+          notes: notes ?? null,
+          resolutionRequested: resolutionRequested ?? "refund",
+          status: "pending",
+          evidenceUrls: evidence,
+          requestedItems: items,
+        })
+        .returning();
+      return row;
+    });
 
-    // 8. Tell both sides: the buyer's confirmation, and the seller's
+    if (!created) {
+      return res.status(409).json({ error: "A return request already exists for this order" });
+    }
+
+    // 7. Tell both sides: the buyer's confirmation, and the seller's
     //    "return requested" row (so a request never sits unseen).
     void notifyReturnStatus(created.id, "pending").catch((err) => {
       req.log.error({ err, returnId: created.id }, "Return request email delivery failed");
@@ -534,7 +545,7 @@ router.patch("/:id/status", validateInput({ params: returnIdParams, body: return
       }
       // A return is refunded once. Approving again only retries a refund
       // that could not be confirmed (same idempotency key → same refund).
-      if (returnRow.status === "refunded") return res.json(returnRow);
+      if (returnRow.status === "refunded") return res.json(await signEvidence(returnRow));
       if (returnRow.status !== "pending" && returnRow.status !== "approved") {
         return res.status(409).json({ error: `This return is already ${returnRow.status}` });
       }
@@ -634,7 +645,7 @@ router.patch("/:id/status", validateInput({ params: returnIdParams, body: return
             req.log.error({ err, returnId: id }, "Return status email delivery failed");
           });
         }
-        return res.json(updated ?? returnRow);
+        return res.json(await signEvidence(updated ?? returnRow));
       }
     } else {
       // status === 'denied'
@@ -656,7 +667,7 @@ router.patch("/:id/status", validateInput({ params: returnIdParams, body: return
       void notifyReturnStatus(id, "denied", null, updated.sellerResponse).catch((err) => {
         req.log.error({ err, returnId: id }, "Return status email delivery failed");
       });
-      return res.json(updated);
+      return res.json(await signEvidence(updated));
     }
   } catch (err: any) {
     const status = err.status ?? 500;

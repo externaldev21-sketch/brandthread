@@ -12,6 +12,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { contactFieldsForViewer, paidManufacturerIdsForSeller, visibleToSellerCondition } from "../lib/manufacturerTrust";
 import { inBackground, notifyManufacturerOfRequest, sellerNameFor } from "../lib/manufacturerNotifications";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -121,7 +122,7 @@ router.post("/quote-requests", async (req, res) => {
     quantity,
     colorways,
     details,
-  } = req.body as {
+  } = (req.body ?? {}) as {
     manufacturerId: string;
     type?: string;
     productName: string;
@@ -139,6 +140,11 @@ router.post("/quote-requests", async (req, res) => {
   }
   if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
     return res.status(400).json({ error: "quantity must be a positive integer" });
+  }
+  if (typeof productType !== "string"
+    || (colorways !== undefined && colorways !== null && typeof colorways !== "string")
+    || (details !== undefined && details !== null && typeof details !== "string")) {
+    return res.status(400).json({ error: "productType, colorways and details must be text" });
   }
 
   // Active and visible to this seller (verified public listing, or one they already work with).
@@ -196,7 +202,7 @@ router.get("/quote-requests/:id", async (req, res) => {
 // manufacturer quote. Status transitions are conditional to prevent races.
 router.patch("/quote-requests/:id", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { status, counteroffer } = req.body as {
+  const { status, counteroffer } = (req.body ?? {}) as {
     status?: string;
     counteroffer?: {
       desiredUnitPriceCents?: number;
@@ -234,7 +240,8 @@ router.patch("/quote-requests/:id", async (req, res) => {
     updatedAt: new Date(),
   };
   if (status === "counteroffer_sent") {
-    if (!counteroffer || !Object.values(counteroffer).some((value) => value !== undefined && value !== "")) {
+    if (!counteroffer || typeof counteroffer !== "object" || Array.isArray(counteroffer)
+      || !Object.values(counteroffer).some((value) => value !== undefined && value !== "")) {
       return res.status(400).json({ error: "Counteroffer terms are required" });
     }
     if (counteroffer.desiredUnitPriceCents !== undefined
@@ -348,7 +355,7 @@ router.post("/rfqs", async (req, res) => {
   const {
     garmentType, category = "", description = "", quantity,
     targetPriceCents, deadline, fileIds = [], manufacturerIds,
-  } = req.body as {
+  } = (req.body ?? {}) as {
     garmentType?: string; category?: string; description?: string; quantity?: number;
     targetPriceCents?: number; deadline?: string; fileIds?: string[]; manufacturerIds?: string[];
   };
@@ -358,6 +365,9 @@ router.post("/rfqs", async (req, res) => {
   }
   if (!Number.isInteger(quantity) || (quantity as number) < 1) {
     return res.status(400).json({ error: "quantity must be a positive integer" });
+  }
+  if (typeof category !== "string" || typeof description !== "string") {
+    return res.status(400).json({ error: "category and description must be text" });
   }
   if (targetPriceCents !== undefined && (!Number.isInteger(targetPriceCents) || targetPriceCents < 0)) {
     return res.status(400).json({ error: "targetPriceCents must be a non-negative integer" });
@@ -431,6 +441,7 @@ router.post("/rfqs", async (req, res) => {
 // RFQ detail with every per-manufacturer quote request, for side-by-side comparison.
 router.get("/rfqs/:id", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Not found" });
   const [rfq] = await db.select().from(sellerRfqs).where(and(
     eq(sellerRfqs.id, req.params.id),
     eq(sellerRfqs.sellerId, sellerId),
@@ -462,7 +473,8 @@ router.get("/rfqs/:id", async (req, res) => {
 // Seller can cancel an open/matched RFQ.
 router.patch("/rfqs/:id", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { status } = req.body as { status?: string };
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Not found" });
+  const { status } = (req.body ?? {}) as { status?: string };
   if (status !== "cancelled" && status !== "closed") {
     return res.status(400).json({ error: "status must be cancelled or closed" });
   }

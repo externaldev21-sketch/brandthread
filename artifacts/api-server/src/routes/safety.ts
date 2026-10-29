@@ -68,7 +68,9 @@ router.post("/muted-words", rateLimit("report"), validateBody(mutedWordBody), as
 
 router.delete("/muted-words/:phrase", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const phrase = normalizeMutedPhrase(decodeURIComponent(String(req.params.phrase)));
+  // The router already percent-decoded the param; decoding again threw on a
+  // literal "%" ("100%") and turned "a%20b" into "a b".
+  const phrase = normalizeMutedPhrase(String(req.params.phrase));
   if (!phrase) return res.status(400).json({ error: "Unknown phrase" });
   await db.delete(mutedWords).where(and(eq(mutedWords.userId, userId), eq(mutedWords.phrase, phrase)));
   return res.json({ ok: true });

@@ -79,7 +79,7 @@ describe("POST /api/returns (buyer return request)", () => {
       type: "return_request_received",
       targetType: "return",
       targetId: created.body.id,
-      body: `Order #${order.orderNumber}. Review the request and approve or decline it.`,
+      body: `Order #${order.orderNumber}. Approve or decline it.`,
     });
     expect(String(sellerRow.title)).toMatch(/requested a return$/);
     expect(published.find((n) => n.userId === buyer)).toMatchObject({ type: "return_requested", targetType: "return" });

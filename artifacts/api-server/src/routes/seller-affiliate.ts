@@ -24,6 +24,7 @@ import { generateUniqueCode, getProgram, syncAllDiscountCodes, syncDiscountCode 
 import { sellerCreatorRows, sellerPayoutRows, sumStats } from "../lib/affiliate/queries";
 import { payoutsConfigured } from "../lib/affiliate/payouts";
 import { getWebOrigin } from "../lib/webOrigin";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -205,6 +206,8 @@ async function mutateCreator(
 ) {
   try {
     const sellerId = store(req);
+    // affiliate_creators.id is a uuid: anything else can't be one of this store's creators.
+    if (!isUuid(req.params.id)) { res.status(404).json({ error: "Creator not found" }); return; }
     const program = await getProgram(sellerId);
     const out = await db.transaction(async (tx) => {
       const [row] = await tx.select().from(affiliateCreators).where(and(
@@ -249,7 +252,9 @@ router.patch("/creators/:id", (req, res) => {
     if (row.status === "removed" || row.status === "declined" || row.status === "invited") {
       return { error: "This creator isn't active in your program" };
     }
-    if (body.status === "active" && row.status === "pending") return { error: "Approve the application first" };
+    // A pending application only becomes active through /approve; pausing it
+    // first and then setting it active would skip approval.
+    if (body.status && row.status === "pending") return { error: "Approve the application first" };
     let override: { set: boolean; bps: number | null } = { set: false, bps: null };
     if (overrideSent) {
       const parsed = parseOverride(body.commissionPercent, row.commissionBpsOverride);
