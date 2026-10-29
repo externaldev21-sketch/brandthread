@@ -84,7 +84,7 @@ async function getStatus() {
   const response = await fetch(`${baseUrl}/api/seller/connect/status`);
   return {
     status: response.status,
-    body: await response.json(),
+    body: (await response.json()) as any,
   };
 }
 
@@ -265,6 +265,72 @@ describe("seller Connect status", () => {
       requirementsDue: ["individual.verification.document"],
       taxInfoStatus: "needed",
       providerConfigured: true,
+    });
+  });
+
+  describe("payoutState (the Payouts screen journey)", () => {
+    it("is not_started when no account exists", async () => {
+      state.user = { stripeAccountId: null, stripeAccountStatus: null };
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("not_started");
+      expect(body.actionItems).toEqual([]);
+    });
+
+    it("is onboarding_incomplete for an unfinished account, never a stale stored 'active'", async () => {
+      state.user = { stripeAccountId: "acct_half", stripeAccountStatus: "active" };
+      state.account = { charges_enabled: false, payouts_enabled: false, details_submitted: false, default_currency: "usd" };
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("onboarding_incomplete");
+    });
+
+    it("is pending_verification while Stripe verifies submitted details", async () => {
+      state.user = { stripeAccountId: "acct_review", stripeAccountStatus: "pending" };
+      state.account = {
+        charges_enabled: false, payouts_enabled: false, details_submitted: true, default_currency: "usd",
+        requirements: { currently_due: [], past_due: [], pending_verification: ["individual.verification.document"], disabled_reason: "requirements.pending_verification" },
+      };
+      state.externalAccounts.push({ id: "ba_1", object: "bank_account", currency: "usd", default_for_currency: true, last4: "6789" });
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("pending_verification");
+      expect(body.actionItems).toEqual([]);
+    });
+
+    it("is action_needed with what Stripe wants and the deadline", async () => {
+      state.user = { stripeAccountId: "acct_due", stripeAccountStatus: "restricted" };
+      state.account = {
+        charges_enabled: false, payouts_enabled: false, details_submitted: true, default_currency: "usd",
+        requirements: { currently_due: ["individual.verification.document"], past_due: ["individual.verification.document"], current_deadline: 1_893_456_000, disabled_reason: "requirements.past_due" },
+      };
+      state.externalAccounts.push({ id: "ba_1", object: "bank_account", currency: "usd", default_for_currency: true, last4: "6789" });
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("action_needed");
+      expect(body.actionItems).toEqual([{ step: "identity", label: "Identity", detail: "Photo ID", pastDue: true }]);
+      expect(body.deadline).toBe(new Date(1_893_456_000 * 1000).toISOString());
+    });
+
+    it("is action_needed when the account has no bank on file", async () => {
+      state.user = { stripeAccountId: "acct_nobank", stripeAccountStatus: "pending" };
+      state.account = { charges_enabled: true, payouts_enabled: true, details_submitted: true, default_currency: "usd" };
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("action_needed");
+      expect(body.actionItems.map((i: any) => i.step)).toEqual(["bank_account"]);
+    });
+
+    it("is active only for a live, fully verified account with a bank", async () => {
+      state.user = { stripeAccountId: "acct_live", stripeAccountStatus: "pending" };
+      state.account = { charges_enabled: true, payouts_enabled: true, details_submitted: true, default_currency: "usd", requirements: { currently_due: [], past_due: [] } };
+      state.externalAccounts.push({ id: "ba_1", object: "bank_account", currency: "usd", default_for_currency: true, last4: "6789" });
+      const { body } = await getStatus();
+      expect(body.payoutState).toBe("active");
+      expect(body.bankLast4).toBe("6789");
+    });
+
+    it("returns an error (no state at all) when Stripe can't be read", async () => {
+      state.user = { stripeAccountId: "acct_err", stripeAccountStatus: "active" };
+      state.retrieveError = new Error("Stripe down");
+      const { status, body } = await getStatus();
+      expect(status).toBe(500);
+      expect(body.payoutState).toBeUndefined();
     });
   });
 

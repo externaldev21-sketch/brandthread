@@ -3415,8 +3415,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         cancel: () => post<{ ok: boolean }>('/api/seller/verification/cancel', {}),
       },
       connect: {
-        /** Initiate Stripe Connect Express onboarding. Returns { url, stripeAccountId }. */
-        onboard: () => post<{ url: string; stripeAccountId: string }>('/api/seller/connect/onboard', {}),
+        /**
+         * Initiate (or resume) Stripe Connect Express onboarding. Returns { url, stripeAccountId }.
+         * returnUrl/refreshUrl must be https on a Brandthread origin (the web app passes its own
+         * /payouts); omitted, Stripe hands the seller back to the app's brandthread://payouts link.
+         */
+        onboard: (body?: { returnUrl?: string; refreshUrl?: string }) =>
+          post<{ url: string; stripeAccountId: string; kind?: 'account_onboarding' | 'login_link' }>('/api/seller/connect/onboard', body ?? {}),
         /** Get current Connect account status. */
         status:  () => get<{
           connected: boolean;
@@ -3439,6 +3444,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
           /** Setup checklist (identity / bank account / tax info). */
           setupState?: 'not_started' | 'in_progress' | 'in_review' | 'complete' | 'restricted';
+          /** The Payouts screen journey (lib/payoutJourney.ts); null when Stripe can't be read. */
+          payoutState?: 'not_started' | 'onboarding_incomplete' | 'pending_verification' | 'action_needed' | 'active' | null;
+          /** What Stripe is asking for, when payoutState is action_needed. */
+          actionItems?: Array<{ step: 'identity' | 'bank_account' | 'tax_info'; label: string; detail: string; pastDue: boolean }>;
           steps?: Array<{
             id: 'identity' | 'bank_account' | 'tax_info';
             label: string;

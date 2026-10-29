@@ -162,6 +162,43 @@ export function deriveSetupState(account: AccountLike | null, steps: ConnectStep
   return active ? "complete" : "in_review";
 }
 
+/**
+ * The Payouts screen's journey state (app/payouts.tsx). Only "active" opens
+ * the manage page, and it is reachable only from a live Stripe account with
+ * charges + payouts enabled and nothing outstanding — there is no default.
+ *
+ * - not_started:          no Connect account yet
+ * - onboarding_incomplete: account exists, the seller left Stripe's form unfinished
+ * - pending_verification:  everything submitted, Stripe is still verifying
+ * - action_needed:         submitted, but Stripe needs more (due / past due /
+ *                          errors / no bank / rejected). `payoutsEnabled` on the
+ *                          same response says whether money still flows meanwhile.
+ * - active:                verified, charges + payouts on, nothing due
+ */
+export type PayoutState =
+  | "not_started"
+  | "onboarding_incomplete"
+  | "pending_verification"
+  | "action_needed"
+  | "active";
+
+export function derivePayoutState(account: AccountLike | null, steps: ConnectStep[]): PayoutState {
+  if (!account) return "not_started";
+  if (account.details_submitted !== true) return "onboarding_incomplete";
+  if (steps.some((s) => s.status === "needed")) return "action_needed";
+  const reason = account.requirements?.disabled_reason;
+  if (typeof reason === "string" && reason && !/pending_verification|under_review/.test(reason)) return "action_needed";
+  if (account.charges_enabled === true && account.payouts_enabled === true) return "active";
+  return "pending_verification";
+}
+
+/** What Stripe still needs, as short seller-facing labels (for the action-needed screen). */
+export function actionItems(steps: ConnectStep[]): Array<{ step: StepId; label: string; detail: string; pastDue: boolean }> {
+  return steps
+    .filter((s) => s.status === "needed")
+    .map((s) => ({ step: s.id, label: s.label, detail: s.detail, pastDue: s.pastDue }));
+}
+
 export function deadlineIso(account: AccountLike | null): string | null {
   const d = account?.requirements?.current_deadline;
   return typeof d === "number" && d > 0 ? new Date(d * 1000).toISOString() : null;
@@ -186,8 +223,9 @@ export function selectHostedLink(account: AccountLike): HostedLinkKind {
 // ── Redirect allow-list ──────────────────────────────────────────────────────
 
 export const APP_SCHEME = "brandthread";
-export const APP_RETURN_DEEP_LINK = `${APP_SCHEME}://payout-setup?returned=1`;
-export const APP_REFRESH_DEEP_LINK = `${APP_SCHEME}://payout-setup?refresh=1`;
+// Payouts is the setup journey (app/payouts.tsx); returning lands there and it re-reads status.
+export const APP_RETURN_DEEP_LINK = `${APP_SCHEME}://payouts?returned=1`;
+export const APP_REFRESH_DEEP_LINK = `${APP_SCHEME}://payouts?refresh=1`;
 
 /** Returns the URL when it is https on an allow-listed origin, else null. */
 export function allowListedRedirect(value: unknown, allowedOrigins: string[]): string | null {

@@ -6,7 +6,7 @@ import { useAgeStatus } from '@/lib/ageGate';
 
 import { AgeRestrictedScreen } from '@/components/age/AgeNotices';
 
-import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 
 import { Icon } from '@/components/ui/Icon';
 
@@ -42,20 +42,29 @@ import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 
 import { buildPreviewPayouts } from '@/lib/previewPayouts';
 
-import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
+import { isManagerRole, hasPayoutsAccess, parseRoleError } from '@/lib/roleError';
 
 import { RoleLockedView } from '@/components/RoleLockedView';
 
-import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
+import { type ConnectStatus, normalizeConnectStatus } from '@/lib/stripeConnectStatus';
+import { resolveSignedOutPreviewGet } from '@/lib/previewApiSession';
+import {
+  PAYOUT_JOURNEY_STATES,
+  fixtureJourneyStatus,
+  normalizePayoutJourney,
+  showsManagePage,
+  type PayoutJourney,
+  type PayoutJourneyState,
+} from '@/lib/payoutJourney';
+import { formatDeadline } from '@/lib/payoutSetupSteps';
+import { PayoutSetupJourney } from '@/components/payouts/PayoutSetupJourney';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
 import { isSellerSetupOrigin, leaveSetupFlow } from '@/lib/setupNavigation';
 
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
-import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
-
-import { goBackOr } from '@/lib/navigation/goBackOr';
+import { scheduleLabel, taxInfoConfig } from '@/lib/payoutSetup';
 
 import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 
@@ -113,6 +122,17 @@ export default function PayoutsScreen() {
   return <PayoutsScreenContent />;
 }
 
+// Stripe sends the in-app browser here when the seller finishes or leaves
+// (api-server lib/connectOnboarding.ts APP_RETURN_DEEP_LINK).
+const PAYOUTS_RETURN_DEEP_LINK = 'brandthread://payouts';
+
+type JourneyLoad =
+  | { kind: 'loading' }
+  | { kind: 'ready'; journey: PayoutJourney }
+  // Connect is owner-only on the server; staff see payouts but cannot run setup.
+  | { kind: 'owner_only' }
+  | { kind: 'error' };
+
 function PayoutsScreenContent() {
   const tabBarMetrics = useTabBarMetrics();
   const { theme } = useAppTheme();
@@ -132,19 +152,26 @@ function PayoutsScreenContent() {
   // state (same convention as the isPreviewMode guard in app/(tabs)/orders.tsx).
   const { currentRole, isLoadingRole, roleError, retryRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
+  // Web dev session only (never a native route param): pin one journey state
+  // so each screen can be reviewed, e.g. &payoutState=action_needed.
+  const forcedState: PayoutJourneyState | null = isPreviewMode && isPreviewDemoMode()
+    && PAYOUT_JOURNEY_STATES.includes(params.payoutState as PayoutJourneyState)
+    ? params.payoutState as PayoutJourneyState
+    : null;
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
   const [loading,   setLoading]   = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [balance,   setBalance]   = useState<any>(null);
   const [payouts,   setPayouts]   = useState<PayoutRecord[]>([]);
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
-  const [connectLoading, setConnectLoading] = useState(true);
+  const [journeyLoad, setJourneyLoad] = useState<JourneyLoad>({ kind: 'loading' });
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const connectRequestRef = useRef(false);
   const onboardingOpenRef = useRef(false);
   const threadCash = useSellerThreadCashBalance();
   const [cashOutVisible, setCashOutVisible] = useState(false);
-  // A new seller's first payout waits for identity verification (server: lib/money/firstPayoutGate.ts).
+  // The first payout of a new seller waits for identity verification (server: lib/money/firstPayoutGate.ts).
   const [identityRequired, setIdentityRequired] = useState(false);
 
   function leaveSetupDestination() {
@@ -157,29 +184,39 @@ function PayoutsScreenContent() {
     leaveSetupFlow(router, params.from, '/(tabs)/more');
   }
 
+  const applyStatus = useCallback((data: unknown) => {
+    const journey = normalizePayoutJourney(data);
+    setConnectStatus(normalizeConnectStatus(data));
+    setJourneyLoad(journey ? { kind: 'ready', journey } : { kind: 'error' });
+    return journey;
+  }, []);
+
   const refreshConnectStatus = useCallback(async () => {
     if (isPreview) {
-      setConnectStatus(null);
-      setConnectLoading(false);
+      // The local preview data layer answers this endpoint (a new seller: not
+      // started), or a pinned state for review. Never the network.
+      const hit = forcedState ? null : resolveSignedOutPreviewGet('/api/seller/connect/status');
+      applyStatus(hit?.data ?? fixtureJourneyStatus(forcedState ?? 'not_started'));
       return;
     }
     if (connectRequestRef.current) return;
     connectRequestRef.current = true;
+    setRefreshingStatus(true);
     try {
       const data = await api.seller.connect.status();
-      const normalized = normalizeConnectStatus(data);
-      setConnectStatus(normalized);
-      await completeSetupTaskWhen(
-        'connect_payments',
-        Boolean(normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled),
-      );
-    } catch {
-      setConnectStatus(null);
+      const normalized = applyStatus(data);
+      // Only a live account with nothing due completes the setup task.
+      await completeSetupTaskWhen('connect_payments', normalized?.state === 'active').catch(() => undefined);
+    } catch (err: any) {
+      const ownerOnly = err?.status === 403 || parseRoleError(err) !== null;
+      // A failed re-check (focus, app resume) keeps the last known answer on screen.
+      setJourneyLoad((prev) => (prev.kind === 'ready' && !ownerOnly ? prev : ownerOnly ? { kind: 'owner_only' } : { kind: 'error' }));
+      if (ownerOnly) setConnectStatus(null);
     } finally {
       connectRequestRef.current = false;
-      setConnectLoading(false);
+      setRefreshingStatus(false);
     }
-  }, [api, isPreview]);
+  }, [api, isPreview, forcedState, applyStatus]);
 
   const load = useCallback(async () => {
     if (isPreview) {
@@ -233,6 +270,7 @@ function PayoutsScreenContent() {
 
   // Load on every focus (first mount included): the balance and history are
   // fresh whenever the seller comes back, the way Thread Cash above refreshes.
+  // Coming back from Stripe (?returned=1) lands here too and re-reads status.
   useFocusEffect(useCallback(() => {
     void load();
   }, [load]));
@@ -253,25 +291,64 @@ function PayoutsScreenContent() {
     return () => subscription.remove();
   }, [refreshConnectStatus]);
 
+  /** Mint a hosted Stripe link. On web, Stripe returns the seller to this page. */
+  const requestOnboardingLink = useCallback(async (onWeb: boolean) => {
+    if (!onWeb) return api.seller.connect.onboard();
+    const here = `${window.location.origin}/payouts`;
+    try {
+      return await api.seller.connect.onboard({ returnUrl: `${here}?returned=1`, refreshUrl: `${here}?refresh=1` });
+    } catch (err: any) {
+      // This web origin is not on the server allow-list: use the default return.
+      if (err?.status === 400) return api.seller.connect.onboard();
+      throw err;
+    }
+  }, [api]);
+
   const openConnectOnboarding = useCallback(async () => {
     if (isPreview) return;
     if (onboardingOpenRef.current) return;
     onboardingOpenRef.current = true;
     setIsConnecting(true);
+    const onWeb = Platform.OS === 'web' && typeof window !== 'undefined';
     try {
-      const data = await api.seller.connect.onboard();
+      const data = await requestOnboardingLink(onWeb);
       if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
         throw new Error('Stripe did not provide a valid onboarding link.');
       }
-      await WebBrowser.openBrowserAsync(data.url);
+      if (onWeb) {
+        // Same tab, like Shopify: Stripe sends the seller back to /payouts?returned=1.
+        window.location.assign(data.url);
+        return;
+      }
+      // The auth session closes itself when Stripe redirects to brandthread://payouts.
+      await WebBrowser.openAuthSessionAsync(data.url, PAYOUTS_RETURN_DEEP_LINK);
       await refreshConnectStatus();
     } catch {
-      Alert.alert('Onboarding unavailable', 'Could not open Stripe onboarding. Try again.');
+      Alert.alert("Couldn't open Stripe", 'Check your connection and try again.');
     } finally {
       onboardingOpenRef.current = false;
       setIsConnecting(false);
     }
-  }, [api, isPreview, refreshConnectStatus]);
+  }, [isPreview, requestOnboardingLink, refreshConnectStatus]);
+
+  /** Every "go to Stripe" button on this screen. Signed out, it says what to do instead. */
+  function startStripe() {
+    if (isPreview) {
+      showToast('Sign in to set up payouts', 'Stripe setup opens from your signed-in store.');
+      return;
+    }
+    haptic('select');
+    void openConnectOnboarding();
+  }
+
+  // Stripe sends an expired or reused link back with ?refresh=1: open a fresh one.
+  const autoResumedRef = useRef(false);
+  useEffect(() => {
+    if (params.refresh !== '1' || autoResumedRef.current || isPreview || journeyLoad.kind !== 'ready') return;
+    if (showsManagePage(journeyLoad.journey) && journeyLoad.journey.state === 'active') return;
+    autoResumedRef.current = true;
+    void openConnectOnboarding();
+  }, [params.refresh, isPreview, journeyLoad, openConnectOnboarding]);
 
 
   // A lost chargeback still being recovered: the balance is shown net of it
@@ -301,7 +378,7 @@ function PayoutsScreenContent() {
   }
 
   // A failed role lookup is not "no access": offer a retry instead of the
-  // owner-only lock, so an owner on a flaky request isn't told they're locked out.
+  // owner-only lock, so an owner on a flaky request is not told they are locked out.
   if (!isPreview && roleError) {
     return (
       <View style={styles.root}>
@@ -322,17 +399,94 @@ function PayoutsScreenContent() {
     );
   }
 
+  const header = (
+    <ScreenHeader
+      title="Payouts"
+      onBack={() => { leaveSetupDestination(); }}
+      actions={[{
+        icon: 'help-circle',
+        onPress: () => { router.push('/help' as never); },
+        accessibilityLabel: 'Payouts help',
+      }]}
+    />
+  );
+
+  // Until Stripe answers, nothing claims payouts are (or are not) set up.
+  const staffWithoutSetup = journeyLoad.kind === 'owner_only' && balance?.connected === false;
+  if (journeyLoad.kind === 'loading' || (journeyLoad.kind === 'owner_only' && loading)) {
+    return (
+      <View style={styles.root}>
+        {header}
+        <View style={{ padding: SP.md, gap: SP.sm }} testID="payouts-status-loading">
+          <LoadingSkeleton height={32} style={{ width: 220 }} />
+          <LoadingSkeleton height={44} />
+          <LoadingSkeleton height={168} />
+        </View>
+      </View>
+    );
+  }
+
+  if (journeyLoad.kind === 'error') {
+    return (
+      <View style={styles.root}>
+        {header}
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't check your payout status with Stripe" onRetry={() => { void refreshConnectStatus(); }} />
+        </View>
+      </View>
+    );
+  }
+
+  const journey = journeyLoad.kind === 'ready' ? journeyLoad.journey : null;
+  if ((journey && journey.state && !showsManagePage(journey)) || staffWithoutSetup) {
+    const view = journey && journey.state && journey.state !== 'active'
+      ? { ...journey, state: journey.state }
+      : { ...normalizePayoutJourney(fixtureJourneyStatus('not_started'))!, state: 'not_started' as const };
+    const waitingCents = !isPreview && !loading && !loadError
+      ? (balance?.available?.amount ?? 0) + (balance?.pending?.amount ?? 0)
+      : null;
+    return (
+      <View style={styles.root}>
+        {header}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: tabBarMetrics.occupiedHeight + SP.md }}
+          showsVerticalScrollIndicator={false}
+          testID="seller-payouts-scroll"
+        >
+          <PayoutSetupJourney
+            journey={view}
+            ownerOnly={isReadOnly || journeyLoad.kind === 'owner_only'}
+            busy={isConnecting}
+            refreshing={refreshingStatus}
+            waitingCents={waitingCents}
+            onRefresh={() => { void refreshConnectStatus(); }}
+            onPrimary={() => {
+              if (view.state === 'action_needed' && view.rejected) { router.push('/help' as never); return; }
+              startStripe();
+            }}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
+  // A null state means the server could not read the Stripe account.
+  if (journey && !journey.state) {
+    return (
+      <View style={styles.root}>
+        {header}
+        <View style={{ padding: SP.md }}>
+          <RetryRow label="Couldn't check your payout status with Stripe" onRetry={() => { void refreshConnectStatus(); }} />
+        </View>
+      </View>
+    );
+  }
+
+  // Active (or live with something due): the manage page.
+  const dueBy = journey?.state === 'action_needed' ? formatDeadline(journey.deadline) : null;
   return (
     <View style={styles.root}>
-      <ScreenHeader
-        title="Payouts"
-        onBack={() => { leaveSetupDestination(); }}
-        actions={[{
-          icon: 'help-circle',
-          onPress: () => { router.push('/help' as never); },
-          accessibilityLabel: 'Payouts help',
-        }]}
-      />
+      {header}
 
       {/* One scroll for the whole page (Shopify payouts): the balance, tabs
           and list move together, so nothing is squeezed above the tab bar. */}
@@ -342,6 +496,26 @@ function PayoutsScreenContent() {
         showsVerticalScrollIndicator={false}
         testID="seller-payouts-scroll"
       >
+      {journey?.state === 'action_needed' && (
+        <TouchableOpacity
+          style={styles.actionBanner}
+          onPress={isReadOnly ? undefined : startStripe}
+          disabled={isReadOnly || isConnecting}
+          accessibilityRole="button"
+          accessibilityLabel="Stripe needs more info. Update it on Stripe."
+          testID="seller-payouts-action-needed"
+        >
+          <Icon name="alert-circle" size={20} color={theme.text} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionBannerTitle}>Stripe needs more info</Text>
+            <Text style={styles.bankSub}>
+              {journey.actionItems.map((i) => i.detail || i.label).join(', ') || 'Update your details on Stripe'}
+              {dueBy ? `. Due by ${dueBy} to keep payouts on.` : '.'}
+            </Text>
+          </View>
+          {!isReadOnly && <Icon name="chevron-right" size={16} color={theme.muted} />}
+        </TouchableOpacity>
+      )}
       <SellerThreadCashCard
         balanceCents={threadCash.balanceCents}
         cashableCents={threadCash.cashableCents}
@@ -400,14 +574,6 @@ function PayoutsScreenContent() {
       </View>
       <HeldForDeliverySection />
 
-      {!isPreview && (
-        <StripeConnectWarning
-          connectStatus={connectStatus}
-          onConnect={openConnectOnboarding}
-          isConnecting={isConnecting}
-        />
-      )}
-
       {/* Tabs */}
       <View style={styles.tabRow}>
         {(['payouts', 'settings'] as const).map((t) => (
@@ -434,17 +600,8 @@ function PayoutsScreenContent() {
             <ErrorState message="Couldn't load your payouts." onRetry={() => { void load(); }} />
           ) : payouts.length === 0 ? (
             <View style={{ alignItems: 'center' }}>
-              <EmptyState
-                icon="inbox"
-                title={!isPreview && balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-                message=""
-                compact
-              />
-              <Text style={styles.payoutsEmptyMessage}>
-                {!isPreview && balance?.connected === false
-                  ? 'Add a bank account under Bank account to start receiving payouts.'
-                  : 'Payouts show up here once your available balance clears.'}
-              </Text>
+              <EmptyState icon="inbox" title="No payouts yet" message="" compact />
+              <Text style={styles.payoutsEmptyMessage}>Payouts show up here once your available balance clears.</Text>
             </View>
           ) : (
             payouts.map((p) => {
@@ -473,53 +630,18 @@ function PayoutsScreenContent() {
              <Icon name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
                 <Text style={styles.bankLabel}>
-                  {isPreview
-                    ? balance?.bankLast4 ? `Bank account ···${balance.bankLast4}` : 'No bank account connected'
-                    : connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'No bank account connected'}
+                  {connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'Bank account'}
                </Text>
                <Text style={styles.bankSub}>
-                  {isPreview
-                    ? balance?.bankLast4 ? 'Default payout account' : 'Connect Stripe to receive payouts'
-                    : connectLoading
-                   ? 'Checking Stripe account status…'
-                   : connectStatus?.verified
-                      ? connectStatus.chargesEnabled
-                        ? 'Default payout account'
-                        : 'Payouts enabled; payments are still restricted'
-                     : connectStatus?.connected
-                       ? 'Complete Stripe verification to receive payouts'
-                       : 'Connect Stripe to receive payouts'}
+                  {connectStatus ? 'Default payout account' : 'Managed by the store owner on Stripe'}
                </Text>
             </View>
-              {!isPreview && !connectLoading && connectStatus && (
+              {connectStatus?.verified && (
                <View style={[styles.statusPill, { borderWidth: 1, borderColor: theme.border }]}>
-                 <Text style={[styles.statusText, {
-                   color: connectStatus.verified ? theme.text : theme.muted,
-                 }]}>
-                   {connectStatus.verified
-                     ? 'Verified'
-                      : connectStatus.status === 'restricted'
-                        ? 'Restricted'
-                     : connectStatus.connected
-                       ? 'Pending verification'
-                       : 'Not connected'}
-                 </Text>
+                 <Text style={[styles.statusText, { color: theme.text }]}>Verified</Text>
                </View>
              )}
           </View>
-
-           {!isPreview && !isReadOnly && !connectLoading && connectStatus?.providerConfigured && !connectStatus.verified && (
-             <TouchableOpacity
-               testID="seller-payouts-setup-checklist"
-               style={[styles.settingsRow, { borderTopWidth: 0, marginBottom: SP.sm }]}
-               onPress={() => { router.push('/payout-setup' as never); }}
-               accessibilityRole="button"
-               accessibilityLabel="Open payout setup checklist"
-             >
-               <Text style={styles.settingsValue}>Payout setup checklist</Text>
-               <Icon name="chevron-right" size={16} color={theme.muted} />
-             </TouchableOpacity>
-           )}
 
            {!isPreview && !isReadOnly && identityRequired && (
              <TouchableOpacity
@@ -537,53 +659,18 @@ function PayoutsScreenContent() {
              </TouchableOpacity>
            )}
 
-           {!isReadOnly && (
+           {!isReadOnly && connectStatus && (
              <TouchableOpacity
                 testID="seller-payouts-bank-account"
                style={styles.addBankBtn}
-                onPress={() => { void openConnectOnboarding(); }}
-               disabled={isConnecting || isPreview}
+                onPress={startStripe}
+               disabled={isConnecting}
                accessibilityRole="button"
-               accessibilityLabel="Add bank account with Stripe"
+               accessibilityLabel="Change bank account on Stripe"
              >
-                <Icon name="plus" size={16} color={theme.accent} />
-                <Text style={styles.addBankText}>
-                  {isPreview
-                    ? 'Bank setup unavailable'
-                    : isConnecting ? 'Opening Stripe…' : connectStatus?.connected ? 'Update bank account' : 'Add bank account'}
-                </Text>
+                <Icon name="edit-2" size={16} color={theme.accent} />
+                <Text style={styles.addBankText}>{isConnecting ? 'Opening Stripe…' : 'Change bank account'}</Text>
              </TouchableOpacity>
-           )}
-
-           {/* Verification status + next steps */}
-            {!isPreview && !connectLoading && connectStatus?.connected && !connectStatus.verified && connectStatus.providerConfigured && (
-             <View style={styles.settingsSection} testID="seller-payouts-verification-next-steps">
-               <Text style={styles.sectionTitle}>Next steps to get verified</Text>
-               {connectStatus.requirementsDue.length === 0 ? (
-                 <Text style={styles.bankSub}>
-                   Stripe is reviewing your account. This usually finishes within a few minutes.
-                 </Text>
-               ) : (
-                 connectStatus.requirementsDue.map((field) => (
-                   <View key={field} style={styles.settingsRow}>
-                     <Text style={styles.settingsLabel}>{requirementLabel(field)}</Text>
-                     <Icon name="alert-circle" size={14} color={theme.warning} />
-                   </View>
-                 ))
-               )}
-               {!isReadOnly && (
-                 <TouchableOpacity
-                   style={[styles.addBankBtn, { marginTop: SP.md }]}
-                   onPress={() => { void openConnectOnboarding(); }}
-                   disabled={isConnecting}
-                   accessibilityRole="button"
-                   accessibilityLabel="Finish Stripe verification"
-                 >
-                   <Icon name="arrow-right-circle" size={16} color={theme.accent} />
-                   <Text style={styles.addBankText}>Finish verification</Text>
-                 </TouchableOpacity>
-               )}
-             </View>
            )}
 
            {/* Payout method + schedule */}
@@ -592,9 +679,7 @@ function PayoutsScreenContent() {
              <View style={styles.settingsRow}>
                <Text style={styles.settingsLabel}>Method</Text>
                <Text style={styles.settingsValue}>
-                  {isPreview
-                    ? balance?.bankLast4 ? `Bank transfer ···${balance.bankLast4}` : 'Not set up'
-                    : connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
+                  {connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Bank transfer'}
                </Text>
              </View>
              <TouchableOpacity
@@ -606,7 +691,7 @@ function PayoutsScreenContent() {
              >
                <Text style={styles.settingsLabel}>Schedule</Text>
                <Text style={styles.settingsValue}>
-                  {isPreview ? 'Not loaded' : connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
+                  {connectStatus?.payoutSchedule ? scheduleLabel(connectStatus.payoutSchedule) : 'Stripe default'}
                </Text>
              </TouchableOpacity>
            </View>
@@ -624,7 +709,7 @@ function PayoutsScreenContent() {
            </TouchableOpacity>
 
            {/* Tax info status */}
-            {!isPreview && connectStatus?.connected && connectStatus.providerConfigured && (() => {
+            {connectStatus?.connected && connectStatus.providerConfigured && (() => {
              const cfg = taxInfoConfig(connectStatus.taxInfoStatus, theme);
              return (
                <View style={styles.settingsSection} testID="seller-payouts-tax-info">
@@ -704,5 +789,7 @@ const createStyles = (theme: AppThemePreset) => {
    feesLinkRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
    feesLinkLabel:{ color: text, fontSize: FS.base, fontFamily: FONT.medium },
    addBankText:  { color: accent, fontSize: FS.sm, fontFamily: FONT.medium },
+  actionBanner: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginHorizontal: SP.md, marginTop: SP.md, paddingVertical: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border },
+  actionBannerTitle: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
   });
 };

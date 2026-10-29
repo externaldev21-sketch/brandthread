@@ -71,8 +71,8 @@ describe('previewApiData', () => {
   });
 
   it('demo seller is coherent: paid orders imply connected payouts and a published store', () => {
-    expect(resolvePreviewApiResponse('/api/seller/connect/status', demo())!.data).toMatchObject({ connected: true, payoutsEnabled: true });
-    expect(resolvePreviewApiResponse('/api/seller/connect/status', fresh())!.data).toMatchObject({ connected: false, status: 'not_started' });
+    expect(resolvePreviewApiResponse('/api/seller/connect/status', demo())!.data).toMatchObject({ connected: true, payoutsEnabled: true, payoutState: 'active' });
+    expect(resolvePreviewApiResponse('/api/seller/connect/status', fresh())!.data).toMatchObject({ connected: false, status: 'not_started', payoutState: 'not_started' });
     expect(resolvePreviewApiResponse('/api/store', demo())!.data).toMatchObject({ status: 'published' });
     expect(resolvePreviewApiResponse('/api/store', fresh())!.data).toMatchObject({ status: 'draft', title: 'My Store' });
   });

@@ -196,12 +196,16 @@ const RESOLVERS: Record<string, Resolver> = {
     ? {
       connected: true, stripeAccountId: null, chargesEnabled: true, payoutsEnabled: true,
       detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242',
-      providerConfigured: true, payoutSchedule: null, requirementsDue: [], taxInfoStatus: 'submitted',
+      providerConfigured: true, payoutSchedule: { interval: 'daily', delayDays: 2, weeklyAnchor: null, monthlyAnchor: null },
+      requirementsDue: [], taxInfoStatus: 'submitted',
+      setupState: 'complete', payoutState: 'active', actionItems: [], deadline: null, disabledReason: null,
     }
     : {
       connected: false, stripeAccountId: null, chargesEnabled: false, payoutsEnabled: false,
       detailsSubmitted: false, status: 'not_started', verified: false, bankLast4: null,
       providerConfigured: false, payoutSchedule: null, requirementsDue: [], taxInfoStatus: 'unknown',
+      // A new seller lands on the Payouts setup stage (app/payouts.tsx).
+      setupState: 'not_started', payoutState: 'not_started', actionItems: [], deadline: null, disabledReason: null,
     }),
   'seller/subscription/status': () => ({
     plan: 'starter', status: 'none', renewsOn: null, trialEnd: null, trialStartAt: null, trialEndAt: null,

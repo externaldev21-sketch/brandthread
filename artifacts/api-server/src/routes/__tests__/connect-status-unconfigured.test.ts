@@ -92,6 +92,7 @@ describe("seller Connect status without a configured Stripe key", () => {
       connected: false,
       status: "not_started",
       providerConfigured: false,
+      payoutState: "not_started",
     });
   });
 
@@ -114,6 +115,8 @@ describe("seller Connect status without a configured Stripe key", () => {
       payoutSchedule: null,
       requirementsDue: [],
       taxInfoStatus: "unknown",
+      // Can't read the account here: no guessed journey state, never "active".
+      payoutState: null,
     });
   });
 });
