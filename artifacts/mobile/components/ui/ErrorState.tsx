@@ -40,7 +40,8 @@ export function ErrorState({
         {message}
       </Text>
       {onRetry && (
-        <Button label={retryLabel} onPress={onRetry} variant="secondary" size="small" style={styles.retryBtn} />
+        // The one empty/error-state action size (tests/empty-state-button-size-lint.test.ts).
+        <Button label={retryLabel} onPress={onRetry} variant="secondary" size="slim" style={styles.retryBtn} />
       )}
     </View>
   );
@@ -49,5 +50,5 @@ export function ErrorState({
 const styles = StyleSheet.create({
   root: { alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.xxl },
   iconCircle: { width: 64, height: 64, borderRadius: 32, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xxs },
-  retryBtn: { marginTop: SPACING.xs, minWidth: 140 },
+  retryBtn: { marginTop: SPACING.xs },
 });

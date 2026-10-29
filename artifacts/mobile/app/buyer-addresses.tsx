@@ -438,6 +438,7 @@ export default function BuyerAddressesScreen() {
                   />
                   <Button
                     label="Try again"
+                    size="slim"
                     accessibilityLabel="Retry loading saved addresses"
                     onPress={() => {
                       setLoading(true);
@@ -453,7 +454,7 @@ export default function BuyerAddressesScreen() {
                     description="Your shipping addresses are saved to your account for faster checkout."
                     compact
                   />
-                  <Button label="Sign in" onPress={() => router.push('/sign-in' as never)} />
+                  <Button label="Sign in" size="slim" onPress={() => router.push('/sign-in' as never)} />
                 </View>
               ) : addresses.length === 0 ? (
                 <EmptyState

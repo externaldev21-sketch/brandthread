@@ -236,7 +236,6 @@ export function BagCheckoutBar({
           loading={busy}
           disabled={disabled}
           fullWidth
-          style={{ minHeight: 56 }}
           accessibilityHint="Reviews shipping and payment"
           testID="cart-go-to-checkout"
         />
@@ -304,7 +303,7 @@ export function BagEmpty({
           <Icon name="shopping-bag" size={52} color={theme.text} />
         </View>
         <Text style={[s.emptyLine, { fontSize: FS.lg, fontFamily: FONT.bold }]}>Your bag is empty</Text>
-        <Button label="Shop Threads" onPress={onShopNow} style={s.shopNow} testID="cart-shop-now" />
+        <Button label="Shop Threads" size="slim" onPress={onShopNow} style={s.shopNow} testID="cart-shop-now" />
       </View>
       {arrivals.length > 0 && (
         <View style={s.arrivals}>
@@ -386,7 +385,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   barButton: { alignSelf: 'stretch' },
 
   emptyLine: { fontFamily: FONT.regular, fontSize: FS.base, color: theme.text, marginTop: SP.md },
-  shopNow: { alignSelf: 'center', marginTop: SP.md, minWidth: 180 },
+  shopNow: { alignSelf: 'center', marginTop: SP.md },
   arrivals: { marginTop: SP.xl },
   arrivalsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
   arrivalsRow: { gap: SP.sm, paddingRight: SP.md },

@@ -160,7 +160,7 @@ export default function CustomerOrdersScreen() {
           <Text style={[s.errorText, { color: colors.mutedForeground }]}>
             Customer not found
           </Text>
-          <Button label="Back to customers" variant="secondary" size="small" style={s.retryBtn} onPress={() => goBackOr(router, '/customers')} />
+          <Button label="Back to customers" variant="secondary" size="slim" style={s.retryBtn} onPress={() => goBackOr(router, '/customers')} />
         </View>
       ) : loading ? (
         <View style={s.center}>
@@ -171,7 +171,7 @@ export default function CustomerOrdersScreen() {
           <Text style={[s.errorText, { color: colors.foreground }]}>
             Couldn't load this customer. Check your connection and try again.
           </Text>
-          <Button label="Retry" variant="secondary" size="small" style={s.retryBtn} onPress={() => { setLoading(true); load(); }} />
+          <Button label="Retry" variant="secondary" size="slim" style={s.retryBtn} onPress={() => { setLoading(true); load(); }} />
         </View>
       ) : (
         <ScrollView

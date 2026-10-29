@@ -247,7 +247,7 @@ export default function StorePreview() {
         <View style={styles.center}>
           <Icon name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
-          <Button label="Try again" variant="secondary" size="small" onPress={load} accessibilityLabel="Try loading the store preview again" />
+          <Button label="Try again" variant="secondary" size="slim" onPress={load} accessibilityLabel="Try loading the store preview again" />
         </View>
       ) : (
         <View

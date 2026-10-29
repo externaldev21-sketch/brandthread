@@ -66,6 +66,7 @@ import type {
 import { CART_FLIGHT_ITEM_SIZE, getCartFlightVector, getSuccessfulCartCount, flightSourceFromRect, measureCartTarget, measureWindowRect, shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource } from '@/lib/cartFlight';
 
 import { crispPx } from '@/lib/crispPixel';
+import { SLIM_BUTTON_METRICS, SLIM_HIT_SLOP } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1135,6 +1136,7 @@ export function ShopProductSheet({
             <Text style={ss.errorText}>{errorMsg || 'Could not load product.'}</Text>
             <TouchableOpacity
               onPress={() => loadProduct(activeTagIdx)}
+              hitSlop={SLIM_HIT_SLOP}
               style={[ss.retryBtn, { borderColor: accent }]}
             >
               <Icon name="refresh-cw" size={14} color={accent} />
@@ -1996,8 +1998,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    ...SLIM_BUTTON_METRICS,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
   },

@@ -574,7 +574,7 @@ export default function BuyerEditProfileScreen() {
           <Icon name="alert-circle" size={28} color={theme.muted} />
           <Text style={[styles.errorTitle, { color: theme.text }]}>Couldn't load your profile</Text>
           <Text style={[styles.errorBody, { color: theme.muted }]}>Try again in a moment.</Text>
-          <Button label="Retry" variant="primary" size="small" onPress={() => { setLoaded(false); loadProfile(); }} />
+          <Button label="Retry" variant="primary" size="slim" onPress={() => { setLoaded(false); loadProfile(); }} />
         </View>
       </View>
     );

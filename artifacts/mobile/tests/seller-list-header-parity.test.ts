@@ -109,7 +109,10 @@ describe('Products empty state has no preview wording', () => {
     const copy = readFileSync(resolve(__dirname, '..', 'lib/sellerLists/emptyCopy.ts'), 'utf8');
     expect(productsSource).toContain('productEmptyCopy(filter, debouncedQuery)');
     expect(productsSource).toContain("actionLabel={copy.action ? 'Add product' : undefined}");
-    expect(productsSource).toContain('actionSize="slim"');
+    // "slim" is now the shared EmptyState's only action size (Button
+    // size="slim"), so Products no longer opts in — and Orders' "Share
+    // store" gets the same button (tests/empty-state-button-size-lint.test.ts).
+    expect(productsSource).not.toContain('actionSize');
     expect(copy).toContain("all: { icon: 'package', title: 'No products yet', action: 'add-product' }");
     expect(copy).toContain("archived: { icon: 'archive', title: 'No archived products' }");
   });

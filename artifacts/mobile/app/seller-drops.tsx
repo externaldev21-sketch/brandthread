@@ -35,6 +35,7 @@ import { isUpcomingDrop } from '@/lib/dropHype';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { previewSellerDrops } from '@/lib/previewSellerDrops';
 import { hapticLight } from '@/lib/haptics';
+import { SLIM_BUTTON_METRICS, SLIM_HIT_SLOP } from '@/components/ui/Button';
 
 type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
 
@@ -149,6 +150,7 @@ export default function SellerDrops() {
             <EmptyState icon="zap" message="No drops yet — create your first one" />
             <TouchableOpacity
               style={[styles.emptyCta, { backgroundColor: theme.accent }]}
+              hitSlop={SLIM_HIT_SLOP}
               onPress={() => router.push('/seller-drop-create' as never)}
             >
               <Icon name="plus" size={16} color={theme.onAccent} />
@@ -202,5 +204,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
   card: { overflow: 'hidden' },
   subRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 11 },
-  emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
+  // Same box as the house empty-state action (Button size="slim").
+  emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, ...SLIM_BUTTON_METRICS, borderRadius: RADIUS.md },
 });

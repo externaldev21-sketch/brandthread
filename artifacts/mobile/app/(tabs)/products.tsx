@@ -967,7 +967,6 @@ export default function ProductsScreen() {
           icon={copy.icon}
           title={copy.title}
           actionLabel={copy.action ? 'Add product' : undefined}
-          actionSize="slim"
           onAction={copy.action ? () => router.push('/add-product?from=products' as never) : undefined}
           testID="products-empty"
         />

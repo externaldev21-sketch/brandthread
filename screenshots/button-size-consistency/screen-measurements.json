@@ -1,0 +1,35 @@
+{
+  "buyer-bag-empty": {
+    "text": "Shop Threads",
+    "width": 120,
+    "height": 36,
+    "paddingLeft": "16px",
+    "paddingRight": "16px",
+    "borderRadius": "12px",
+    "fontSize": "13px",
+    "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "fontWeight": "600"
+  },
+  "seller-quick-replies": {
+    "text": "New quick reply",
+    "width": 133,
+    "height": 36,
+    "paddingLeft": "16px",
+    "paddingRight": "16px",
+    "borderRadius": "12px",
+    "fontSize": "13px",
+    "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "fontWeight": "600"
+  },
+  "seller-discounts": {
+    "text": "Create discount",
+    "width": 134,
+    "height": 36,
+    "paddingLeft": "16px",
+    "paddingRight": "16px",
+    "borderRadius": "12px",
+    "fontSize": "13px",
+    "fontFamily": "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "fontWeight": "600"
+  }
+}

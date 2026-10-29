@@ -524,7 +524,7 @@ function EditProfileScreen() {
           <Icon name="alert-circle" size={28} color={theme.muted} />
           <Text style={styles.errorTitle}>Couldn't load your profile</Text>
           <Text style={styles.errorBody}>Check your connection and try again.</Text>
-          <Button label="Retry" variant="primary" size="small" style={styles.retryBtn} onPress={loadProfile} />
+          <Button label="Retry" variant="primary" size="slim" style={styles.retryBtn} onPress={loadProfile} />
         </View>
       ) : !profileLoaded ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, gap: 20 }}>

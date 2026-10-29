@@ -54,6 +54,7 @@ import { useFocusedAnimationLoop } from '@/lib/useFocusedAnimationLoop';
 import { minHitSlop } from '@/lib/hitSlop';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
 
 import { DISABLED_OPACITY } from '@/constants/states';
 
@@ -868,9 +869,9 @@ interface EmptyStateProps {
   /** Diameter of the shared badge (default 64 — the one badge size every
    *  empty state in the app uses). */
   circleSize?: number;
-  /** 'fill' (default): the full-width PrimaryButton. 'pill': a slim white
-   *  pill sized to its own text (36px tall, equal 16px side padding) — Dev's
-   *  spec for the lighter empty states (Content Analytics' "Create post"). */
+  /** 'fill' (default): the accent-filled action. 'pill': a white pill (Dev's
+   *  spec for the lighter empty states, Content Analytics' "Create post").
+   *  Both are Button size="slim" — 36pt, 16px sides, sized to the label. */
   actionVariant?: 'fill' | 'pill';
   testID?: string;
 }
@@ -894,24 +895,20 @@ export function EmptyState({
       {!!description && (
         <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
       )}
-      {action && actionVariant === 'pill' && (
-        <PressableScale
-          onPress={() => { action.onPress(); }}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          style={[esS.pill, { backgroundColor: theme.text }]}
-          noMinHeight
-          testID={testID ? `${testID}-action` : undefined}
-        >
-          {action.icon && <Icon name={action.icon} size={ICON.sm} color={theme.background} />}
-          <Text style={[esS.pillLabel, { color: theme.background }]} numberOfLines={1}>{action.label}</Text>
-        </PressableScale>
-      )}
-      {action && actionVariant === 'fill' && (
-        <View style={esS.actions}>
-          <PrimaryButton label={action.label} onPress={action.onPress} icon={action.icon} style={esS.btn} />
-          {secondaryAction && (
-            <SecondaryButton label={secondaryAction.label} onPress={secondaryAction.onPress} style={esS.btn} />
+      {/* Both looks use the one empty-state action size (Button 'slim' —
+          the seller Products "Add product" button); see
+          tests/empty-state-button-size-lint.test.ts. */}
+      {action && (
+        <View style={actionVariant === 'fill' ? esS.actions : undefined}>
+          <Button
+            label={action.label}
+            onPress={action.onPress}
+            size="slim"
+            colors={actionVariant === 'pill' ? { background: theme.text, foreground: theme.background } : undefined}
+            testID={testID ? `${testID}-action` : undefined}
+          />
+          {actionVariant === 'fill' && secondaryAction && (
+            <Button label={secondaryAction.label} onPress={secondaryAction.onPress} variant="secondary" size="slim" />
           )}
         </View>
       )}
@@ -925,12 +922,7 @@ const esS = StyleSheet.create({
   illustration: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
   desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
-  actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },
-  btn:     { width: '100%' },
-  // Slim, fit-to-text pill: 36px tall, equal 16px side padding, black text
-  // on the theme's white (see actionVariant 'pill').
-  pill:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, paddingHorizontal: SP.md, borderRadius: ControlRadius.md, alignSelf: 'center' },
-  pillLabel: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  actions: { alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
 });
 
 export function BrandedLoader({ label = 'Stitching things together…', style }: {
