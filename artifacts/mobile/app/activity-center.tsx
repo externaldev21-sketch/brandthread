@@ -335,6 +335,7 @@ export const ActivityRowView = React.memo(function ActivityRowView({
       label: 'Delete',
       icon: 'trash-2',
       tone: 'destructive',
+      removes: true,
       accessibilityLabel: 'Delete this notification',
       onPress: () => onDismiss(row),
     },

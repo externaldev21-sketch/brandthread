@@ -752,7 +752,7 @@ export default function CartScreen() {
                     disabled={editMode || !!pendingByItemId[item.id]}
                     trailing={[
                       { key: 'save', label: 'Save', icon: 'bookmark', tone: 'muted', onPress: () => handleMoveToSaves(item.id), accessibilityLabel: `Move ${item.productName} to saves` },
-                      { key: 'remove', label: 'Remove', icon: 'trash-2', tone: 'destructive', onPress: () => handleSwipeRemove(item.id), accessibilityLabel: `Remove ${item.productName} from bag` },
+                      { key: 'remove', label: 'Remove', icon: 'trash-2', tone: 'destructive', removes: true, onPress: () => handleSwipeRemove(item.id), accessibilityLabel: `Remove ${item.productName} from bag` },
                     ]}
                   >
                   <BagItemRow

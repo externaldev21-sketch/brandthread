@@ -538,6 +538,7 @@ export default function BuyerNotifications() {
           label: 'Clear',
           icon: 'trash-2',
           tone: 'destructive',
+          removes: true,
           onPress: async () => {
             setNotifs(prev => prev.filter(n => n.id !== notif.id));
             if (isBuyerDevPreview()) return;
