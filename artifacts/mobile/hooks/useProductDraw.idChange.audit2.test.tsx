@@ -24,7 +24,7 @@ function Probe({ id }: { id: string }) { latest = useProductDraw(id); return nul
 
 const drawFor = (id: string) => ({
   serverNow: new Date().toISOString(),
-  draw: { id: `draw-${id}`, productId: id, status: 'closed', opensAt: '2020-01-01T00:00:00Z', closesAt: '2020-01-02T00:00:00Z' },
+  draw: { productId: id, seedHash: `seed-${id}`, drawnAt: null, status: 'closed', opensAt: '2020-01-01T00:00:00Z', closesAt: '2020-01-02T00:00:00Z' },
 });
 
 describe('useProductDraw — product change', () => {
@@ -35,9 +35,9 @@ describe('useProductDraw — product change', () => {
     let r!: ReactTestRenderer;
     await act(async () => { r = create(<Probe id="p1" />); });
     await act(async () => { r.update(<Probe id="p2" />); });
-    expect(latest?.draw?.id).toBe('draw-p2');
+    expect(latest?.draw?.productId).toBe('p2');
     await act(async () => { resolveOld(drawFor('p1')); });
-    expect(latest?.draw?.id).toBe('draw-p2');
+    expect(latest?.draw?.productId).toBe('p2');
     r.unmount();
   });
 
@@ -45,7 +45,7 @@ describe('useProductDraw — product change', () => {
     state.mockImplementationOnce(async () => drawFor('p1'));
     let r!: ReactTestRenderer;
     await act(async () => { r = create(<Probe id="p1" />); });
-    expect(latest?.draw?.id).toBe('draw-p1');
+    expect(latest?.draw?.productId).toBe('p1');
     let rejectNew!: (e: unknown) => void;
     state.mockImplementationOnce(() => new Promise((_, rej) => { rejectNew = rej; }));
     await act(async () => { r.update(<Probe id="p2" />); });
