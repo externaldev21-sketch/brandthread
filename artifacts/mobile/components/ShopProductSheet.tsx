@@ -30,6 +30,7 @@ import { Feather } from '@expo/vector-icons';
 
 
 import { useRouter } from 'expo-router';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
 
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 
@@ -358,6 +359,7 @@ export function ShopProductSheet({
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const router = useRouter();
+  const shopperRoutes = useShopperRoutes();
   const { requireSignIn } = useSignInGate();
   const { push } = useThreadPull();
 
@@ -926,7 +928,7 @@ export function ShopProductSheet({
   }
 
   function handleViewCart() {
-    navigateAndDismiss(() => router.push('/(buyer)/cart' as never));
+    navigateAndDismiss(() => router.push(shopperRoutes.bag as never));
   }
 
   const accent = theme.accent;

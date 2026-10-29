@@ -170,11 +170,12 @@ const MENU_EXCLUDED_IDS = [
   // normal entry point elsewhere.
   'taxes', 'content', 'finance',
 ];
-// Dev: "Make the create post one the first one" — the menu opens on
-// whichever card is CARD_ORDER[0], so post-video (label "Create post")
-// leads. The rest keeps its prior most-used-first order.
+// Dev: "instead of the first slide being Create post, the first slide can
+// be Watch Threads" — the menu opens on whichever card is CARD_ORDER[0], so
+// watch-threads leads and post-video (label "Create post") is the very next
+// slide. The rest keeps its prior most-used-first order.
 const CARD_ORDER = [
-  'post-video', 'add-product', 'go-live', 'analytics',
+  'watch-threads', 'post-video', 'add-product', 'go-live', 'analytics',
   // '/seller-activity' doesn't exist yet (see lib/sellerActivityRoute.ts) —
   // this only resolves to a real item once that flag flips, at which point
   // CARD_ITEMS below naturally picks it up right after Analytics.

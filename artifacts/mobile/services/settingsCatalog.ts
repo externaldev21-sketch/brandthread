@@ -230,6 +230,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Account',
     items: [
+      { label: 'Your purchases', description: 'Orders you bought while watching Threads', aliases: ['orders', 'purchases', 'bought', 'my orders', 'returns'], icon: 'package', route: '/purchases', audience: 'seller' },
       { label: 'Login methods', description: 'Password, connected accounts, and two-factor authentication', aliases: ['password', '2fa', 'two factor'], icon: 'key', route: '/login-methods', audience: 'seller' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/login-activity', audience: 'seller' },
       { label: 'AI assistant', description: 'Assistant, data sources, and confirmations', aliases: ['ai', 'assistant', 'copilot'], icon: 'zap', route: '/ai-settings', audience: 'seller' },

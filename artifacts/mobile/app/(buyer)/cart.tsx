@@ -27,6 +27,8 @@ import { Icon } from '@/components/ui/Icon';
 import { ProductPhoto } from '@/components/media/ProductPhoto';
 import { productPhotoHeight } from '@/constants/media';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
+import { keepShopping } from '@/lib/navigation/shopperRoutes';
 import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { applyCartQuantity } from '@/lib/cartOptimistic';
@@ -193,6 +195,7 @@ export default function CartScreen() {
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
+  const shopperRoutes = useShopperRoutes();
   const { push } = useThreadPull();
   const api = useApi();
   const { isSignedIn, userId: cartOwnerId } = useAuth();
@@ -782,8 +785,8 @@ export default function CartScreen() {
             ) : (
               <BagEmpty
                 loadArrivals={loadNewArrivals}
-                onShopNow={() => router.navigate('/(buyer)' as never)}
-                onViewAll={() => router.navigate('/(buyer)/discover' as never)}
+                onShopNow={() => (shopperRoutes.isSeller ? keepShopping(router, shopperRoutes) : router.navigate('/(buyer)' as never))}
+                onViewAll={() => (shopperRoutes.isSeller ? keepShopping(router, shopperRoutes) : router.navigate('/(buyer)/discover' as never))}
                 onOpenProduct={(productId) => push({ pathname: '/thread-product-detail' as any, params: { productId, src: 'cart' } } as never)}
               />
             )}

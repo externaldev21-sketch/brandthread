@@ -62,19 +62,21 @@ describe('Seller Studio sheet: menu consolidation — only destinations with no 
     expect(studio).toContain('const MENU_EXCLUDED_IDS = [');
   });
 
-  it('keeps the Dev-named-no-matter-what items plus everything with no other entry point, with Create post (post-video) leading', () => {
+  it('keeps the Dev-named-no-matter-what items plus everything with no other entry point, with Watch Threads first and Create post (post-video) next', () => {
     const kept = [
-      'post-video', 'add-product', 'go-live', 'analytics', 'payouts', 'customers', 'community',
+      'watch-threads', 'post-video', 'add-product', 'go-live', 'analytics', 'payouts', 'customers', 'community',
       'manufacturer', 'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
     ];
     kept.forEach((id) => {
       expect(studio, `${id} should be in CARD_ORDER`).toContain(`'${id}'`);
     });
     expect(studio).toContain('const CARD_ORDER = [');
-    // "Make the create post one the first one" — the menu opens on
-    // CARD_ORDER[0], so post-video must lead the list, not just appear in it.
+    // "instead of the first slide being Create post, the first slide can be
+    // Watch Threads" — the menu opens on CARD_ORDER[0]; Create post is the
+    // very next slide, not removed.
     const orderBlock = studio.slice(studio.indexOf('const CARD_ORDER = ['), studio.indexOf('];', studio.indexOf('const CARD_ORDER = [')));
-    expect(orderBlock.indexOf("'post-video'")).toBeLessThan(orderBlock.indexOf("'add-product'"));
+    const ids = Array.from(orderBlock.matchAll(/'([a-z0-9-]+)'/g), (m) => m[1]);
+    expect(ids.slice(0, 3)).toEqual(['watch-threads', 'post-video', 'add-product']);
   });
 
   it('warns in dev if an item is ever left out of both lists (never silently unreachable)', () => {

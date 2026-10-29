@@ -23,6 +23,8 @@ import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
+import { keepShopping } from '@/lib/navigation/shopperRoutes';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -179,6 +181,7 @@ export function OrderConfirmation({
 }) {
   const { theme } = useAppTheme();
   const router = useRouter();
+  const shopperRoutes = useShopperRoutes();
   const api = useApi();
   const { userId, isSignedIn } = useAuth();
   const t = useCheckoutT();
@@ -418,7 +421,7 @@ export function OrderConfirmation({
         <LinkRow
           icon="compass"
           label={t('Continue shopping')}
-          onPress={() => router.replace('/(buyer)/discover' as never)}
+          onPress={() => keepShopping(router, shopperRoutes)}
           testID="checkout-continue-shopping"
         />
       </View>

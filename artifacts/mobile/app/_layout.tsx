@@ -474,6 +474,11 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'live-feed',
   // Full-screen live replay player.
   'live-replay',
+  // Watch Threads — the full-bleed buyer Threads feed a seller opens from
+  // the Studio menu, with its own Back control in the feed's top row.
+  'watch-threads',
+  // That seller's Bag (app/bag.tsx) — its own pinned checkout bar.
+  'bag',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -1787,6 +1792,7 @@ const AppStack = React.memo(function AppStack() {
         {/* Analytics screens */}
         <Stack.Screen name="analytics-reports"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
+        <Stack.Screen name="watch-threads"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="draw-entry" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="draw-result" options={{ headerShown: false, presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />

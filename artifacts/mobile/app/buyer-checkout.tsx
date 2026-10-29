@@ -57,6 +57,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useShopperRoutes } from '@/hooks/useShopperRoutes';
+import { keepShopping } from '@/lib/navigation/shopperRoutes';
 import { currentCheckoutReturnUrls, hostedCheckoutVerdict } from '@/lib/checkoutReturn';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -184,15 +186,16 @@ export default function BuyerCheckoutScreen() {
   const styles = useMemo(() => makeStyles(ck), [ck]);
   const { source, wallet } = useLocalSearchParams<{ source?: string; wallet?: string }>();
   const router = useRouter();
+  const shopperRoutes = useShopperRoutes();
   const pathname = usePathname();
   const { back } = useThreadPull();
   // thread-checkout.tsx is a redirect alias — use ThreadPull transition if coming from there
   const usesThreadPull = pathname === '/thread-checkout';
   const leaveCheckout = () => (usesThreadPull ? back() : goBackOr(router));
   const closeConfirmation = () => {
-    if (source !== 'buynow') { router.replace('/(buyer)/discover' as never); return; }
+    if (source !== 'buynow') { keepShopping(router, shopperRoutes); return; }
     if (usesThreadPull) back();
-    else goBackOr(router, '/(buyer)/discover' as never);
+    else goBackOr(router, shopperRoutes.shopping as never);
   };
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -1269,8 +1272,8 @@ export default function BuyerCheckoutScreen() {
       <View style={styles.root}>
         {header('Checkout', leaveCheckout, 'Close checkout')}
         <CheckoutNotLive
-          onBackToBag={() => router.replace('/(buyer)/cart' as never)}
-          onKeepShopping={() => router.replace('/(buyer)/discover' as never)}
+          onBackToBag={() => router.replace(shopperRoutes.bag as never)}
+          onKeepShopping={() => keepShopping(router, shopperRoutes)}
         />
       </View>
     );

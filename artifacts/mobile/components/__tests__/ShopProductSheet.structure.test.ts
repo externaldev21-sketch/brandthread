@@ -59,7 +59,7 @@ describe('Thread shop drawer purchase actions', () => {
     expect(sheetSource).toContain("setShowAddedConfirmation(true)");
     expect(sheetSource).toContain('<Text style={[ss.addedToastText, { color: theme.onAccent }]}>Added to bag</Text>');
     expect(sheetSource).toContain("phase === 'added' ? 'View bag' : 'Add to bag'");
-    expect(sheetSource).toContain("router.push('/(buyer)/cart'");
+    expect(sheetSource).toContain('router.push(shopperRoutes.bag as never)');
     expect(sheetSource).not.toContain('setFlyingToCart(false);\\n      dismissSheet(onClose)');
   });
 });
