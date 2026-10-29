@@ -19,10 +19,12 @@ export type PlanPerkConfig = {
   advancedAnalytics: boolean;
 };
 
+// advancedAnalytics follows planCatalogue.ts (features.analytics), the one
+// place the tier is set: Growth and Pro include it.
 export const PLAN_PERKS: Record<SellerPlanId, PlanPerkConfig> = {
-  starter: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: false },
-  growth: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: false },
-  pro: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: true },
+  starter: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: planIncludes("starter", "advanced_analytics") },
+  growth: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: planIncludes("growth", "advanced_analytics") },
+  pro: { platformFeeBps: PLATFORM_FEE_BPS, advancedAnalytics: planIncludes("pro", "advanced_analytics") },
 };
 
 /** Rate used whenever the plan is unknown or cannot be looked up. */
