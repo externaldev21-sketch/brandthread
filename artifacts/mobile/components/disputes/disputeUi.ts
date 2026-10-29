@@ -46,16 +46,24 @@ export function isFinalStatus(status: string): boolean {
   return status === 'won' || status === 'lost' || status === 'closed';
 }
 
-/** Whole days until the deadline; negative once past. */
+/**
+ * Local calendar days until the deadline (0 = due later today, 1 = due
+ * tomorrow); negative once the deadline's day has passed.
+ */
 export function daysLeft(iso: string | null | undefined, now = Date.now()): number | null {
   if (!iso) return null;
-  return Math.ceil((new Date(iso).getTime() - now) / 86_400_000);
+  const due = new Date(iso);
+  const today = new Date(now);
+  const dueDay = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
+  const nowDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((dueDay - nowDay) / 86_400_000);
 }
 
 export function dueChipLabel(iso: string | null | undefined, now = Date.now()): string | null {
   const d = daysLeft(iso, now);
   if (d === null) return null;
-  if (d < 0) return 'Past due';
+  // Earlier today counts as 0 calendar days: still past due, not "today".
+  if (new Date(iso!).getTime() < now) return 'Past due';
   if (d === 0) return 'Due today';
   if (d === 1) return 'Due in 1 day';
   return `Due in ${d} days`;

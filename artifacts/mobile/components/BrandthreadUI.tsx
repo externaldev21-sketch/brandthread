@@ -90,7 +90,12 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
   const undo = useCallback(async () => {
     if (!action || undoing) return;
     setUndoing(true);
-    try { await action.undo(); setAction(null); } finally { setUndoing(false); }
+    try {
+      await action.undo();
+      // Only clear the toast this undo belonged to — a newer one shown while
+      // the undo was in flight must stay up.
+      setAction((current) => (current === action ? null : current));
+    } finally { setUndoing(false); }
   }, [action, undoing]);
   return (
     <UndoToastContext.Provider value={{ showUndo, dismissUndo }}>

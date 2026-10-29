@@ -28,6 +28,8 @@ const FRESH_MS = 60_000;
 
 const memo = new Map<string, { at: number; value: AccountSettingsResponse }>();
 const inflight = new Map<string, Promise<AccountSettingsResponse>>();
+/** Bumped by every PATCH, so a GET that started before it can't overwrite the newer memo. */
+const writeGen = new Map<string, number>();
 
 function normalize(raw: unknown): AccountSettingsResponse {
   const obj = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
@@ -46,6 +48,7 @@ export async function fetchAccountSettings(opts: { force?: boolean } = {}): Prom
   if (!canSyncAccountServer(uid)) throw notAvailable();
   const cached = memo.get(uid);
   if (!opts.force && cached && Date.now() - cached.at < FRESH_MS) return cached.value;
+  const gen = writeGen.get(uid) ?? 0;
   let p = inflight.get(uid);
   if (!p) {
     p = serviceRequest<unknown>(PATH, {}, false).then(normalize);
@@ -53,7 +56,13 @@ export async function fetchAccountSettings(opts: { force?: boolean } = {}): Prom
   }
   try {
     const value = await p;
-    memo.set(uid, { at: Date.now(), value });
+    if ((writeGen.get(uid) ?? 0) !== gen) {
+      // A PATCH landed while this GET was in flight: its response is newer.
+      const newer = memo.get(uid);
+      if (newer) return newer.value;
+    } else {
+      memo.set(uid, { at: Date.now(), value });
+    }
     return value;
   } finally {
     if (inflight.get(uid) === p) inflight.delete(uid);
@@ -67,6 +76,9 @@ export async function patchAccountSettings(patch: AccountSettings): Promise<Acco
   const value = normalize(await serviceRequest<unknown>(PATH, {
     method: 'PATCH', body: JSON.stringify(patch),
   }, false));
+  writeGen.set(uid, (writeGen.get(uid) ?? 0) + 1);
+  // A GET already in flight predates this write; later readers start fresh.
+  inflight.delete(uid);
   memo.set(uid, { at: Date.now(), value });
   return value;
 }
@@ -89,4 +101,5 @@ export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 export function __resetAccountSettingsForTests(): void {
   memo.clear();
   inflight.clear();
+  writeGen.clear();
 }

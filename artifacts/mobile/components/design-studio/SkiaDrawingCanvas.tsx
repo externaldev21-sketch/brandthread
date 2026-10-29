@@ -138,7 +138,9 @@ function SkiaDrawingCanvasInner({
     })
     .onEnd(() => {
       runOnJS(commitStroke)();
-    }), [disabled, brushKind, color, size, opacity, streamline]);
+    // Every value commitStroke / the live-point callbacks read: a stale
+    // `tool` here saved an eraser stroke as a coloured brush stroke.
+    }), [disabled, brushKind, color, size, opacity, streamline, tool, pressureCurve, onStrokeEnd, onLivePoint]);
 
   const liveSkPath = useMemo(() => pointsToSkiaPath(livePoints), [livePoints]);
 

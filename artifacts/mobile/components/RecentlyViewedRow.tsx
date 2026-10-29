@@ -38,19 +38,23 @@ export function RecentlyViewedRow({ style, excludeProductId }: { style?: object;
   const router = useRouter();
   const { theme } = useAppTheme();
   const api = useApi();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const [items, setItems] = useState<RecentlyViewedItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Keyed on the account: signing out (or switching accounts) must never keep
+  // showing the previous buyer's history while this row stays mounted.
   useEffect(() => {
+    setItems([]);
     if (!isSignedIn) { setLoaded(true); return; }
+    setLoaded(false);
     let cancelled = false;
     api.buyer.recentlyViewed.list(12)
       .then((rows) => { if (!cancelled) setItems(rows); })
       .catch(() => { if (!cancelled) setItems([]); })
       .finally(() => { if (!cancelled) setLoaded(true); });
     return () => { cancelled = true; };
-  }, [api, isSignedIn]);
+  }, [api, isSignedIn, userId]);
 
   // No skeleton/empty-state here by design — a "Recently viewed" section
   // simply isn't shown until there's real history, same as the pattern used

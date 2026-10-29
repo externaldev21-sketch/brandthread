@@ -13,7 +13,7 @@
  *   validatePlacementStage → formats + budget + duration (deprecated)
  *
  * Additional tests:
- *   - Reach estimate formula (shared with server)
+ *   - totalBudgetCents (daily budget × days; reach itself is in adReach.test.ts)
  *   - Video vs photos mutual exclusivity
  *   - CTA allowlist + product-destination requirement
  *   - Aspect-ratio accuracy of AD_FORMAT_OPTIONS

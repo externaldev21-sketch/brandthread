@@ -5,11 +5,11 @@ import Svg, { Circle } from 'react-native-svg';
 /**
  * Spinning progress ring shown over media while it uploads.
  *
- * `uploadMedia()` sends the file as a single base64 POST with no byte-level
- * progress callback, so this ring is intentionally indeterminate (a
- * continuously spinning partial arc) rather than a true 0-100% fill — it
- * communicates "working" without fabricating a progress number the app
- * doesn't have.
+ * Two modes: with a numeric `progress` (an upload that reports real bytes,
+ * e.g. uploadMediaFile's onProgress) it draws a filling 0–100% arc with no
+ * spin; without one (a single base64 POST with no byte-level progress) it is
+ * indeterminate — a continuously spinning partial arc — so it communicates
+ * "working" without fabricating a progress number the app doesn't have.
  *
  * The rotation lives entirely on the wrapping `Animated.View`'s `transform`
  * — the arc `Circle` itself has no animated prop (its dasharray is a fixed

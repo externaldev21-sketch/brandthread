@@ -142,7 +142,7 @@ export function BrandsToFollowStep({ onLikedChange, onNoBrands }: {
           hitSlop={8}
         >
           <Text style={[styles.followAllText, { color: theme.text }]}>
-            Follow all{followedCount > 0 ? ` (${followedCount}/${brands.length})` : ''}
+            Follow all{followedCount > 0 ? ` (${followedCount}/${totalBrands})` : ''}
           </Text>
         </Pressable>
       )}
@@ -176,7 +176,7 @@ export function BrandsToFollowStep({ onLikedChange, onNoBrands }: {
                 {brand.verified && <VerifiedBadge />}
               </View>
               <Text numberOfLines={1} style={styles.handle}>
-                {brand.handle ? `@${brand.handle} · ` : ''}{brand.productCount ?? 0} listings
+                {brand.handle ? `@${brand.handle} · ` : ''}{brand.productCount ?? 0} {(brand.productCount ?? 0) === 1 ? 'listing' : 'listings'}
               </Text>
             </View>
             <View style={[styles.select, isFollowing && { backgroundColor: theme.text, borderColor: theme.text }]}>

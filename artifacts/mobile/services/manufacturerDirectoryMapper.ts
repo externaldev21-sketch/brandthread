@@ -1,7 +1,9 @@
 import { Manufacturer } from './manufacturerTypes';
 
 function parseMoneyRange(value: unknown): [number, number] {
-  const values = String(value ?? '').match(/\d+(?:\.\d{1,2})?/g)?.map(Number) ?? [];
+  // "$1,200" is one amount: drop thousands separators before reading numbers.
+  const text = String(value ?? '').replace(/(\d),(?=\d{3}(?!\d))/g, '$1');
+  const values = text.match(/\d+(?:\.\d{1,2})?/g)?.map(Number) ?? [];
   if (!values.length) return [0, 0];
   const cents = values.map((amount) => Math.round(amount * 100));
   return [cents[0], cents[1] ?? cents[0]];

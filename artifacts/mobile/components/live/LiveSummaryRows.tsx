@@ -23,7 +23,7 @@ export function LiveSummaryRows({ lives, onOpen }: { lives: LiveAnalyticsListIte
             onPress={() => onOpen(live.streamId)}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
             accessibilityRole="button"
-            accessibilityLabel={`${live.title}, ${live.orders} orders, ${revenueLabel(live.revenueCents)}`}
+            accessibilityLabel={`${live.title}, ${live.orders === 1 ? '1 order' : `${live.orders} orders`}, ${revenueLabel(live.revenueCents)}`}
           >
             <View style={styles.text}>
               <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{live.title}</Text>

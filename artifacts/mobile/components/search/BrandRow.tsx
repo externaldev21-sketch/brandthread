@@ -28,9 +28,9 @@ export type SearchBrandRow = {
 };
 
 /**
- * Accounts/Brands tab row for a brand — same row shape as PersonRow but a
- * fixed store-icon avatar (brand search results carry no photo today, so a
- * generic storefront glyph reads honestly instead of implying a real logo).
+ * Accounts/Brands tab row for a brand — same row shape as PersonRow. Avatar:
+ * the bundled B logo for the official account, else the brand's real photo
+ * (http/https `imageUri`), else its initials on its colour.
  */
 export function BrandRow({ brand, onPress }: { brand: SearchBrandRow; onPress: () => void }) {
   const { theme } = useAppTheme();

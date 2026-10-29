@@ -9,6 +9,7 @@
 
 import type { AISettings, AISuggestion, AIScreenContext, SuggestionCategory, SuggestionPriority } from '@/services/aiTypes';
 import { suggestionCategoryAllowed } from '@/services/aiSettingsPolicy';
+import { RETAINED_FEATURE_ROUTES, normalizeLegacyPath, resolveLegacyRoute } from '@/lib/navigation/legacyRoutes';
 
 export const DASHBOARD_SUGGESTION_LIMIT = 3;
 
@@ -31,11 +32,17 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-/** In-app routes only: "/(tabs)/products", "/(tabs)/orders" — never "//host" or a URL. */
+/**
+ * In-app routes only: "/(tabs)/products", "/(tabs)/orders" — never "//host" or
+ * a URL. A path of a removed screen that older servers still send (e.g.
+ * the old inventory screen) opens its new home (lib/navigation/legacyRoutes) directly.
+ */
 export function safeSuggestionRoute(route: unknown): string | undefined {
   const r = str(route);
   if (!r.startsWith('/') || r.startsWith('//') || /\s/.test(r)) return undefined;
-  return r;
+  const pathname = r.split(/[?#]/)[0];
+  if (RETAINED_FEATURE_ROUTES.has(normalizeLegacyPath(pathname))) return r;
+  return resolveLegacyRoute(r) ?? r;
 }
 
 /** Whether the card may appear at all under these AI Settings. */

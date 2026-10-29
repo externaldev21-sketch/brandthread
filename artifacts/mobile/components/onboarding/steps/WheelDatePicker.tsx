@@ -44,6 +44,8 @@ function Column({
   const ref = useRef<ScrollView>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastIndex = useRef(index);
+  // A pending web settle must not fire onIndex after the wheel is gone.
+  useEffect(() => () => { if (settleTimer.current) clearTimeout(settleTimer.current); }, []);
 
   // Keep the wheel on the selected row when the value changes from outside
   // (e.g. the day clamps after switching to a shorter month).

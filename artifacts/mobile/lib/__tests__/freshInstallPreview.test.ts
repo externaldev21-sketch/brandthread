@@ -22,8 +22,10 @@ function src(relPath: string): string {
 describe("fresh-install: personal preview modules gate their seeded cast on isPreviewDemoMode()", () => {
   it("previewInbox.ts: conversations and notifications are demo-gated", () => {
     const s = src("../previewInbox.ts");
-    expect(s).toContain("import { isPreviewDemoMode } from './devPreview';");
-    expect(s).toMatch(/cachedConversations = isPreviewDemoMode\(\) \? allSeeds\(\)\.map\(toConversation\) : \[\];/);
+    expect(s).toMatch(/import \{[^}]*\bisPreviewDemoMode\b[^}]*\} from '\.\/devPreview';/);
+    // A fresh preview keeps only the official Brandthread welcome thread (the
+    // app's own assistant, not a seeded person); the 10-thread cast is demo-only.
+    expect(s).toMatch(/cachedConversations = \(isPreviewDemoMode\(\) \? allSeeds\(\) : \[BRANDTHREAD_AGENT_SEED\]\)\.map\(toConversation\);/);
     expect(s).toMatch(/cachedNotifications = !isPreviewDemoMode\(\) \? \[\] : PREVIEW_FOLLOWER_SEEDS\.map/);
   });
 

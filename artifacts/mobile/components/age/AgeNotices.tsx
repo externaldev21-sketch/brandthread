@@ -7,6 +7,7 @@ import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { apiErrorCode, apiErrorMessage } from '@/lib/safety';
+import { ApiError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   AGE_RESTRICTED_COPY, DOB_PLACEHOLDER, checkDobInput, formatDobInput, type AgeBand,
@@ -14,6 +15,20 @@ import {
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { NativeDateTimeField } from '@/components/ui/NativeDateTimeField';
 import { dateToMdy, mdyToDate } from '@/lib/dateTimeField';
+
+/**
+ * The band the server already has on file, from POST /api/auth/age's 409
+ * AGE_BAND_LOCKED body (`{ code, ageBand }`). Null when it isn't readable.
+ */
+export function lockedAgeBand(err: unknown): AgeBand | null {
+  if (!(err instanceof ApiError)) return null;
+  try {
+    const band = (JSON.parse(err.body) as { ageBand?: unknown } | null)?.ageBand;
+    return band === '13_17' || band === '18_plus' || band === 'under_13' ? band : null;
+  } catch {
+    return null;
+  }
+}
 
 /** The single date-of-birth field. Pass the host form's own styles so it matches its siblings. */
 export function AgeDobField({
@@ -93,8 +108,13 @@ export function AgeAskInline({ onResolved }: { onResolved: (band: AgeBand) => vo
     } catch (err) {
       const code = apiErrorCode(err);
       if (code === 'AGE_UNDER_13') setError('You must be at least 13 to use Brandthread.');
-      else if (code === 'AGE_BAND_LOCKED') onResolved('18_plus');
-      else setError(apiErrorMessage(err, 'Could not save. Try again.'));
+      else if (code === 'AGE_BAND_LOCKED') {
+        // Already answered (another device, or a lost race): the 409 carries
+        // the stored band, which is what this account actually has.
+        const stored = lockedAgeBand(err);
+        if (stored) onResolved(stored);
+        else setError(apiErrorMessage(err, 'Could not save. Try again.'));
+      } else setError(apiErrorMessage(err, 'Could not save. Try again.'));
     } finally {
       setSaving(false);
     }

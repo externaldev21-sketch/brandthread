@@ -7,7 +7,9 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[0-9+(). -]{7,32}$/;
 
 export function isValidCheckoutEmail(email?: string | null): boolean {
-  return EMAIL_PATTERN.test(email ?? '');
+  // Trimmed like the inline field check and the request body, so a trailing
+  // space from autofill never blocks Pay with no visible field error.
+  return EMAIL_PATTERN.test((email ?? '').trim());
 }
 
 export function isValidCheckoutPhone(phone?: string | null): boolean {
@@ -26,11 +28,11 @@ export function isValidCheckoutPostalCode(postalCode?: string | null): boolean {
 export function isCompleteCheckoutAddress(address: Partial<CheckoutAddress>): boolean {
   return !!(
     address.firstName?.trim()
-    && address.line1
-    && address.city
-    && address.state
+    && address.line1?.trim()
+    && address.city?.trim()
+    && address.state?.trim()
     && isValidCheckoutPostalCode(address.postalCode)
-    && address.country
+    && address.country?.trim()
   );
 }
 
@@ -146,13 +148,6 @@ export interface CheckoutDisplayTotals {
 }
 
 /**
- * The one price breakdown the screen shows. `summary.totalCents` already
- * nets out rewards; a validated promo code is subtracted on top because the
- * server applies it to the Stripe session (pay() sends `discountCode` for
- * single-seller orders only — so multi-seller orders never show it either).
- * Stripe remains the final authority on tax and the charged amount.
- */
-/**
  * The hosted path's totals with a server tax estimate folded in (Stripe
  * Checkout charges the final tax), so the "Estimated tax" line and the total
  * still add up. A missing or invalid estimate leaves the totals unchanged.
@@ -167,6 +162,13 @@ export function withTaxEstimate(totals: CheckoutDisplayTotals, taxCents: number)
   };
 }
 
+/**
+ * The one price breakdown the screen shows. `summary.totalCents` already
+ * nets out rewards; a validated promo code is subtracted on top because the
+ * server applies it to the Stripe session (pay() sends `discountCode` for
+ * single-seller orders only — so multi-seller orders never show it either).
+ * Stripe remains the final authority on tax and the charged amount.
+ */
 export function getCheckoutDisplayTotals(
   session: Pick<CheckoutSession, 'summary' | 'discounts' | 'deliveryGroups'> & Partial<Pick<CheckoutSession, 'threadCashRedemption'>>,
 ): CheckoutDisplayTotals {

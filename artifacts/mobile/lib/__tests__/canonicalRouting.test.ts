@@ -2,18 +2,25 @@
  * Focused tests for canonical profile routing correctness.
  *
  * These tests prove:
- * 1. /u/[username] → profile.id = clerkId (canonical, not DB UUID).
+ * 1. /u/[username] → profile.id is the opaque users.id alias (GET
+ *    /api/public/profiles/:username never returns the Clerk id); the screens
+ *    it opens resolve the canonical clerkId from their own profile load.
  * 2. Seller posts/follow/message use canonical clerkId, not route alias.
  * 3. Buyer follow/message use canonical clerkId resolved from profile response.
  * 4. No action uses a raw DB UUID for write/social operations.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCanonicalProfileUrl, normalizeUsername } from '../shareProfile';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const appSource = (rel: string) => readFileSync(resolve(__dirname, '../../app', rel), 'utf8');
 
 // ─── Simulate the PublicProfileDto returned by GET /api/public/profiles/:username ─
 
 interface PublicProfileDto {
-  id: string;        // canonical clerkId (NOT DB UUID)
+  id: string;        // opaque users.id alias (NOT the Clerk id)
   username: string;
   accountType: 'buyer' | 'seller';
   displayName: string | null;
@@ -22,9 +29,9 @@ interface PublicProfileDto {
   verified: boolean;
 }
 
-function buildMockProfileDto(clerkId: string, accountType: 'buyer' | 'seller', username: string): PublicProfileDto {
+function buildMockProfileDto(dbId: string, accountType: 'buyer' | 'seller', username: string): PublicProfileDto {
   return {
-    id: clerkId,   // server returns clerkId as `id`
+    id: dbId,   // server returns users.id as `id` (artifacts/api-server/src/routes/public.ts)
     username,
     accountType,
     displayName: 'Test User',
@@ -34,20 +41,19 @@ function buildMockProfileDto(clerkId: string, accountType: 'buyer' | 'seller', u
   };
 }
 
-// ─── 1. Profile endpoint returns clerkId as `id` ─────────────────────────────
+// ─── 1. Profile endpoint returns the opaque users.id alias as `id` ───────────
 
-describe('PublicProfileDto: id is canonical clerkId', () => {
-  it('seller profile dto.id is the clerkId for downstream calls', () => {
-    const dto = buildMockProfileDto('user_clerk_seller_001', 'seller', 'mybrand');
-    expect(dto.id).toBe('user_clerk_seller_001');
-    // Must NOT be a UUID
-    expect(dto.id).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+describe('PublicProfileDto: id is the opaque users.id alias, never the Clerk id', () => {
+  it('seller profile dto.id is an opaque alias the seller screen resolves itself', () => {
+    const dto = buildMockProfileDto('ba5e6a11-0000-0000-0000-000000000001', 'seller', 'mybrand');
+    expect(dto.id).toMatch(UUID_RE);
+    expect(dto.id).not.toContain('user_');
   });
 
-  it('buyer profile dto.id is the clerkId for downstream calls', () => {
-    const dto = buildMockProfileDto('user_clerk_buyer_001', 'buyer', 'janedoe');
-    expect(dto.id).toBe('user_clerk_buyer_001');
-    expect(dto.id).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  it('buyer profile dto.id is an opaque alias the buyer screen resolves itself', () => {
+    const dto = buildMockProfileDto('ba5e6a11-0000-0000-0000-000000000002', 'buyer', 'janedoe');
+    expect(dto.id).toMatch(UUID_RE);
+    expect(dto.id).not.toContain('user_');
   });
 });
 
@@ -150,23 +156,18 @@ describe('buyer-other-profile: canonicalUserId from social profile response', ()
   });
 });
 
-// ─── 4. /u/[username] navigation uses dto.id for sellerId/userId params ──────
+// ─── 4. /u/[username] navigation passes dto.id (opaque alias) to screens ─────
 
-describe('/u/[username] navigation: passes dto.id (clerkId) to screens', () => {
-  it('seller navigation param is dto.id (clerkId), not a UUID', () => {
-    const dto = buildMockProfileDto('user_clerk_seller_001', 'seller', 'mybrand');
-    // Navigation: router.replace(`/seller-profile?sellerId=${dto.id}`)
-    const navParam = dto.id;
-    expect(navParam).toBe('user_clerk_seller_001');
-    expect(navParam).not.toMatch(/^[0-9a-f-]{36}$/);
+describe('/u/[username] navigation: passes the opaque dto.id; screens resolve the clerkId', () => {
+  it('seller navigation passes dto.id as sellerId, and seller-profile adopts the clerkId from its own load', () => {
+    expect(appSource('u/[username].tsx')).toContain('`/seller-profile?sellerId=${encodeURIComponent(profile.id)}&isOwner=false`');
+    // The route param is only an alias: follow/message/posts use the
+    // canonical clerkId the profile response carries.
+    expect(appSource('seller-profile.tsx')).toContain('sellerId: profile?.clerkId ?? profile?.id ?? fallbackId,');
   });
 
-  it('buyer navigation param is dto.id (clerkId), not a UUID', () => {
-    const dto = buildMockProfileDto('user_clerk_buyer_001', 'buyer', 'janedoe');
-    // Navigation: router.replace(`/buyer-other-profile?userId=${dto.id}`)
-    const navParam = dto.id;
-    expect(navParam).toBe('user_clerk_buyer_001');
-    expect(navParam).not.toMatch(/^[0-9a-f-]{36}$/);
+  it('buyer navigation passes dto.id as userId', () => {
+    expect(appSource('u/[username].tsx')).toContain('`/buyer-other-profile?userId=${encodeURIComponent(profile.id)}');
   });
 
   it('canonical URL is always /u/{username}, never exposing clerkId', () => {

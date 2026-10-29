@@ -1,6 +1,8 @@
 // ─── Brandthread AI Store Builder — Service Layer ────────────────────────────
-// All persistence via AsyncStorage. No real AI backend required.
-// Mock generation is separated into pure functions — never placed in UI code.
+// The editable draft is cached per account in AsyncStorage and synced to the
+// server storefront (GET/PUT /api/store, publish, versions); builder lists and
+// AI suggestions/generation go through the real API. Only the signed-out web
+// demo stays on-device.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveAccountKey } from '@/lib/accountStorage';
@@ -721,7 +723,7 @@ export async function updateSection(id: string, settings: Partial<StoreSectionSe
 
 export async function reorderSections(orderedIds: string[]): Promise<Storefront> {
   const store = await getStorefront({ refreshRemote: false });
-  _pushUndo(store, 'reorder_sections', { sections: store.sections.map(s => ({ id: s.id, order: s.order })) });
+  _pushUndo(store, 'reorder_sections', { sections: store.sections });
   orderedIds.forEach((id, idx) => {
     const s = store.sections.find(sec => sec.id === id);
     if (s) s.order = idx;
@@ -770,7 +772,9 @@ export async function deleteSection(id: string): Promise<Storefront> {
 
 // ─── Undo / Redo ──────────────────────────────────────────────────────────────
 function _pushUndo(store: Storefront, action: string, before: unknown) {
-  store.undoStack.push({ action, before, after: null, timestamp: new Date().toISOString() });
+  // A deep copy: callers mutate store.sections right after this, and a
+  // shared reference would make the "before" state equal the "after" state.
+  store.undoStack.push({ action, before: JSON.parse(JSON.stringify(before)), after: null, timestamp: new Date().toISOString() });
   if (store.undoStack.length > 50) store.undoStack.shift();
 }
 
@@ -781,11 +785,20 @@ export async function undoLastAction(): Promise<Storefront> {
   store.redoStack.push({ ...entry, after: JSON.parse(JSON.stringify(store.sections)) });
   if (entry.action === 'delete_section' || entry.action === 'reorder_sections' ||
       entry.action === 'duplicate_section' || entry.action === 'create_section') {
-    store.sections = (entry.before as { sections?: StoreSection[] }).sections ??
-      (entry.before as StoreSection[]) ?? store.sections;
+    const before = (entry.before as { sections?: Array<Partial<StoreSection>> }).sections ??
+      (entry.before as Array<Partial<StoreSection>>);
+    if (Array.isArray(before) && before.every(s => typeof s?.type === 'string')) {
+      store.sections = before as StoreSection[];
+    } else if (Array.isArray(before)) {
+      // Older reorder entries saved only { id, order }: restore the order,
+      // never replace the sections with those partial rows.
+      const orderById = new Map(before.map(s => [s.id, s.order]));
+      store.sections.forEach(s => { const o = orderById.get(s.id); if (typeof o === 'number') s.order = o; });
+      store.sections.sort((a, b) => a.order - b.order);
+    }
   } else if (entry.action === 'update_section') {
-    const prev = entry.before as StoreSection;
-    const idx = store.sections.findIndex(s => s.id === prev.id);
+    const prev = (entry.before as { section?: StoreSection }).section ?? (entry.before as StoreSection);
+    const idx = store.sections.findIndex(s => s.id === prev?.id);
     if (idx !== -1) store.sections[idx] = prev;
   } else if (entry.action === 'toggle_section') {
     const { id, enabled } = entry.before as { id: string; enabled: boolean };
@@ -1418,9 +1431,10 @@ function mapAiBorderRadius(r?: number): StoreBranding['cornerRadius'] {
 }
 
 // ─── Map a complete raw AI config → StoreGenerationResult ────────────────────
-// Extracts ALL fields the AI returns: palette, typography (including exact font
-// names and border radius), sections, title, subtitle, description, SEO
-// (including keywords), and DB-side branding (tagline/mission/targetAudience).
+// Takes the AI's sections, title, subtitle, description, SEO (including
+// keywords) and DB-side branding (tagline/mission/targetAudience). The AI's
+// palette, fonts and border radius are deliberately not applied: every
+// generated store uses the Thread Theme look (palette, Cormorant/Raleway, sharp).
 function mapAiConfigToResult(
   cfg: any,
   currentStore: Storefront,
@@ -1523,7 +1537,7 @@ export async function applyGenerationResult(result: StoreGenerationResult): Prom
       accentColor:     store.branding.colors.accent,
       backgroundColor: store.branding.colors.background,
       textColor:       store.branding.colors.text,
-      // Persist exact AI font name, not the reduced style enum
+      // The Thread Theme heading font set above (not the AI's font).
       fontFamily:      store.branding.typography.headingFont,
       borderRadius:    store.branding.cornerRadius === 'sharp'   ? 0
                      : store.branding.cornerRadius === 'pill'    ? 24
@@ -1564,8 +1578,8 @@ export async function generateFromSocial(
     existingContent: [], features: [], moodBoardUris: [],
   };
 
-  // mapAiConfigToResult extracts ALL fields: sections, palette, typography,
-  // title, subtitle, description, SEO, and DB branding.
+  // mapAiConfigToResult takes sections, title, subtitle, description, SEO
+  // and DB branding (the look stays the Thread Theme).
   return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
 }
 

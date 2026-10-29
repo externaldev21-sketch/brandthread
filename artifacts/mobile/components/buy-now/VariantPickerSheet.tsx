@@ -14,7 +14,7 @@
  * clear disabled treatment) — https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
  * and https://mobbin.com/screens/b8b1facf-9643-45a8-80fa-55971049d670.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -100,11 +100,18 @@ export function VariantPickerSheet({
   const [toast, setToast] = useState<string | null>(null);
   const sizeBadgeModel = useSizeBadgeModel(product);
 
+  // Only the latest load may write state (a product switch or unmount
+  // supersedes an in-flight one).
+  const loadGenRef = useRef(0);
+  useEffect(() => () => { loadGenRef.current += 1; }, []);
   const load = useCallback(async () => {
+    const gen = ++loadGenRef.current;
+    const isCurrent = () => loadGenRef.current === gen;
     setLoading(true);
     setError('');
     try {
       const p = await getBuyerProduct(productId);
+      if (!isCurrent()) return;
       if (!p) { setError('Product not found.'); return; }
       setProduct(p);
       const current = initialVariantId ? p.variants.find(v => v.id === initialVariantId) : undefined;
@@ -122,15 +129,16 @@ export function VariantPickerSheet({
         setSelections(Object.fromEntries(only.optionValues.map(ov => [ov.optionId, ov.valueId])));
       }
     } catch {
-      setError("Couldn't load this product. Tap to retry.");
+      if (isCurrent()) setError("Couldn't load this product. Tap to retry.");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [productId, initialVariantId]);
 
   useEffect(() => { if (!initialProduct) load(); }, [initialProduct, load]);
   useEffect(() => {
     if (!initialProduct) return;
+    loadGenRef.current += 1; // a fetch still in flight must not replace it
     setProduct(initialProduct);
     setLoading(false);
     setError('');

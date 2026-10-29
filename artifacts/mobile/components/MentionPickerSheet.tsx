@@ -39,7 +39,11 @@ function useMentionSearch(query: string, active: boolean, enabled: boolean) {
   const [attempt, setAttempt] = useState(0);
   const seq = useRef(0);
   useEffect(() => {
-    if (!active || !enabled) { setPeople([]); setLoading(false); setFailed(false); return; }
+    if (!active || !enabled) {
+      // Invalidate any read still in flight so it can't repopulate the list.
+      seq.current += 1;
+      setPeople([]); setLoading(false); setFailed(false); return;
+    }
     const mine = ++seq.current;
     setLoading(true);
     const t = setTimeout(() => {

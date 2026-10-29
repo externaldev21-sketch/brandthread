@@ -78,7 +78,8 @@ export function formatAuctionClock(ms: number): string {
 
 /** "$12" for whole dollars, "$12.50" otherwise (bid buttons). */
 export function formatBid(cents: number): string {
-  return cents % 100 === 0 ? `$${(cents / 100).toLocaleString('en-US')}` : `$${(cents / 100).toFixed(2)}`;
+  const digits = cents % 100 === 0 ? 0 : 2;
+  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
 
 /** The line above the product row identifies the leading bidder or winner. */

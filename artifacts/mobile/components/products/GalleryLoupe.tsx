@@ -11,7 +11,7 @@
  * gallery draws it (`contain` in the slide's frame), so the loupe shows the
  * exact pixels under the finger.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import { hapticLight } from '@/lib/haptics';
 
@@ -78,6 +78,8 @@ export function useGalleryLoupe({ enabled, onActiveChange }: { enabled: boolean;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
   };
+  // A hold in progress when the photo unmounts must not fire the loupe later.
+  useEffect(() => () => clearTimer(), []);
 
   const end = useCallback(() => {
     clearTimer();

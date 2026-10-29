@@ -43,6 +43,8 @@ export function ProductSellerRow({
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
+    // Never show the previous seller's rating while (or if) this one loads.
+    setRating(null);
     if (!sellerId || preview) return undefined;
     let active = true;
     api.reviews.forSeller(sellerId)
@@ -52,6 +54,8 @@ export function ProductSellerRow({
   }, [api, sellerId, preview]);
 
   useEffect(() => {
+    // Follow state belongs to this viewer + seller; drop the previous one.
+    setFollowing(false);
     if (!sellerId || preview || !userId || isOwn) return undefined;
     let active = true;
     getSellerFollowState(sellerId)

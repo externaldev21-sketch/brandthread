@@ -12,6 +12,7 @@ import type * as NotificationsTypes from 'expo-notifications';
 import {
   NOTIFICATION_ACTION, NOTIFICATION_CATEGORY, planNotificationAction,
 } from '@/lib/nativeSystemLogic';
+import { openNotificationHref } from '@/lib/notificationNavigation';
 
 let registered = false;
 
@@ -59,7 +60,9 @@ export function handleNotificationAction(
     return true;
   }
   if (plan.kind === 'open') {
-    router.push(plan.route);
+    // Same account switch as a plain tap: "Mark shipped" on a push for
+    // another signed-in seller account opens that account's order.
+    openNotificationHref(router, plan.route, data);
     return true;
   }
   return false;

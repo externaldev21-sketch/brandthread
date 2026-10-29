@@ -261,6 +261,25 @@ export async function getBuyerProduct(productId: string): Promise<BuyerProduct |
 /** Serializes write-through syncs so an older full-replace can never land after a newer one. */
 let _syncChain: Promise<void> = Promise.resolve();
 
+/**
+ * Serializes every write of the stored cart that is based on a read made
+ * inside the same critical section (clearing the sync marker, adopting the
+ * server copy) against ordinary cart writes. Without it, a marker-clear that
+ * read the bag just before an "Add to bag" wrote it would write that older
+ * bag back afterwards and silently drop the new line.
+ */
+let _cartWriteLock: Promise<unknown> = Promise.resolve();
+function withCartWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = _cartWriteLock.then(fn, fn);
+  _cartWriteLock = run.catch(() => {});
+  return run;
+}
+
+/** Same lines (what the server stores) — updatedAt alone can collide within one millisecond. */
+function sameCartLines(a: Cart, b: Cart): boolean {
+  return JSON.stringify([a.items, a.savedItems]) === JSON.stringify([b.items, b.savedItems]);
+}
+
 function scheduleSync(k: CartKeys): Promise<void> {
   const run = _syncChain.then(() => pushLocalCart(k));
   _syncChain = run.catch(() => {});
@@ -293,10 +312,12 @@ async function pushLocalCart(k: CartKeys): Promise<void> {
   }
   if (_cartUserId !== k.userId) return;
   // Only clear the marker when nothing newer was written while in flight.
-  const latest = await readLocalCart(k);
-  if (latest && latest.syncPending && latest.updatedAt === cart.updatedAt) {
-    await safeSetItem(k.cart, JSON.stringify({ ...latest, syncPending: false }));
-  }
+  await withCartWriteLock(async () => {
+    const latest = await readLocalCart(k);
+    if (latest && latest.syncPending && latest.updatedAt === cart.updatedAt && sameCartLines(latest, cart)) {
+      await safeSetItem(k.cart, JSON.stringify({ ...latest, syncPending: false }));
+    }
+  });
 }
 
 /**
@@ -366,9 +387,13 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
     // Guard: skip cache write if account switched while the request was in-flight.
     if ((resolved.adoptedRemote || resolved.push) && _cartUserId === k.userId) {
       // A write that landed while the GET was in flight wins over it.
-      const latest = await readLocalCart(k);
-      if (latest && latest.updatedAt !== cart.updatedAt) return { cart: latest, remoteConfirmed };
-      await safeSetItem(k.cart, JSON.stringify(resolved.cart));
+      const kept = await withCartWriteLock(async () => {
+        const latest = await readLocalCart(k);
+        if (latest && (latest.updatedAt !== cart.updatedAt || !sameCartLines(latest, cart))) return latest;
+        await safeSetItem(k.cart, JSON.stringify(resolved.cart));
+        return null;
+      });
+      if (kept) return { cart: kept, remoteConfirmed };
       if (resolved.push) void scheduleSync(k);
       return { cart: resolved.cart, remoteConfirmed };
     }
@@ -470,7 +495,8 @@ async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   // Signed-in: mark the write unacknowledged until the server confirms it
   // (pushLocalCart clears it), so no read can replace it with an older copy.
   if (k.userId !== 'anon') cart.syncPending = true;
-  await safeSetItem(k.cart, JSON.stringify(cart));
+  const serialized = JSON.stringify(cart);
+  await withCartWriteLock(() => safeSetItem(k.cart, serialized));
   // Queued, in write order; k.userId lets the sync drop itself if the account switches first.
   if (k.userId !== 'anon') void scheduleSync(k);
 }
@@ -508,7 +534,7 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     const newQty = existing.quantity + quantity;
     const cap = cartMaxQuantity(variant.inventoryQuantity, product.isPreOrder);
     if (newQty > cap) {
-      return { success: false, message: `You already have ${existing.quantity}in your bag. Can't add more.`, cart };
+      return { success: false, message: `You already have ${existing.quantity} in your bag. Can't add more.`, cart };
     }
     cart.items[existingIdx] = {
       ...existing,

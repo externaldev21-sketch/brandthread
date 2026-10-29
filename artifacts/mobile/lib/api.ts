@@ -82,7 +82,6 @@ export type LikedPost = {
   likedAt: string;
 };
 
-/** Server story highlight (GET /api/social/highlights/*). */
 /** GET /api/drops/:id/sms-blast — the seller's drop waitlist screen. */
 export interface DropSmsBlastPreview {
   drop: {
@@ -130,6 +129,7 @@ export interface SearchAllResponse {
   order: SearchAllSectionKey[];
 }
 
+/** Server story highlight (GET /api/social/highlights/*). */
 export interface ServerHighlight {
   id: string; userId: string; title: string;
   coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
@@ -612,14 +612,19 @@ function request<T = any>(
   if (options.cache === 'no-store') {
     return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
   }
-  const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
-  const existing = inFlightGetRequests.get(dedupeKey);
-  if (existing) return existing;
-  const promise = doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs).finally(() => {
-    if (inFlightGetRequests.get(dedupeKey) === promise) inFlightGetRequests.delete(dedupeKey);
+  // Keyed by account scope too: after an account switch (or sign-in), the
+  // new account's GET must not join the previous account's in-flight request
+  // and receive that account's data.
+  return Promise.resolve(getCacheScope()).then((scope) => {
+    const dedupeKey = `${encodeURIComponent(scope || 'anonymous')}::${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
+    const existing = inFlightGetRequests.get(dedupeKey);
+    if (existing) return existing as Promise<T>;
+    const promise: Promise<T> = doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs).finally(() => {
+      if (inFlightGetRequests.get(dedupeKey) === promise) inFlightGetRequests.delete(dedupeKey);
+    });
+    inFlightGetRequests.set(dedupeKey, promise);
+    return promise;
   });
-  inFlightGetRequests.set(dedupeKey, promise);
-  return promise;
 }
 
 /**
@@ -754,9 +759,12 @@ async function doRequest<T = any>(
   }
   if (reportErrors) dismissNetworkNotice();
   if (asText) return res.text() as Promise<T>;
-  const data = await res.json() as T;
+  // 204 No Content (address delete, launch-checklist dismiss, first-run tips,
+  // milestone seen, …) has no body: res.json() would throw and turn a write
+  // that succeeded into a failure.
+  const data = (res.status === 204 ? undefined : await res.json()) as T;
   if (cacheKey) {
-    await writeApiCache(cacheKey, data);
+    if (data !== undefined) await writeApiCache(cacheKey, data);
   } else if (!isRead) {
     await clearApiCache(await getCacheScope());
   }
@@ -1045,7 +1053,6 @@ export interface PublicProductBundle {
 }
 export interface ProductVideoInfo { videoUrl: string; posterUrl: string | null; durationMs: number | null }
 
-/** Like uploadVideo, but reports upload progress (0–1). */
 /** Seller-set product page fields (migration 270). */
 export interface ProductPageDetailsInput {
   modelHeightCm: number | null;
@@ -1802,8 +1809,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     config: {
       featureFlags: () =>
         get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
-      /** The shared seller plan config (trial length, reminder, prices, checkout mode). */
       live: () => get<{ liveAvailable: boolean }>('/api/config/live'),
+      /** The shared seller plan config (trial length, reminder, prices, checkout mode). */
       sellerPlans: () => get<unknown>('/api/config/seller-plans'),
     },
     // ── iOS Live Activity push tokens (lib/nativeSystem.ts) ──────────────────
@@ -2082,7 +2089,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
       ship: (id: string, body: { carrier: string; trackingNumber: string }) => post(`/api/orders/${id}/ship`, body),
       markDelivered: (id: string) => post(`/api/orders/${id}/mark-delivered`, {}),
-      /** Seller's manual refund (Issue refund screen): to the original payment or as store credit. */
       /** Ship only the selected order items with their own tracking number. */
       addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string; notifyCustomer?: false }) =>
         patch(`/api/orders/${id}/items-tracking`, body),
@@ -2353,6 +2359,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/push/voip-token',
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
+          false,
+          getCacheScope,
         ),
       register:   (body: { token: string; platform?: string; accountIds?: string[]; timezone?: string }) =>
         post<{ ok: boolean }>('/api/push/register', body),
@@ -2361,6 +2369,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/push/deregister',
           { method: 'DELETE', body: JSON.stringify({ token }) },
           getToken,
+          false,
+          getCacheScope,
         ),
     },
     notifications: {
@@ -3024,7 +3034,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           freshGet<{ calls: DmCallDto[] }>(`/api/call/dm/conversations/${encodeURIComponent(conversationId)}/calls?limit=50`),
       },
     },
-    /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
      * Profile cover video (buyer + seller). The server enforces ≤25s and one
      * change per 24h (setting and removing both count); a 429 ApiError's
@@ -3137,6 +3146,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           authorName: string;
         }>>(`/api/public/products/${encodeURIComponent(productId)}/videos${limit ? `?limit=${limit}` : ''}`),
     },
+    /** /api/public search endpoints — work signed out, except the signed-in buyer's own recent searches. */
     public: {
       search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string | string[]; size?: string | string[]; color?: string | string[]; brand?: string | string[]; inStock?: boolean; facets?: boolean; limit?: number; offset?: number }) => {
         const params = new URLSearchParams();
@@ -3610,7 +3620,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       saveOnboardingData: (body: {
         goals?: string[]; brandStage?: string; sellModel?: string; styleInterests?: string[];
       }) => post<{ ok: boolean }>('/api/seller/onboarding/data', body),
-      /** Vacation / away mode — pause storefront without removing listings. */
       /** Push notification frequency preference (realtime vs daily digest) */
       notificationPrefs: {
         get: () =>
@@ -3618,6 +3627,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
           put<{ digest: 'realtime' | 'daily'; role: 'buyer' | 'seller'; categories: Record<string, boolean> }>('/api/seller/notification-prefs', body),
       },
+      /** Vacation / away mode — pause storefront without removing listings. */
       vacation: {
         get: () =>
           get<{ vacationMode: boolean; vacationMessage: string | null; vacationUntil: string | null }>(
@@ -4153,12 +4163,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** List users I have blocked, newest first */
       blocks: () => freshGet<BlockedAccount[]>('/api/social/blocks'),
     },
-    /** Referral / invite-code system */
     /** Brand → brand referrals: a free month for both brands (BT-313). */
     sellerReferrals: {
       overview: () => get<SellerReferralOverview>('/api/seller-referrals'),
       apply: (code: string) => post<{ ok: true }>('/api/seller-referrals/apply', { code }),
     },
+    /** Referral / invite-code system */
     referrals: {
       /** Get (or lazily generate) my invite code + shareable link */
       code: () =>
@@ -4568,7 +4578,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       calculate: (sellerId: string, subtotalCents: number) =>
         get<any>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
     },
-    /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
     /** Intl #107: display-only currency (charges stay USD). */
     fx: {
       rates: () => get<{ enabled: boolean; available?: boolean; base: string; date?: string | null; rates: Record<string, number> }>('/api/fx/rates'),
@@ -4576,6 +4585,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       setDisplayCurrency: (displayCurrency: string) =>
         patch<{ displayCurrency: string }>('/api/fx/display-currency', { displayCurrency }),
     },
+    /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
     shippingZones: {
       list: () => get<any[]>('/api/shipping-zones'),
       create: (data: {
@@ -4634,7 +4644,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       cancelPayment:   (paymentIntentId: string) =>
         post<{ ok: boolean }>(`/api/seller/terminal/payment-intents/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
     },
-    /** Scheduled product launches + "Notify me". */
     /** Draws for limited drops (server: routes/product-draws.ts). */
     productDraws: {
       state:    (productId: string) =>
@@ -4673,6 +4682,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ brands: Array<{ sellerId: string; name: string; handle: string; initials: string; avatarUrl: string | null; rank: number; since: string }> }>(
           `/api/day-one/${encodeURIComponent(userId)}`),
     },
+    /** Scheduled product launches + "Notify me". */
     productLaunches: {
       /** Public: is this product waiting on a launch time? */
       state:       (productId: string) =>
@@ -4976,9 +4986,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>('/api/finance/payout', data),
       /** Lost chargebacks being recovered from upcoming payouts, with their history. */
       recoveries: () => freshGet<RecoveriesResponse>('/api/finance/recoveries'),
-      /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
       /** True while a new seller's first payout waits for identity verification. */
       firstPayout: () => get<{ identityRequired: boolean; message: string | null }>('/api/finance/first-payout'),
+      /** Current schedule, Instant eligibility and fee quote (optionally for an amount in cents), next payout estimate. */
       payoutSchedule: (amountCents?: number) =>
         freshGet<PayoutScheduleInfo>(`/api/finance/payout-schedule${amountCents ? `?amount=${amountCents}` : ''}`),
       setPayoutSchedule: (data: { interval: 'daily' | 'weekly' | 'manual'; weeklyAnchor?: WeeklyAnchor }) =>
@@ -5486,7 +5496,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         void: (id: string) => post<{ card: GiftCard }>(`/api/gift-cards/seller/cards/${encodeURIComponent(id)}/void`, {}),
       },
     },
-    /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
     /** AI credits: balance, history and pack purchases (web checkout; native uses store billing). */
     aiCredits: {
       get: () => get<AiCreditsOverview>('/api/ai/credits'),
@@ -5497,6 +5506,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       verify: (sessionId: string) =>
         post<{ credited: boolean; newlyGranted: boolean; credits: number; balance: number }>('/api/ai/credits/purchases/verify', { sessionId }),
     },
+    /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
     threadCash: {
       get: () =>
         get<ThreadCashStatus>('/api/thread-cash'),
@@ -5753,12 +5763,6 @@ export interface ContactMatch {
 export type BrandthreadApi = ReturnType<typeof createApi>;
 
 // ─── React hook ──────────────────────────────────────────────────────────────
-/**
- * useApi() — hook for React components.
- * Returns a fully-authed BrandthreadApi instance tied to the current Clerk session.
- * Memoised per user. Clerk may return a new getToken function between renders,
- * so the client reads it through a ref instead of rebuilding on function identity.
- */
 export interface HashtagTrendingTag { tag: string; rank: number; postCount: number; recentPostCount: number; score: number }
 export interface HashtagPostItem {
   id: string; mediaType: string; mediaUrl: string; mediaUrls: string[]; thumbnailUrl: string | null;
@@ -5855,6 +5859,12 @@ export interface LinkedProfilesResponse {
   canAdd: { buyer: boolean; seller: boolean };
 }
 
+/**
+ * useApi() — hook for React components.
+ * Returns a fully-authed BrandthreadApi instance tied to the current Clerk session.
+ * Memoised per user. Clerk may return a new getToken function between renders,
+ * so the client reads it through a ref instead of rebuilding on function identity.
+ */
 export function useApi(): BrandthreadApi {
   const { getToken, userId, isLoaded, isSignedIn } = useAuth();
   const authRef = useRef({ getToken, isLoaded, isSignedIn });
@@ -5882,11 +5892,16 @@ export function useApi(): BrandthreadApi {
  */
 let _globalGetter: GetToken = async () => null;
 let _globalCacheScope: GetCacheScope = () => 'anonymous';
+const globalTokenGetter: GetToken = () => _globalGetter();
 export function configureApi(getter: GetToken, getCacheScope: GetCacheScope = () => 'anonymous'): void {
   _globalGetter = getter;
   _globalCacheScope = getCacheScope;
+  // The singleton keeps one token-cache identity across configurations, so a
+  // new session (account switch, sign-out) must not reuse the previous
+  // session's cached bearer for the rest of its 4s TTL.
+  authTokenCache.delete(globalTokenGetter);
 }
-export const api = createApi(() => _globalGetter(), () => _globalCacheScope());
+export const api = createApi(globalTokenGetter, () => _globalCacheScope());
 
 export type ProductDrawState = {
   productId: string;

@@ -140,7 +140,7 @@ export function LiveRail({ productCount, onMore, onShare, onFlip, onOpenShop }: 
       <RailItem icon="more-horizontal" label="More" onPress={onMore} testID="live-more" />
       {onShare && <RailItem icon="share" label="Share" onPress={onShare} testID="live-share" />}
       {onFlip && <RailItem icon="refresh-cw" label="Flip" onPress={onFlip} testID="live-flip" />}
-      <RailItem icon="shopping-bag" label={`Shop, ${productCount} items`} onPress={onOpenShop} badge={productCount} testID="live-bag" />
+      <RailItem icon="shopping-bag" label={`Shop, ${productCount} ${productCount === 1 ? 'item' : 'items'}`} onPress={onOpenShop} badge={productCount} testID="live-bag" />
     </View>
   );
 }

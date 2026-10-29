@@ -4,7 +4,7 @@
  *
  * Call configureServices(getToken) once from _layout.tsx after Clerk auth is ready.
  * Services call serviceRequest() which uses the stored token getter.
- * If called before configureServices(), throws so callers can fall back to demo data.
+ * If called before configureServices(), waits up to 8s for it, then throws so callers can fall back.
  */
 
 import {
@@ -23,11 +23,6 @@ let _getToken: GetToken | null = null;
 let _configured: Promise<void> | null = null;
 let _resolveConfigured: (() => void) | null = null;
 
-/**
- * Screens opened from a deep link or notification mount before the root
- * layout's effect wires auth in (child effects run first). Wait briefly for
- * configuration instead of failing the first request.
- */
 /**
  * Every request gets a hard ceiling so a hung connection (dead server, black
  * hole route) always resolves into an error the caller can show instead of
@@ -77,13 +72,19 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Screens opened from a deep link or notification mount before the root
+ * layout's effect wires auth in (child effects run first). Wait briefly for
+ * configuration instead of failing the first request.
+ */
 function whenConfigured(timeoutMs = 8_000): Promise<void> {
   if (_getToken) return Promise.resolve();
   _configured ??= new Promise<void>((resolve) => { _resolveConfigured = resolve; });
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     _configured,
-    new Promise<void>((_, reject) => setTimeout(() => reject(new Error("Services not configured")), timeoutMs)),
-  ]);
+    new Promise<void>((_, reject) => { timer = setTimeout(() => reject(new Error("Services not configured")), timeoutMs); }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 /**

@@ -117,8 +117,9 @@ export function LivePulseDot({ color }: LivePulseDotProps) {
 // ─── Countdown hook ───────────────────────────────────────────────────────────
 
 /**
- * Counts down from endsAt in 1-second ticks.
- * Returns null when endsAt is absent or already passed.
+ * Counts down to endsAt, re-reading the clock on every 1-second tick (so a
+ * backgrounded app or a late timer never leaves the countdown behind the
+ * real time). Returns null when endsAt is absent or already passed.
  */
 export function useSecondsRemaining(endsAt: string | null | undefined): number | null {
   const [secs, setSecs] = useState<number | null>(() => secondsUntil(endsAt));
@@ -128,10 +129,9 @@ export function useSecondsRemaining(endsAt: string | null | undefined): number |
     setSecs(initial);
     if (initial === null) return;
     const id = setInterval(() => {
-      setSecs(prev => {
-        if (prev === null || prev <= 1) { clearInterval(id); return 0; }
-        return prev - 1;
-      });
+      const next = secondsUntil(endsAt);
+      if (next === null) { clearInterval(id); setSecs(0); return; }
+      setSecs(next);
     }, 1000);
     return () => clearInterval(id);
   }, [endsAt]);

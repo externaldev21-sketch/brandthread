@@ -155,7 +155,7 @@ export class PaintEngine<S> {
     return true;
   }
 
-  /** Replaces a layer's pixels with a flattened copy of `src` layers (merge down etc. use sync instead). */
+  /** Wipes a layer's pixels (content and display) and forgets its rendered records; the next sync replays from scratch. */
   clearLayer(id: string) {
     const l = this.layer(id);
     this.backend.clear(l.content);

@@ -1,13 +1,14 @@
 /**
  * useResponsive — the single source of truth for size-class-aware layout.
  *
- * Breakpoints are keyed off the shortest side so split-view/foldable/rotated
- * layouts classify the same as a plain phone or tablet of that width:
- *   compact    < 360   (smallest Android/iPhone SE-class phones)
- *   regular    360–430 (mainstream phones)
- *   largePhone > 430   (Pro Max-class phones, unfolded foldables in portrait)
- *   tablet     >= 600  (iPad mini/Air/Pro, Android tablets, foldables unfolded)
- *   wide       >= 1024 (iPad Pro landscape, desktop web)
+ * Tablet/wide are keyed off the shortest side (so rotating a tablet keeps
+ * its class); the phone classes are keyed off the current WIDTH, so a phone
+ * rotated to landscape (width > 430) classifies as largePhone:
+ *   wide       shortest side >= 1024 (iPad Pro landscape, desktop web)
+ *   tablet     shortest side >= 600  (iPad mini/Air/Pro, Android tablets, foldables unfolded)
+ *   largePhone width > 430           (Pro Max-class phones, unfolded foldables in portrait, rotated phones)
+ *   compact    width < 360           (smallest Android/iPhone SE-class phones)
+ *   regular    width 360–430         (mainstream phones in portrait)
  *
  * Every product/video grid, form layout, and type size in the app should
  * derive from this hook rather than hard-coding a breakpoint or pixel value.
@@ -20,7 +21,7 @@ export type SizeClass = 'compact' | 'regular' | 'largePhone' | 'tablet' | 'wide'
 export interface Responsive {
   width: number;
   height: number;
-  /** Shorter of width/height — used for size-class classification so rotation doesn't change class. */
+  /** Shorter of width/height — decides tablet/wide (phone classes use the current width). */
   shortestSide: number;
   sizeClass: SizeClass;
   isCompact: boolean;

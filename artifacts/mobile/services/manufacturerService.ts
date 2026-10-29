@@ -647,6 +647,22 @@ export async function payBulkOrderFromWallet(id: string, walletId: string): Prom
   }));
 }
 
+/**
+ * The sample decision was saved, but posting the manufacturer review after it
+ * failed. Carries the saved sample so a caller can show the new state; its
+ * message says the decision is saved, so a plain error alert stays truthful.
+ */
+export class SampleReviewNotPostedError extends Error {
+  readonly sample: Sample;
+  readonly reviewError: unknown;
+  constructor(sample: Sample, reviewError: unknown) {
+    super('Your decision was saved, but the manufacturer review could not be posted.');
+    this.name = 'SampleReviewNotPostedError';
+    this.sample = sample;
+    this.reviewError = reviewError;
+  }
+}
+
 export async function submitSampleReview(
   sampleId: string,
   expectedRevision: number,
@@ -656,13 +672,17 @@ export async function submitSampleReview(
   const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(sampleId)}/sample-detail`, {
     method: 'PATCH', body: JSON.stringify({ status, expectedRevision, review }),
   });
-  await submitManufacturerReview(row.manufacturerId, sampleId, {
-    rating: review.overallRating,
-    qualityRating: review.qualityRating || review.overallRating,
-    communicationRating: review.fitRating || review.overallRating,
-    deliveryRating: review.packagingRating || review.overallRating,
-    comment: review.notes,
-  });
+  try {
+    await submitManufacturerReview(row.manufacturerId, sampleId, {
+      rating: review.overallRating,
+      qualityRating: review.qualityRating || review.overallRating,
+      communicationRating: review.fitRating || review.overallRating,
+      deliveryRating: review.packagingRating || review.overallRating,
+      comment: review.notes,
+    });
+  } catch (error) {
+    throw new SampleReviewNotPostedError(mapSampleOrder(row), error);
+  }
   return mapSampleOrder(row);
 }
 
@@ -688,11 +708,17 @@ function mapBulkOrder(row: any): ProductionOrder {
   };
   const currentStage = stageMap[row.status] ?? 'quote_accepted';
   const currentIndex = PRODUCTION_STAGES.findIndex((stage) => stage.key === currentStage);
+  // A closed (cancelled / refunded) card is neither in production nor paid —
+  // it must not count as an active order or show the full price as deposited.
+  const closed = row.status === 'cancelled' || row.status === 'refunded';
+  const status: ProductionOrder['status'] = closed ? 'cancelled'
+    : ['delivered', 'complete', 'completed'].includes(row.status) ? 'completed'
+    : row.status === 'pending_payment' ? 'pending' : 'active';
   return {
     id: row.id, sellerId: row.sellerId ?? '', manufacturerId: row.manufacturerId, quoteId: '',
-    productName: row.title ?? '', status: row.status === 'delivered' ? 'completed' : row.status === 'pending_payment' ? 'pending' : 'active',
+    productName: row.title ?? '', status,
     quantity: Number(row.quantity ?? 1), variants: {}, totalCostCents: Number(row.priceCents ?? 0),
-    depositAmountCents: row.status === 'pending_payment' ? 0 : Number(row.priceCents ?? 0),
+    depositAmountCents: row.status === 'pending_payment' || closed ? 0 : Number(row.priceCents ?? 0),
     remainingBalanceCents: row.status === 'pending_payment' ? Number(row.priceCents ?? 0) : 0,
     currentStage, stages: PRODUCTION_STAGES.map((stage, index) => ({ ...stage, completedAt: index < currentIndex ? row.updatedAt : undefined })),
     updates: [], qcChecklist: [], issues: [], payments: [], fileIds: [],

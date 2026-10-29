@@ -17,6 +17,8 @@ export function ProductSaveStatsRow({ productId }: { productId: string }) {
   const [stats, setStats] = useState<ProductSaveStats | null>(null);
 
   useEffect(() => {
+    // Never show the previous product's numbers while (or if) this one loads.
+    setStats(null);
     if (!productId) return;
     let cancelled = false;
     api.products.saveStats(productId)

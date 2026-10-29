@@ -439,6 +439,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
               initials={identity.initials || '•'}
               hasActiveStory={!!avatar?.ring}
               onPress={avatarPress}
+              onLongPress={isOwnProfile ? avatar?.onLongPress : undefined}
               onPressBadge={isOwnProfile ? avatar?.onPressStoryBadge : undefined}
               accessibilityLabel={avatarPressLabel}
             />

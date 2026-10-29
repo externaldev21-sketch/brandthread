@@ -11,7 +11,10 @@ describe('Instagram-style notification settings model', () => {
   it('shows each role only its own types', () => {
     const buyerOrders = pageById('buyer', 'orders')!.sections.map((s) => s.key);
     const sellerOrders = pageById('seller', 'orders')!.sections.map((s) => s.key);
-    expect(buyerOrders).toEqual(['order_updates', 'shipped', 'delivered', 'returns_refunds', 'promotions']);
+    // saved_alerts (restock / price-drop alerts) is a buyer-only category row
+    // stored under notification-prefs `categories` (app/notification-settings-page.tsx).
+    expect(buyerOrders).toEqual(['order_updates', 'shipped', 'delivered', 'returns_refunds', 'promotions', 'saved_alerts']);
+    expect(sellerOrders).not.toContain('saved_alerts');
     expect(sellerOrders).toEqual(['new_orders', 'returns_refunds', 'payouts', 'reviews', 'promotions']);
     expect(pageById('buyer', 'messages')!.sections.map((s) => s.key)).not.toContain('manufacturer_messages');
     expect(pageById('seller', 'messages')!.sections.map((s) => s.key)).toContain('manufacturer_messages');

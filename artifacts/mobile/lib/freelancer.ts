@@ -28,7 +28,7 @@ export function serviceIcon(value: string | undefined | null): keyof typeof Feat
   return FREELANCER_SERVICE_TYPES.find((t) => t.value === value)?.icon ?? 'star';
 }
 
-/** 8000 → "$80/hr", 5550 → "$55.50/hr" */
+/** 8000 → "$80.00/hr", 5550 → "$55.50/hr" (formatCents always shows cents) */
 export function formatHourlyRate(cents: number): string {
   return `${formatCents(cents)}/hr`;
 }

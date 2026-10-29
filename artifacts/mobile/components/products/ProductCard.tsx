@@ -217,7 +217,7 @@ export const ProductCard = React.memo(function ProductCard({
 
             <View style={s.priceRow}>
               <Text style={[s.price, { color: theme.text }]}>{formatMoney(price)}</Text>
-              {compare && compare > price && (
+              {compare != null && compare > price && (
                 <Text style={[s.compare, { color: theme.subtle }]}>{formatMoney(compare)}</Text>
               )}
               {discountPct !== null && (

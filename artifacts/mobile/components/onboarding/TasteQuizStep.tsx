@@ -2,8 +2,9 @@
  * Buyer onboarding — swipe taste quiz (the step after the style picker).
  *
  * Copied from Tinder's card stack: one big photo card, the next one waiting
- * underneath, X / heart buttons below, and a "Learning your style · N left"
- * pill on top (Tinder's "Learning your type"). Right = like, left = pass.
+ * underneath, X / heart buttons below, and a "Building your style profile"
+ * pill with "N left" under it on top (after Tinder's "Learning your type").
+ * Right = like, left = pass.
  * 12–15 real, active products come from GET /api/buyer/taste-quiz; when the
  * catalog can't fill 12 the step skips itself. It ends on a style identity
  * card ("Your style / Archive Minimal") the buyer can share or skip.

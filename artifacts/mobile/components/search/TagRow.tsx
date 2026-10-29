@@ -25,7 +25,7 @@ export function TagRow({ tag, onPress }: { tag: SearchTag; onPress: () => void }
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
-      accessibilityLabel={`#${tag.tag}, ${tag.postCount} posts`}
+      accessibilityLabel={`#${tag.tag}, ${tag.postCount} ${tag.postCount === 1 ? 'post' : 'posts'}`}
       style={styles.row}
     >
       <Animated.View style={[styles.rowInner, { transform: [{ scale }] }]}>

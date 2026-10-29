@@ -351,6 +351,14 @@ interface ShippingLabelApiRow {
   createdAt: string;
 }
 
+/** snake_case columns of a raw shipping_labels row (the void endpoint's duplicate replies). */
+interface ShippingLabelRawRow {
+  tracking_number?: string | null;
+  label_url?: string | null;
+  price_cents?: number;
+  created_at?: string;
+}
+
 /** The server refused to quote because the seller has no usable ship-from address. */
 export function isShipFromError(err: unknown): err is { code: 'SHIP_FROM_REQUIRED' | 'SHIP_FROM_IS_BUYER' } {
   const code = (err as { code?: unknown } | null)?.code;
@@ -456,20 +464,23 @@ export async function voidShippingLabel(orderId: string, labelId: string): Promi
   const result = await serviceRequest(
     `/api/shipping-labels/${encodeURIComponent(orderId)}/${encodeURIComponent(labelId)}/void`,
     { method: 'POST', body: JSON.stringify({}) },
-  ) as { label: ShippingLabelApiRow; refundPending: boolean };
+  ) as { label: ShippingLabelApiRow & ShippingLabelRawRow; refundPending?: boolean };
+  // A repeated void (label already voided / refund already pending) answers
+  // with the raw SQL row, whose columns are snake_case.
+  const label = result.label;
   return {
-    id: result.label.id,
+    id: label.id,
     orderId,
-    carrier: result.label.carrier ?? '',
-    service: result.label.service ?? '',
-    trackingNumber: result.label.trackingNumber ?? '',
-    labelUrl: result.label.labelUrl ?? undefined,
-    priceCents: result.label.priceCents,
-    status: result.label.status,
+    carrier: label.carrier ?? '',
+    service: label.service ?? '',
+    trackingNumber: label.trackingNumber ?? label.tracking_number ?? '',
+    labelUrl: label.labelUrl ?? label.label_url ?? undefined,
+    priceCents: label.priceCents ?? label.price_cents ?? 0,
+    status: label.status,
     isDemo: false,
     fundingSource: 'pending_order_funds',
-    refundPending: result.refundPending,
-    purchasedAt: result.label.createdAt,
+    refundPending: result.refundPending === true,
+    purchasedAt: label.createdAt ?? label.created_at ?? '',
   };
 }
 
@@ -859,8 +870,10 @@ export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefi
 
 export async function exportOrdersCsv(orders: Order[]): Promise<string> {
   const header = 'Order #,Customer,Date,Total,Payment,Fulfillment';
+  // Quote every field: "$1,234.00" and names like "Lee, Ana" contain commas.
+  const cell = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const rows = orders.map(o =>
-    [o.orderNumber, o.customer.name, o.createdAt.slice(0, 10), formatCents(o.payment.totalCents), o.paymentStatus, o.fulfillmentStatus].join(',')
+    [o.orderNumber, o.customer.name, o.createdAt.slice(0, 10), formatCents(o.payment.totalCents), o.paymentStatus, o.fulfillmentStatus].map(cell).join(',')
   );
   return [header, ...rows].join('\n');
 }

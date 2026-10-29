@@ -8,6 +8,7 @@
 import { getGeneratedSellerOrder, isGeneratedSellerOrderId } from './previewSellerOrders';
 import { getPreviewSellerOrder } from './previewOrders';
 import { isPreviewSellerOrderId } from './previewDeliveryOrders';
+import { isPreviewDemoMode } from './devPreview';
 
 const edits = new Map<string, Record<string, unknown>>();
 
@@ -15,9 +16,11 @@ export function isLocalPreviewSellerOrderId(id: string | null | undefined): bool
   return isGeneratedSellerOrderId(id) || isPreviewSellerOrderId(id);
 }
 
-/** The demo order as this session last left it, or null for any other id. */
+/** The demo order as this session last left it, or null for any other id
+ *  (and for every id outside the `&demo=1` preview: a real account never
+ *  sees a generated demo order, the same gate getPreviewSellerOrder uses). */
 export function loadPreviewSellerOrder(id: string | null | undefined): Record<string, unknown> | null {
-  if (!id || !isLocalPreviewSellerOrderId(id)) return null;
+  if (!id || !isLocalPreviewSellerOrderId(id) || !isPreviewDemoMode()) return null;
   const edited = edits.get(id);
   if (edited) return edited;
   if (isGeneratedSellerOrderId(id)) {

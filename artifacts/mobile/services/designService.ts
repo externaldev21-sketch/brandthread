@@ -1,7 +1,8 @@
 /**
  * Brandthread Design Studio — Service Layer
- * All AsyncStorage CRUD + mock AI functions.
- * No dynamic await import(). All types from './designTypes'.
+ * Local (AsyncStorage) project storage with Design Studio cloud sync, the
+ * brand-asset library, and the AI generation calls (real endpoints; only
+ * generateCampaign is still a local mock). All types from './designTypes'.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -190,6 +191,38 @@ function delay(ms: number): Promise<void> {
 
 async function saveProjects(arr: DesignProject[], key = K().projects): Promise<void> {
   await AsyncStorage.setItem(key, JSON.stringify(arr));
+}
+
+/** Append a new project to the stored list, read and written under the sync lock. */
+async function insertLocalProject(project: DesignProject, context: DesignSyncContext): Promise<void> {
+  await withSyncLock(context, async () => {
+    const current = await loadProjects(context.keys.projects);
+    await saveProjects([...current, project], context.keys.projects);
+  });
+}
+
+/**
+ * Record the cloud revision a push returned on the *current* stored copy of
+ * the project. Re-reads under the sync lock instead of writing back a list
+ * captured before the network call, which would undo any project created,
+ * edited or deleted while the push was in flight.
+ */
+async function storeSyncedRevision(
+  project: DesignProject,
+  cloudRevision: number | undefined,
+  context: DesignSyncContext,
+): Promise<DesignProject> {
+  return withSyncLock(context, async () => {
+    const current = await loadProjects(context.keys.projects);
+    let stored: DesignProject | undefined;
+    const next = current.map(item => {
+      if (item.id !== project.id) return item;
+      stored = { ...item, cloudRevision };
+      return stored;
+    });
+    if (stored) await saveProjects(next, context.keys.projects);
+    return stored ?? { ...project, cloudRevision };
+  });
 }
 
 async function loadProjects(key = K().projects): Promise<DesignProject[]> {
@@ -845,7 +878,7 @@ export async function createProject(
 ): Promise<DesignProject> {
   const context = captureSyncContext();
   const keys = context.keys;
-  const projects = await seedIfEmpty(keys.projects);
+  await seedIfEmpty(keys.projects);
   const now = new Date().toISOString();
   const fullCanvas: DesignCanvas = {
     width: canvas.width ?? 1080,
@@ -873,16 +906,15 @@ export async function createProject(
     createdAt: now,
     updatedAt: now,
   };
-  await saveProjects([...projects, project], keys.projects);
+  await insertLocalProject(project, context);
+  let synced: DesignProject;
   try {
-    const synced = await pushProjectSerialized(project, context);
-    const localSynced = { ...project, cloudRevision: synced.cloudRevision };
-    await saveProjects([...projects, localSynced], keys.projects);
-    return localSynced;
+    synced = await pushProjectSerialized(project, context);
   } catch {
     await queueProjectSync(project, context);
     return (await loadProjects(keys.projects)).find(item => item.id === project.id) ?? project;
   }
+  return storeSyncedRevision(project, synced.cloudRevision, context);
 }
 
 export async function updateProject(id: string, partial: Partial<DesignProject>): Promise<DesignProject> {
@@ -1242,18 +1274,15 @@ async function insertProjectCopy(
     if (layer.data.kind === 'image') delete (layer.data as typeof layer.data & { cloudObjectPath?: string }).cloudObjectPath;
   }
   assertCurrentContext(context);
-  const keys = context.keys;
-  const projects = await loadProjects(keys.projects);
-  await saveProjects([...projects, copy], keys.projects);
+  await insertLocalProject(copy, context);
+  let synced: DesignProject;
   try {
-    const synced = await pushProjectSerialized(copy, context);
-    const localSynced = { ...copy, cloudRevision: synced.cloudRevision };
-    await saveProjects([...projects, localSynced], keys.projects);
-    return localSynced;
+    synced = await pushProjectSerialized(copy, context);
   } catch {
     await queueProjectSync(copy, context);
     return copy;
   }
+  return storeSyncedRevision(copy, synced.cloudRevision, context);
 }
 
 export async function archiveProject(id: string): Promise<DesignProject> {
@@ -1423,11 +1452,16 @@ export async function getBrandAssets(): Promise<BrandAsset[]> {
   // existed. Only assets that can be stored (colors, fonts, https images) are
   // moved; a device-local image file cannot be, and stays on this phone only.
   const local = await loadAssets().catch(() => [] as BrandAsset[]);
-  const portable = local.filter(a => {
+  const isPortable = (a: BrandAsset) => {
     try { toServerBrandAsset(a); return true; } catch { return false; }
-  });
+  };
+  const portable = local.filter(isPortable);
   if (portable.length === 0) return server;
-  return saveServerBrandAssets(portable);
+  const saved = await saveServerBrandAssets(portable);
+  // Moved for good: drop them from the phone copy, or a library the seller
+  // later empties on purpose would be re-uploaded from here on the next load.
+  await saveAssets(local.filter(a => !isPortable(a))).catch(() => {});
+  return saved;
 }
 
 // addBrandAsset — alias for createBrandAsset (used by design-brand-assets.tsx)

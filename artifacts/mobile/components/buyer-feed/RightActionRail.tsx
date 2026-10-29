@@ -2,7 +2,8 @@
  * Buyer Threads Home feed — right action rail (TikTok/Reels-quality pass).
  *
  * Avatar (38pt circle) + follow badge,
- * like, comment, repost, save, share. Custom filled SVG glyphs (RailGlyph),
+ * like, comment, save, share (no repost — it lives in the share sheet;
+ * `onRepost` is accepted for existing callers and unused). Custom filled SVG glyphs (RailGlyph),
  * counts below (formatRailCount: exact 0-999, compact K/M, always shows 0). All motion runs on the
  * UI thread via Reanimated shared values and respects `reduceMotion`.
  *
@@ -167,7 +168,7 @@ export function RightActionRail({
   style?: StyleProp<ViewStyle>;
   testIdBase: string;
   reduceMotion?: boolean;
-  /** Shows a small "Official" label under the avatar. */
+  /** Official account: adds ", official account" to the avatar's accessibility label (no visible label). */
   isOfficial?: boolean;
   /** Viewer's own post — no follow badge. */
   isSelf?: boolean;
@@ -292,7 +293,7 @@ export function RightActionRail({
 
       <RailAction
         glyph="heart" count={likes} active={liked} activeColor={HEART_RED} kind="pop" reduceMotion={reduceMotion}
-        onPress={onLike} label={`${liked ? 'Unlike' : 'Like'}, ${likes} likes`} checked={liked} testID={`like-btn-${testIdBase}`}
+        onPress={onLike} label={`${liked ? 'Unlike' : 'Like'}, ${likes} ${likes === 1 ? 'like' : 'likes'}`} checked={liked} testID={`like-btn-${testIdBase}`}
       />
       <RailAction
         glyph="comment" count={commentsCount} active={false} activeColor={ON_DARK} kind="none"
@@ -300,7 +301,7 @@ export function RightActionRail({
       />
       <RailAction
         glyph="bookmark" count={saveCount} active={saved} activeColor="#FACE15" kind="bounce" reduceMotion={reduceMotion}
-        onPress={onSave} onLongPress={onSaveLongPress} label={`${saved ? 'Unsave' : 'Save'}, ${saveCount} saves`} checked={saved} testID={`save-btn-${testIdBase}`}
+        onPress={onSave} onLongPress={onSaveLongPress} label={`${saved ? 'Unsave' : 'Save'}, ${saveCount} ${saveCount === 1 ? 'save' : 'saves'}`} checked={saved} testID={`save-btn-${testIdBase}`}
       />
       <RailAction
         glyph="share" count={shares} active={false} activeColor={ON_DARK} kind="none"

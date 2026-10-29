@@ -52,9 +52,13 @@ export function useFeaturedBrands() {
         api.featuredSlots.active().catch(() => null),
       ]);
       if (!alive) return;
-      const rows = mergeFeaturedBrands(picks?.brands, paid?.brands);
-      setBrands(rows.length > 0 ? rows : isPreviewDemoMode() ? DEMO_BRANDS : []);
-      setThreads(featuredThreadTiles(picks?.threads));
+      // A failed request is not "nothing featured": keep what the sticky
+      // cache already shows rather than wiping the rail offline.
+      if (picks || paid) {
+        const rows = mergeFeaturedBrands(picks?.brands, paid?.brands);
+        setBrands(rows.length > 0 ? rows : isPreviewDemoMode() ? DEMO_BRANDS : []);
+      }
+      if (picks) setThreads(featuredThreadTiles(picks.threads));
       setSettled(true);
     })();
     return () => { alive = false; };

@@ -38,8 +38,11 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   // A broken/unreachable thumbnail falls back to the media-type icon instead
-  // of an empty grey square.
-  const [thumbFailed, setThumbFailed] = React.useState(false);
+  // of an empty grey square. Remembered per URL, so a new thumbnail on the
+  // same card instance gets its own attempt.
+  const thumbnailUrl = 'unavailable' in quotedPost ? null : quotedPost.thumbnailUrl;
+  const [failedThumbUrl, setFailedThumbUrl] = React.useState<string | null>(null);
+  const thumbFailed = thumbnailUrl != null && failedThumbUrl === thumbnailUrl;
 
   if ('unavailable' in quotedPost) {
     return (
@@ -54,7 +57,7 @@ export function QuotedPostCard({ quotedPost, onPress, testID = 'quoted-post-card
   const body = (
     <>
       {quotedPost.thumbnailUrl && !thumbFailed ? (
-        <Image cachePolicy="memory-disk" source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors onError={() => setThumbFailed(true)} />
+        <Image cachePolicy="memory-disk" source={{ uri: quotedPost.thumbnailUrl }} style={styles.thumb} accessibilityIgnoresInvertColors onError={() => setFailedThumbUrl(quotedPost.thumbnailUrl)} />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
           <Icon name={quotedPost.mediaType === 'video' ? 'video' : 'image'} size={20} color={theme.muted} />

@@ -86,6 +86,7 @@ export function LiveThreadCashSheet({
     setSelected(null);
     setJustSentCents(null);
     setSendError(null);
+    setBalanceError(false);
     // Same short-circuit ChatAttachThreadCash.tsx uses: there's no backend
     // to answer this in the dev-web preview, so attempting the real call
     // first just means a multi-second wait for it to time out before the
@@ -117,7 +118,18 @@ export function LiveThreadCashSheet({
   async function handleSend() {
     if (!selected || sending || balanceCents == null || selected > balanceCents) return;
     setSending(true);
-    if (recipientId && streamId && !isPreviewThreadCashEnabled()) {
+    setSendError(null);
+    const localOnly = previewOnly || isPreviewThreadCashEnabled();
+    if (!localOnly) {
+      if (!(recipientId && streamId)) {
+        // No real host / live to send to: fail visibly rather than report a
+        // gift that never happened (see the module doc).
+        setSending(false);
+        const message = 'Could not send Thread Cash. Try again.';
+        setSendError(message);
+        onSendFailed?.(message);
+        return;
+      }
       try {
         await api.threadCash.liveGift({
           streamId,
@@ -159,9 +171,12 @@ export function LiveThreadCashSheet({
       <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
         <ThreadCashBillIcon size={16} />
         <Text style={[styles.balanceText, { color: theme.text }]} testID="live-thread-cash-balance">
-          {balanceCents == null ? '···' : `${formatCents(balanceCents)} available`}
+          {balanceCents == null ? (balanceError ? 'Couldn’t load your balance' : '···') : `${formatCents(balanceCents)} available`}
         </Text>
       </View>
+      {sendError ? (
+        <Text style={[styles.sub, { color: theme.text }]} testID="live-thread-cash-error" accessibilityLiveRegion="polite">{sendError}</Text>
+      ) : null}
 
       {justSentCents != null && (
         <Animated.View style={[styles.sentBanner, { borderColor: THREAD_CASH_GREEN_MID }, popStyle]}>

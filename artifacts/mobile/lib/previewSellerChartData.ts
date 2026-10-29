@@ -11,18 +11,18 @@
  * happened to be cached, producing exactly the bug this PR fixes — the same
  * bucket data reused for every range, so switching ranges changed nothing
  * but the range pill, and "Year" showed the current month's label repeated
- * instead of 12 distinct trailing months.
+ * instead of one distinct month per bucket (Jan through the current month).
  *
  * Two modes (see lib/devPreview.ts's isPreviewFreshMode/isPreviewDemoMode):
  *   - 'fresh' (default — isPreviewFreshMode(), no ?demo=1): a flat $0
  *     baseline for every bucket, with correct range-appropriate x-axis
  *     labels. Never a fake curve or a fake percentage — matches Shopify's
  *     own zero-state chart ("$0.00 —").
- *   - 'demo' (isPreviewDemoMode() — ?bt_preview=seller&demo=1): a
- *     deterministic, realistic-looking curve that actually varies in shape
- *     between ranges, with a real previous-period comparison. Deterministic
- *     (seeded, not Math.random()) so the same range renders identically
- *     across re-renders/re-fetches instead of jittering.
+ *   - 'demo' (isPreviewDemoMode() — ?bt_preview=seller&demo=1): every
+ *     bucket is the sum of the demo order set (lib/previewSellerOrders.ts),
+ *     so it varies in shape between ranges and has a real previous-period
+ *     comparison. Deterministic (seeded by day, not Math.random()) so the
+ *     same range renders identically across re-renders/re-fetches.
  *
  * Bucket timestamps are built from local Date components (not UTC) so
  * lib/sellerHomeChartLabels.ts's bucketLabel — which reads local

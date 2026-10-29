@@ -5,8 +5,8 @@
  * component is currently unreachable in production. The discount is always
  * computed from the real plan price — never a separate hard-coded number.
  *
- * Runs on the shared `<Sheet>`, like SellerPaywallExitDrawer: the offer is
- * the body, the claim CTA is pinned in the footer.
+ * Runs on the shared `<Sheet>` (unlike SellerPaywallExitDrawer, which uses a
+ * plain RN Modal): the offer is the body, the claim CTA is pinned in the footer.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';

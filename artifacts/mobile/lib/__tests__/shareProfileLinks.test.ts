@@ -30,7 +30,7 @@ describe('shareProfile links: canonical URL construction', () => {
     // Clerk IDs look like "user_2abc..." — these must not become URLs.
     const clerkId = 'user_2abcDEFghijk';
     const normalized = normalizeUsername(clerkId);
-    // After stripping non-[a-z0-9_] chars and lowercasing, this becomes "user2abcdefghijk" (16 chars) — valid length but from a Clerk ID.
+    // After stripping non-[a-z0-9_] chars and lowercasing, this becomes "user_2abcdefghijk" (17 chars; the underscore is kept) — valid length but from a Clerk ID.
     // The key contract: we only call buildCanonicalProfileUrl with the users.username field, never with clerkId.
     // This test verifies normalizeUsername behavior when given a Clerk-style ID.
     // We confirm no production code path should pass clerkId to buildCanonicalProfileUrl.

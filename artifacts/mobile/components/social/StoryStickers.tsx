@@ -206,10 +206,19 @@ export function countdownParts(msLeft: number) {
   };
 }
 
+/** Server-minus-device clock offset. `receivedAt` is when the `serverNow` snapshot reached the
+ *  device; without it the snapshot is assumed to have arrived just now. */
+export function serverClockOffset(serverNow: number | undefined, receivedAt?: number, now = Date.now()): number {
+  if (serverNow === undefined) return 0;
+  return serverNow - (typeof receivedAt === 'number' ? receivedAt : now);
+}
+
 /** Milliseconds until `releaseAt`, ticking each second from the SERVER clock (`serverNow`), not the phone's. */
-export function useCountdown(releaseAt: string | null | undefined, serverNow?: number, tick = true): number | null {
-  const offset = useRef((serverNow ?? Date.now()) - Date.now());
-  useEffect(() => { offset.current = (serverNow ?? Date.now()) - Date.now(); }, [serverNow]);
+export function useCountdown(
+  releaseAt: string | null | undefined, serverNow?: number, tick = true, receivedAt?: number,
+): number | null {
+  const offset = useRef(serverClockOffset(serverNow, receivedAt));
+  useEffect(() => { offset.current = serverClockOffset(serverNow, receivedAt); }, [serverNow, receivedAt]);
   const target = releaseAt ? new Date(releaseAt).getTime() : null;
   const compute = () => (target === null ? null : target - (Date.now() + offset.current));
   const [left, setLeft] = useState<number | null>(compute);
@@ -226,11 +235,13 @@ export function useCountdown(releaseAt: string | null | undefined, serverNow?: n
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function CountdownSticker({
-  name, releaseAt, serverNow, live, subscribed, mode, busy, onNotify, onOpen,
+  name, releaseAt, serverNow, receivedAt, live, subscribed, mode, busy, onNotify, onOpen,
 }: {
   name: string;
   releaseAt: string | null;
   serverNow?: number;
+  /** Device time `serverNow` arrived (StoryStickerState.receivedAt). */
+  receivedAt?: number;
   /** the drop has launched and is selling */
   live?: boolean;
   subscribed?: boolean;
@@ -239,7 +250,7 @@ export function CountdownSticker({
   onNotify?: () => void;
   onOpen?: () => void;
 }) {
-  const left = useCountdown(releaseAt, serverNow, mode === 'viewer');
+  const left = useCountdown(releaseAt, serverNow, mode === 'viewer', receivedAt);
   const launched = !!live || (left !== null && left <= 0);
   const parts = useMemo(() => countdownParts(left ?? 0), [left]);
   const cells: Array<[string, string]> = [
@@ -383,7 +394,7 @@ export function ViewerStickerLayer({
           const name = c?.name ?? o.dropName ?? 'Drop';
           body = (
             <CountdownSticker
-              name={name} releaseAt={c?.releaseAt ?? o.dropReleaseAt ?? null} serverNow={live?.serverNow}
+              name={name} releaseAt={c?.releaseAt ?? o.dropReleaseAt ?? null} serverNow={live?.serverNow} receivedAt={live?.receivedAt}
               live={c?.live} subscribed={c?.subscribed} mode="viewer" busy={busyId === o.id}
               onNotify={() => run(o.id, async () => {
                 if (!local) await actions.notify(dropId);

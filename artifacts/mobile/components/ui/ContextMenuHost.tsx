@@ -37,6 +37,7 @@ import {
 export function menuSurface(theme: AppThemePreset): string {
   return theme.id === 'monochrome' ? '#1C1C1E' : theme.cardElevated;
 }
+const CONTEXT_MENU_SCRIM = 'rgba(0,0,0,0.8)'; // theme-exempt: neutral context-menu scrim
 const PULLDOWN_WIDTH = 250;
 const ROW_HEIGHT = 44;
 const nativeDriver = Platform.OS !== 'web';
@@ -130,7 +131,7 @@ function PreviewMenu({ req }: { req: ContextMenuRequest }) {
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={() => close()}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} /> // theme-exempt: neutral context-menu scrim
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: CONTEXT_MENU_SCRIM }]} />
         {/* A dim over the blur (Instagram) — the theme background at ~45%, so
             the blurred screen stays visible behind the card. */}
         <View style={[StyleSheet.absoluteFill, styles.previewScrim, { backgroundColor: `${theme.background}73` }]} />

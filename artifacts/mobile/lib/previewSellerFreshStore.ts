@@ -76,6 +76,9 @@ function initialState(): PreviewSellerFreshState {
 }
 
 let state: PreviewSellerFreshState = initialState();
+// Every mutation replaces `state`, so `state !== untouchedState` means the
+// seller already changed something before the saved session finished loading.
+const untouchedState = state;
 
 const STORAGE_KEY = 'bt_preview_seller_fresh_store_v1';
 
@@ -93,14 +96,28 @@ const hydration: Promise<void> = AsyncStorage.getItem(STORAGE_KEY)
   .then((raw) => {
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<PreviewSellerFreshState>;
-    state = {
+    const saved: PreviewSellerFreshState = {
       discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [],
       liveSessions: Array.isArray(parsed.liveSessions) ? parsed.liveSessions : [],
       storefront: parsed.storefront ?? { headline: null, bio: null, updatedAt: null },
     };
+    // A change made while this read was in flight (e.g. a discount added on
+    // a slow device) is newer than the saved session: keep it on top instead
+    // of overwriting it, and keep the saved rows it doesn't replace.
+    state = state === untouchedState ? saved : mergeOverSaved(state, saved);
     notify();
   })
   .catch(() => { /* non-fatal — starts from initialState() */ });
+
+function mergeOverSaved(live: PreviewSellerFreshState, saved: PreviewSellerFreshState): PreviewSellerFreshState {
+  const discountIds = new Set(live.discounts.map((d) => d.id));
+  const sessionIds = new Set(live.liveSessions.map((x) => x.id));
+  return {
+    discounts: [...live.discounts, ...saved.discounts.filter((d) => !discountIds.has(d.id))],
+    liveSessions: [...live.liveSessions, ...saved.liveSessions.filter((x) => !sessionIds.has(x.id))],
+    storefront: live.storefront.updatedAt ? live.storefront : saved.storefront,
+  };
+}
 
 /** Resolves once a previous session's saved state (if any) has loaded into `state`. */
 export function whenPreviewSellerFreshStoreReady(): Promise<void> {

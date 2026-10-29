@@ -7,8 +7,10 @@
  * from when they were fetched. Real posts are persisted through the social
  * APIs (POST /api/posts/:id/interact, /api/buyer/saved) — this store just
  * makes the viewer show what the viewer did (and the server accepted) when
- * the same post is reopened before the next refetch. Pure, unit-tested.
+ * the same post is reopened before the next refetch. Cleared on every
+ * account switch / sign-out (lib/accountStorage.ts). Unit-tested.
  */
+import { onAccountStorageScopeChange } from '@/lib/accountStorage';
 
 export interface DiscoverEngagement {
   liked: boolean;
@@ -17,6 +19,9 @@ export interface DiscoverEngagement {
 }
 
 const overrides = new Map<string, DiscoverEngagement>();
+// "What the viewer did" belongs to the account that did it: a switch or
+// sign-out must not show the previous account's likes/saves.
+onAccountStorageScopeChange(() => overrides.clear());
 
 export function discoverEngagementFor(post: {
   id: string; likedByMe?: boolean; likesCount: number; savedByMe?: boolean;

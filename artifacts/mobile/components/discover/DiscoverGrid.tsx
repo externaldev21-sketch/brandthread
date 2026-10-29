@@ -1,5 +1,5 @@
 /**
- * The For You / Fits Explore grid — 3 columns, 1pt gaps, every ~5th tile a
+ * The For You / Fits Explore grid — 3 columns, 3pt gaps (GRID_GAP), every ~5th tile a
  * 2x2 feature (Instagram Explore's real packing pattern: a big tile plus two
  * small tiles stacked beside it, consuming one 2-row block). Every tile is
  * portrait 3:4 (width:height) so a full-length fashion photo or video fits

@@ -60,9 +60,9 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
   },
 ];
 
-/** Minimum plan to host a live (server: planCatalogue.ts → liveSelling). */
 export const SELLER_TRIAL_DAYS = 7;
 
+/** Minimum plan to host a live (server: planCatalogue.ts → liveSelling). */
 export const LIVE_HOST_MIN_PLAN: 'growth' | 'pro' = 'growth';
 
 /**

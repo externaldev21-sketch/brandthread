@@ -42,13 +42,14 @@ export async function saveStyleBadge(state: StyleBadgeState): Promise<void> {
   ]);
 }
 
-/** The locally saved badge, or null when this device never saved one. */
+/**
+ * The badge this account saved on this device, or null when it never saved
+ * one. Reads the account-scoped keys saveStyleBadge writes (any pre-scoping
+ * device-wide value is claimed into them first); the bare legacy keys are
+ * deleted once claimed, so they can't answer this.
+ */
 export async function loadStoredStyleBadge(): Promise<StyleBadgeState | null> {
-  const pairs = await AsyncStorage.multiGet([
-    STYLE_BADGE_LABEL_KEY,
-    STYLE_BADGE_EMOJI_KEY,
-    STYLE_BADGE_ENABLED_KEY,
-  ]);
+  const pairs = await AsyncStorage.multiGet(await scopedKeys());
   if (pairs.every(p => p[1] === null || p[1] === undefined)) return null;
   return loadStyleBadge();
 }

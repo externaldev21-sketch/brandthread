@@ -125,12 +125,19 @@ describe('seller payment status cache', () => {
   });
 
   it('does not cache failed requests', async () => {
+    // lib/api.ts quietly retries a transient read failure once
+    // (AUTO_RETRY_DELAY_MS, lib/requestResilience.ts), so a request only
+    // fails once both attempts have failed.
     fetchMock
+      .mockRejectedValueOnce(new Error('offline'))
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(paymentResponse({ ready: true }));
 
-    await expect(api.buyer.sellerPaymentStatus('seller-a')).rejects.toThrow('offline');
-    await expect(api.buyer.sellerPaymentStatus('seller-a')).resolves.toEqual({ ready: true });
+    const failed = expect(api.buyer.sellerPaymentStatus('seller-a')).rejects.toThrow('offline');
+    await vi.runAllTimersAsync();
+    await failed;
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(api.buyer.sellerPaymentStatus('seller-a')).resolves.toEqual({ ready: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

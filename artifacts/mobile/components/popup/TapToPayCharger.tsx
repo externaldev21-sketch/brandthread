@@ -3,7 +3,7 @@
  * this build) and exposes one imperative charge() to the Pop-up mode screen.
  * Renders nothing visible; without the SDK it renders nothing at all.
  */
-import React, { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { chargeWithTapToPay, loadTerminalModule, type ChargeOutcome, type TerminalApi } from '@/lib/tapToPay';
 
 export type TapToPayChargerHandle = {
@@ -30,6 +30,11 @@ export const TapToPayCharger = forwardRef<TapToPayChargerHandle, Props>(function
 function Inner({ sdk, forwardedRef }: { sdk: any; forwardedRef: React.ForwardedRef<TapToPayChargerHandle> }) {
   const waiters = useRef<Array<(readers: unknown[]) => void>>([]);
   const initialized = useRef(false);
+  const fallbackTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => () => {
+    fallbackTimers.current.forEach(clearTimeout);
+    fallbackTimers.current.clear();
+  }, []);
   const terminal = sdk.useStripeTerminal({
     onUpdateDiscoveredReaders: (readers: unknown[]) => {
       const pending = waiters.current;
@@ -39,9 +44,17 @@ function Inner({ sdk, forwardedRef }: { sdk: any; forwardedRef: React.ForwardedR
   }) as TerminalApi;
 
   const nextDiscoveredReaders = useCallback(() => new Promise<unknown[]>((resolve) => {
-    waiters.current.push(resolve);
-    // Never hang the Charge step if the SDK reports nothing.
-    setTimeout(() => resolve([]), 20_000);
+    // Never hang the Charge step if the SDK reports nothing; whichever comes
+    // first wins and the other is cancelled.
+    const timer = setTimeout(() => { fallbackTimers.current.delete(timer); done([]); }, 20_000);
+    fallbackTimers.current.add(timer);
+    function done(readers: unknown[]) {
+      clearTimeout(timer);
+      fallbackTimers.current.delete(timer);
+      waiters.current = waiters.current.filter((w) => w !== done);
+      resolve(readers);
+    }
+    waiters.current.push(done);
   }), []);
 
   useImperativeHandle(forwardedRef, () => ({

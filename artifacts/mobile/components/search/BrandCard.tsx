@@ -29,7 +29,7 @@ export function BrandCard({ brand, width, onPress }: {
       onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
       onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
-      accessibilityLabel={`Visit ${brand.name}, ${brand.followerCount} followers`}
+      accessibilityLabel={`Visit ${brand.name}, ${brand.followerCount} ${brand.followerCount === 1 ? 'follower' : 'followers'}`}
     >
       <Animated.View
         style={[

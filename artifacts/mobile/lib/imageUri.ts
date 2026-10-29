@@ -116,7 +116,11 @@ export async function makeDurableUri(pickerUri: string, ext = 'jpg'): Promise<st
   }
 
   // 5. Native: copy picker temp file into app-owned document directory.
-  const safeExt = (pickerUri.split('.').pop()?.split('?')[0] ?? ext).toLowerCase();
+  // The URI's own extension when its last path segment has one (Android
+  // content:// URIs often don't), otherwise the caller's hint.
+  const lastSegment = pickerUri.split(/[?#]/)[0].split('/').pop() ?? '';
+  const ownExt = lastSegment.includes('.') ? lastSegment.split('.').pop() ?? '' : '';
+  const safeExt = (/^[a-z0-9]{1,5}$/i.test(ownExt) ? ownExt : ext.replace(/[^a-z0-9]/gi, '') || 'jpg').toLowerCase();
   const dest = new File(Paths.document, `${uid()}.${safeExt}`);
   const src = new File(pickerUri);
   await src.copy(dest);

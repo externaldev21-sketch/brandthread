@@ -142,7 +142,7 @@ export async function syncAISettingsFromServer(authToken: string | null | undefi
   const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   if (!apiBase || !authToken) return null;
   try {
-    const res = await fetch(`${apiBase}/api/v1/ai/settings`, {
+    const res = await fetchWithTimeout(`${apiBase}/api/v1/ai/settings`, {
       headers: { Authorization: `Bearer ${authToken}` },
     });
     if (!res.ok) return null;
@@ -192,7 +192,9 @@ export function pushAISettings(
     try {
       const authToken = typeof auth === 'function' ? await auth().catch(() => null) : auth;
       if (!authToken) return false;
-      const res = await fetch(`${apiBase}/api/v1/ai/settings`, {
+      // Bounded: writes are serialized, so one hung PUT would otherwise hold
+      // every later settings change back forever.
+      const res = await fetchWithTimeout(`${apiBase}/api/v1/ai/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -256,22 +258,26 @@ function creditGateError(status: number, text: string): AIRequestError | null {
 
 // ─── Session repair ───────────────────────────────────────────────────────────
 
+/** A double write of the same message lands within this window. */
+const DUPLICATE_WINDOW_MS = 2_000;
+
 /**
  * Remove empty messages and deduplicate consecutive identical messages.
  * Preserves ordering. Called on every session load.
  */
 function repairMessages(messages: AIMessage[]): AIMessage[] {
-  const seen = new Set<string>();
   const out: AIMessage[] = [];
   for (const m of messages) {
-    // Drop empty non-streaming messages
-    if (!m.isStreaming && !m.content?.trim() && !m.error) continue;
-    // Drop exact content duplicates (same role + content within 2 s)
-    const dedupKey = `${m.role}:${m.content}`;
-    if (seen.has(dedupKey)) continue;
-    seen.add(dedupKey);
     // Strip any persisted streaming placeholders (should never be stored)
     if (m.isStreaming) continue;
+    // Drop empty messages
+    if (!m.content?.trim() && !m.error) continue;
+    // Drop an exact duplicate of the message right before it (same role +
+    // content within 2 s). The same question asked again later in the
+    // conversation is a real turn and is kept.
+    const prev = out[out.length - 1];
+    if (prev && prev.role === m.role && prev.content === m.content &&
+        Math.abs((m.ts ?? 0) - (prev.ts ?? 0)) <= DUPLICATE_WINDOW_MS) continue;
     out.push(m);
   }
   return out;
@@ -320,6 +326,17 @@ export async function loadSession(
   return _newSession(context, key);
 }
 
+/**
+ * Make `session` the in-memory current session — unless the screen has since
+ * loaded another account's / store's session (a turn that finished after an
+ * account switch must not replace the new account's conversation in memory;
+ * it is still persisted under its own key).
+ */
+function setCurrentSessionFor(session: AISession, userId?: string | null, storeContext?: string | null): void {
+  if (_lastSessionKey !== null && _lastSessionKey !== sessionKey(userId, storeContext)) return;
+  _currentSession = session;
+}
+
 function _newSession(context: AIScreenContext, key?: string): AISession {
   const session: AISession = {
     id: nanoid(),
@@ -363,7 +380,11 @@ export async function clearSession(
   storeContext?: string | null,
 ): Promise<void> {
   _currentSession = null;
-  const key = sessionKey(userId, storeContext);
+  // Called without an account (AI Settings → Clear history): clear the
+  // conversation that was actually loaded, not the signed-out 'anon' slot.
+  const key = userId === undefined && storeContext === undefined && _lastSessionKey
+    ? _lastSessionKey
+    : sessionKey(userId, storeContext);
   await AsyncStorage.removeItem(key);
 }
 
@@ -498,6 +519,12 @@ function callAIStream(
       aborted = true;
       xhr.abort();
     };
+    // Stopped before the request went out (e.g. while the request body was
+    // being built): never send it.
+    if (signal.aborted) {
+      reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
+      return;
+    }
     signal.addEventListener('abort', onAbort);
     const cleanup = () => signal.removeEventListener('abort', onAbort);
 
@@ -674,7 +701,7 @@ async function finalizeTurn(
     messages: [...session.messages, userMsg, aiMsg],
     updatedAt: Date.now(),
   };
-  _currentSession = newSession;
+  setCurrentSessionFor(newSession, userId, storeContext);
 
   if (aiMsg.actionCard) {
     await addAuditEntry({
@@ -817,7 +844,7 @@ export async function applyAction(
     ),
     updatedAt: Date.now(),
   };
-  _currentSession = newSession;
+  setCurrentSessionFor(newSession, userId, storeContext);
 
   await addAuditEntry({
     eventType: confirmed ? 'approved' : 'rejected',
@@ -849,7 +876,7 @@ export async function undoAction(
     ),
     updatedAt: Date.now(),
   };
-  _currentSession = newSession;
+  setCurrentSessionFor(newSession, userId, storeContext);
 
   await addAuditEntry({
     eventType: 'undone',
@@ -888,14 +915,19 @@ export async function getAISuggestions(
       });
       if (res.ok) {
         const { suggestions } = await res.json() as { suggestions: AISuggestion[] };
-        if (Array.isArray(suggestions) && suggestions.length > 0) {
+        // An empty list is a real answer (everything was handled): it replaces
+        // the cache instead of falling back to suggestions that no longer apply.
+        if (Array.isArray(suggestions)) {
           try {
             const raw = await AsyncStorage.getItem(storageKey);
             const stored: AISuggestion[] = raw ? JSON.parse(raw) : [];
-            const dismissedIds = new Set(stored.filter(s => s.dismissedAt).map(s => s.id));
-            const filtered = suggestions.filter(s => !dismissedIds.has(s.id) && allowed(s));
+            // Dismissed and completed suggestions stay hidden (the cached
+            // path below filters both) — keep their markers across refetches.
+            const handled = stored.filter(s => s.dismissedAt || s.completedAt);
+            const handledIds = new Set(handled.map(s => s.id));
+            const filtered = suggestions.filter(s => !handledIds.has(s.id) && allowed(s));
             await AsyncStorage.setItem(storageKey, JSON.stringify([
-              ...stored.filter(s => s.dismissedAt),
+              ...handled,
               ...filtered,
             ]));
             return filtered;

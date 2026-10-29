@@ -294,10 +294,14 @@ export function useJoinedCommunities(pollMs = 20_000): { communities: Community[
   const [loading, setLoading] = useState(!hadCache);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  // The client changes with the signed-in account / mode; a list fetched by
+  // the previous client (another account) must not land after the switch.
+  const clientRef = useRef(client);
+  clientRef.current = client;
   const reload = useCallback(async () => {
     try {
       const rows = await client.mine();
-      if (alive.current) setCommunities(rows);
+      if (alive.current && clientRef.current === client) setCommunities(rows);
     } catch { /* quiet — inbox must never break on this */ }
     finally { if (alive.current) setLoading(false); }
   }, [client]);

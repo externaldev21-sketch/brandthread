@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Platform, Text } from 'react-native';
 import { CachedImage as Image } from '@/components/CachedImage';
 
+const ZWJ = String.fromCodePoint(0x200d);
+const VS16 = String.fromCodePoint(0xfe0f);
+
 /**
  * One consistent emoji glyph across iOS, Android and web.
  *
@@ -28,7 +31,10 @@ export function AppleEmoji({ emoji, size = 24 }: { emoji: string; size?: number 
     return <Text style={{ fontSize: size }}>{emoji}</Text>;
   }
 
-  const codepoint = Array.from(emoji)
+  // Twemoji's file names drop U+FE0F unless the sequence has a ZWJ (U+200D)
+  // — same rule as twemoji.parse's grabTheRightIcon().
+  const glyphs = emoji.includes(ZWJ) ? emoji : emoji.split(VS16).join('');
+  const codepoint = Array.from(glyphs)
     .map(char => char.codePointAt(0)?.toString(16))
     .filter(Boolean)
     .join('-');

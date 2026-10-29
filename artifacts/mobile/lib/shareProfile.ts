@@ -55,7 +55,7 @@ export function parseProfileDeepLink(raw: string | null | undefined): string | n
   if (!raw || typeof raw !== 'string') return null;
   const trimmed = raw.trim();
   const match = trimmed.match(
-    /^(?:https?:\/\/(?:www\.)?brandthread\.app|brandthread:\/\/)\/?u\/([^/?#]+)/i,
+    /^(?:https?:\/\/(?:www\.)?brandthread\.app\/|brandthread:\/\/\/?)u\/([^/?#]+)/i,
   );
   if (!match) return null;
   return normalizeUsername(match[1]);

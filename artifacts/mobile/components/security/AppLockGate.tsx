@@ -32,6 +32,7 @@ export default function AppLockGate() {
   const settingsRef = useRef<AppLockSettings>({ enabled: false, graceSeconds: 0 });
   const backgroundedAtRef = useRef<number | null>(null);
   const promptingRef = useRef(false);
+  const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const unlock = useCallback(async () => {
     if (promptingRef.current) return;
@@ -66,13 +67,22 @@ export default function AppLockGate() {
     setState('locked');
     setMessage(null);
     // Let the lock screen paint before the system prompt appears.
-    setTimeout(() => { unlock(); }, 250);
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+    promptTimerRef.current = setTimeout(() => { promptTimerRef.current = null; unlock(); }, 250);
   }, [unlock]);
+
+  // Never raise the system prompt for a gate that is gone.
+  useEffect(() => () => { if (promptTimerRef.current) clearTimeout(promptTimerRef.current); }, []);
 
   // Cold start / sign-in: lock immediately when enabled.
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    if (!isSignedIn) { setState('unlocked'); return; }
+    if (!isSignedIn) {
+      // Signed out ("Sign out instead"): drop a pending biometric prompt.
+      if (promptTimerRef.current) { clearTimeout(promptTimerRef.current); promptTimerRef.current = null; }
+      setState('unlocked');
+      return;
+    }
     let active = true;
     (async () => {
       const [settings, device] = await Promise.all([loadAppLockSettings(), getDeviceSecurity()]);

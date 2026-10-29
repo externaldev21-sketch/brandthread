@@ -13,13 +13,17 @@ export async function confirmPublishWithoutPayouts(api: ConnectApi, router: Navi
   // Alert.alert is a no-op on web; checkout itself still guards payments there.
   if (Platform.OS === 'web') return true;
   let raw: unknown = null;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     raw = await Promise.race([
       api.seller.connect.status(),
-      new Promise((resolve) => setTimeout(() => resolve(null), 4000)),
+      new Promise((resolve) => { timeout = setTimeout(() => resolve(null), 4000); }),
     ]);
   } catch {
     return true;
+  } finally {
+    // The status usually answers first: drop the 4s fallback timer with it.
+    if (timeout !== undefined) clearTimeout(timeout);
   }
   if (!payoutsMissingForPublish(raw)) return true;
   return new Promise((resolve) => {

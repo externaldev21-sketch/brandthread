@@ -186,6 +186,8 @@ export function createApiLiveProvider(): LiveStreamProvider {
       let lastPinned: string | null | undefined;
       let lastLikes: number | undefined;
       const id = encodeURIComponent(streamId);
+      // Ids of chat lines already delivered (poll or socket).
+      const seen = new Set<string>();
       async function poll() {
         try {
           const [comments, detail, activity] = await Promise.all([
@@ -201,9 +203,16 @@ export function createApiLiveProvider(): LiveStreamProvider {
             activitySince = events[events.length - 1].at;
             listener({ type: 'chat', streamId, messages: events.map(activityToChat) });
           }
-          const fresh = (comments.comments ?? []).slice().reverse().map(chatFromRow);
+          const polled = (comments.comments ?? []).slice().reverse().map(chatFromRow);
+          if (polled.length) {
+            const lastAt = polled[polled.length - 1].at;
+            if (lastAt > new Date(since).getTime()) since = new Date(lastAt).toISOString();
+          }
+          // The socket may already have delivered a comment this request was
+          // in flight for (and vice versa): one id is shown once.
+          const fresh = polled.filter((m) => !seen.has(m.id));
           if (fresh.length) {
-            since = new Date(fresh[fresh.length - 1].at).toISOString();
+            for (const m of fresh) seen.add(m.id);
             listener({ type: 'chat', streamId, messages: fresh });
           }
           const s = detail.stream;
@@ -227,7 +236,6 @@ export function createApiLiveProvider(): LiveStreamProvider {
       // stream's socket; `poll` runs every 3s only while it is down, plus
       // once on every (re)connect to catch up, and every 15s as a safety net
       // for the end of the stream.
-      const seen = new Set<string>();
       let timer: ReturnType<typeof setInterval> | null = setInterval(poll, POLL_MS);
       void poll();
       const room = openLiveRoomSocket(streamId, {

@@ -41,18 +41,24 @@ export default function LegalAcceptanceGate() {
   const [error, setError] = useState<string | null>(null);
   const attemptRef = useRef(0);
 
-  const check = useCallback(async (): Promise<'done' | 'retry'> => {
+  // `isActive` is false once the account (or sign-in state) this check was
+  // started for has changed: a slow /me for the previous account must never
+  // decide the gate for the next one (e.g. clear it for an account that has
+  // not agreed yet).
+  const check = useCallback(async (isActive: () => boolean): Promise<'done' | 'retry'> => {
     try {
       const profile = await api.auth.me();
+      if (!isActive()) return 'done';
       if (hasAcceptedCurrentTerms(profile.termsVersion)) {
         setNeedsAgreement(false);
         return 'done';
       }
       const pending = await readPendingConsent();
+      if (!isActive()) return 'done';
       if (pending && hasAcceptedCurrentTerms(pending.version)) {
         await api.auth.acceptLegal(pending.version, 'signup');
         await clearPendingConsent();
-        setNeedsAgreement(false);
+        if (isActive()) setNeedsAgreement(false);
         return 'done';
       }
       setPreviouslyAgreed(!!profile.termsVersion);
@@ -74,7 +80,7 @@ export default function LegalAcceptanceGate() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const run = async () => {
-      const outcome = await check();
+      const outcome = await check(() => !cancelled);
       if (cancelled || outcome === 'done') return;
       const delay = RETRY_DELAYS_MS[attemptRef.current];
       attemptRef.current += 1;

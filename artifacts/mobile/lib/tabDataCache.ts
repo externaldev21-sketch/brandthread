@@ -35,6 +35,10 @@ function scopedKey(key: string): string {
 }
 
 const memoryCache = new Map<string, unknown>();
+/** Bumped by every write/clear of a key, so a disk read that started earlier never lands over it. */
+const keyVersion = new Map<string, number>();
+const bump = (scoped: string) => keyVersion.set(scoped, (keyVersion.get(scoped) ?? 0) + 1);
+let clears = 0;
 
 /** Synchronous — returns whatever is already in memory for this key, or undefined. */
 export function getCachedTabData<T>(key: string): T | undefined {
@@ -50,8 +54,15 @@ export async function hydrateTabData<T>(key: string): Promise<T | undefined> {
   const scoped = scopedKey(key);
   const inMemory = memoryCache.get(scoped);
   if (inMemory !== undefined) return inMemory as T;
+  const version = keyVersion.get(scoped) ?? 0;
+  const clearsAtStart = clears;
   try {
     const raw = await AsyncStorage.getItem(STORAGE_PREFIX + scoped);
+    // A fresh load (or a sign-out clear) happened while the disk read was in
+    // flight: what it read is older, so keep what memory holds now.
+    if ((keyVersion.get(scoped) ?? 0) !== version || clears !== clearsAtStart) {
+      return memoryCache.get(scoped) as T | undefined;
+    }
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as T;
     memoryCache.set(scoped, parsed);
@@ -65,7 +76,9 @@ export async function hydrateTabData<T>(key: string): Promise<T | undefined> {
 /** Memory-only write — instant on the next mount this session, never persisted. */
 export function setMemoryTabData<T>(key: string, data: T): void {
   if (data === undefined) return;
-  memoryCache.set(scopedKey(key), data);
+  const scoped = scopedKey(key);
+  bump(scoped);
+  memoryCache.set(scoped, data);
 }
 
 /**
@@ -101,6 +114,7 @@ export async function hydratePersistedTabData(): Promise<void> {
 export function setCachedTabData<T>(key: string, data: T): void {
   if (data === undefined) return;
   const scoped = scopedKey(key);
+  bump(scoped);
   memoryCache.set(scoped, data);
   AsyncStorage.setItem(STORAGE_PREFIX + scoped, JSON.stringify(data)).catch(() => {});
 }
@@ -109,6 +123,9 @@ export function setCachedTabData<T>(key: string, data: T): void {
 export async function clearTabDataCacheForUser(userId: string): Promise<void> {
   const prefix = `${userId}:`;
   for (const key of [...memoryCache.keys()]) if (key.startsWith(prefix)) memoryCache.delete(key);
+  // Also invalidates disk reads still in flight (they may not be in memory
+  // yet), so none of them repopulates what was just cleared.
+  clears += 1;
   try {
     const keys = await AsyncStorage.getAllKeys();
     const mine = keys.filter((k) => k.startsWith(STORAGE_PREFIX + prefix));

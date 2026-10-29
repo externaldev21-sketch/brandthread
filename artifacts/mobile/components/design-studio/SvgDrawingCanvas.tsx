@@ -44,31 +44,38 @@ export default function SvgDrawingCanvas({
   const [liveD, setLiveD] = useState('');
   const [liveWidth, setLiveWidth] = useState(size);
   const brush = BRUSH_LIBRARY[brushKind];
+  // The PanResponder below is created once; it reads the CURRENT tool,
+  // colour, size, etc. through this ref so a tool/colour change made while
+  // the surface stays mounted applies to the next stroke.
+  const latest = useRef({ brush, size, opacity, pressureCurve, streamline, tool, color, disabled, onStrokeEnd, onLivePoint });
+  latest.current = { brush, size, opacity, pressureCurve, streamline, tool, color, disabled, onStrokeEnd, onLivePoint };
 
   function recomputeLive() {
-    const style = buildStrokeStyle(rawPointsRef.current, brush, size, opacity, pressureCurve, streamline);
+    const p = latest.current;
+    const style = buildStrokeStyle(rawPointsRef.current, p.brush, p.size, p.opacity, p.pressureCurve, p.streamline);
     setLiveD(strokeStyleToSvgPath(style));
-    setLiveWidth(averageStrokeWidth(style) || size);
+    setLiveWidth(averageStrokeWidth(style) || p.size);
   }
 
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
+      onStartShouldSetPanResponder: () => !latest.current.disabled,
+      onMoveShouldSetPanResponder: () => !latest.current.disabled,
       onPanResponderGrant: (e) => {
         const { locationX, locationY } = e.nativeEvent;
         rawPointsRef.current = [{ x: locationX, y: locationY, t: Date.now() }];
         recomputeLive();
-        onLivePoint?.({ x: locationX, y: locationY });
+        latest.current.onLivePoint?.({ x: locationX, y: locationY });
       },
       onPanResponderMove: (e) => {
         const { locationX, locationY } = e.nativeEvent;
         rawPointsRef.current = [...rawPointsRef.current, { x: locationX, y: locationY, t: Date.now() }];
         recomputeLive();
-        onLivePoint?.({ x: locationX, y: locationY });
+        latest.current.onLivePoint?.({ x: locationX, y: locationY });
       },
       onPanResponderRelease: () => {
         const raw = rawPointsRef.current;
+        const { brush, size, opacity, pressureCurve, streamline, tool, color, onStrokeEnd, onLivePoint } = latest.current;
         if (raw.length > 0) {
           const style = buildStrokeStyle(raw, brush, size, opacity, pressureCurve, streamline);
           onStrokeEnd({

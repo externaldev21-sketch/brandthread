@@ -130,20 +130,25 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     setPackages([]);
     if (!available) return;
     let listener: ((info: CustomerInfo) => void) | null = null;
+    // Set by the cleanup: an unmount does not bump the session generation, so
+    // without this a setup still in flight would add the SDK listener (and set
+    // state) after the provider is gone, and the listener would never be removed.
+    let disposed = false;
+    const live = () => !disposed && sessionGuard.isCurrent(generation);
     const clerkId = isSignedIn ? user?.id : undefined;
     const start = async () => {
       try {
         // Deferred setup shares the serialized, anonymous-safe identity transition.
         await accountSetup(Purchases!, key!)(clerkId);
-        if (!sessionGuard.isCurrent(generation)) return;
+        if (!live()) return;
         listener = (info) => {
-          if (!sessionGuard.isCurrent(generation)) return;
+          if (!live()) return;
           setCustomerInfo(info);
           if (clerkId) void sync(generation).catch(() => {});
         };
         Purchases!.addCustomerInfoUpdateListener(listener);
         const [info, offerings] = await Promise.all([Purchases!.getCustomerInfo(), Purchases!.getOfferings()]);
-        if (!sessionGuard.isCurrent(generation)) return;
+        if (!live()) return;
         setCustomerInfo(info);
         setPackages(offerings.current?.availablePackages.filter((pkg) =>
           isSellerRevenueCatPackage(pkg.identifier), // monthly + optional yearly packages
@@ -156,6 +161,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     const cancelDeferred = configured ? null : runAfterFirstPaint(() => { void start(); });
     if (configured) void start();
     return () => {
+      disposed = true;
       cancelDeferred?.();
       if (listener) Purchases!.removeCustomerInfoUpdateListener(listener);
     };

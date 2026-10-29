@@ -104,18 +104,22 @@ function ConfettiPiece({ spec }: { spec: PieceSpec }) {
 /** Renders the falling burst while `play` is true; auto-clears itself after the fall completes. */
 export function OrderConfetti({ play }: { play: boolean }) {
   const { width } = useWindowDimensions();
-  const [reduceMotion, setReduceMotion] = useState(false);
+  // null until the Reduce Motion setting is known: playing before it resolves
+  // would burst (and buzz) for a buyer who turned motion off.
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [visible, setVisible] = useState(false);
   const pieces = useMemo(() => buildPieces(Date.now(), Math.min(width * 0.85, 340)), [width]);
 
   useEffect(() => {
     let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled?.().then((v) => { if (alive) setReduceMotion(!!v); }).catch(() => {});
+    const check = AccessibilityInfo.isReduceMotionEnabled;
+    if (!check) { setReduceMotion(false); return undefined; }
+    check().then((v) => { if (alive) setReduceMotion(!!v); }).catch(() => { if (alive) setReduceMotion(false); });
     return () => { alive = false; };
   }, []);
 
   useEffect(() => {
-    if (!play || reduceMotion) return;
+    if (!play || reduceMotion !== false) return;
     setVisible(true);
     haptics.success();
     const timer = setTimeout(() => setVisible(false), FALL_DURATION_MS + 200);

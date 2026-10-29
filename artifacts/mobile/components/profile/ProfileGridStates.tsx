@@ -54,9 +54,6 @@ export function ProfileGridPlaceholder({
   /** `text` = Instagram-style link action; `pill` = slim white fit-to-text
    *  pill; default `button`. */
   actionStyle?: 'button' | 'text' | 'pill';
-  /** The posts grid's empty state: three ghost tiles above the copy, instead
-   * of a lone icon with no relation to the grid it's standing in for. */
-  showGridPreview?: boolean;
   /** Profile grids: a small plain icon, a 15pt title and one muted line —
    *  no badge circle or headline — so it sits in the room under the tabs
    *  without running under the floating tab bar. */

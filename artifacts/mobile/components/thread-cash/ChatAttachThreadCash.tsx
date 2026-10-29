@@ -165,8 +165,19 @@ export function ThreadCashAttachButton({
   const [sentResult, setSentResult] = useState<SentResult | null>(null);
   const idempotencyKey = useMemo(() => (open ? randomUUID() : null), [open]);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A completed transfer whose chat bubble hasn't been posted yet (`onSent`
+  // runs at the end of the confirmation hold). Flushed on unmount so leaving
+  // the screen mid-hold never drops the bubble for money that already moved.
+  const pendingSent = useRef<SentResult | null>(null);
+  const onSentRef = useRef(onSent);
+  onSentRef.current = onSent;
 
-  useEffect(() => () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); }, []);
+  useEffect(() => () => {
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    const pending = pendingSent.current;
+    pendingSent.current = null;
+    if (pending) onSentRef.current(pending);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -294,8 +305,11 @@ export function ThreadCashAttachButton({
   useEffect(() => {
     if (step !== 'sent' || !sentResult) return;
     const result = sentResult;
+    pendingSent.current = result;
     dismissTimer.current = setTimeout(() => {
-      onSent(result);
+      if (pendingSent.current !== result) return;
+      pendingSent.current = null;
+      onSentRef.current(result);
       setOpen(false);
       reset();
     }, SEND_CONFIRM_HOLD_MS);
@@ -387,9 +401,8 @@ export function ThreadCashAttachButton({
           // for Cash App's green filled circle, reusing that component's
           // existing timing/easing rather than a new animation.
           <View style={styles.sentBlock} testID="thread-cash-sent-confirmation">
-            {/* haptic=false: the success haptic already fired the moment
-                the transfer was confirmed (see handleSend above), not
-                re-fired here on mount. */}
+            {/* haptic=false: this confirmation plays no success haptic of
+                its own (handleSend above doesn't fire one either). */}
             <SuccessCheck variant="draw" size={72} haptic={false} testID="thread-cash-sent-check" />
             <Text style={[styles.sentAmount, { color: theme.text }]}>
               You sent <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatAmountDisplay(sentResult.amountCents)}</Text>

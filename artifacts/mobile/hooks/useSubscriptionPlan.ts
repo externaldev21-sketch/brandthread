@@ -81,10 +81,14 @@ export function useSubscriptionPlan() {
    * re-registering on every render.
    */
   const fetchRef = useRef<() => void>(() => {});
+  /** Bumped per fetch: only the latest one may set this instance's state, so
+   *  a store/account switch can't be overwritten by the previous answer. */
+  const requestRef = useRef(0);
 
   // Rebuild fetchPlan whenever `api` changes (it wraps Clerk tokens).
   useEffect(() => {
     fetchRef.current = function fetchPlan() {
+      const request = ++requestRef.current;
       // Never call the protected subscription API without a signed-in session.
       if (!isSignedIn || !userId) {
         setPlan(null);
@@ -133,10 +137,12 @@ export function useSubscriptionPlan() {
       }
 
       _promise.then((p) => {
+        if (request !== requestRef.current) return;
         setPlan(p);
         setLoading(false);
         setError(false);
       }).catch(() => {
+        if (request !== requestRef.current) return;
         setLoading(false);
         setError(true);
       });

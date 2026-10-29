@@ -8,7 +8,7 @@
  * the session here). The signed-out preview never calls that protected API:
  * the link opens sign-in instead.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, type StyleProp, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
@@ -39,6 +39,11 @@ export function useCaptionTranslation(original: string | null | undefined): Capt
   const [result, setResult] = useState<TranslationResult | null>(() => memo.peek(source, target) ?? null);
   const [status, setStatus] = useState<Status>('idle');
   const [showingTranslation, setShowingTranslation] = useState(prefs.autoTranslateCaptions);
+  // The caption/language this hook is showing right now. A recycled feed row
+  // changes `source` while an earlier caption's request is still in flight;
+  // that late answer must not land on the new caption.
+  const currentKey = useRef('');
+  currentKey.current = `${target}\u0000${source}`;
 
   // A new caption or language starts over.
   useEffect(() => {
@@ -48,6 +53,7 @@ export function useCaptionTranslation(original: string | null | undefined): Capt
   }, [source, target, prefs.autoTranslateCaptions]);
 
   const fetchTranslation = useCallback(async () => {
+    const key = `${target}\u0000${source}`;
     setStatus('loading');
     try {
       const value = await memo.get(source, target, async () => {
@@ -56,10 +62,12 @@ export function useCaptionTranslation(original: string | null | undefined): Capt
         if (!first) throw new Error('Empty translation response');
         return first;
       });
+      if (currentKey.current !== key) return false;
       setResult(value);
       setStatus('idle');
       return true;
     } catch (error) {
+      if (currentKey.current !== key) return false;
       setStatus(error instanceof ApiError && error.code === 'TRANSLATION_NOT_CONFIGURED' ? 'unavailable' : 'error');
       return false;
     }

@@ -53,6 +53,9 @@ export function useSellerSocket({ enabled, onEvent, onConnected, onStatus, reset
   const attemptsRef = useRef(0);
   const stoppedRef = useRef(false);
   const connectRef = useRef<() => void>(() => {});
+  // Bumped whenever the connection is restarted or stopped: a token request
+  // still in flight from an earlier connection must not open a socket.
+  const generationRef = useRef(0);
 
   const teardownSocket = useCallback(() => {
     const socket = socketRef.current;
@@ -78,8 +81,9 @@ export function useSellerSocket({ enabled, onEvent, onConnected, onStatus, reset
   const connect = useCallback(() => {
     if (stoppedRef.current) return;
     teardownSocket();
+    const generation = generationRef.current;
     void getToken().then((token) => {
-      if (stoppedRef.current) return;
+      if (generation !== generationRef.current || stoppedRef.current) return;
       if (!token) { scheduleReconnect(); return; }
       let socket: WebSocket;
       try {
@@ -104,13 +108,14 @@ export function useSellerSocket({ enabled, onEvent, onConnected, onStatus, reset
         if (!stoppedRef.current) scheduleReconnect();
       };
     }).catch(() => {
-      if (!stoppedRef.current) scheduleReconnect();
+      if (generation === generationRef.current && !stoppedRef.current) scheduleReconnect();
     });
   }, [getToken, teardownSocket, scheduleReconnect]);
 
   connectRef.current = connect;
 
   useEffect(() => {
+    generationRef.current += 1;
     stoppedRef.current = false;
     attemptsRef.current = 0;
     if (enabled) {
@@ -118,6 +123,7 @@ export function useSellerSocket({ enabled, onEvent, onConnected, onStatus, reset
       connect();
     }
     return () => {
+      generationRef.current += 1;
       stoppedRef.current = true;
       if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
       teardownSocket();

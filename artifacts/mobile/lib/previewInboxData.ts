@@ -516,7 +516,7 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
       { id: 'preview-seller-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
       {
         // Item 73 (voice note waveform playback progress), seller-side
-        // mirror of preview-msg-03-2 on the buyer side above — same real
+        // mirror of preview-msg-07-3 on the buyer side above — same real
         // bundled voice bubble, rendered here as an incoming message from
         // the buyer (Ava Chen) so the seller preview also has a genuinely
         // playable voice note to demo, not only the buyer preview.

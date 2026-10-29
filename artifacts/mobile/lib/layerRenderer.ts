@@ -23,8 +23,8 @@
  *   - green: scale G output by green curve mid-slope
  *   - blue:  scale B output by blue curve mid-slope
  *
- * We use a "gain" approximation: sample the curve at 11 points and compute
- * mean(output / input) weighted by input > 0.  This maps cleanly to the
+ * We use a "gain" approximation: sample the curve at 9 interior points
+ * (t = 0.1 … 0.9) and compute mean(output / input).  This maps cleanly to the
  * feColorMatrix diagonal.  For the bias term (column 5), we use the shadow
  * lift: curve value at t=0 (shadows).
  *
@@ -102,7 +102,7 @@ export function buildLayerTransform(
 
 /**
  * curveGain — computes the effective gain (slope) of a curve.
- * Uses the mean ratio of output/input for input > 0.05 across 9 sample points.
+ * Uses the mean ratio of output/input across 9 sample points (t = 0.1 … 0.9).
  * Returns a value typically in [0, 2].
  */
 function curveGain(points: CurvePoint[]): number {

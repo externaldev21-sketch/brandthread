@@ -132,7 +132,8 @@ export function SellerDashboardChart({
   const scrubActive = useSharedValue(0);
   const activeIndex = useSharedValue(-1);
 
-  // No haptic per scrub tick: haptics never fire on a continuous drag.
+  // One selection tick each time the scrub lands on a NEW bucket (not on
+  // every pan update); lib/haptics throttles back-to-back selection ticks.
   const handleIndexChange = useCallback((index: number) => {
     if (lastHapticIndex.current !== index) {
       lastHapticIndex.current = index;
@@ -194,12 +195,10 @@ export function SellerDashboardChart({
   // x=0 after a range switch.
   const scrubPoint = !isEmpty && tooltipIndex !== null ? points[tooltipIndex] ?? null : null;
 
-  // The empty/fresh-seller state must still draw a real, VISIBLE flat line
-  // at $0 (never blank space that reads as a broken/missing chart) — just
-  // muted rather than the full accent color, so it never implies real
-  // activity. theme.borderSubtle (~4% opacity) was invisible against the
-  // dark background; theme.muted is the same solid, monochrome tone the
-  // rest of the dashboard already uses for secondary/inactive content.
+  // The empty/fresh-seller state draws no line at all (`series` is empty
+  // above): it shows a baseline plus the centred empty message instead. The
+  // muted stroke below only applies if a caller ever plots values while
+  // flagging the chart empty.
   const strokeColor = isEmpty ? theme.muted ?? BORDER_SUBTLE : theme.text;
 
   // Today's chart spreads its labels across even quarters of the day
@@ -319,8 +318,8 @@ export function SellerDashboardChart({
           Shopify/Robinhood-style chart → its own x-axis → range selector,
           not chart → range selector → labels (which read as detached from
           the chart entirely). Shown for the empty/fresh state too: a
-          zero-sales chart still has correctly-labeled ranges, just a flat
-          line instead of a real curve. */}
+          zero-sales chart still has correctly-labeled ranges, over the
+          empty baseline instead of a curve. */}
       {labels.length > 0 && width > 0 && visibleAxisIndices.length > 0 && (
         <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
           {visibleAxisIndices.map((bucketIndex, i) => {

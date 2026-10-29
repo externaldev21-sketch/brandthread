@@ -129,6 +129,12 @@ export function LiveShowsGrid({
   const { streams, upcoming } = snapshot.scope === scope ? snapshot :
     directoryCache.get(scope) ?? { streams: null, upcoming: [] };
   const setUpcoming = (update: React.SetStateAction<UpcomingLive[]>) => {
+    // Keep the module cache in step too: a remount (tab switch) seeds from it,
+    // and must not show a reminder the viewer just changed in its old state.
+    const cached = directoryCache.get(scope);
+    if (cached) {
+      directoryCache.set(scope, { ...cached, upcoming: typeof update === 'function' ? update(cached.upcoming) : update });
+    }
     setSnapshot(prev => prev.scope !== scope ? prev : {
       ...prev, upcoming: typeof update === 'function' ? update(prev.upcoming) : update,
     });

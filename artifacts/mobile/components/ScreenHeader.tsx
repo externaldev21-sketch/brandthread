@@ -236,11 +236,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    // Center the title with the back/close button on the same row. The
-    // subtitle no longer lives inside this row (it's a sibling Text below
-    // `container`), so it can never affect this row's height or nudge the
-    // title's vertical position — that's what keeps title Y identical with
-    // or without a subtitle (the #389 invariant), even under center-align.
+    // Center the title with the back/close button on the same row. There is
+    // no subtitle line any more (the prop was removed), so nothing else can
+    // change this row's height or nudge the title's vertical position — the
+    // #389 invariant (title Y identical on every screen).
     alignItems: 'center',
     minHeight: COMP.headerH,
     paddingHorizontal: SP.md,

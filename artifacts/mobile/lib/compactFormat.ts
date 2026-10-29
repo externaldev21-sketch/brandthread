@@ -1,13 +1,23 @@
 import { formatMoney } from '@/lib/format';
 
-/** Scales a positive magnitude to a K/M/B suffix, e.g. 12_400 -> "12.4K". */
+/**
+ * Scales a positive magnitude to a K/M/B suffix, e.g. 12_400 -> "12.4K". A
+ * value whose rounded form would read 1000 in its unit (999_600 -> "1000K")
+ * moves up one unit instead ("1.0M").
+ */
 function scaleWithSuffix(magnitude: number): string {
-  const units: Array<[number, string]> = [[1_000_000_000, 'B'], [1_000_000, 'M'], [1_000, 'K']];
-  for (const [threshold, suffix] of units) {
+  const units: Array<[number, string]> = [[1_000, 'K'], [1_000_000, 'M'], [1_000_000_000, 'B']];
+  for (let i = units.length - 1; i >= 0; i -= 1) {
+    const [threshold, suffix] = units[i];
     if (magnitude >= threshold) {
-      const scaled = magnitude / threshold;
-      const digits = scaled >= 100 ? 0 : 1;
-      return `${scaled.toFixed(digits)}${suffix}`;
+      const format = (t: number) => {
+        const scaled = magnitude / t;
+        return scaled.toFixed(scaled >= 100 ? 0 : 1);
+      };
+      const text = format(threshold);
+      const up = units[i + 1];
+      if (up && parseFloat(text) >= 1000) return `${format(up[0])}${up[1]}`;
+      return `${text}${suffix}`;
     }
   }
   return String(Math.round(magnitude));

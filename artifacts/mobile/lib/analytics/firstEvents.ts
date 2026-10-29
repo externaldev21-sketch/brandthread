@@ -7,9 +7,11 @@
  *   observed earlier), so an existing seller who already has orders never
  *   fires it on a fresh install or after this ships.
  *
- * Markers live in AsyncStorage under bt:analytics:first:*. Nothing is
- * recorded unless the event can actually be sent (key present, consent
- * granted, not a preview session), so a gated event is not lost forever.
+ * Markers live in AsyncStorage under bt:analytics:first:*. A marker that
+ * means "fired" is only written when the event can actually be sent (key
+ * present, consent granted, not a preview session), so a gated event is not
+ * lost forever. (first_sale's observation states — "seen empty", and "first
+ * seen with orders, never fire" — are recorded whatever the gate.)
  * Never throws and never changes the promise it observes.
  *
  * Kept free of React Native imports (AsyncStorage is required lazily) so it

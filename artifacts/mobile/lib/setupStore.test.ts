@@ -41,10 +41,10 @@ describe('seller setup progress', () => {
     });
   });
 
-  it('keeps all ten tasks while excluding the optional manufacturer from progress', async () => {
+  it('keeps all nine tasks while excluding the optional manufacturer from progress', async () => {
     const state = await getSetupState('seller-nine');
-    expect(state.tasks).toHaveLength(10);
-    expect(requiredTaskCount(state)).toBe(9);
+    expect(state.tasks).toHaveLength(9);
+    expect(requiredTaskCount(state)).toBe(8);
     expect(completionPercent(state)).toBe(0);
 
     const completed = {
@@ -54,7 +54,7 @@ describe('seller setup progress', () => {
       ),
     };
     expect(completedRequiredTaskCount(completed)).toBe(1);
-    expect(completionPercent(completed)).toBe(11);
+    expect(completionPercent(completed)).toBe(13);
 
     const withOptionalDone = {
       ...completed,
@@ -62,7 +62,7 @@ describe('seller setup progress', () => {
         task.id === 'connect_manufacturer' ? { ...task, completed: true } : task,
       ),
     };
-    expect(completionPercent(withOptionalDone)).toBe(11);
+    expect(completionPercent(withOptionalDone)).toBe(13);
     expect(isSetupComplete(withOptionalDone)).toBe(false);
   });
 
@@ -75,7 +75,7 @@ describe('seller setup progress', () => {
     expect(accountTask?.description).toContain('seller signup');
     expect(accountTask?.description).not.toContain('Stripe Identity');
     expect(accountTask?.route).toBe('/seller-verification');
-    expect(completionPercent(state)).toBe(11);
+    expect(completionPercent(state)).toBe(13);
     expect(setItem).toHaveBeenCalledWith(
       setupStorageKeyForUser('seller-onboarded'),
       expect.any(String),
@@ -90,7 +90,7 @@ describe('seller setup progress', () => {
     // successful identity check must remain harmless and idempotent.
     const afterIdentityCheck = await completeTask('verify_account', 'seller-onboarded');
     expect(afterIdentityCheck.tasks.find(task => task.id === 'verify_account')?.completed).toBe(true);
-    expect(completionPercent(afterIdentityCheck)).toBe(11);
+    expect(completionPercent(afterIdentityCheck)).toBe(13);
   });
 
   it('isolates users and migrates the old key without reading it for signed-out state', async () => {

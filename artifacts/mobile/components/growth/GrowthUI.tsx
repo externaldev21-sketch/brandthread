@@ -41,6 +41,8 @@ export function Chip({ label, active, onPress }: { label: string; active: boolea
 export function CopyRow({ value, label = 'Copy link' }: { value: string; label?: string }) {
   const colors = useColors();
   const [done, setDone] = React.useState(false);
+  const doneTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (doneTimer.current) clearTimeout(doneTimer.current); }, []);
   return (
     <View style={[st.copyRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
       <Text style={[st.copyText, { color: colors.foreground }]} numberOfLines={1} selectable>{value}</Text>
@@ -50,7 +52,8 @@ export function CopyRow({ value, label = 'Copy link' }: { value: string; label?:
         onPress={async () => {
           await Clipboard.setStringAsync(value);
           setDone(true);
-          setTimeout(() => setDone(false), 2000);
+          if (doneTimer.current) clearTimeout(doneTimer.current);
+          doneTimer.current = setTimeout(() => setDone(false), 2000);
         }}
         style={st.copyBtn}
       >

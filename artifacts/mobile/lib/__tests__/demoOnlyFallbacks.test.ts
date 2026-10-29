@@ -51,9 +51,9 @@ describe('services/aiBrandMemory.ts rebuildBrandMemory', () => {
 // that vitest cannot import (see freshInstallPreview.test.ts), so their gates
 // are verified via source inspection, matching that file's pattern.
 describe('preview catalog / discover / suggestions return [] unless demo=1', () => {
-  it('lib/previewCatalog.ts getPreviewCatalog gates before its cache', () => {
+  it('lib/previewCatalog.ts getPreviewCatalog gates before building the catalog', () => {
     expect(src('../previewCatalog.ts')).toMatch(
-      /export function getPreviewCatalog\(\): PreviewCatalogProduct\[\] \{[\s\S]{0,140}if \(!isPreviewDemoMode\(\)\) return \[\];\s*if \(cached\) return cached;/,
+      /export function getPreviewCatalog\(\): PreviewCatalogProduct\[\] \{[\s\S]{0,140}if \(!isPreviewDemoMode\(\)\) return \[\];\s*return buildCatalog\(\);/,
     );
   });
 
@@ -85,20 +85,31 @@ describe('services never fabricate a success outside demo', () => {
 });
 
 describe('screens gate their sample fallbacks on isPreviewDemoMode()', () => {
-  it('calls: the only (simulated) provider is demo-only and screens hide call buttons otherwise', () => {
+  it('calls: the simulated provider is demo-only (real accounts get the server + Agora provider) and the thread hides call buttons when calls are unavailable', () => {
     const ctx = src('../calls/CallSessionContext.tsx');
-    expect(ctx).toContain('const CALLS_AVAILABLE = isPreviewDemoMode();');
-    expect(ctx).toMatch(/const startCall = useCallback\(async \(input: StartCallInput\) => \{\s*if \(!CALLS_AVAILABLE\) return;/);
-    expect(src('../../app/buyer-conversation.tsx').match(/conv && !isAgentConv && callsAvailable && \(/g)).toHaveLength(2);
-    expect(src('../../app/seller-conversation.tsx')).toContain('{id && callsAvailable && (');
+    expect(ctx).toContain('const demo = isPreviewDemoMode();');
+    expect(ctx).toMatch(/const provider = useMemo<CallProvider>\(\(\) => \(\s*demo\s*\?\s*createPreviewCallProvider\(\)\s*:\s*createAgoraCallProvider\(/);
+    // The fake "incoming call" only rings on the simulated provider.
+    expect(ctx).toMatch(/const simulateIncomingCall = useCallback\(\(input: StartCallInput\) => \{\s*if \(provider\.id !== 'preview'\) return;/);
+    expect(ctx).toContain("callsAvailable: provider.id !== 'preview' || isPreviewDemoMode(),");
+    // Buyer and seller conversations both render components/chat/ConversationThread.tsx.
+    expect(src('../../components/chat/ConversationThread.tsx').match(/conv && !isAgentConv && callsAvailable && !requestLocked && \(/g)).toHaveLength(2);
   });
 
   it('buyer-search only blends preview videos/products/accounts under demo', () => {
     const s = src('../../app/buyer-search.tsx');
-    expect(s).toContain('const demoFallback = previewMode && isPreviewDemoMode();');
-    expect(s).toContain('peopleResult.length === 0 && demoFallback');
-    expect(s).toContain('(demoFallback && trimmedQuery.length > 0 ? PREVIEW_VIDEOS');
-    expect(s).toContain('(demoFallback && trimmedQuery.length > 0 && activeFilterCount === 0 ? PREVIEW_PRODUCTS');
+    expect(s).toContain('const demoMode = previewMode && isPreviewDemoMode();');
+    // Every previewFallback(...) call site (top overview, tab first page, tab
+    // error) must be gated on demoMode, not on the plain preview flag.
+    const callSites = [...s.matchAll(/previewFallback\(/g)]
+      .map((m) => m.index!)
+      .filter((i) => !s.slice(Math.max(0, i - 9), i).endsWith('function '));
+    expect(callSites.length).toBeGreaterThanOrEqual(3);
+    for (const i of callSites) {
+      const guard = s.slice(Math.max(0, i - 80), i);
+      expect(guard, `ungated previewFallback at offset ${i}: …${guard}`).toMatch(/\bdemoMode\b/);
+      expect(guard, `previewFallback at offset ${i} is gated on previewMode: …${guard}`).not.toMatch(/\bpreviewMode\b/);
+    }
   });
 
   it('feed only injects the fashion preview posts under demo, not in every __DEV__ build', () => {
@@ -115,8 +126,16 @@ describe('screens gate their sample fallbacks on isPreviewDemoMode()', () => {
     }
   });
 
-  it('order-detail only renders a generated demo order under demo', () => {
-    expect(src('../../app/order-detail.tsx')).toContain('const raw = isPreviewDemoMode() ? getGeneratedSellerOrder(id) : null;');
+  it('order-detail only renders a generated demo order inside a preview', () => {
+    // order-detail / fulfill-batch read local preview orders through
+    // lib/previewOrderEdits.ts loadPreviewSellerOrder; a generated
+    // `preview-demo-order-*` id must not render for a real (non-preview) account.
+    expect(src('../../app/order-detail.tsx')).toContain('const previewRaw = loadPreviewSellerOrder(id);');
+    const edits = src('../previewOrderEdits.ts');
+    const body = edits.slice(edits.indexOf('export function loadPreviewSellerOrder'));
+    const generatedAt = body.indexOf('getGeneratedSellerOrder(');
+    expect(generatedAt).toBeGreaterThan(0);
+    expect(body.slice(0, generatedAt)).toMatch(/isPreviewDemoMode\(\)|isSellerDevPreview\(\)/);
   });
 
   it('post comments only seed sample comments under demo', () => {
@@ -132,9 +151,17 @@ describe('screens gate their sample fallbacks on isPreviewDemoMode()', () => {
   });
 
   it('share-store never offers the placeholder link for copy/share outside demo', () => {
-    const s = src('../../app/share-store.tsx');
-    expect(s).toContain('const ready = isPreviewDemoMode() || (!loading && !!(profile?.username || profile?.brandName || profile?.displayName));');
-    expect(s.match(/disabled=\{!ready\}/g)).toHaveLength(2);
+    // app/share-store.tsx renders components/store/ShareStoreSheet.tsx's
+    // ShareStoreContent, whose link comes from hooks/useStoreLink.ts.
+    expect(src('../../app/share-store.tsx')).toContain('<ShareStoreContent ');
+    const hook = src('../../hooks/useStoreLink.ts');
+    expect(hook).toMatch(/if \(isSellerDevPreview\(\)\) \{\s*setProfile\(isPreviewDemoMode\(\)\s*\? \{ username: PREVIEW_SELLER_IDENTITY\.username/);
+    expect(hook).toMatch(/: null\);\s*setLoading\(false\);\s*return;/);
+    const sheet = src('../../components/store/ShareStoreSheet.tsx');
+    // copy, system share and per-app share all refuse without a real link…
+    expect(sheet.match(/if \(!link\.url\) return;/g)).toHaveLength(3);
+    // …and the body shows "Pick a username" instead of an invented one.
+    expect(sheet).toContain('testID="share-store-no-username"');
   });
 
   it('seller preview conversation getters (thread, messages, buyer orders) are demo-gated like the buyer ones', () => {

@@ -12,7 +12,7 @@
  * the PR description. Without a granted camera permission this renders a
  * clear "camera unavailable" state instead of a blank screen.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -41,7 +41,11 @@ const FRAME_SIZE = 260;
 export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [handled, setHandled] = useState(false);
+  // A ref, not state: the camera fires onBarcodeScanned for every frame the
+  // code is in view, and several events can arrive before a state update
+  // re-renders the callback — each would see `handled === false` and push
+  // the profile again (and call onClose again).
+  const handledRef = useRef(false);
   const topInset = useHeaderTopInset();
 
   // Prompt once on mount (native only — web has no meaningful permission
@@ -54,13 +58,13 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
   }, [permission?.granted]);
 
   const handleScanned = useCallback((result: BarcodeScanningResult) => {
-    if (handled) return;
+    if (handledRef.current) return;
     const username = parseProfileDeepLink(result.data);
     if (!username) return; // Not a Brandthread profile QR — ignore, keep scanning.
-    setHandled(true);
+    handledRef.current = true;
     onClose();
     router.push(`/u/${username}` as never);
-  }, [handled, onClose, router]);
+  }, [onClose, router]);
 
   const cameraReady = permission?.granted;
 

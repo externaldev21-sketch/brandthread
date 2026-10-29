@@ -372,9 +372,19 @@ export function AnalyticsBarChart({
   );
 }
 
-function niceLevels(maxValue: number, steps = 4): number[] {
+/**
+ * Axis levels, drawn at evenly spaced heights. Every level must be exactly
+ * `top / count * i`: rounding a fractional step (the old behavior) labeled a
+ * max of 2 as "0, 1, 1, 2, 2" and put "1" at the 0.5 gridline. A whole-number
+ * top is split into the most steps (preferring 4) that divide it evenly; a
+ * fractional top keeps 4 exact, unrounded steps.
+ */
+export function niceLevels(maxValue: number, steps = 4): number[] {
   const top = niceMax(maxValue);
-  return Array.from({ length: steps + 1 }, (_, i) => Math.round((top / steps) * i));
+  const count = Number.isInteger(top) && top >= 1
+    ? [steps, 5, 3, 2, 1].find(n => top % n === 0) ?? 1
+    : steps;
+  return Array.from({ length: count + 1 }, (_, i) => (top / count) * i);
 }
 function niceMax(maxValue: number): number {
   if (maxValue <= 0) return 5;

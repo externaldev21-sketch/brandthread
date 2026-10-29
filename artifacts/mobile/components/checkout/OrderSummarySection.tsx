@@ -164,17 +164,17 @@ export function OrderSummarySection({
           <Line styles={styles} label={t('Tip')} value={formatCents(totals.tipCents ?? 0)} testID="checkout-tip-line" />
         ) : null}
         {totals.rewardsCents > 0 ? <Line styles={styles} label={t('Rewards')} value={`−${formatCents(totals.rewardsCents)}`} /> : null}
+        {totals.threadCashCents > 0 || giftCardCents > 0 ? (
+          // One order total before Thread Cash and the gift card pay part of
+          // it: the card charge plus both (server: totalCents = full − Thread
+          // Cash − gift card).
+          <Line styles={styles} label={t('Order total')} value={formatCents(totals.totalCents + totals.threadCashCents + giftCardCents)} testID="checkout-order-total-line" />
+        ) : null}
         {totals.threadCashCents > 0 ? (
-          <>
-            <Line styles={styles} label={t('Order total')} value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
-            <Line styles={styles} label={t('Thread Cash')} value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
-          </>
+          <Line styles={styles} label={t('Thread Cash')} value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
         ) : null}
         {giftCardCents > 0 ? (
-          <>
-            <Line styles={styles} label="Order total" value={formatCents(totals.totalCents + giftCardCents)} testID="checkout-order-total-line" />
-            <Line styles={styles} label="Gift card" value={`−${formatCents(giftCardCents)}`} testID="checkout-gift-card-line" />
-          </>
+          <Line styles={styles} label="Gift card" value={`−${formatCents(giftCardCents)}`} testID="checkout-gift-card-line" />
         ) : null}
         <View style={styles.totalDivider} />
         <Line

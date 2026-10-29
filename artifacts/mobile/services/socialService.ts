@@ -38,6 +38,7 @@ import type {
 import type { PostSlide } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
 import { mapApiProductMentions, type PostProductMention } from '@/lib/captionMentions';
+import { reactionAuthorId, reactionKind } from '@/lib/reactionShapes';
 
 // ─── Keys (scoped by user ID so two accounts never share storage) ─────────────
 
@@ -1738,6 +1739,16 @@ export function mergeUnsentMessages(remote: Message[], unsent: Message[]): Messa
 export const LOCAL_MESSAGE_ID_PREFIX = 'local-out-';
 
 /**
+ * Stable idempotency key for a locally written message, so a retry after a
+ * lost response returns the stored row instead of a duplicate (server:
+ * lib/clientMessageId.ts accepts /^[A-Za-z0-9_-]{8,64}$/ and ignores anything else).
+ */
+export function clientMessageIdFor(message: Pick<Message, 'id' | 'clientMessageId'>): string | undefined {
+  const raw = (message.clientMessageId ?? message.id).replace(/[^A-Za-z0-9_-]/g, '').slice(-64);
+  return raw.length >= 8 ? raw : undefined;
+}
+
+/**
  * Send with an outbox (offline polish #33): the message is on screen right
  * away as "sending"; when the request fails it stays as "failed" with Tap to
  * retry (retryMessage) instead of disappearing behind an alert. Survives a
@@ -1749,7 +1760,7 @@ export async function sendMessageWithOutbox(
 ): Promise<Message> {
   const k = K();
   const msgKey = k.messages(conversationId);
-  const pending: Message = { ...local, status: 'sending' };
+  const pending: Message = { ...local, status: 'sending', clientMessageId: clientMessageIdFor(local) };
   if (_socialUserId === k.userId) {
     const existing = await load<Message[]>(msgKey, []);
     await save(msgKey, [...existing.filter((m) => m.id !== pending.id), pending]);
@@ -1757,7 +1768,7 @@ export async function sendMessageWithOutbox(
   try {
     const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text: pending.text, attachment: pending.attachment, replyToId: pending.replyToId }),
+      body: JSON.stringify({ text: pending.text, attachment: pending.attachment, replyToId: pending.replyToId, clientMessageId: pending.clientMessageId }),
     });
     if (_socialUserId === k.userId) {
       const current = await load<Message[]>(msgKey, []);
@@ -1875,7 +1886,7 @@ export async function retryMessage(conversationId: string, messageId: string): P
   try {
     const canonical = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text: message.text, attachment: message.attachment, replyToId: message.replyToId }),
+      body: JSON.stringify({ text: message.text, attachment: message.attachment, replyToId: message.replyToId, clientMessageId: clientMessageIdFor(message) }),
     });
     if (_socialUserId === k.userId) {
       const current = await load<Message[]>(msgKey, []);
@@ -1905,8 +1916,14 @@ export async function addReaction(conversationId: string, messageId: string, emo
   const msgKey = k.messages(conversationId);
   const msgs = await load<Message[]>(msgKey, []);
   const idx = msgs.findIndex(m => m.id === messageId);
-  const existingMine = idx >= 0 ? msgs[idx].reactions.find(r => r.fromId === MY_USER_ID) : undefined;
-  const isToggleOff = existingMine?.emoji === emoji;
+  // Server reactions carry the real account id as `userId` (no `fromId`);
+  // local/optimistic ones use `fromId` — mine is either.
+  const isMine = (r: MessageReaction) => {
+    const author = reactionAuthorId(r);
+    return author === MY_USER_ID || (k.userId !== 'anon' && author === k.userId);
+  };
+  const existingMine = idx >= 0 ? msgs[idx].reactions.find(isMine) : undefined;
+  const isToggleOff = !!existingMine && reactionKind(existingMine) === emoji;
 
   const path = `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`;
   if (isToggleOff) {
@@ -1919,7 +1936,7 @@ export async function addReaction(conversationId: string, messageId: string, emo
   }
 
   if (idx >= 0 && _socialUserId === k.userId) {
-    const others = msgs[idx].reactions.filter(r => r.fromId !== MY_USER_ID);
+    const others = msgs[idx].reactions.filter(r => !isMine(r));
     msgs[idx] = {
       ...msgs[idx],
       reactions: isToggleOff
@@ -2097,7 +2114,20 @@ export async function getStories(k: SocialKeys = K()): Promise<Story[]> {
 }
 export async function getMyStories(k: SocialKeys = K()): Promise<Story[]> {
   const remote = await serviceRequest<Story[]>('/api/social/stories/me');
-  return Array.isArray(remote) ? remote : [];
+  return Array.isArray(remote) ? remote.map((story) => stampStickerStateReceipt(story)) : [];
+}
+
+/**
+ * Records when this device received a story's sticker state
+ * (`stickerState.receivedAt`, device clock). `serverNow` is a snapshot from
+ * when the server built the response, so a countdown opened later must use
+ * `serverNow - receivedAt` as the clock offset, never `serverNow - now`.
+ * A state that already carries a receipt time keeps it.
+ */
+export function stampStickerStateReceipt(story: Story, receivedAt = Date.now()): Story {
+  const state = story?.stickerState;
+  if (!state || typeof state.receivedAt === 'number') return story;
+  return { ...story, stickerState: { ...state, receivedAt } };
 }
 /**
  * Merges freshly-fetched `Story` objects (from `api.social.myStories()` /
@@ -2114,8 +2144,9 @@ export async function cacheStoriesForViewer(stories: Story[], k: SocialKeys = K(
   if (!stories.length) return;
   const existing = await load<Story[]>(k.stories, []);
   const byId = new Map(existing.map(s => [s.id, s]));
-  for (const story of stories) byId.set(story.id, story);
   const now = Date.now();
+  // Stamped now: these were just fetched, and the cache may be read hours later.
+  for (const story of stories) byId.set(story.id, stampStickerStateReceipt(story, now));
   await save(k.stories, Array.from(byId.values()).filter(s => s.expiresAt > now));
 }
 export async function createStory(params: {
@@ -2212,16 +2243,13 @@ export async function markNotificationUnread(id: string): Promise<void> {
   const notifs = await getNotifications(k);
   await save(k.notifications, notifs.map(n => n.id === id ? { ...n, isRead: false } : n)); notify();
 }
+/** Deletes one notification on the server. Throws on failure (callers put the row back). */
 export async function deleteNotification(id: string): Promise<void> {
   const k = K();
-  try {
-    await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
-    const notifs = await getNotifications(k);
-    await save(k.notifications, notifs.filter(n => n.id !== id));
-    notify(); return;
-  } catch { /* fall through to existing local logic */ }
+  await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
   const notifs = await getNotifications(k);
-  await save(k.notifications, notifs.filter(n => n.id !== id)); notify();
+  await save(k.notifications, notifs.filter(n => n.id !== id));
+  notify();
 }
 /**
  * "Mute <category> alerts": stored server-side, so future notifications of that

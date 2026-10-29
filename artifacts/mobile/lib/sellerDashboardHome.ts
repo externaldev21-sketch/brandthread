@@ -41,13 +41,13 @@ export const HOME_RANGE_EMPTY_MESSAGE: Record<SellerHomeDashboardRange, string> 
 
 export interface HomeDeltaLine {
   direction: 'up' | 'down' | 'flat';
-  /** "+12% vs yesterday", "−4.5% vs previous 7 days", "0% vs yesterday". */
+  /** "12% vs yesterday", "4.5% vs previous 7 days", "0% vs yesterday" (unsigned; `direction` carries the sign). */
   label: string;
 }
 
 /**
- * The hero's delta line. Percent only (Shopify's format), signed, with the
- * range's comparison copy. Returns null when there is no honest percentage:
+ * The hero's delta line. Percent only (Shopify's format), unsigned (the hero
+ * draws an up/down arrow from `direction`), with the range's comparison copy. Returns null when there is no honest percentage:
  * an empty/brand-new store, or a prior period of 0 (any percentage would be
  * made up).
  */

@@ -4,7 +4,7 @@
  * the Store policies screen; a tap saves right away and reverts on failure.
  * "Until shipped" is the platform default (up to day 21).
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -21,11 +21,21 @@ export function CancelWindowSetting() {
   const api = useApi();
   const [hours, setHours] = useState<CancelWindowHours | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // The last value the server confirmed, and which save is the latest: an
+  // older save failing after a newer one was sent must not undo the newer one.
+  const savedRef = useRef<CancelWindowHours | undefined>(undefined);
+  const saveSeqRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   useEffect(() => {
     let alive = true;
     api.seller.getCancelWindow()
-      .then(res => { if (alive) setHours((res?.hours ?? null) as CancelWindowHours); })
+      .then(res => {
+        if (!alive) return;
+        savedRef.current = (res?.hours ?? null) as CancelWindowHours;
+        setHours(savedRef.current);
+      })
       // Unknown is not "Until shipped": keep the choices unselected and say why.
       .catch(() => { if (alive) setError('Couldn’t load your cancellation window. Leave and reopen this screen to try again.'); });
     return () => { alive = false; };
@@ -34,12 +44,15 @@ export function CancelWindowSetting() {
   function choose(next: CancelWindowHours) {
     if (hours === undefined || next === hours) return;
     hapticSelection();
-    const previous = hours;
+    const seq = ++saveSeqRef.current;
     setHours(next);
     setError(null);
-    api.seller.setCancelWindow(next).catch(() => {
+    api.seller.setCancelWindow(next).then(() => {
+      savedRef.current = next;
+    }, () => {
+      if (!mountedRef.current || seq !== saveSeqRef.current) return;
       hapticError();
-      setHours(previous);
+      setHours(savedRef.current);
       setError('Couldn’t save. Check your connection and try again.');
     });
   }

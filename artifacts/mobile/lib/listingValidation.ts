@@ -44,7 +44,7 @@ export function validatePhotosStep(input: Pick<ListingValidationInput, 'media'>)
   return errors;
 }
 
-/** Validates the Details step: name + category are required. */
+/** Validates the Details step: a name is required (category is optional). */
 export function validateDetailsStep(input: Pick<ListingValidationInput, 'name' | 'category'>): FieldError[] {
   const errors: FieldError[] = [];
   if (!input.name || !input.name.trim()) {

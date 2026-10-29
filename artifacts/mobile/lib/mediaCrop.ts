@@ -138,7 +138,11 @@ export function transformFromNormalizedRect(
   const pixelWidth = rect.width * sourceW;
   const pixelHeight = rect.height * sourceH;
   if (pixelWidth <= 0 || pixelHeight <= 0) return DEFAULT_CROP_TRANSFORM;
-  const scale = sourceW / pixelWidth;
+  // Scale is relative to the scale-1 box (the largest box of the rect's own
+  // ratio that fits the source), not to the full source width: on a source
+  // wider than the target ratio those differ.
+  const base = cropBoxSize(sourceW, sourceH, pixelWidth / pixelHeight, 1);
+  const scale = base.width / pixelWidth;
   const centerX = (rect.x + rect.width / 2) * sourceW;
   const centerY = (rect.y + rect.height / 2) * sourceH;
   return {

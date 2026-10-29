@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/hooks/useApi';
 import { useSignInGate } from '@/hooks/useSignInGate';
@@ -14,7 +15,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { hapticSelection } from '@/lib/haptics';
 
-// Keeps a row's state when the list virtualises it away and back.
+// Keeps a row's state when the list virtualises it away and back. Keyed by
+// account + drop: a subscription belongs to one buyer, so another account
+// signing in on this device must not inherit (or skip fetching) it.
 const statusCache = new Map<string, boolean>();
 
 export function DropNotifyBell({ dropId, dropName }: { dropId: string; dropName: string }) {
@@ -22,23 +25,27 @@ export function DropNotifyBell({ dropId, dropName }: { dropId: string; dropName:
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { isSignedIn, goToSignIn } = useSignInGate();
+  const { userId } = useAuth();
   const { showUndo } = useUndoToast();
-  const [on, setOn] = useState<boolean>(() => statusCache.get(dropId) ?? false);
+  const cacheKey = `${isSignedIn && userId ? userId : 'signed-out'}:${dropId}`;
+  const [on, setOn] = useState<boolean>(() => statusCache.get(cacheKey) ?? false);
   const [pending, setPending] = useState(false);
 
   const set = useCallback((value: boolean) => {
-    statusCache.set(dropId, value);
+    statusCache.set(cacheKey, value);
     setOn(value);
-  }, [dropId]);
+  }, [cacheKey]);
 
   useEffect(() => {
-    if (!isSignedIn || statusCache.has(dropId)) return;
+    // Account changed (or signed out) while mounted: show that account's state.
+    setOn(statusCache.get(cacheKey) ?? false);
+    if (!isSignedIn || statusCache.has(cacheKey)) return;
     let cancelled = false;
     api.publicDrops.notificationStatus(dropId)
       .then((r) => { if (!cancelled) set(!!r.subscribed); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [api, dropId, isSignedIn, set]);
+  }, [api, cacheKey, dropId, isSignedIn, set]);
 
   const toggle = useCallback(async () => {
     if (pending) return;

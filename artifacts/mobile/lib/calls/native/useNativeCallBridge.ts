@@ -118,6 +118,7 @@ export function useNativeCallBridge(opts: {
       },
     });
     let lastToken = '';
+    const effectUserId = opts.userId;
     const offToken = nativeCallKit.registerToken((token) => {
       if (token.token === lastToken) return;
       lastToken = token.token;
@@ -126,11 +127,17 @@ export function useNativeCallBridge(opts: {
     return () => {
       offEvents();
       offToken();
-      // Signing out / switching account: drop this device's token for the
-      // account that is leaving. Best-effort — once the session is gone the
-      // request may be refused; the push's calleeId check (callIdentity.ts)
-      // and the server moving the token on the next registration cover that.
-      if (lastToken) latest.current.deregisterToken(lastToken).catch(() => {});
+      // Calls turned off for the same account: drop this device's token.
+      // Not on sign-out / account switch: by the time this cleanup runs the
+      // API client already speaks for the NEW session (or none), so the
+      // DELETE would be sent as the wrong account — a no-op at best, and at
+      // worst it lands after the new account's own registration of this same
+      // device token and deletes it. The push's calleeId check
+      // (callIdentity.ts) and the server moving the token to the new account
+      // on its registration (onConflict on token) cover the leaving account.
+      if (lastToken && latest.current.userId === effectUserId) {
+        latest.current.deregisterToken(lastToken).catch(() => {});
+      }
     };
   }, [active, opts.userId]);
 

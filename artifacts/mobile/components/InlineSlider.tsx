@@ -60,25 +60,36 @@ export function InlineSlider({
     return Math.min(steps.length - 1, Math.round(fraction * (steps.length - 1)));
   }, [steps]);
 
+  // `g.dx` is the total drag since the touch started, so it is applied to the
+  // value the drag started from (captured at grant) — not to the value the
+  // drag has already moved to, which would count every pixel again on each
+  // move. The responder reads the latest props through a ref so it stays the
+  // same instance for the whole gesture.
+  const latest = useRef({ value, steps, min, max, snapValue, indexFromX, emit });
+  latest.current = { value, steps, min, max, snapValue, indexFromX, emit };
+  const dragStartValue = useRef(value);
+
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
     // Keep the drag once it starts: a long horizontal drag must never be
     // handed to the screen's swipe-back gesture (or a parent scroll view).
     onPanResponderTerminationRequest: () => false,
-    onPanResponderGrant:          () => {},
+    onPanResponderGrant:          () => { dragStartValue.current = latest.current.value; },
     onPanResponderMove:           (_e, g) => {
-      if (steps) {
-        const currentIdx = steps.indexOf(value as any);
+      const { steps: s, min: lo, max: hi, snapValue: snap, indexFromX: toIndex, emit: send } = latest.current;
+      const start = dragStartValue.current;
+      if (s) {
+        const currentIdx = s.indexOf(start as any);
         const startX = currentIdx === -1
           ? widthRef.current / 2
-          : (currentIdx / (steps.length - 1)) * widthRef.current;
-        emit(steps[indexFromX(startX + g.dx)]);
+          : (currentIdx / (s.length - 1)) * widthRef.current;
+        send(s[toIndex(startX + g.dx)]);
       } else {
-        emit(snapValue(value + (g.dx / widthRef.current) * (max - min)));
+        send(snap(start + (g.dx / widthRef.current) * (hi - lo)));
       }
     },
-  }), [steps, value, max, min, snapValue, indexFromX, emit]);
+  }), []);
 
   const fraction = fractionFromValue(value);
 

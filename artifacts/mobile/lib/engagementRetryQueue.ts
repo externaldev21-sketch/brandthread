@@ -186,7 +186,10 @@ export async function processEngagementRetryQueue(): Promise<void> {
     const globalFallback = globalFallbackExecutor;
     const owner = currentOwner();
     const remaining: QueuedEngagementAction[] = [];
-    for (const action of queue) {
+    // Snapshot: enqueueEngagementRetry can run while a replay is awaited, and
+    // what it adds must survive the write-back below.
+    const snapshot = queue;
+    for (const action of snapshot) {
       // Never replay one account's queued actions after switching to another.
       if (getAccountStorageScope() !== scope) return;
       // A kind with its own registered handler always uses it (the feed's
@@ -215,7 +218,11 @@ export async function processEngagementRetryQueue(): Promise<void> {
       }
     }
     if (getAccountStorageScope() !== scope || loadedScope !== scope) return;
-    queue = remaining;
+    // Taps queued during this pass are new objects in `queue`; they win over
+    // this pass's copy of the same (kind, target) and keep their place.
+    const added = queue.filter((action) => !snapshot.includes(action));
+    const addedIds = new Set(added.map((action) => action.id));
+    queue = [...remaining.filter((action) => !addedIds.has(action.id)), ...added];
     await persist(scope);
   } finally {
     processing = false;

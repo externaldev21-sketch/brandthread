@@ -68,8 +68,10 @@ describe('isSellerDevPreview — native platform guard', () => {
 // ── Query-string logic (dev + web) ────────────────────────────────────────────
 
 describe('isSellerDevPreview — query-string logic (dev web)', () => {
-  it('does not default to seller when no bt_preview param exists', () => {
-    expect(sellerPreviewFromSearch('', true, true)).toBe(false);
+  // The owner's current review defaults a fresh preview browser to seller
+  // (lib/previewRoleSelection.ts, .agents/memory/guest-browsing-contract.md).
+  it('defaults to seller when no bt_preview param exists', () => {
+    expect(sellerPreviewFromSearch('', true, true)).toBe(true);
   });
 
   it('returns true only for explicit ?bt_preview=seller', () => {
@@ -80,12 +82,12 @@ describe('isSellerDevPreview — query-string logic (dev web)', () => {
     expect(sellerPreviewFromSearch('?bt_preview=buyer', true, true)).toBe(false);
   });
 
-  it('returns false for unrecognised bt_preview values', () => {
-    expect(sellerPreviewFromSearch('?bt_preview=admin', true, true)).toBe(false);
+  it('falls back to the seller default for unrecognised bt_preview values', () => {
+    expect(sellerPreviewFromSearch('?bt_preview=admin', true, true)).toBe(true);
   });
 
-  it('returns false when bt_preview is absent but other params are present', () => {
-    expect(sellerPreviewFromSearch('?foo=bar&baz=qux', true, true)).toBe(false);
+  it('falls back to the seller default when bt_preview is absent but other params are present', () => {
+    expect(sellerPreviewFromSearch('?foo=bar&baz=qux', true, true)).toBe(true);
   });
 
   it('returns false when bt_preview=buyer is mixed with other params', () => {
@@ -112,8 +114,8 @@ describe('isBuyerDevPreview', () => {
     expect(buyerPreviewFromSearch('?bt_preview=seller', true, true)).toBe(false);
   });
 
-  it('defaults to buyer (no param) on dev web', () => {
-    expect(buyerPreviewFromSearch('', true, true)).toBe(true);
+  it('does not default to buyer (no param) on dev web — seller is the default', () => {
+    expect(buyerPreviewFromSearch('', true, true)).toBe(false);
   });
 });
 
@@ -121,7 +123,7 @@ describe('isBuyerDevPreview', () => {
 
 describe('seller + buyer preview symmetry', () => {
   const cases = [
-    { search: '',                   seller: false, buyer: true },
+    { search: '',                   seller: true,  buyer: false },
     { search: '?bt_preview=seller', seller: true,  buyer: false },
     { search: '?bt_preview=buyer',  seller: false, buyer: true },
   ];
@@ -155,9 +157,9 @@ describe('preview detection falls back to the persisted role once the query para
     expect(buyerPreviewFromSearch('', true, true, 'buyer')).toBe(true);
   });
 
-  it('an absent param with no persisted role defaults to the preview buyer', () => {
-    expect(sellerPreviewFromSearch('', true, true, null)).toBe(false);
-    expect(buyerPreviewFromSearch('', true, true, null)).toBe(true);
+  it('an absent param with no persisted role defaults to the preview seller', () => {
+    expect(sellerPreviewFromSearch('', true, true, null)).toBe(true);
+    expect(buyerPreviewFromSearch('', true, true, null)).toBe(false);
   });
 
   it('an absent param never leaks the OTHER role\'s persisted flag', () => {
@@ -272,11 +274,11 @@ describe('isProductionPreviewHost — matching logic', () => {
 // opt-in only, via `&demo=1`, and never the default — Dev's explicit call
 // ("I don't want it to act like it already has people on it").
 
-function demoModeFromSearch(search: string, inPreview: boolean, persistedDemo = false): PreviewResult {
+// Mirrors isPreviewDemoMode(): demo is URL-only and never persisted, so a
+// flag left in storage by an earlier page (persistedDemo) is ignored.
+function demoModeFromSearch(search: string, inPreview: boolean, _persistedDemo = false): PreviewResult {
   if (!inPreview) return false;
-  const v = new URLSearchParams(search).get('demo');
-  if (v === '1') return true;
-  return persistedDemo;
+  return new URLSearchParams(search).get('demo') === '1';
 }
 
 function freshModeFromSearch(search: string, inPreview: boolean, persistedDemo = false): PreviewResult {
@@ -306,18 +308,14 @@ describe('isPreviewDemoMode / isPreviewFreshMode — data-mode logic', () => {
     expect(demoModeFromSearch('?demo=1', false)).toBe(false);
   });
 
-  it('persisted demo flag survives a later navigation with no demo param, same as the role flag does', () => {
-    expect(demoModeFromSearch('?bt_preview=seller', true, true)).toBe(true);
-    expect(freshModeFromSearch('?bt_preview=seller', true, true)).toBe(false);
+  it('a stale stored demo flag never survives a later route without demo=1 (demo is URL-only, unlike the role)', () => {
+    expect(demoModeFromSearch('?bt_preview=seller', true, true)).toBe(false);
+    expect(freshModeFromSearch('?bt_preview=seller', true, true)).toBe(true);
   });
 
-  it('a fresh param explicitly overrides a stale persisted demo flag', () => {
-    // demo is only ever set to '1' by an explicit param in the real module;
-    // there is no way to un-set it via the URL, mirroring bt_preview's own
-    // "only the first load has to carry it" contract — this documents that
-    // the fresh/demo distinction is a one-way opt-in for the rest of the
-    // session, exactly like the seller/buyer role itself.
-    expect(demoModeFromSearch('?bt_preview=seller', true, true)).toBe(true);
+  it('demo=1 on the current route still opts in, whatever was stored before', () => {
+    expect(demoModeFromSearch('?bt_preview=seller&demo=1', true, false)).toBe(true);
+    expect(demoModeFromSearch('?bt_preview=seller&demo=1', true, true)).toBe(true);
   });
 });
 

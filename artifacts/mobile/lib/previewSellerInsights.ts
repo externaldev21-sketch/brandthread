@@ -42,7 +42,7 @@ export function previewBuckets(range: InsightRange, now = new Date()): { starts:
   } else if (range === 'week') {
     step = '1 day';
     start = new Date(y, m, d - now.getDay());
-    for (let i = 0; i <= now.getDay(); i++) starts.push(new Date(y, m, start.getDate() + i));
+    for (let i = 0; i <= now.getDay(); i++) starts.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
   } else if (range === 'month') {
     step = '1 day';
     start = new Date(y, m, 1);

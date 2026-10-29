@@ -19,6 +19,9 @@ export function GiveawayProfileCard({ sellerId, enabled = true }: { sellerId: st
   const [g, setG] = useState<any>(null);
 
   useEffect(() => {
+    // Never keep showing the previous seller's giveaway while (or if) this
+    // seller's read is pending, skipped or fails.
+    setG(null);
     if (!enabled || !sellerId || sellerId.startsWith('u_')) return;
     let cancelled = false;
     // Optional-chained so screens rendered under a partial api mock (tests) never crash on an extra read.

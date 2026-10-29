@@ -111,11 +111,14 @@ export interface TrendingBrandRow {
   followersLabel?: string;
 }
 
-/** "1 follower" / "1.2K followers"; undefined when there are none to show. */
+/** "1 follower" / "1.2K followers" / "1.5M followers"; undefined when there are none to show. */
 export function followersLabel(count: number): string | undefined {
   if (!Number.isFinite(count) || count <= 0) return undefined;
   if (count === 1) return '1 follower';
-  if (count >= 1000) return `${(Math.round(count / 100) / 10).toString().replace(/\.0$/, '')}K followers`;
+  const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
+  // A count that would round to "1000K" reads in millions instead.
+  if (count >= 999_950) return `${oneDecimal(count / 1_000_000)}M followers`;
+  if (count >= 1000) return `${oneDecimal(count / 1000)}K followers`;
   return `${count} followers`;
 }
 

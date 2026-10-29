@@ -11,9 +11,9 @@ import { crispPx } from '@/lib/crispPixel';
 /**
  * Unread Activity Center count. Refreshes when the host screen gains focus,
  * (debounced) whenever activity is read or dismissed anywhere in the app, and
- * short-polls every ~1.5s while this button is mounted so a new follow/like
- * elsewhere bumps the badge live (see watchActivityRealtime's own comment —
- * there is no websocket/SSE layer in this codebase).
+ * live via watchActivityRealtime while this button is mounted: the realtime
+ * sockets trigger an immediate fetch, and a ~1.5s short poll runs only while
+ * those sockets are down (see watchActivityRealtime's own comment).
  */
 export function useActivityUnreadCount(): number {
   const [count, setCount] = useState(0);

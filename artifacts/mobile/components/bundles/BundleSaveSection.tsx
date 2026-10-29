@@ -10,7 +10,7 @@
  * bundle screen to choose; otherwise every item goes in the bag at once.
  * Checkout applies the bundle price server-side (lib/money/bundlePricing.ts).
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon as Feather } from '@/components/ui/Icon';
@@ -67,6 +67,10 @@ export function BundleOfferCard({ bundle, onAdded }: { bundle: PublicBundle; onA
   const st = useMemo(() => makeStyles(theme), [theme]);
   const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle');
   const [error, setError] = useState<string | null>(null);
+  // The "Added to bag" confirmation reverts after a beat; cleared on unmount
+  // so the card never sets state after it's gone.
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (addedTimer.current) clearTimeout(addedTimer.current); }, []);
 
   const open = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -87,7 +91,8 @@ export function BundleOfferCard({ bundle, onAdded }: { bundle: PublicBundle; onA
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setState('added');
       onAdded?.();
-      setTimeout(() => setState('idle'), 2200);
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+      addedTimer.current = setTimeout(() => { addedTimer.current = null; setState('idle'); }, 2200);
     } catch {
       setError('This bundle can’t be added right now.');
       setState('idle');

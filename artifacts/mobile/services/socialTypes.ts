@@ -410,9 +410,9 @@ export interface StoryOverlay {
   locationLabel?: string;
   /** Resolved /api/places id; when set, the viewer may open the location page from the sticker. */
   locationPlaceId?: string;
-  // question sticker (answers are not yet persisted server-side — UI-only)
+  // question sticker (answers are saved server-side: POST /api/social/stories/:id/question-answer)
   questionPrompt?: string;
-  // poll sticker (results are not yet persisted server-side — UI-only)
+  // poll sticker (votes are saved server-side: POST /api/social/stories/:id/poll-vote; live counts are in Story.stickerState)
   pollQuestion?: string;
   pollOptions?: StoryPollOption[];
   // product-tag sticker (sellers, or buyers tagging a saved product)
@@ -483,6 +483,9 @@ export interface StoryCountdownState { dropId: string; name: string; releaseAt: 
 export interface StoryStickerState {
   /** Server clock (ms) when the state was built: countdowns tick from it, not from the phone's clock. */
   serverNow: number;
+  /** Device clock (ms) when this state arrived (set by the app, not the server) — with
+   *  `serverNow` it gives the clock offset even when the story is shown much later. */
+  receivedAt?: number;
   polls: Record<string, StoryPollState>;
   questions: Record<string, StoryQuestionState>;
   products: Record<string, StoryProductState>;

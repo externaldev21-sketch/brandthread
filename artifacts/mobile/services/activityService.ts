@@ -214,6 +214,10 @@ export function watchActivityRealtime(
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   let inFlight = false;
+  // A wake-up (socket event, reconnect) that lands while a fetch is already in
+  // flight must not be dropped: that fetch may have been answered before the
+  // change, and with the socket up the next scheduled tick is 60s away.
+  let rerun = false;
   const RECONCILE_MS = 60_000;
   const schedule = () => {
     if (stopped) return;
@@ -221,8 +225,10 @@ export function watchActivityRealtime(
     timer = setTimeout(tick, isRealtimeConnected() ? RECONCILE_MS : isUserEventsConnected() ? Math.max(intervalMs, REALTIME_SAFETY_POLL_MS) : intervalMs);
   };
   const tick = async () => {
-    if (stopped || inFlight) return;
+    if (stopped) return;
+    if (inFlight) { rerun = true; return; }
     inFlight = true;
+    rerun = false;
     if (timer) { clearTimeout(timer); timer = null; }
     try {
       const result = await serviceRequest<{ count?: number; latestId?: string | null }>(
@@ -231,7 +237,8 @@ export function watchActivityRealtime(
       const count = typeof result?.count === 'number' ? result.count : 0;
       const latestId = result?.latestId ?? null;
       const key = `${count}:${latestId}`;
-      if (key !== lastKey) {
+      // Stopped while the request was in flight: the screen is gone.
+      if (!stopped && key !== lastKey) {
         lastKey = key;
         // The app icon follows the same server count as the bell.
         void setAppBadgeCount(count);
@@ -241,7 +248,8 @@ export function watchActivityRealtime(
       // A failed poll just tries again next tick.
     } finally {
       inFlight = false;
-      schedule();
+      if (rerun && !stopped) void tick();
+      else schedule();
     }
   };
 

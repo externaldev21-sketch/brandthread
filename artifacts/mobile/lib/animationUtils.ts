@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Platform } from 'react-native';
 
 /**
  * Blurry-text prevention helpers for animated transforms.
@@ -83,8 +83,10 @@ export function identityOrNone<T extends ReadonlyArray<TransformEntry>>(
  * rasterizer, so off-web this returns `value` unchanged.
  */
 export function snapToDevicePixel(value: number): number {
-  const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
-  if (typeof window === 'undefined') return value;
+  // React Native defines a global `window` too, so check the platform rather
+  // than `window` to keep native values unchanged.
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return value;
+  const dpr = window.devicePixelRatio || 1;
   return Math.round(value * dpr) / dpr;
 }
 

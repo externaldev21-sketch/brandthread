@@ -11,10 +11,10 @@
 
 /** One card step per this many px of horizontal drag — the single knob to
  *  turn for scrub feel. Raised from 26 to 32 per Dev's live-testing
- *  feedback ("a tiny bit too fast"); a full edge-to-edge swipe (~360px of
- *  usable drag range on a 393pt-wide phone) still comfortably covers the
- *  whole 16-card menu in one pass — see indexForDrag's own doc comment for
- *  the exact math this satisfies. */
+ *  feedback ("a tiny bit too fast"). A full edge-to-edge swipe (~360px of
+ *  usable drag range on a 393pt-wide phone) covers about 12 cards, so the
+ *  whole 16-card menu (15 steps = 480px) takes at most two passes — see
+ *  dragRangeForFullList and its test for the exact math. */
 export const SCRUB_PX_PER_CARD = 32;
 
 /**

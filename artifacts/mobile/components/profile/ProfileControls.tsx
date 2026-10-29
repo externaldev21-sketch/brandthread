@@ -126,12 +126,11 @@ export function ProfileButton({
 }
 
 /**
- * Own-profile action row (seller): a compact "Edit" button on the left
- * (black + 1pt silver border, white text) and one long white "Messages"
- * button filling the rest of the row (black text, unread badge) — Dev's
- * call replacing the previous three-button Edit/Share/Contact row. Both
- * controls are 38-40pt tall with a 10pt radius and a 44pt hit area (padded
- * via hitSlop rather than growing the visible pill), Inter 600 labels.
+ * Own-profile action row (seller): "Edit" (card fill + border, theme text)
+ * and "Messages" (accent fill, onAccent text, unread badge) side by side in
+ * two equal-width columns — Dev's call replacing the previous three-button
+ * Edit/Share/Contact row. Both controls are 39pt tall with a RADIUS.sm
+ * radius and a 3pt hitSlop on every side, Inter 600 labels.
  */
 export function ProfileEditMessagesRow({
   onEdit,

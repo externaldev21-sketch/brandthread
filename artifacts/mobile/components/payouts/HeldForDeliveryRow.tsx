@@ -12,7 +12,7 @@
  *                                              no per-order list, so payouts.tsx's
  *                                              fixed header stays short)
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -68,10 +68,14 @@ export function HeldForDeliveryRow({ summary, inset = 0, compact = false }: Prop
 /** Self-loading variant for screens that don't fetch /finance/summary. */
 export function HeldForDeliverySection({ inset = SP.md, compact = true }: { inset?: number; compact?: boolean }) {
   const api = useApi();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const preview = isSellerDevPreview();
   const [summary, setSummary] = useState<Pick<FinanceSummary, 'held'> | null>(null);
   const [failed, setFailed] = useState(false);
+
+  // The held balance belongs to one account: drop it on sign-out / switch.
+  const accountKey = isSignedIn ? userId ?? null : null;
+  useEffect(() => { setSummary(null); setFailed(false); }, [accountKey]);
 
   useFocusEffect(useCallback(() => {
     // Preview never calls protected APIs; signed-out never either.
@@ -81,7 +85,7 @@ export function HeldForDeliverySection({ inset = SP.md, compact = true }: { inse
       .then((next) => { if (active) { setSummary(next); setFailed(false); } })
       .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [api, preview, isLoaded, isSignedIn]));
+  }, [api, preview, isLoaded, isSignedIn, accountKey]));
 
   // A failed load shows nothing rather than a misleading $0.00; the balance
   // above already offers the retry.

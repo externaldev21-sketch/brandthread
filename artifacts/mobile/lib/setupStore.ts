@@ -109,13 +109,6 @@ const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
     route: '/store-publish',
   },
   {
-    id: 'connect_payments',
-    label: 'Set up payments',
-    description: 'Link Stripe Connect so you can receive payouts',
-    icon: 'credit-card',
-    route: '/payouts',
-  },
-  {
     id: 'first_post',
     label: 'Post your first video',
     description: 'Share content to the Thread feed to attract buyers',

@@ -64,12 +64,11 @@ export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
 
 /**
  * Two-line caption with an explicit, always-visible "… more" control.
- * A hidden copy of the full caption is laid out at the real width and
- * font scale (onTextLayout); when it needs more than 2 lines, line 1 and
- * the rest are drawn separately — the rest truncated to one line beside a
- * separate "more" button, so truncation can never clip the control. The
- * caption text itself is not a touch target (product links stay tappable).
- * Before the first layout, a character heuristic decides overflow.
+ * Overflow is decided from the text alone (./captionClamp.ts — no layout
+ * measuring), so every post gets the same clamp: a long caption is cut to
+ * what fits in 2 lines with room left for the inline "… more", and the
+ * expanded caption ends in " less". The caption text itself is not a touch
+ * target (product links stay tappable).
  */
 export function CollapsibleCaption({ text, productMentions, onProductMention, expanded, onToggle, onLayout }: {
  text: string; productMentions?: PostProductMention[]; onProductMention?: (mention: PostProductMention) => void;

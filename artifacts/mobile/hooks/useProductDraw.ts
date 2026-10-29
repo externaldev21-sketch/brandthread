@@ -4,7 +4,7 @@
  * phase can change (entries open, entries close), and every 15s while the
  * buyer is waiting on a result.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
@@ -26,22 +26,35 @@ export function useProductDraw(productId?: string): {
   const [skewMs, setSkewMs] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
+  // Only the latest request may write state: a response for a previous
+  // productId (or an older poll) must not land after a newer one started.
+  const requestRef = useRef(0);
   const reload = useCallback(() => {
     if (!productId) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => requestRef.current === request;
     api.productDraws.state(productId)
       .then((s) => {
+        if (!isCurrent()) return;
         setSkewMs(new Date(s.serverNow).getTime() - Date.now());
         setNow(Date.now());
         setDraw(s.draw);
         if (s.draw && isSignedIn) {
-          api.productDraws.entry(productId).then((r) => setEntry(r.entry)).catch(() => {});
+          api.productDraws.entry(productId).then((r) => { if (isCurrent()) setEntry(r.entry); }).catch(() => {});
         } else {
           setEntry(null);
         }
       })
-      .catch(() => setDraw(null));
+      .catch(() => { if (isCurrent()) setDraw(null); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, isSignedIn]);
+
+  // A different product: never show the previous product's draw/entry.
+  useEffect(() => {
+    requestRef.current += 1;
+    setDraw(null);
+    setEntry(null);
+  }, [productId]);
 
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 

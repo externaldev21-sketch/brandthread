@@ -5,7 +5,7 @@ const cart = {
   id: 'cart',
   items: [
     { id: 'a', quantity: 1, maxQuantity: 3 },
-    { id: 'b', quantity: 2, maxQuantity: 0 },
+    { id: 'b', quantity: 2 },
   ],
 };
 
@@ -16,7 +16,7 @@ describe('applyCartQuantity', () => {
     expect(cart.items[0].quantity).toBe(1);
   });
 
-  it('caps at the line max, or 99 when the line has none', () => {
+  it('caps at the line max, or 99 when the line has none (stock unknown)', () => {
     expect(applyCartQuantity(cart, 'a', 10).items[0].quantity).toBe(3);
     expect(applyCartQuantity(cart, 'b', 500).items[1].quantity).toBe(99);
   });

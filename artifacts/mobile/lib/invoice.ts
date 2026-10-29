@@ -6,6 +6,7 @@
 import * as Sharing from 'expo-sharing';
 import type { Order } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
+import { dateToYmd } from '@/lib/dateTimeField';
 
 export type InvoiceInput = {
   orderNumber: string;
@@ -91,7 +92,8 @@ export function invoiceFromBuyerOrder(order: {
 export function buildInvoiceHtml(input: InvoiceInput): string {
   const money = (cents: number) => formatCents(cents, input.currency);
   const date = new Date(input.issuedAt);
-  const issued = Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+  // Local calendar date: an 8pm order in the US must not read as the next (UTC) day.
+  const issued = Number.isNaN(date.getTime()) ? '' : dateToYmd(date);
   const rows = input.items.map(item => `
     <tr>
       <td>${escapeHtml(item.name)}${item.variant ? ` — ${escapeHtml(item.variant)}` : ''}</td>

@@ -103,6 +103,15 @@ function demoFees(totalCents: number): { platformFeeCents: number; processingFee
   return { platformFeeCents, processingFeeChargedCents, sellerNetCents: totalCents - platformFeeCents - processingFeeChargedCents };
 }
 
+/**
+ * A day's order number: 100 numbers per day, so a busy day (up to ~14 random
+ * orders, plus the two world orders in slots 90-91) never runs into the next
+ * day's numbers. (Ten per day handed the same BT-number to different orders.)
+ */
+function orderNumberFor(idx: number, slot: number): string {
+  return `BT-${(idx - EPOCH_DAY) * 100 + slot + 1000}`;
+}
+
 function statusFor(ageMs: number, rand: number): PreviewSellerOrder['status'] {
   if (rand < 0.04 && ageMs > DAY_MS) return 'cancelled';
   if (ageMs < 0.75 * DAY_MS) return 'pending';
@@ -148,6 +157,8 @@ function worldOrdersForDay(y: number, m: number, d: number, idx: number, now: Da
     const customer = WORLD_CUSTOMERS[slot];
     const product = CATALOG[(idx + j) % CATALOG.length];
     const i = 900 + j;
+    // Order-number slot 90+j: below the next day's numbers (see orderNumberFor).
+    const numberSlot = 90 + j;
     const subtotalCents = product.priceCents;
     const shippingCents = 1800;
     const totalCents = subtotalCents + shippingCents;
@@ -156,7 +167,7 @@ function worldOrdersForDay(y: number, m: number, d: number, idx: number, now: Da
     const shipped = status === 'shipped' || status === 'delivered';
     out.push({
       id: `preview-demo-order-${idx}-${i}`,
-      orderNumber: `BT-${(idx - EPOCH_DAY) * 10 + i + 1000}`,
+      orderNumber: orderNumberFor(idx, numberSlot),
       status, createdAt: createdIso, updatedAt: createdIso, paidAt: createdIso,
       totalCents, subtotalCents, shippingCents, taxCents: 0, ...demoFees(totalCents), itemCount: 1,
       customerName: customer[0], customerEmail: `${customer[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]+/g, '.')}@example.com`,
@@ -213,7 +224,7 @@ function randomOrdersForDay(y: number, m: number, d: number, idx: number, age: n
     const fees = paid ? demoFees(totalCents) : { platformFeeCents: 0, processingFeeChargedCents: 0, sellerNetCents: 0 };
     out.push({
       id: `preview-demo-order-${idx}-${i}`,
-      orderNumber: `BT-${(idx - EPOCH_DAY) * 10 + i + 1000}`,
+      orderNumber: orderNumberFor(idx, i),
       status, createdAt: createdIso, updatedAt: createdIso,
       paidAt: status === 'cancelled' ? null : createdIso,
       totalCents, subtotalCents, shippingCents, taxCents: 0, ...fees, itemCount,

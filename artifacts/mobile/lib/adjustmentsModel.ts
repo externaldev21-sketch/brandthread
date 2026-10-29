@@ -8,9 +8,10 @@
  * CURVES:
  *   - Control points: { t: number [0,1], v: number [0,1] }[] (at least 2, sorted by t).
  *   - Channel: 'gamma' | 'red' | 'green' | 'blue'.
- *   - Applied as an SVG feComponentTransfer tableValues approximation in the
- *     compositor.  The curve is sampled at 11 uniform t values to produce the
- *     tableValues string.
+ *   - Applied in the compositor as a per-channel gain/bias feColorMatrix
+ *     approximation (layerRenderer.ts curvesToColorMatrixValues);
+ *     react-native-svg does not implement feComponentTransfer. The 11-sample
+ *     tableValues string below only drives the curve preview bars.
  *   - Histogram is computed from layer colors (image dominant color or drawing
  *     stroke colors) — never random/fake.
  *
@@ -98,15 +99,9 @@ export function curveToTableValues(points: CurvePoint[]): string {
 }
 
 /**
- * curvesAdjustmentToSvgFilter — builds a complete SVG feComponentTransfer
- * filter element string from a CurvesAdjustment.
- *
- * The filter id must be unique per layer.  The gamma channel adjusts all three
- * RGB channels simultaneously; per-channel curves are composed on top.
- *
- * React-native-svg does not expose feComponentTransfer in all Expo Go versions.
- * Where unsupported, the compositor falls back to adjusting layer opacity as a
- * deterministic approximation (documented in the rendering label).
+ * gammaApproxOpacity — an opacity in [0.2, 1] derived from the gamma curve's
+ * midpoint (midV × 2, clamped), as a crude brightness proxy for renderers
+ * without feComponentTransfer. Not currently used by the compositor.
  */
 export function gammaApproxOpacity(gammaCurve: ChannelCurve): number {
   // Sample the midpoint of the gamma curve as a proxy for overall brightness.
@@ -142,7 +137,7 @@ export function hexToRgb(hex: string): [number, number, number] | null {
 /**
  * HISTOGRAM_UNAVAILABLE — sentinel returned when pixel data is inaccessible
  * (e.g. raster image layers where we cannot read raw pixel values).
- * All channels are null arrays to distinguish from a valid all-zero histogram.
+ * It is plain `null`, to distinguish it from a valid all-zero histogram.
  */
 export const HISTOGRAM_UNAVAILABLE: null = null;
 export type HistogramOrUnavailable = Histogram | null;

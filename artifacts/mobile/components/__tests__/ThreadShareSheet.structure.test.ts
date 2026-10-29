@@ -7,9 +7,12 @@ const feed = readFileSync(resolve(process.cwd(), 'app/(tabs)/feed.tsx'), 'utf8')
 
 describe('Thread video sharing flow', () => {
   it('opens Brandthread sharing before the native system sheet', () => {
-    expect(feed).toContain('setShareOpen(true)');
+    // The feed lifted share state to one `sharePostId` for the whole pager.
+    expect(feed).toContain('setSharePostId(id)');
+    expect(feed).toContain('<ThreadShareSheet visible={shareOpen}');
     expect(feed).toContain('<ThreadShareSheet');
-    expect(source).toContain('title="Send to"');
+    // The sheet has been titled "Share to" since it moved onto the shared Sheet.
+    expect(source).toContain('title="Share to"');
   });
 
   it('provides real recipient, external share, moderation, and download actions', () => {
@@ -19,15 +22,18 @@ describe('Thread video sharing flow', () => {
       'Email',
       'Instagram',
       'More',
-      'Add to Story',
-      'Invite friends to chat',
-      'Why this video',
+      'Invite',
       'Report',
-      'Not interested',
+      'Block',
       'Save video',
     ]) {
       expect(source).toContain(`label="${label}"`);
     }
+    // Add to Story lives in the "More" options list, not the tile rows.
+    expect(source).toContain("text: 'Add to Story'");
+    // Discovery actions moved out of Share (tests/merge-polish-layouts.test.ts).
+    expect(source).not.toContain('<ShareAction label="Not interested"');
+    expect(source).not.toContain('<ShareAction label="Why this video"');
     expect(source).toContain('createOrGetConversation');
     expect(source).toContain('sendMessage(');
     expect(source).toContain('actionInFlightRef.current');

@@ -111,6 +111,11 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
   const [loading, setLoading]     = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalated, setEscalated] = useState(false);
+  // Read synchronously by handleEscalate: an AI-requested escalation runs
+  // from the sendMessage closure captured before the reply arrived, so its
+  // `escalated`/`escalating` state can be stale (Human tapped meanwhile) and
+  // would open a second ticket.
+  const escalationRef = useRef<'idle' | 'pending' | 'done'>('idle');
 
   // Seed welcome message when modal opens
   useEffect(() => {
@@ -168,7 +173,8 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
   }, [msgs, loading, api]);
 
   async function handleEscalate(reason?: string, history?: ChatMsg[]) {
-    if (escalated || escalating) return;
+    if (escalated || escalating || escalationRef.current !== 'idle') return;
+    escalationRef.current = 'pending';
     setEscalating(true);
     const snippet = (history ?? msgs)
       .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -177,12 +183,14 @@ export function SupportChatModal({ visible, onClose }: { visible: boolean; onClo
       .join('\n');
     try {
       await api.supportChat.escalate(reason ?? "User requested human support", snippet);
+      escalationRef.current = 'done';
       setEscalated(true);
       setMsgs(prev => [...prev, {
         id: uid(), role: 'assistant', ts: Date.now(),
         content: "I've flagged your case for our human support team. You'll receive a reply at your account email within 2 business hours.",
       }]);
     } catch {
+      escalationRef.current = 'idle';
       setMsgs(prev => [...prev, {
         id: uid(), role: 'assistant', isError: true, ts: Date.now(),
         content: "Couldn't create a ticket automatically. Please email us directly at support@brandthread.app",

@@ -75,7 +75,10 @@ export function finishedVideoIds(): Set<string> {
 
 export function markVideoFinished(id: string): void {
   const postId = basePostId(id);
-  void loadFinishedVideos().then((map) => {
+  void loadFinishedVideos().then((loaded) => {
+    // Marks made while the first load was pending all resolve with the same
+    // loaded map; build on the latest one so none of them is lost.
+    const map = memory ?? loaded;
     if (map[postId]) return;
     memory = pruneFinished({ ...map, [postId]: Date.now() }, Date.now());
     void AsyncStorage.setItem(FINISHED_VIDEOS_KEY, JSON.stringify(memory)).catch(() => {});
