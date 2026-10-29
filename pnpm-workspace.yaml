@@ -69,6 +69,9 @@ catalog:
 autoInstallPeers: false
 
 onlyBuiltDependencies:
+  # Skia's postinstall copies its prebuilt iOS/Android binaries into libs/;
+  # without it `pod install` fails ("Skia prebuilt binaries not found").
+  - '@shopify/react-native-skia'
   - '@swc/core'
   - esbuild
   - msw
