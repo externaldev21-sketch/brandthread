@@ -18,7 +18,6 @@ import { FlashList } from '@shopify/flash-list';
 import { Icon } from '@/components/ui/Icon';
 
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import { usePreloadedSceneEffect } from '@/hooks/usePreloadedSceneEffect';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1338,7 +1337,6 @@ export default function OrdersScreen() {
       {/* ── Fixed header ── */}
       <SellerListHeader
         title="Orders"
-        onBack={() => goBackOr(router, '/(tabs)')}
         showControls={hasAnyOrders}
         actions={[{ icon: 'more-horizontal', onPress: handleMoreMenu, accessibilityLabel: 'More order actions' }]}
         searchValue={searchQuery}

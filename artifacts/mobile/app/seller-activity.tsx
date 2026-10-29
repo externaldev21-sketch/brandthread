@@ -26,7 +26,7 @@ import { SP } from '@/lib/theme';
 import { EmptyState, useScreenPadding } from '@/components/layout';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
-
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 import { useScrollReset } from '@/hooks/useScrollReset';
 
@@ -413,7 +413,7 @@ export default function SellerActivityScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Activity" divider={false} showBack={false} />
+      <ScreenHeader title="Activity" divider={false} onBack={() => goBackOr(router, '/(tabs)/profile')} />
       <View style={styles.chipRow}>
         <ChipRow
           bounces={false}

@@ -3,6 +3,12 @@ name: Expo stale preview bundles
 description: How to respond when an open Expo client continues showing UI that no longer exists in source.
 ---
 
+For small owner-directed edits in the regular Expo preview, do not rebuild the separate fast preview unless requested.
+
+**Why:** The owner explicitly objected to an unsolicited fast-preview rebuild during a one-button correction.
+
+**How to apply:** Verify the change in the regular development preview; leave the static export untouched for these narrowly scoped edits.
+
 When the current source and focused tests prove that retired labels or icons are gone but an open phone still displays them, treat the client bundle as stale before rewriting the same UI again.
 
 **Why:** An open Brandthread Expo session continued showing an old header, Add to bag copy, missing description, and lightning Buy now icon after all had been replaced in the exact buyer route.
