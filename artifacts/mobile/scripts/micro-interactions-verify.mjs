@@ -44,12 +44,13 @@ const touchEnd = (cdp) => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd
 const lerp = (a, b, t) => a + (b - a) * t;
 const tap = (cdp, x, y) => touchPath(cdp, [[{ x, y }]]).then(() => touchEnd(cdp));
 
-async function open(browser, images, origin, role, target, { contextOptions = {}, routes } = {}) {
+async function open(browser, images, origin, role, target, { contextOptions = {}, routes, direct = false } = {}) {
   const { context, page, activity } = await openContext(browser, {
     device: DEVICE, role, origin, images, contextOptions: { reducedMotion: 'no-preference', ...contextOptions },
   });
   if (routes) await routes(context);
-  await openScreen(page, activity, origin, role, target);
+  if (direct) await page.goto(`${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  else await openScreen(page, activity, origin, role, target);
   const cdp = await context.newCDPSession(page);
   const shot = (name) => page.screenshot({ path: path.join(OUT, `${name}.png`) });
   const settle = async (ms = 600) => { await waitForQuietNetwork(activity, 500, 10_000); await page.waitForTimeout(ms); };
@@ -227,9 +228,25 @@ function friendsRoutes() {
 
 async function openWithRetry(browser, images, origin, role, target, ready, opts) {
   for (let attempt = 0; ; attempt += 1) {
-    const s = await open(browser, images, origin, role, target, opts);
-    try { await ready(s.page).first().waitFor({ timeout: 15_000 }); return s; } catch (e) {
-      await s.context.close();
+    let s;
+    try {
+      s = await open(browser, images, origin, role, target, opts);
+      // The first client-side push can land before the router is ready:
+      // push again in the same page before giving up on this load.
+      for (let push = 0; ; push += 1) {
+        try { await ready(s.page).first().waitFor({ timeout: 8_000 }); return s; } catch (e) {
+          if (push >= 3) throw e;
+          await s.page.evaluate((url) => {
+            history.pushState(history.state, '', url);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+          }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
+        }
+      }
+    } catch (e) {
+      if (s) {
+        await s.page.screenshot({ path: path.join(OUT, `load-fail-${target.replace(/\W+/g, '-')}-${attempt}.png`) }).catch(() => {});
+        await s.context.close();
+      }
       if (attempt >= 2) throw e;
     }
   }
@@ -330,7 +347,9 @@ Object.assign(STEPS, {
     await s.settle(800);
     for (let i = 0; i < 4; i += 1) {
       await s.page.getByText('People', { exact: true }).first().click({ force: true });
-      try { await s.page.locator('[data-testid="follow-button"]').first().waitFor({ timeout: 8_000 }); break; } catch (e) { if (i === 3) throw e; }
+      try { await s.page.locator('[data-testid="follow-button"]').first().waitFor({ timeout: 8_000 }); break; } catch (e) {
+        if (i === 3) { await s.shot('follow-load-fail'); throw e; }
+      }
     }
     await s.settle(600);
     const btn = s.page.locator('[data-testid="follow-button"]').first();
@@ -362,6 +381,10 @@ Object.assign(STEPS, {
     // Bag: add to cart, film the badge.
     r.badgeBefore = await s.page.getByTestId('product-cart-badge').innerText().catch(() => null);
     await s.page.getByTestId('product-add-to-cart').click();
+    // The size sheet: pick M, which adds it.
+    await s.page.getByText('M', { exact: true }).first().click({ timeout: 8_000 }).catch(() => {});
+    await s.page.waitForTimeout(400);
+    await s.page.getByText('Add to bag', { exact: true }).last().click({ timeout: 8_000 }).catch(() => {});
     for (let i = 0; i < 6; i += 1) {
       await s.page.getByTestId('product-cart-button').screenshot({ path: path.join(OUT, `product-00-bag-tick-f${i}.png`) }).catch(() => {});
       await s.page.waitForTimeout(50);
@@ -402,7 +425,7 @@ Object.assign(STEPS, {
     const devServer = await serveBuild(DEV_BUILD);
     try {
       const s = await openWithRetry(browser, images, devServer.origin, 'seller', '/seller-conversation?id=preview-seller-conversation-01',
-        (p) => p.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])'));
+        (p) => p.locator('[data-testid^="conversation-bubble-"]:not([data-testid*="swipe"])'), { direct: true });
       await s.settle(1200);
       const r = {};
       await s.shot('dm-00-thread');

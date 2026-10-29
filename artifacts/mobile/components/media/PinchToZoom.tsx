@@ -24,6 +24,8 @@ import { hideZoomLift, isZoomHostMounted, showZoomLift } from './PhotoZoomHost';
 const SPRING = { damping: 26, stiffness: 260, mass: 0.9 } as const;
 /** One finger moving this far (pt) means "scroll", not "about to pinch". */
 const ONE_FINGER_SLOP = 10;
+/** Upper bound for the spring home (ms) before the lifted copy is dropped regardless. */
+const RELEASE_MS = 700;
 
 export function PinchToZoom({
   uri, contentFit = 'cover', borderRadius = 0, onZoomChange, children, style, testID,
@@ -61,6 +63,20 @@ export function PinchToZoom({
   // Never leave a lifted copy behind (unmount / recycled row).
   useEffect(() => () => hideZoomLift(lifted), [lifted]);
 
+  // The lifted copy goes once the spring home has had time to land, on a JS
+  // timer, so it can never outlive the gesture even if the spring is cut short.
+  const unliftSoon = useCallback(() => { setTimeout(() => hideZoomLift(lifted), RELEASE_MS); }, [lifted]);
+  const release = () => {
+    'worklet';
+    if (!pinching.value) return;
+    pinching.value = false;
+    tx.value = withSpring(0, SPRING);
+    ty.value = withSpring(0, SPRING);
+    scale.value = withSpring(1, SPRING, (finished) => { if (finished) runOnJS(unlift)(); });
+    runOnJS(unliftSoon)();
+    runOnJS(zoomChange)(false);
+  };
+
   const pinch = Gesture.Pinch()
     .enabled(enabled)
     .manualActivation(true)
@@ -84,14 +100,10 @@ export function PinchToZoom({
       const z = focalZoom({ scale: 1, tx: 0, ty: 0 }, f0.value.x, f0.value.y, e.focalX - size.value.w / 2, e.focalY - size.value.h / 2, e.scale, 1);
       scale.value = z.scale; tx.value = z.tx; ty.value = z.ty;
     })
-    .onFinalize(() => {
-      if (!pinching.value) return;
-      pinching.value = false;
-      tx.value = withSpring(0, SPRING);
-      ty.value = withSpring(0, SPRING);
-      scale.value = withSpring(1, SPRING, (finished) => { if (finished) runOnJS(unlift)(); });
-      runOnJS(zoomChange)(false);
-    });
+    // Release: onEnd for a completed pinch, onFinalize for a cancelled one —
+    // whichever comes first springs home (the flag makes it run once).
+    .onEnd(() => { release(); })
+    .onFinalize(() => { release(); });
   if (parentScroll) pinch.blocksExternalGesture(parentScroll);
 
   const zoomStyle = useAnimatedStyle(() => ({
