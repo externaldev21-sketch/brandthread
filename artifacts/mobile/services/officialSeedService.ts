@@ -70,10 +70,15 @@ export async function fetchOfficialSeedPage(
     if (previewMode) params.set('preview', '1');
     const res = await serviceRequest<{
       seeding: boolean;
+      reason?: string;
       preview?: boolean;
       items?: OfficialSeedItem[];
       cursor?: { position: number; lastOfficialPosition: number };
     }>(`/api/feed/official-seed?${params.toString()}`, {}, false);
+    // `reason: 'error'` is the server's answer to a transient failure (feed.ts
+    // official-seed catch), not "this viewer isn't seeded": keep the organic
+    // page and ask again on the next page, like a thrown request.
+    if (res && !res.seeding && res.reason === 'error') return passthrough;
     if (!res?.seeding || !Array.isArray(res.items) || !res.cursor) {
       seedingActive = false;
       return { ...passthrough, cursor: { ...passthrough.cursor, done: true } };

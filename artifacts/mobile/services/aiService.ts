@@ -921,10 +921,13 @@ export async function getAISuggestions(
           try {
             const raw = await AsyncStorage.getItem(storageKey);
             const stored: AISuggestion[] = raw ? JSON.parse(raw) : [];
-            const dismissedIds = new Set(stored.filter(s => s.dismissedAt).map(s => s.id));
-            const filtered = suggestions.filter(s => !dismissedIds.has(s.id) && allowed(s));
+            // Dismissed and completed suggestions stay hidden (the cached
+            // path below filters both) — keep their markers across refetches.
+            const handled = stored.filter(s => s.dismissedAt || s.completedAt);
+            const handledIds = new Set(handled.map(s => s.id));
+            const filtered = suggestions.filter(s => !handledIds.has(s.id) && allowed(s));
             await AsyncStorage.setItem(storageKey, JSON.stringify([
-              ...stored.filter(s => s.dismissedAt),
+              ...handled,
               ...filtered,
             ]));
             return filtered;

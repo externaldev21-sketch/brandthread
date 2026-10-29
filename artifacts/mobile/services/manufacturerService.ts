@@ -642,6 +642,22 @@ export async function payBulkOrderFromWallet(id: string, walletId: string): Prom
   }));
 }
 
+/**
+ * The sample decision was saved, but posting the manufacturer review after it
+ * failed. Carries the saved sample so a caller can show the new state; its
+ * message says the decision is saved, so a plain error alert stays truthful.
+ */
+export class SampleReviewNotPostedError extends Error {
+  readonly sample: Sample;
+  readonly reviewError: unknown;
+  constructor(sample: Sample, reviewError: unknown) {
+    super('Your decision was saved, but the manufacturer review could not be posted.');
+    this.name = 'SampleReviewNotPostedError';
+    this.sample = sample;
+    this.reviewError = reviewError;
+  }
+}
+
 export async function submitSampleReview(
   sampleId: string,
   expectedRevision: number,
@@ -651,13 +667,17 @@ export async function submitSampleReview(
   const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(sampleId)}/sample-detail`, {
     method: 'PATCH', body: JSON.stringify({ status, expectedRevision, review }),
   });
-  await submitManufacturerReview(row.manufacturerId, sampleId, {
-    rating: review.overallRating,
-    qualityRating: review.qualityRating || review.overallRating,
-    communicationRating: review.fitRating || review.overallRating,
-    deliveryRating: review.packagingRating || review.overallRating,
-    comment: review.notes,
-  });
+  try {
+    await submitManufacturerReview(row.manufacturerId, sampleId, {
+      rating: review.overallRating,
+      qualityRating: review.qualityRating || review.overallRating,
+      communicationRating: review.fitRating || review.overallRating,
+      deliveryRating: review.packagingRating || review.overallRating,
+      comment: review.notes,
+    });
+  } catch (error) {
+    throw new SampleReviewNotPostedError(mapSampleOrder(row), error);
+  }
   return mapSampleOrder(row);
 }
 

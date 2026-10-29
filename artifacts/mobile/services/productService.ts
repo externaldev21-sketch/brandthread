@@ -900,7 +900,8 @@ export function summarizeProducts(list: Product[]) {
     draft: list.filter(p => p.status === 'draft').length,
     scheduled: list.filter(p => p.status === 'scheduled').length,
     archived: list.filter(p => p.status === 'archived').length,
-    preOrder: list.filter(p => p.salesModel === 'pre-order').length,
+    // Same rule as the 'pre-order' filter in getProducts: 'both' products take pre-orders too.
+    preOrder: list.filter(p => p.salesModel === 'pre-order' || p.salesModel === 'both').length,
     lowStock: list.filter(p => p.inventory.totalStock > 0 && p.inventory.totalStock <= p.inventory.lowStockThreshold).length,
     outOfStock: list.filter(p => p.inventory.totalStock === 0 && p.inventory.policy === 'deny' && p.status === 'active').length,
     totalInventoryValueCents: list.reduce((s, p) => s + (p.pricing.costCents ?? 0) * p.inventory.totalStock, 0),

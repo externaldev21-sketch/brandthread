@@ -1739,6 +1739,16 @@ export function mergeUnsentMessages(remote: Message[], unsent: Message[]): Messa
 export const LOCAL_MESSAGE_ID_PREFIX = 'local-out-';
 
 /**
+ * Stable idempotency key for a locally written message, so a retry after a
+ * lost response returns the stored row instead of a duplicate (server:
+ * lib/clientMessageId.ts accepts /^[A-Za-z0-9_-]{8,64}$/ and ignores anything else).
+ */
+export function clientMessageIdFor(message: Pick<Message, 'id' | 'clientMessageId'>): string | undefined {
+  const raw = (message.clientMessageId ?? message.id).replace(/[^A-Za-z0-9_-]/g, '').slice(-64);
+  return raw.length >= 8 ? raw : undefined;
+}
+
+/**
  * Send with an outbox (offline polish #33): the message is on screen right
  * away as "sending"; when the request fails it stays as "failed" with Tap to
  * retry (retryMessage) instead of disappearing behind an alert. Survives a
@@ -1750,7 +1760,7 @@ export async function sendMessageWithOutbox(
 ): Promise<Message> {
   const k = K();
   const msgKey = k.messages(conversationId);
-  const pending: Message = { ...local, status: 'sending' };
+  const pending: Message = { ...local, status: 'sending', clientMessageId: clientMessageIdFor(local) };
   if (_socialUserId === k.userId) {
     const existing = await load<Message[]>(msgKey, []);
     await save(msgKey, [...existing.filter((m) => m.id !== pending.id), pending]);
@@ -1758,7 +1768,7 @@ export async function sendMessageWithOutbox(
   try {
     const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text: pending.text, attachment: pending.attachment, replyToId: pending.replyToId }),
+      body: JSON.stringify({ text: pending.text, attachment: pending.attachment, replyToId: pending.replyToId, clientMessageId: pending.clientMessageId }),
     });
     if (_socialUserId === k.userId) {
       const current = await load<Message[]>(msgKey, []);
@@ -1876,7 +1886,7 @@ export async function retryMessage(conversationId: string, messageId: string): P
   try {
     const canonical = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text: message.text, attachment: message.attachment, replyToId: message.replyToId }),
+      body: JSON.stringify({ text: message.text, attachment: message.attachment, replyToId: message.replyToId, clientMessageId: clientMessageIdFor(message) }),
     });
     if (_socialUserId === k.userId) {
       const current = await load<Message[]>(msgKey, []);
