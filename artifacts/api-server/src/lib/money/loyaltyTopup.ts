@@ -14,7 +14,7 @@
  * buyer's charge as source_transaction and can never exceed it.
  */
 import type Stripe from "stripe";
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { db, orders, users } from "@workspace/db";
 import { logger } from "../logger";
 import { stripe as defaultStripe } from "../stripe";
@@ -91,6 +91,11 @@ export async function sweepLoyaltySellerTopups(options: { stripe?: StripeTransfe
     gt(orders.loyaltyAppliedCents, 0),
     isNull(orders.stripeLoyaltyTransferId),
     inArray(orders.fundsState, ["settled_direct", "released"]),
+    // Same exclusions as loyaltyTopupDue: a cancelled order (e.g. fully
+    // refunded as store credit, which keeps its funds state) is never due,
+    // and without this filter enough of them would fill every page and
+    // starve the orders that are.
+    notInArray(orders.status, ["cancelled", "refund_pending"]),
   )).limit(options.limit ?? 100);
   let done = 0;
   for (const { id } of due) {

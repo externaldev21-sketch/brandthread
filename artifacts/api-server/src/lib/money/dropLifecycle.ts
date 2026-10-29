@@ -240,6 +240,9 @@ export async function runMoneySweep(now = new Date()): Promise<{
   const unrecovered = rows<{ id: string }>(await db.execute(sql`
     SELECT l.id FROM shipping_labels l JOIN orders o ON o.id = l.order_id
     WHERE o.charge_model IN ('destination', 'transfer') AND l.status = 'active'
+      -- recoverLabelCost can only reverse an existing transfer; without one it
+      -- skips the label, so such labels would refill every page forever.
+      AND o.stripe_transfer_id IS NOT NULL
       AND EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id)
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label-recovery/' || l.id)
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id AND t.kind = 'label_paid_from_held')
