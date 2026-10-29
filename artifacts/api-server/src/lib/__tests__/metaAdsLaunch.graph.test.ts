@@ -23,7 +23,11 @@ vi.mock("@workspace/db", async () => {
           }),
         }),
       }),
-      update: () => ({ set: () => ({ where: async () => undefined }) }),
+      update: () => ({
+        set: () => ({
+          where: () => Object.assign(Promise.resolve(undefined), { returning: async () => [{ id: state.campaignRow.id }] }),
+        }),
+      }),
     },
   };
 });
