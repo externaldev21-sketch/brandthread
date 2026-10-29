@@ -43,7 +43,17 @@ describe('seller Profile tab navigation', () => {
     expect(sellerProfile).toContain("import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar'");
     expect(sellerProfile).toContain('<ProfileAccountSwitcher');
     expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
-    expect(sellerProfile).toContain("key: 'activity', icon: 'bell'");
+    // De-clutter (Dev): every action has one home. Activity is the bell, so
+    // the ••• menu doesn't repeat it; Edit profile / Share profile are the
+    // action row only (no top-bar pencil, no "Edit name and bio" quick
+    // sheet, no "Share store" — that lives on the Dashboard and My store).
+    expect(sellerProfile).not.toContain("key: 'activity'");
+    expect(sellerProfile).not.toContain('name="edit-2"');
+    expect(sellerProfile).not.toContain('profile-banner-edit');
+    expect(sellerProfile).not.toContain("key: 'quick-edit'");
+    expect(sellerProfile).not.toContain('profile-edit-sheet');
+    expect(sellerProfile).not.toContain("key: 'share-store'");
+    expect(sellerProfile).toContain("key: 'view-as-visitor'");
     // Share profile is the labelled button under the bio only — the ••• menu
     // no longer repeats it (audit: "Share profile" was offered twice).
     expect(sellerProfile).not.toContain("key: 'share', icon: 'share-2'");

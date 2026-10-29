@@ -263,12 +263,6 @@ const initialProfile = () => ({
   },
 });
 
-const updatedProfile = () => ({
-  ...initialProfile(),
-  brandName: "Updated Brand",
-  bio: "Updated bio",
-});
-
 function textContent(value: unknown): string {
   if (typeof value === "string" || typeof value === "number") return String(value);
   if (Array.isArray(value)) return value.map(textContent).join("");
@@ -287,28 +281,7 @@ async function renderScreen(): Promise<ReactTestRenderer> {
   return renderer;
 }
 
-async function openEditor(renderer: ReactTestRenderer) {
-  await act(async () => {
-    renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onLongPress === "function")[0].props.onLongPress();
-  });
-}
-
-async function enterProfileDetails(renderer: ReactTestRenderer) {
-  await act(async () => {
-    renderer.root.findByProps({ testID: "profile-edit-brand-name" }).props.onChangeText("Updated Brand");
-    renderer.root.findByProps({ testID: "profile-edit-bio" }).props.onChangeText("Updated bio");
-  });
-}
-
-async function save(renderer: ReactTestRenderer) {
-  await act(async () => {
-    await renderer.root.findByProps({ testID: "profile-edit-save" }).props.onPress();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-}
-
-describe("seller Profile brand details save", () => {
+describe("seller Profile Edit profile", () => {
   let renderer!: ReactTestRenderer;
 
   beforeEach(() => {
@@ -336,51 +309,11 @@ describe("seller Profile brand details save", () => {
     });
   });
 
-  it("opens the full seller Edit Profile screen from Edit Profile (the quick sheet stays on long-press)", async () => {
+  it("opens the full seller Edit Profile screen from Edit profile", async () => {
     renderer = await renderScreen();
     const edit = renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onPress === "function")[0];
     await act(async () => { edit.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith("/edit-profile");
-  });
-
-  it("updates the displayed Profile details only after the save succeeds", async () => {
-    apiMock.seller.getProfile
-      .mockResolvedValueOnce(initialProfile())
-      .mockResolvedValue(updatedProfile());
-    apiMock.auth.updateProfile.mockResolvedValue(updatedProfile());
-    renderer = await renderScreen();
-    await openEditor(renderer);
-    await enterProfileDetails(renderer);
-
-    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
-      .toContain("Original Brand");
-
-    await save(renderer);
-
-    expect(apiMock.auth.updateProfile).toHaveBeenCalledWith({
-      brandName: "Updated Brand",
-      bio: "Updated bio",
-    });
-    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
-      .toContain("Updated Brand");
-    expect(renderer.root.findAllByProps({ visible: false })).not.toHaveLength(0);
-  });
-
-  it("keeps the previous Profile details and surfaces an error when saving fails", async () => {
-    apiMock.auth.updateProfile.mockRejectedValue(new Error("Request failed"));
-    renderer = await renderScreen();
-    await openEditor(renderer);
-    await enterProfileDetails(renderer);
-
-    await save(renderer);
-
-    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
-      .toContain("Original Brand");
-    expect(alertMock).toHaveBeenCalledWith(
-      "Could not save changes",
-      "Check your connection and try again.",
-    );
-    expect(renderer.root.findByProps({ testID: "profile-edit-save" })).toBeTruthy();
   });
 });
 

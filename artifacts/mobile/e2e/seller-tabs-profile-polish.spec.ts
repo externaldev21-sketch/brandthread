@@ -9,8 +9,8 @@ import { clerkStubScript } from './clerkStub';
  *
  * Covers:
  *  - real Posts/Followers/Following/Likes counts, never stuck on "–"
- *  - the Instagram business layout: Professional dashboard row, then
- *    Edit profile / Share profile / Contact (was a six-button wall)
+ *  - the own-profile action row: Edit profile / Share profile (was a
+ *    six-button wall; the Professional dashboard row above it is gone)
  *
  * No backend runs in this sandbox, so seller.getProfile / social.profile /
  * publicSellers.get are mocked here — app code itself is untouched by this
@@ -51,7 +51,7 @@ test('seller (tabs)/profile — real counts + Instagram business action row @ 39
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
 
   await page.goto('/(tabs)/profile?bt_preview=seller', { waitUntil: 'networkidle' });
-  await page.getByText('Professional dashboard').first().waitFor({ timeout: 20_000 });
+  await page.getByText('Edit profile').first().waitFor({ timeout: 20_000 });
   await dismissOverlays(page);
   // The sandbox's clerkStub never resolves useAuth().isLoaded under
   // ?bt_preview (a pre-existing gap — see the header comment and PR body),
