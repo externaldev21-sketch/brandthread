@@ -15,3 +15,7 @@ Apple API request. Report local preflight results separately from remote
 authentication and signing readiness. Materialize private keys outside the
 checkout with restricted permissions and delete them after use. Fill submission
 credentials transiently at command runtime, not in committed configuration.
+
+EAS API-key injection does not prove non-interactive signing bootstrap is supported.
+**Why:** EAS can stop with “Credentials are not set up” before validating a distribution certificate, even with the ASC variables populated.
+**How to apply:** Distinguish CLI setup-mode rejection from Apple authorization rejection; do not blame the API-key role or claim an Apple ID login is unavoidable without provider evidence.
