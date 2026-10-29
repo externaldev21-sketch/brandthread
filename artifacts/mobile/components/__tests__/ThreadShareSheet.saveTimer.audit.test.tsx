@@ -45,7 +45,7 @@ describe('ThreadShareSheet — save progress timer', () => {
         />,
       );
     });
-    const save = r.root.find((n) => n.type === 'Pressable' && n.props.accessibilityLabel === 'Save video');
+    const save = r.root.find((n) => (n.type as unknown) === 'Pressable' && n.props.accessibilityLabel === 'Save video');
     await act(async () => {
       save.props.onPress();
       // saveVideo awaits a dynamic import; let it run to its finally.

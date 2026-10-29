@@ -32,7 +32,7 @@ vi.mock('@/lib/shareCard', () => ({
 const { ShareProfileSheet } = await import('../ShareProfileSheet');
 
 function texts(r: ReactTestRenderer): string[] {
-  return r.root.findAll((n) => n.type === 'Text').map((n) => [n.props.children].flat().join(''));
+  return r.root.findAll((n) => (n.type as unknown) === 'Text').map((n) => [n.props.children].flat().join(''));
 }
 
 describe('ShareProfileSheet — late username', () => {

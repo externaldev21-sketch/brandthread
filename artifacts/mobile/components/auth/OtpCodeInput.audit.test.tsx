@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 const { OtpCodeInput } = await import('./OtpCodeInput');
 
 function paste(renderer: ReactTestRenderer, text: string) {
-  const input = renderer.root.find((n) => n.type === 'TextInput');
+  const input = renderer.root.find((n) => (n.type as unknown) === 'TextInput');
   const max = input.props.maxLength as number | undefined;
   act(() => { input.props.onChangeText(max === undefined ? text : text.slice(0, max)); });
 }

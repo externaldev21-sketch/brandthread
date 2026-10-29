@@ -60,7 +60,7 @@ describe('OrderConfirmation — Message seller', () => {
         />,
       );
     });
-    const row = renderer.root.find((n) => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Message Orison Studio');
+    const row = renderer.root.find((n) => (n.type as unknown) === 'PressableScale' && n.props.accessibilityLabel === 'Message Orison Studio');
     act(() => { row.props.onPress(); });
     expect(push).toHaveBeenCalledTimes(1);
     const href = String(push.mock.calls[0][0]);

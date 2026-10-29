@@ -31,10 +31,10 @@ async function submitAdultBirthday(onResolved: (band: string) => void): Promise<
   let renderer!: ReactTestRenderer;
   act(() => { renderer = create(<AgeAskInline onResolved={onResolved} />); });
   act(() => {
-    renderer.root.find((n) => n.type === 'TextInput').props.onChangeText('01/01/1990');
+    renderer.root.find((n) => (n.type as unknown) === 'TextInput').props.onChangeText('01/01/1990');
   });
   await act(async () => {
-    await renderer.root.find((n) => n.type === 'PrimaryButton').props.onPress();
+    await renderer.root.find((n) => (n.type as unknown) === 'PrimaryButton').props.onPress();
   });
   return renderer;
 }

@@ -35,9 +35,9 @@ vi.mock('@/lib/actionSheet', () => ({ showAlert: vi.fn() }));
 import MediaViewer from '../MediaViewer';
 
 function transform(renderer: ReactTestRenderer) {
-  const image = renderer.root.find((n) => n.type === 'Image');
+  const image = renderer.root.find((n) => (n.type as unknown) === 'Image');
   const style = (image.props.style as Array<{ transform?: Array<Record<string, { value: number }>> }>)[1];
-  const backdrop = renderer.root.find((n) => n.type === 'View' && Array.isArray(n.props.style) && n.props.style[1]?.opacity);
+  const backdrop = renderer.root.find((n) => (n.type as unknown) === 'View' && Array.isArray(n.props.style) && n.props.style[1]?.opacity);
   return {
     translateY: style.transform![0].translateY.value,
     opacity: (backdrop.props.style[1].opacity as { value: number }).value,

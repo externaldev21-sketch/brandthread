@@ -66,7 +66,7 @@ const selection = {
 };
 
 function texts(r: ReactTestRenderer): string[] {
-  return r.root.findAll((n) => n.type === 'Text').map((n) => [n.props.children].flat().join(''));
+  return r.root.findAll((n) => (n.type as unknown) === 'Text').map((n) => [n.props.children].flat().join(''));
 }
 
 async function settle(fn: () => void) {
@@ -81,7 +81,7 @@ describe('ShopProductSheet — tag switch while loading', () => {
     await settle(() => { r = create(<ShopProductSheet selection={selection} onClose={() => {}} reduceMotion />); });
     // Open tag B's DETAIL step while tag A's load is still pending.
     await settle(() => {
-      r.root.find((n) => n.type === 'TouchableOpacity' && String(n.props.accessibilityLabel).startsWith('View Bravo Hoodie')).props.onPress();
+      r.root.find((n) => (n.type as unknown) === 'TouchableOpacity' && String(n.props.accessibilityLabel).startsWith('View Bravo Hoodie')).props.onPress();
     });
     // Resolve every pending B request first, then the stale A ones.
     await settle(() => { cart.calls.filter(c => c.id === 'prod-b').forEach(c => c.resolve(product('prod-b', 'Bravo Hoodie'))); });
@@ -100,7 +100,7 @@ describe('ShopProductSheet — repeated Add to bag', () => {
     let r!: ReactTestRenderer;
     await settle(() => { r = create(<ShopProductSheet selection={selection} onClose={() => {}} reduceMotion />); });
     await settle(() => { cart.calls.filter(c => c.id === 'prod-a').forEach(c => c.resolve(product('prod-a', 'Alpha Tee'))); });
-    const rowCart = (name: string) => r.root.find((n) => n.type === 'TouchableOpacity' && n.props.accessibilityLabel === `Add ${name} to bag`);
+    const rowCart = (name: string) => r.root.find((n) => (n.type as unknown) === 'TouchableOpacity' && n.props.accessibilityLabel === `Add ${name} to bag`);
     // Quick-add row A (already hydrated, active tag).
     await settle(() => { rowCart('Alpha Tee').props.onPress(); });
     expect(texts(r)).toContain('Added to bag');

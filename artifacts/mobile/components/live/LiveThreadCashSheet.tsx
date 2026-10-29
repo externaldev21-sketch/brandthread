@@ -120,16 +120,16 @@ export function LiveThreadCashSheet({
     setSending(true);
     setSendError(null);
     const localOnly = previewOnly || isPreviewThreadCashEnabled();
-    if (!localOnly && !(recipientId && streamId)) {
-      // No real host / live to send to: fail visibly rather than report a
-      // gift that never happened (see the module doc).
-      setSending(false);
-      const message = 'Could not send Thread Cash. Try again.';
-      setSendError(message);
-      onSendFailed?.(message);
-      return;
-    }
     if (!localOnly) {
+      if (!(recipientId && streamId)) {
+        // No real host / live to send to: fail visibly rather than report a
+        // gift that never happened (see the module doc).
+        setSending(false);
+        const message = 'Could not send Thread Cash. Try again.';
+        setSendError(message);
+        onSendFailed?.(message);
+        return;
+      }
       try {
         await api.threadCash.liveGift({
           streamId,

@@ -43,7 +43,7 @@ describe('AnalyticsBarChart y-axis', () => {
       renderer = create(<AnalyticsBarChart points={[{ label: 'a', value: 1 }, { label: 'b', value: 2 }]} />);
     });
     const axis = renderer.root
-      .findAll((n) => n.type === 'SvgText' && n.props.textAnchor === 'end')
+      .findAll((n) => (n.type as unknown) === 'SvgText' && n.props.textAnchor === 'end')
       .map((n) => String(n.props.children));
     expect(axis).toEqual(['0', '1', '2']);
     renderer.unmount();

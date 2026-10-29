@@ -43,11 +43,11 @@ describe('SupportChatModal — one ticket per conversation', () => {
     let r!: ReactTestRenderer;
     act(() => { r = create(<SupportChatModal visible onClose={() => {}} />); });
     // Send a question; the reply is still pending.
-    act(() => { r.root.find((n) => n.type === 'Composer').props.onChangeText('Where is my payout?'); });
-    await act(async () => { r.root.find((n) => n.type === 'Composer').props.onSend(); });
+    act(() => { r.root.find((n) => (n.type as unknown) === 'Composer').props.onChangeText('Where is my payout?'); });
+    await act(async () => { r.root.find((n) => (n.type as unknown) === 'Composer').props.onSend(); });
     // Tap "Human" (the header's escalate button) while waiting.
-    const human = r.root.find((n) => n.type === 'TouchableOpacity'
-      && n.findAll((c) => c.type === 'Text' && c.props.children === 'Human').length > 0);
+    const human = r.root.find((n) => (n.type as unknown) === 'TouchableOpacity'
+      && n.findAll((c) => (c.type as unknown) === 'Text' && c.props.children === 'Human').length > 0);
     await act(async () => { human.props.onPress(); });
     expect(chat.escalate).toHaveBeenCalledTimes(1);
     // Now the AI reply lands, asking to escalate.

@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 function confetti(renderer: ReactTestRenderer) {
-  return renderer.root.findAll((n) => n.type === 'View' && n.props.testID === 'order-confetti');
+  return renderer.root.findAll((n) => (n.type as unknown) === 'View' && n.props.testID === 'order-confetti');
 }
 
 describe('OrderConfetti and Reduce Motion', () => {

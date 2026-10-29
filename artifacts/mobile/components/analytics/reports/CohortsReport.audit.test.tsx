@@ -37,7 +37,7 @@ const { default: CohortsReport } = await import('./CohortsReport');
 
 function texts(renderer: ReactTestRenderer): string[] {
   return renderer.root
-    .findAll((n) => n.type === 'Text')
+    .findAll((n) => (n.type as unknown) === 'Text')
     .map((n) => [n.props.children].flat().join(''));
 }
 

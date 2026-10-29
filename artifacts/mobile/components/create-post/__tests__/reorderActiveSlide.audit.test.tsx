@@ -31,6 +31,7 @@ vi.mock('@/components/ScreenHeader', () => ({ ScreenHeader: () => null }));
 import { indexAfterMove } from '@/components/create-post/ReorderStrip';
 import { SlideEditor } from '@/components/create-post/SlideEditor';
 import { CarouselEditor } from '@/components/create-post/CarouselEditor';
+import type { SlideDraft } from '@/lib/createPost/types';
 
 const slide = (id: string) => ({
   id, uri: `file://${id}.jpg`, kind: 'photo' as const, width: 1000, height: 1000, duration: 0,
@@ -42,14 +43,18 @@ function reorderedActiveId(Editor: 'slide' | 'carousel', active: number, from: n
   const slides = [slide('a'), slide('b'), slide('c'), slide('d')] as Array<{ id: string }>;
   let nextSlides = slides;
   let nextActive = active;
-  const props = {
-    slides: slides as never, activeIndex: active, aspect: '3:4' as const,
+  const common = {
+    slides: slides as unknown as SlideDraft[], activeIndex: active,
     onActiveIndex: (i: number) => { nextActive = i; },
-    onSlides: (s: never) => { nextSlides = s; },
-    onAspect: () => {}, onBack: () => {}, onNext: () => {}, onAdd: () => {},
+    onSlides: (s: SlideDraft[]) => { nextSlides = s; },
+    onBack: () => {}, onNext: () => {},
   };
   stripProps = null;
-  act(() => { create(Editor === 'slide' ? <SlideEditor {...props} /> : <CarouselEditor {...props} />); });
+  act(() => {
+    create(Editor === 'slide'
+      ? <SlideEditor {...common} aspect="3:4" onAspect={() => {}} />
+      : <CarouselEditor {...common} onAdd={() => {}} />);
+  });
   act(() => { stripProps!.onReorder(from, to); });
   return nextSlides[nextActive].id;
 }
