@@ -17,6 +17,7 @@
       "fallbackToCacheTimeout": 0
     },
     "ios": {
+      "deploymentTarget": "17.0",
       "icon": {
         "light": "./assets/images/app-icons/monochrome.png",
         "dark": "./assets/images/app-icons/monochrome-ios-dark.png",
@@ -370,6 +371,14 @@
         }
       ],
       "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
       "expo-font",
       [
         "expo-splash-screen",
