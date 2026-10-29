@@ -64,9 +64,9 @@ describe('order globe projection', () => {
     expect(Math.abs(dragView(view, 0, 100_000, SIZE).pitch)).toBeLessThanOrEqual(1.1);
   });
 
-  it('zoom scales the radius and stays light', () => {
+  it('zoom scales the radius and is clamped', () => {
     expect(clampZoom(0.2)).toBe(ZOOM_MIN);
-    expect(clampZoom(9)).toBe(ZOOM_MAX);
+    expect(clampZoom(99)).toBe(ZOOM_MAX);
     expect(globeRadius(SIZE, 1.5)).toBeCloseTo(globeRadius(SIZE, 1) * 1.5);
   });
 

@@ -8,6 +8,7 @@
  *   yaw   rotates about the polar axis (drag sideways, auto-rotate),
  *   pitch tilts the poles toward/away from the viewer (drag up/down),
  *   zoom  scales the radius (pinch / scroll), clamped to [ZOOM_MIN, ZOOM_MAX].
+ *         Zoomed in, lib/liveMap/globeDetail.ts fades in borders and names.
  *
  * Functions are plain math marked 'worklet' so Reanimated can run them on
  * the UI thread; on web and in tests they are ordinary functions.
@@ -17,7 +18,8 @@ import { WORLD_LAND_PATH, WORLD_LAT_TOP } from './worldLand';
 export interface GlobeView { yaw: number; pitch: number; zoom: number }
 
 export const ZOOM_MIN = 1;
-export const ZOOM_MAX = 1.7;
+/** Close enough to read a small US state (Rhode Island) on a phone-width globe. */
+export const ZOOM_MAX = 18;
 export const PITCH_LIMIT = 1.1;
 /** Radians per second: one lap in ~70s, slow enough to read the dots. */
 export const AUTO_ROTATE_SPEED = 0.09;
@@ -122,11 +124,54 @@ export function viewCenteredOn(lat: number, lng: number, zoom = ZOOM_MIN): Globe
   return { yaw: -lng * DEG, pitch: clampPitch(lat * DEG * 0.6 + 0.12), zoom };
 }
 
+/**
+ * How much of the auto-rotation runs at a zoom: all of it at the default
+ * zoom, easing to none once zoomed in, so a country or state being read
+ * doesn't drift away.
+ */
+export function autoRotateFactor(zoom: number): number {
+  'worklet';
+  return Math.min(1, Math.max(0, (1.6 - zoom) / 0.45));
+}
+
 /** Applies a drag of (dx, dy) points to a view. Dragging right turns the globe right; down tilts the north toward you. */
 export function dragView(view: GlobeView, dx: number, dy: number, size: number): GlobeView {
   'worklet';
   const r = Math.max(1, globeRadius(size, view.zoom));
   return { yaw: view.yaw + (dx / r) * DRAG_GAIN, pitch: clampPitch(view.pitch + (dy / r) * DRAG_GAIN), zoom: view.zoom };
+}
+
+/**
+ * The view zoomed to `zoom` about a focal point (fx, fy) in the box (the
+ * pinch midpoint, the cursor), so the place under the fingers stays put.
+ * Finds that place on the sphere, then turns the zoomed globe until it is
+ * back under (fx, fy); off the globe, zooms about the centre.
+ */
+export function zoomViewAt(view: GlobeView, zoom: number, fx: number, fy: number, size: number): GlobeView {
+  'worklet';
+  const next = clampZoom(zoom);
+  const c = size / 2;
+  const r0 = Math.max(1, globeRadius(size, view.zoom));
+  const sx = (fx - c) / r0;
+  const sy = (c - fy) / r0;
+  const d2 = sx * sx + sy * sy;
+  if (d2 >= 0.95) return { yaw: view.yaw, pitch: view.pitch, zoom: next };
+  const sz = Math.sqrt(1 - d2);
+  // projectUnit's rotation, undone: pitch, then yaw.
+  const cp = Math.cos(view.pitch);
+  const sp = Math.sin(view.pitch);
+  const y = sy * cp + sz * sp;
+  const z1 = -sy * sp + sz * cp;
+  const cy = Math.cos(view.yaw);
+  const syw = Math.sin(view.yaw);
+  const x = sx * cy - z1 * syw;
+  const z = sx * syw + z1 * cy;
+  let v: GlobeView = { yaw: view.yaw, pitch: view.pitch, zoom: next };
+  for (let i = 0; i < 4; i += 1) {
+    const p = projectUnit(x, y, z, v, size);
+    v = dragView(v, fx - p[0], fy - p[1], size);
+  }
+  return v;
 }
 
 /**
@@ -162,6 +207,54 @@ export function pulsePhase(timeMs: number, index: number, periodMs = 2400): numb
   return t;
 }
 
+/** Off-box slack for clipped land, so the fill's edge never shows. */
+const BOX_MARGIN = 4;
+
+function ringPath(px: readonly number[], py: readonly number[]): string {
+  'worklet';
+  let out = '';
+  for (let i = 0; i < px.length; i += 1) out += `${i === 0 ? 'M' : 'L'}${px[i].toFixed(1)} ${py[i].toFixed(1)}`;
+  return out ? `${out}Z` : '';
+}
+
+/**
+ * A closed ring clipped to the square [lo, hi]² (Sutherland–Hodgman, one
+ * box edge at a time). Zoomed in, most of the globe is off the box; clipping
+ * keeps the path (and the fill's work) to what is on screen, and clipping
+ * each ring on its own keeps the even-odd fill right inside the box.
+ */
+function ringPathClipped(px: readonly number[], py: readonly number[], lo: number, hi: number): string {
+  'worklet';
+  let xs: number[] = px.slice();
+  let ys: number[] = py.slice();
+  for (let edge = 0; edge < 4 && xs.length > 0; edge += 1) {
+    const ox: number[] = [];
+    const oy: number[] = [];
+    const n = xs.length;
+    for (let i = 0; i < n; i += 1) {
+      const ax = xs[i];
+      const ay = ys[i];
+      const bx = xs[(i + 1) % n];
+      const by = ys[(i + 1) % n];
+      // Signed distance inside the edge: x ≥ lo, x ≤ hi, y ≥ lo, y ≤ hi.
+      const da = edge === 0 ? ax - lo : edge === 1 ? hi - ax : edge === 2 ? ay - lo : hi - ay;
+      const db = edge === 0 ? bx - lo : edge === 1 ? hi - bx : edge === 2 ? by - lo : hi - by;
+      if (da >= 0) {
+        ox.push(ax);
+        oy.push(ay);
+      }
+      if ((da >= 0) !== (db >= 0)) {
+        const t = da / (da - db);
+        ox.push(ax + (bx - ax) * t);
+        oy.push(ay + (by - ay) * t);
+      }
+    }
+    xs = ox;
+    ys = oy;
+  }
+  return xs.length >= 3 ? ringPath(xs, ys) : '';
+}
+
 /** Angle step (radians) for the stretch of a land ring that runs along the horizon. */
 const LIMB_STEP = 0.12;
 
@@ -184,6 +277,10 @@ export function landPath(rings: readonly number[], starts: readonly number[], vi
   const sp = Math.sin(view.pitch);
   const r = globeRadius(size, view.zoom);
   const c = size / 2;
+  // Zoomed in past the box, rings are clipped to it; otherwise drawn whole.
+  const overflows = r > c;
+  // The limb stays a smooth curve on a globe zoomed past the box.
+  const limbStep = overflows ? Math.min(LIMB_STEP, 24 / r) : LIMB_STEP;
   let d = '';
   for (let ring = 0; ring + 1 < starts.length; ring += 1) {
     const from = starts[ring];
@@ -206,12 +303,12 @@ export function landPath(rings: readonly number[], starts: readonly number[], vi
       if (firstVisible < 0 && zs[i] >= 0) firstVisible = i;
     }
     if (firstVisible < 0) continue;
-    let started = false;
     let exitAngle = 0;
-    let out = '';
+    const px: number[] = [];
+    const py: number[] = [];
     const emit = (x: number, y: number) => {
-      out += `${started ? 'L' : 'M'}${(c + x * r).toFixed(1)} ${(c - y * r).toFixed(1)}`;
-      started = true;
+      px.push(c + x * r);
+      py.push(c - y * r);
     };
     for (let k = 0; k < n; k += 1) {
       const a = (firstVisible + k) % n;
@@ -230,7 +327,7 @@ export function landPath(rings: readonly number[], starts: readonly number[], vi
           let delta = angle - exitAngle;
           while (delta > Math.PI) delta -= Math.PI * 2;
           while (delta < -Math.PI) delta += Math.PI * 2;
-          const steps = Math.ceil(Math.abs(delta) / LIMB_STEP);
+          const steps = Math.ceil(Math.abs(delta) / limbStep);
           for (let s = 0; s <= steps; s += 1) {
             const ang = exitAngle + (delta * s) / Math.max(1, steps);
             emit(Math.cos(ang), Math.sin(ang));
@@ -238,7 +335,7 @@ export function landPath(rings: readonly number[], starts: readonly number[], vi
         }
       }
     }
-    d += `${out}Z`;
+    d += overflows ? ringPathClipped(px, py, -BOX_MARGIN, size + BOX_MARGIN) : ringPath(px, py);
   }
   // Skia rejects an empty path string; a bare move draws nothing.
   return d || 'M0 0';

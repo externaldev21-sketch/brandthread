@@ -15,9 +15,12 @@
  * recent activity takes turns firing at a calm cadence (lib/liveMap/arcs.ts
  * caps how many fly at once and recycles slots).
  *
- * Drag to spin (with a little fling), pinch or scroll to zoom lightly. A new
- * order also flares its city's dot and refetches; without a socket the hook
- * polls.
+ * Drag to spin (with a little fling), pinch or scroll to zoom about the
+ * fingers / cursor. Zooming in fades in country borders and names, then
+ * state/province lines and abbreviations (lib/liveMap/globeDetail.ts), so a
+ * dot reads to the state; zoomed in, auto-rotation eases off and a vertical
+ * drag tilts the globe instead of scrolling the page. A new order also flares
+ * its city's dot and refetches; without a socket the hook polls.
  *
  * Rendering is per platform (components/globe/GlobeSurface*.tsx): Skia on
  * native, a 2D canvas on web, both projecting through lib/liveMap/globe.ts so
@@ -40,14 +43,16 @@ import type { LiveMapPing } from '@/hooks/useSellerLiveMap';
 import {
   AUTO_ROTATE_RESUME_MS,
   AUTO_ROTATE_SPEED,
-  clampZoom,
+  autoRotateFactor,
   dragView,
   globeRadius,
   hitTest,
   projectLatLng,
   viewCenteredOn,
+  zoomViewAt,
   type GlobeView,
 } from '@/lib/liveMap/globe';
+import { countryLabelTable, labelLayout, regionLabelTable } from '@/lib/liveMap/globeDetail';
 import { AMBIENT_ARC_MS, ambientArcEnds, emptyArcSlots, liveArcCount, makeArc, pushArc, type ArcSlot } from '@/lib/liveMap/arcs';
 import {
   globeActivities,
@@ -72,6 +77,8 @@ const MAX_GLOBE = 380;
 /** Default view before any order: the Atlantic, tilted north. */
 const DEFAULT_VIEW: GlobeView = viewCenteredOn(25, -35);
 const PING_FLARE_MS = 4000;
+/** Past this zoom a vertical drag tilts the globe instead of scrolling the page. */
+const ZOOMED_IN = 1.15;
 
 interface Selection { activity: GlobeActivity; x: number; y: number }
 
@@ -112,6 +119,7 @@ function OrderGlobeView({
   const size = Math.min(width, maxSize);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  const [zoomedIn, setZoomedIn] = useState(false);
 
   const view = useSharedValue<GlobeView>(DEFAULT_VIEW);
   const clock = useSharedValue(0);
@@ -120,8 +128,11 @@ function OrderGlobeView({
   const paused = useSharedValue(false);
   const still = useSharedValue(reduceMotion);
   const lastTouch = useSharedValue(-1e9);
-  const startView = useSharedValue<GlobeView>(DEFAULT_VIEW);
+  // Last drag translation: drags apply step by step so a pinch's zoom (and
+  // its focal shift) during the same two-finger gesture isn't overwritten.
+  const lastPan = useSharedValue({ x: 0, y: 0 });
   const startZoom = useSharedValue(1);
+  const zoomedFlag = useSharedValue(false);
   const arcs = useSharedValue<ArcSlot[]>(emptyArcSlots());
   const centeredRef = useRef(false);
   const arcTickRef = useRef(0);
@@ -185,7 +196,7 @@ function OrderGlobeView({
       yaw += spin.value * dt;
       spin.value *= Math.pow(0.05, dt);
     } else if (!paused.value && !still.value && info.timestamp - lastTouch.value > AUTO_ROTATE_RESUME_MS) {
-      yaw += AUTO_ROTATE_SPEED * dt;
+      yaw += AUTO_ROTATE_SPEED * autoRotateFactor(v.zoom) * dt;
     }
     if (yaw !== v.yaw) view.value = { yaw, pitch: v.pitch, zoom: v.zoom };
   }, false);
@@ -210,20 +221,32 @@ function OrderGlobeView({
     setSelection({ activity: hit, x: px, y: py });
   }, [activities, close, paused, size, spin, view]);
 
+  /** Applies a zoom about a focal point; flips `zoomedIn` when it crosses ZOOMED_IN. */
+  const zoomTo = useCallback((zoom: number, fx: number, fy: number) => {
+    'worklet';
+    const next = zoomViewAt(view.value, zoom, fx, fy, size);
+    view.value = next;
+    const isIn = next.zoom > ZOOMED_IN;
+    if (isIn !== zoomedFlag.value) {
+      zoomedFlag.value = isIn;
+      runOnJS(setZoomedIn)(isIn);
+    }
+  }, [size, view, zoomedFlag]);
+
   const gesture = useMemo(() => {
-    const pan = Gesture.Pan()
-      .minDistance(4)
-      // Horizontal drags spin; a mostly vertical drag is left to the page scroll.
-      .activeOffsetX([-8, 8])
-      .failOffsetY([-16, 16])
+    const base = Gesture.Pan().minDistance(4).activeOffsetX([-8, 8]);
+    // At the default zoom horizontal drags spin and a mostly vertical drag is
+    // left to the page scroll; zoomed in, a drag either way moves the map.
+    const pan = (zoomedIn ? base.activeOffsetY([-8, 8]) : base.failOffsetY([-16, 16]))
       .onStart(() => {
         dragging.value = true;
         spin.value = 0;
-        startView.value = view.value;
+        lastPan.value = { x: 0, y: 0 };
         runOnJS(close)();
       })
       .onUpdate((e) => {
-        view.value = dragView(startView.value, e.translationX, e.translationY, size);
+        view.value = dragView(view.value, e.translationX - lastPan.value.x, e.translationY - lastPan.value.y, size);
+        lastPan.value = { x: e.translationX, y: e.translationY };
       })
       .onEnd((e) => {
         spin.value = e.velocityX / Math.max(1, globeRadius(size, view.value.zoom));
@@ -238,7 +261,7 @@ function OrderGlobeView({
         runOnJS(close)();
       })
       .onUpdate((e) => {
-        view.value = { ...view.value, zoom: clampZoom(startZoom.value * e.scale) };
+        zoomTo(startZoom.value * e.scale, e.focalX, e.focalY);
       })
       .onFinalize(() => {
         lastTouch.value = clock.value;
@@ -249,9 +272,9 @@ function OrderGlobeView({
         if (success) runOnJS(handleTap)(e.x, e.y);
       });
     return Gesture.Race(Gesture.Simultaneous(pan, pinch), tap);
-  }, [clock, close, dragging, handleTap, lastTouch, size, spin, startView, startZoom, view]);
+  }, [clock, close, dragging, handleTap, lastPan, lastTouch, size, spin, startZoom, view, zoomTo, zoomedIn]);
 
-  // Web: scroll wheel / trackpad pinch zooms lightly.
+  // Web: scroll wheel / trackpad pinch zooms about the cursor.
   const boxRef = useRef<View>(null);
   useEffect(() => {
     if (Platform.OS !== 'web' || mode !== 'globe') return;
@@ -259,13 +282,14 @@ function OrderGlobeView({
     if (!node?.addEventListener) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      view.value = { ...view.value, zoom: clampZoom(view.value.zoom * Math.exp(-e.deltaY * 0.0015)) };
+      const box = node.getBoundingClientRect();
+      zoomTo(view.value.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - box.left, e.clientY - box.top);
       lastTouch.value = clock.value;
       if (selection) close();
     };
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
-  }, [clock, close, lastTouch, mode, selection, size, view]);
+  }, [clock, close, lastTouch, mode, selection, size, view, zoomTo]);
 
   // Dev web harness only: lets the Playwright check find a dot on screen.
   useEffect(() => {
@@ -277,6 +301,8 @@ function OrderGlobeView({
       size,
       view: () => view.value,
       liveArcs: () => liveArcCount(arcs.value, clock.value),
+      projectLatLng: (lat: number, lng: number) => projectLatLng(lat, lng, view.value, size),
+      labels: () => labelLayout(countryLabelTable(), regionLabelTable(), view.value, size),
       project: (id: string) => {
         const a = activities.find((x) => x.id === id);
         return a ? projectLatLng(a.lat, a.lng, view.value, size) : null;
