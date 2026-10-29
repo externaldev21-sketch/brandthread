@@ -16,7 +16,8 @@
  * caps how many fly at once and recycles slots).
  *
  * Drag to spin (with a little fling), pinch or scroll to zoom about the
- * fingers / cursor. Zooming in fades in country borders and names, then
+ * fingers / cursor (web: wheel, trackpad and two-finger touch through DOM
+ * listeners on the globe's box; native: the gesture handler's pinch). Zooming in fades in country borders and names, then
  * state/province lines and abbreviations (lib/liveMap/globeDetail.ts), so a
  * dot reads to the state; zoomed in, auto-rotation eases off and a vertical
  * drag tilts the globe instead of scrolling the page. A new order also flares
@@ -271,25 +272,87 @@ function OrderGlobeView({
       .onEnd((e, success) => {
         if (success) runOnJS(handleTap)(e.x, e.y);
       });
-    return Gesture.Race(Gesture.Simultaneous(pan, pinch), tap);
+    // Web pinches through the DOM touch handler below (it also takes touches
+    // the gesture library's pointer path never sees), so only native uses
+    // the library's pinch: one source of zoom per platform, never both.
+    return Platform.OS === 'web' ? Gesture.Race(pan, tap) : Gesture.Race(Gesture.Simultaneous(pan, pinch), tap);
   }, [clock, close, dragging, handleTap, lastPan, lastTouch, size, spin, startZoom, view, zoomTo, zoomedIn]);
 
-  // Web: scroll wheel / trackpad pinch zooms about the cursor.
+  // Web: scroll wheel / trackpad pinch (a wheel event with ctrlKey) zooms
+  // about the cursor, and a two-finger touch pinch zooms about the fingers'
+  // midpoint. Listeners sit on the globe's box in the capture phase, so they
+  // get every wheel/touch aimed anywhere inside it (the canvas, the gesture
+  // view), bubbling or not, before anything else can swallow it.
   const boxRef = useRef<View>(null);
+  // Refs, so closing a popover mid-pinch doesn't re-subscribe and drop the pinch.
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const webPinch = useRef<{ distance: number; zoom: number } | null>(null);
   useEffect(() => {
     if (Platform.OS !== 'web' || mode !== 'globe') return;
     const node = boxRef.current as unknown as HTMLElement | null;
     if (!node?.addEventListener) return;
+    const settle = () => {
+      lastTouch.value = clock.value;
+      if (selectionRef.current) close();
+    };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // Lines / pages (Firefox, some mice) to pixels.
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
       const box = node.getBoundingClientRect();
-      zoomTo(view.value.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - box.left, e.clientY - box.top);
-      lastTouch.value = clock.value;
-      if (selection) close();
+      zoomTo(view.value.zoom * Math.exp(-dy * 0.0015), e.clientX - box.left, e.clientY - box.top);
+      settle();
     };
-    node.addEventListener('wheel', onWheel, { passive: false });
-    return () => node.removeEventListener('wheel', onWheel);
-  }, [clock, close, lastTouch, mode, selection, size, view, zoomTo]);
+    const twoFingers = (e: TouchEvent) => {
+      const t = e.touches;
+      if (t.length < 2) return null;
+      const box = node.getBoundingClientRect();
+      return {
+        distance: Math.max(1, Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY)),
+        fx: (t[0].clientX + t[1].clientX) / 2 - box.left,
+        fy: (t[0].clientY + t[1].clientY) / 2 - box.top,
+      };
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      const f = twoFingers(e);
+      if (!f) return;
+      webPinch.current = { distance: f.distance, zoom: view.value.zoom };
+      settle();
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const f = twoFingers(e);
+      const pinch = webPinch.current;
+      if (!f || !pinch) return;
+      // Two fingers on the globe zoom it, not the page.
+      if (e.cancelable) e.preventDefault();
+      zoomTo(pinch.zoom * (f.distance / pinch.distance), f.fx, f.fy);
+      lastTouch.value = clock.value;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        // A finger lifted but two remain: carry on from here.
+        const f = twoFingers(e);
+        if (f) webPinch.current = { distance: f.distance, zoom: view.value.zoom };
+        return;
+      }
+      if (webPinch.current) lastTouch.value = clock.value;
+      webPinch.current = null;
+    };
+    const capture = { capture: true, passive: false } as const;
+    node.addEventListener('wheel', onWheel, capture);
+    node.addEventListener('touchstart', onTouchStart, capture);
+    node.addEventListener('touchmove', onTouchMove, capture);
+    node.addEventListener('touchend', onTouchEnd, capture);
+    node.addEventListener('touchcancel', onTouchEnd, capture);
+    return () => {
+      node.removeEventListener('wheel', onWheel, capture);
+      node.removeEventListener('touchstart', onTouchStart, capture);
+      node.removeEventListener('touchmove', onTouchMove, capture);
+      node.removeEventListener('touchend', onTouchEnd, capture);
+      node.removeEventListener('touchcancel', onTouchEnd, capture);
+    };
+  }, [clock, close, lastTouch, mode, size, view, zoomTo]);
 
   // Dev web harness only: lets the Playwright check find a dot on screen.
   useEffect(() => {
