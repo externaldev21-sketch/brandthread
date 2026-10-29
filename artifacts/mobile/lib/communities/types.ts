@@ -111,6 +111,8 @@ export type CommunityEvent =
   | { type: 'message.deleted'; messageId: string }
   | { type: 'reaction.updated'; messageId: string; reactions: CommunityReaction[] }
   | { type: 'member.removed'; userId: string }
+  /** Name / description / photo changed by the creator or an admin (only the changed keys are sent). */
+  | { type: 'community.updated'; name?: string; description?: string; iconUrl?: string | null }
   | { type: 'community.deleted' };
 
 export interface CommunityMessagesPage {

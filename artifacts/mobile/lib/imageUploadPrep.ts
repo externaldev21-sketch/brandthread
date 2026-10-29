@@ -48,6 +48,7 @@ export const IMAGE_UPLOAD_PRESETS: Record<UploadImageKind, ImageUploadPreset> = 
 export function presetForUploadPath(path: string): UploadImageKind {
   const p = path.split('?')[0].toLowerCase();
   if (/\/avatar(\/|$)/.test(p)) return 'avatar';
+  if (/^\/api\/communities\/[^/]+\/photo$/.test(p)) return 'avatar'; // group photo = a profile photo
   if (/\/logo(\/|$)/.test(p)) return 'logo';
   if (/\/banner(\/|$)/.test(p)) return 'banner';
   if (/\/photo-slides(\/|$)/.test(p)) return 'post';

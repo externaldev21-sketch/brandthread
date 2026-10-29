@@ -2933,7 +2933,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         del<{ ok: boolean }>(`/api/communities/${encodeURIComponent(id)}/bans/${encodeURIComponent(userId)}`),
       bans: (id: string) =>
         freshGet<{ userId: string; name: string; bannedAt: string }[]>(`/api/communities/${encodeURIComponent(id)}/bans`),
-      setRole: (id: string, userId: string, role: 'admin' | 'member' | 'owner') =>
+      setRole: (id: string, userId: string, role: 'admin' | 'member') =>
         patch<{ ok: boolean; role: string }>(`/api/communities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}/role`, { role }),
       requests: (id: string) => freshGet<CommunityJoinRequest[]>(`/api/communities/${encodeURIComponent(id)}/requests`),
       approveRequest: (id: string, userId: string) =>
@@ -2961,6 +2961,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Image moderation runs here (gore/violence/nudity) — a rejected photo throws ApiError(422, code IMAGE_REJECTED). */
       uploadPhoto: (body: { data: string; mimeType: string }) =>
         post<{ url: string }>('/api/communities/upload-photo', body),
+      /** Set the group photo (creator / admins). Same upload path as a profile photo. */
+      setPhoto: (id: string, image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<Community>(`/api/communities/${encodeURIComponent(id)}/photo`, image, getToken, getCacheScope),
+      removePhoto: (id: string) => del<Community>(`/api/communities/${encodeURIComponent(id)}/photo`),
     },
     /** Brandthread Agent — the official AI friend account's chat backend. */
     brandthreadAgent: {

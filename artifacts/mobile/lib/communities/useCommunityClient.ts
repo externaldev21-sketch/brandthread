@@ -58,7 +58,8 @@ export interface CommunityClient {
   banMember(id: string, userId: string): Promise<void>;
   unban(id: string, userId: string): Promise<void>;
   bans(id: string): Promise<{ userId: string; name: string; bannedAt: string }[]>;
-  setRole(id: string, userId: string, role: 'admin' | 'member' | 'owner'): Promise<void>;
+  /** Creator only: promote / demote an admin. The creator role itself never moves. */
+  setRole(id: string, userId: string, role: 'admin' | 'member'): Promise<void>;
   requests(id: string): Promise<CommunityJoinRequest[]>;
   approveRequest(id: string, userId: string): Promise<void>;
   denyRequest(id: string, userId: string): Promise<void>;
@@ -69,6 +70,9 @@ export interface CommunityClient {
   unreact(id: string, messageId: string): Promise<CommunityReaction[]>;
   /** Moderated upload. Rejects with ApiError(422, code IMAGE_REJECTED) for gore/violence/nudity. */
   uploadPhoto(body: { data: string; mimeType: string }): Promise<{ url: string }>;
+  /** Group photo (creator / admins), through the profile-photo upload path. Resolves with the updated group. */
+  setPhoto(id: string, image: { uri: string; mimeType?: string | null }): Promise<Community>;
+  removePhoto(id: string): Promise<Community>;
   /** Realtime channel while a chat is open. Returns an unsubscribe function. */
   subscribe(id: string, sub: CommunitySubscription): () => void;
   /** Subscribe to changes of the local joined/unread/muted state (demo mode only; no-op elsewhere). */
@@ -92,6 +96,7 @@ function makeReadonlyClient(api: BrandthreadApi): CommunityClient {
     bans: async () => deny(), setRole: async () => deny(), requests: async () => deny(), approveRequest: async () => deny(),
     denyRequest: async () => deny(), messages: async () => deny(), send: async () => deny(), deleteMessage: async () => deny(),
     react: async () => deny(), unreact: async () => deny(), uploadPhoto: async () => deny(),
+    setPhoto: async () => deny(), removePhoto: async () => deny(),
     subscribe: () => noop, onLocalChange: () => noop,
   };
 }
@@ -104,7 +109,13 @@ function makeDemoClient(): CommunityClient {
     mine: async () => demoStore.mine(),
     get: async (id) => demoStore.get(id)!,
     create: async (input) => demoStore.create(input),
-    update: async (id, input) => ({ ...demoStore.get(id)!, ...(input as Partial<Community>) } as Community),
+    update: async (id, input) => demoStore.update(id, {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+      ...(input.requireApproval !== undefined ? { requireApproval: input.requireApproval } : {}),
+      ...(input.iconUrl !== undefined ? { iconUrl: input.iconUrl ?? undefined } : {}),
+    }),
     remove: async () => {},
     join: async (id) => demoStore.join(id)!,
     joinByCode: async () => ({ status: 'joined', community: demoStore.join('demo-c-embroidery') }),
@@ -118,7 +129,8 @@ function makeDemoClient(): CommunityClient {
     invite: async (id) => ({ code: 'demo1234', url: `https://brandthread.app/community-join?code=demo1234&g=${id}` }),
     resetInvite: async (id) => ({ code: 'demo5678', url: `https://brandthread.app/community-join?code=demo5678&g=${id}` }),
     members: async (id, { offset } = {}) => { const all = demoStore.members(id); const p = page(all, offset, 50); return { memberCount: demoStore.get(id)?.memberCount ?? all.length, members: p.items, nextOffset: p.nextOffset }; },
-    removeMember: async () => {}, banMember: async () => {}, unban: async () => {}, bans: async () => [], setRole: async () => {},
+    removeMember: async () => {}, banMember: async () => {}, unban: async () => {}, bans: async () => [],
+    setRole: async (id, userId, role) => demoStore.setRole(id, userId, role),
     requests: async () => [], approveRequest: async () => {}, denyRequest: async () => {},
     messages: async (id, { before, after, limit = 50 } = {}) => {
       const all = demoStore.messages(id);
@@ -134,6 +146,8 @@ function makeDemoClient(): CommunityClient {
     react: async (id, messageId, type) => demoStore.react(id, messageId, type),
     unreact: async (id, messageId) => demoStore.react(id, messageId, null),
     uploadPhoto: async ({ data, mimeType }) => ({ url: data.startsWith('data:') ? data : `data:${mimeType};base64,${data}` }),
+    setPhoto: async (id, image) => demoStore.update(id, { iconUrl: image.uri }),
+    removePhoto: async (id) => demoStore.update(id, { iconUrl: undefined }),
     subscribe: (id, sub) => demoStore.subscribe(id, sub.onEvent),
     onLocalChange: (l) => demoStore.onChange(l),
   };
@@ -235,6 +249,8 @@ function makeLiveClient(api: BrandthreadApi, getToken: () => Promise<string | nu
     react: async (id, m, t) => (await c.react(id, m, t)).reactions,
     unreact: async (id, m) => (await c.unreact(id, m)).reactions,
     uploadPhoto: (body) => c.uploadPhoto(body),
+    setPhoto: (id, image) => c.setPhoto(id, image),
+    removePhoto: (id) => c.removePhoto(id),
     subscribe: (id, sub) => openCommunitySocket(id, getToken, sub),
     onLocalChange: () => noop,
   };

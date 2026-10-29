@@ -19,6 +19,7 @@ import { UploadAbortedError } from '@/lib/createPost/chunkedUpload';
 describe('presetForUploadPath', () => {
   it('maps every upload route to its preset', () => {
     expect(presetForUploadPath('/api/seller/profile/avatar/upload')).toBe('avatar');
+    expect(presetForUploadPath('/api/communities/c1/photo')).toBe('avatar');
     expect(presetForUploadPath('/api/seller/profile/logo/upload')).toBe('logo');
     expect(presetForUploadPath('/api/seller/profile/banner/upload')).toBe('banner');
     expect(presetForUploadPath('/api/products/images')).toBe('product');

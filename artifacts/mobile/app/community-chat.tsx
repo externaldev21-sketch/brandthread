@@ -28,6 +28,7 @@ import {
   CommunityMessageRow, communityBubbleStyle, communityBubbleTextStyle,
 } from '@/components/community-chat/CommunityMessageRow';
 import { useCommunityChat } from '@/components/community-chat/useCommunityChat';
+import { withPreviewDemo } from '@/lib/communities/previewHref';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
@@ -61,7 +62,7 @@ export default function CommunityChatScreen() {
   const isLive = chat.client.mode === 'live';
   const back = useCallback(() => { hapticPrimaryAction(); goBackOr(router); }, [router]);
   const openMembers = useCallback(() => {
-    if (communityId) router.push(`/community-members?id=${encodeURIComponent(communityId)}` as never);
+    if (communityId) router.push(withPreviewDemo(`/community-members?id=${encodeURIComponent(communityId)}`) as never);
   }, [communityId, router]);
 
   // ─── Header menu ──────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ export default function CommunityChatScreen() {
     hapticSelection();
     showActionSheet(community.name, undefined, [
       { text: community.muted ? 'Unmute notifications' : 'Mute notifications', onPress: () => { void chat.setMuted(!community.muted); } },
-      { text: 'Members', onPress: openMembers },
+      { text: 'Group info', onPress: openMembers },
       ...(community.kind === 'user'
         ? [{
             text: 'Report group',
@@ -97,7 +98,10 @@ export default function CommunityChatScreen() {
             },
           }]
         : []),
-      { text: 'Leave group', style: 'destructive' as const, onPress: confirmLeave },
+      // The creator can't leave their own group (they delete it from Group info).
+      ...(community.role === 'owner' && community.kind === 'user'
+        ? []
+        : [{ text: 'Leave group', style: 'destructive' as const, onPress: confirmLeave }]),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
   }, [chat, community, confirmLeave, openMembers, router]);
@@ -343,7 +347,7 @@ export default function CommunityChatScreen() {
               onPress={() => { hapticSelection(); openMembers(); }}
               style={s.titleRow}
               accessibilityRole="button"
-              accessibilityLabel={`${community.name}, ${formatMemberCount(community.memberCount)}. View members`}
+              accessibilityLabel={`${community.name}, ${formatMemberCount(community.memberCount)}. Group info`}
               testID="community-chat-title"
             >
               <CommunityAvatar community={community} size={36} />

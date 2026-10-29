@@ -14,8 +14,9 @@ import { GroupFormFields, type GroupFormErrors, type GroupFormValue } from '@/co
 import { SignInPrompt } from '@/components/community/SignInPrompt';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useCommunityClient } from '@/lib/communities/useCommunityClient';
+import { withPreviewDemo } from '@/lib/communities/previewHref';
 import { describeCommunityError } from '@/lib/communities/errors';
-import { pickAndUploadCommunityPhoto } from '@/lib/communities/pickPhoto';
+import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
 import { parseInviteCode } from '@/lib/communities/inviteLink';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { validateGroupDescription, validateGroupName } from '@/lib/communities/validation';
@@ -33,8 +34,9 @@ export default function CommunityCreateScreen() {
   const [errors, setErrors] = useState<GroupFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [needsSignIn, setNeedsSignIn] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  // Picked + cropped locally; uploaded through the group-photo route once the group exists.
+  const [photo, setPhoto] = useState<{ uri: string; mimeType?: string | null } | null>(null);
+  const { open: openImageSheet, sheet: imageSourceSheet } = useImageSourceSheet();
   const [saving, setSaving] = useState(false);
   const [inviteText, setInviteText] = useState('');
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -57,19 +59,13 @@ export default function CommunityCreateScreen() {
     if (formError) setFormError(null);
   };
 
+  // Same picker + circular crop as a profile photo (Take photo / Choose from library).
   const pickPhoto = async () => {
     setErrors((e) => ({ ...e, photo: null }));
-    setUploading(true);
-    try {
-      const picked = await pickAndUploadCommunityPhoto(client);
-      if (picked) { setPhotoUrl(picked.url); setForm((f) => ({ ...f, photoUri: picked.uri })); }
-    } catch (e) {
-      const info = describeCommunityError(e, "We couldn't upload that photo. Try another one.");
-      if (info.authRequired) setNeedsSignIn(true);
-      else setErrors((prev) => ({ ...prev, photo: info.message }));
-    } finally {
-      setUploading(false);
-    }
+    const asset = await openImageSheet({ aspect: [1, 1], cropCircle: true });
+    if (!asset) return;
+    setPhoto({ uri: asset.uri, mimeType: asset.mimeType });
+    setForm((f) => ({ ...f, photoUri: asset.uri }));
   };
 
   const submit = async () => {
@@ -85,10 +81,19 @@ export default function CommunityCreateScreen() {
         description: form.description.trim() || undefined,
         visibility: form.visibility,
         requireApproval: form.visibility === 'private' ? form.requireApproval : false,
-        iconUrl: photoUrl,
       });
+      if (photo) {
+        try {
+          await client.setPhoto(created.id, photo);
+        } catch (e) {
+          // The group exists either way: land on Group info, where the creator can retry the photo.
+          const notice = `Group created, but the photo didn't upload. ${describeCommunityError(e, 'Try adding it again.').message}`;
+          router.replace(withPreviewDemo(`/community-members?id=${encodeURIComponent(created.id)}&notice=${encodeURIComponent(notice)}`) as never);
+          return;
+        }
+      }
       haptics.success();
-      router.replace(`/community-chat?id=${encodeURIComponent(created.id)}` as never);
+      router.replace(withPreviewDemo(`/community-chat?id=${encodeURIComponent(created.id)}`) as never);
     } catch (e) {
       const info = describeCommunityError(e);
       if (info.authRequired) setNeedsSignIn(true);
@@ -111,13 +116,12 @@ export default function CommunityCreateScreen() {
           value={form}
           onChange={patch}
           errors={errors}
-          uploading={uploading}
           onPickPhoto={() => { void pickPhoto(); }}
-          onRemovePhoto={() => { setPhotoUrl(null); setForm((f) => ({ ...f, photoUri: undefined })); }}
+          onRemovePhoto={() => { setPhoto(null); setForm((f) => ({ ...f, photoUri: undefined })); }}
         />
         {formError ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{formError}</Text> : null}
         {needsSignIn ? <SignInPrompt message="Sign in to create a group." /> : null}
-        <Button label="Create group" onPress={() => { void submit(); }} loading={saving} disabled={uploading} fullWidth />
+        <Button label="Create group" onPress={() => { void submit(); }} loading={saving} fullWidth />
 
         <View style={styles.inviteBlock}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Have an invite link?</Text>
@@ -142,6 +146,7 @@ export default function CommunityCreateScreen() {
           {inviteError ? <Text style={[styles.note, { color: colors.mutedForeground }]}>{inviteError}</Text> : null}
         </View>
       </KeyboardAwareScrollViewCompat>
+      {imageSourceSheet}
     </View>
   );
 }

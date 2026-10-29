@@ -173,9 +173,26 @@ export const demoStore = {
       iconUrl: input.iconUrl ?? undefined, coverUrl: input.coverUrl ?? undefined, createdAt: new Date().toISOString(),
     });
     s.communities.unshift(c); s.messages.set(id, []); s.seq.set(id, 0);
-    s.members.set(id, [{ userId: DEMO_ME_ID, name: 'You', handle: '', initials: 'YO', role: 'owner', joinedAt: new Date().toISOString() }]);
+    // A few demo people "join" right away so the creator view has members to promote.
+    const joiners = PEOPLE.slice(1, 4).map((p) => ({
+      userId: p.id, name: p.name, handle: p.handle, initials: initials(p.name), accountType: p.accountType,
+      role: 'member' as const, joinedAt: new Date().toISOString(),
+    }));
+    s.members.set(id, [{ userId: DEMO_ME_ID, name: 'You', handle: '', initials: 'YO', role: 'owner', joinedAt: new Date().toISOString() }, ...joiners]);
+    c.memberCount = 1 + joiners.length;
     emitChange();
     return { ...c };
+  },
+  update(id: string, patch: Partial<Pick<Community, 'name' | 'description' | 'visibility' | 'requireApproval' | 'iconUrl'>>): Community {
+    const c = find(id)!;
+    Object.assign(c, patch);
+    emitChange();
+    emit(id, { type: 'community.updated', name: c.name, description: c.description, iconUrl: c.iconUrl ?? null });
+    return { ...c };
+  },
+  setRole(id: string, userId: string, role: 'admin' | 'member') {
+    const m = init().members.get(id)?.find((x) => x.userId === userId);
+    if (m && m.role !== 'owner') m.role = role;
   },
   messages(id: string): CommunityMessage[] { return [...(init().messages.get(id) ?? [])]; },
   members(id: string): CommunityMember[] { return [...(init().members.get(id) ?? [])]; },
