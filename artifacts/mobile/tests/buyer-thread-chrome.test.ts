@@ -11,7 +11,8 @@ describe('buyer Thread chrome', () => {
   it('uses the cart as the final header action instead of create post', () => {
     const topBar = feed.slice(feed.indexOf('{/* ─ Top bar overlay ─ */}'), feed.indexOf('{/* ─ Feed tab switcher'));
     expect(topBar).toContain('name="shopping-cart"');
-    expect(topBar).toContain("router.push('/(buyer)/cart'");
+    // The buyer Bag, or a seller's root-stack Bag from Watch Threads (lib/navigation/shopperRoutes.ts).
+    expect(topBar).toContain('router.push(shopperRoutes.bag as never)');
     expect(topBar).not.toContain('name="plus-square"');
     expect(topBar).not.toContain('name="user-plus"');
   });
