@@ -314,9 +314,11 @@ function split(r: Record<string, any> | undefined) {
   const shownNew = newer >= K_ANONYMITY_MIN;
   const shownRet = ret >= K_ANONYMITY_MIN;
   const suppressed = !(shownNew && shownRet);
+  // Exactly one half shown: total − shown half would reveal the hidden half.
+  const totalHidden = total < K_ANONYMITY_MIN || shownNew !== shownRet;
   return {
     suppressed,
-    total: suppressed && total < K_ANONYMITY_MIN ? null : total,
+    total: totalHidden ? null : total,
     new: shownNew ? newer : null,
     returning: shownRet ? ret : null,
   };

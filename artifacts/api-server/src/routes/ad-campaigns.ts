@@ -37,7 +37,7 @@
 
 import express, { Router } from "express";
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, adCampaigns, products } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requirePermission } from "../middlewares/requireRole";
@@ -51,6 +51,7 @@ import { adCampaignResults, adResultsSummaries, completeEndedAdCampaigns } from 
 import { estimateCampaignReach } from "../lib/ads/reachEstimate";
 import { loadReachModel } from "../lib/ads/reachAudience";
 import { refundUndeliveredAdBudget, type RefundOutcome } from "../lib/ads/adRefunds";
+import { isUuid } from "../lib/uuid";
 
 const router = Router();
 router.use(requireAuth);
@@ -130,6 +131,9 @@ function buildCreativeConfig(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function findOwnedCampaign(id: string, owner: string) {
+  // ad_campaigns.id is a uuid column: a malformed id can never match and must
+  // not reach Postgres (the cast error would surface as a 500).
+  if (!isUuid(id)) return null;
   const [row] = await db
     .select()
     .from(adCampaigns)
@@ -230,6 +234,9 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
         error: "Product CTAs (shop_now, view_product) require a ctaDestinationId",
       });
     }
+    if (!isUuid(ctaDestinationId)) {
+      return res.status(422).json({ error: "Product not found or not owned by you" });
+    }
     const [prod] = await db
       .select({ id: products.id })
       .from(products)
@@ -311,11 +318,20 @@ router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb
     ),
   };
 
+  // Still editable at write time: a concurrent /pay may have moved it to
+  // pending_payment (Checkout already priced at the old budget) in between.
   const [updated] = await db
     .update(adCampaigns)
     .set(updates)
-    .where(and(eq(adCampaigns.id, req.params.id), eq(adCampaigns.sellerId, owner)))
+    .where(and(
+      eq(adCampaigns.id, req.params.id),
+      eq(adCampaigns.sellerId, owner),
+      inArray(adCampaigns.status, ["draft", "failed"]),
+    ))
     .returning();
+  if (!updated) {
+    return res.status(409).json({ error: "Only draft or failed campaigns can be edited" });
+  }
 
   return res.json({ campaign: await hydrateCampaign(updated) });
 });
@@ -661,7 +677,9 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
     );
 
     // Persist session ID + transition to pending_payment.
-    // Race-safe: only updates if no other session was persisted first.
+    // Race-safe: only updates if no other session was persisted first, and
+    // only while the budget/duration are still the ones this session charges
+    // (a concurrent PATCH must not leave a bigger budget behind a smaller charge).
     const [persisted] = await db
       .update(adCampaigns)
       .set({
@@ -675,6 +693,9 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
           eq(adCampaigns.sellerId, owner),
           sql`${adCampaigns.stripeCheckoutSessionId} IS NULL`,
           eq(adCampaigns.checkoutSessionVersion, checkoutSessionVersion),
+          inArray(adCampaigns.status, ["draft", "failed", "pending_payment"]),
+          eq(adCampaigns.budgetCents, campaign.budgetCents),
+          eq(adCampaigns.durationDays, campaign.durationDays),
         ),
       )
       .returning({ stripeCheckoutSessionId: adCampaigns.stripeCheckoutSessionId });
@@ -704,7 +725,20 @@ router.post("/:id/pay", requirePermission("marketing"), rejectNativeStripeChecko
       });
     }
 
-    return res.status(409).json({ error: "Checkout session changed; retry" });
+    // The campaign changed (e.g. its budget) while this session was being
+    // created: retire the session (its URL was never handed out) and bump the
+    // version so the retry gets a fresh session at the current price instead
+    // of the idempotent replay of this one.
+    try { await stripe.checkout.sessions.expire(session.id); } catch { /* best effort */ }
+    await db
+      .update(adCampaigns)
+      .set({ checkoutSessionVersion: sql`${adCampaigns.checkoutSessionVersion} + 1`, updatedAt: new Date() })
+      .where(and(
+        eq(adCampaigns.id, campaign.id),
+        eq(adCampaigns.checkoutSessionVersion, checkoutSessionVersion),
+        sql`${adCampaigns.stripeCheckoutSessionId} IS NULL`,
+      ));
+    return res.status(409).json({ error: "Checkout session changed; retry", code: "campaign_changed" });
   } catch (err) {
     req.log?.error?.({ err, campaignId: req.params.id }, "Failed to create ad campaign Checkout Session");
     return res.status(500).json({ error: "Failed to create checkout session. Please try again." });
