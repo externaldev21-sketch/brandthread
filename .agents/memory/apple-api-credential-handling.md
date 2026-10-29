@@ -19,3 +19,11 @@ credentials transiently at command runtime, not in committed configuration.
 EAS API-key injection does not prove non-interactive signing bootstrap is supported.
 **Why:** EAS can stop with “Credentials are not set up” before validating a distribution certificate, even with the ASC variables populated.
 **How to apply:** Distinguish CLI setup-mode rejection from Apple authorization rejection; do not blame the API-key role or claim an Apple ID login is unavoidable without provider evidence.
+
+Apple signing can be bootstrapped with the ASC API and an OpenSSL-generated CSR/P12 on Linux, then handed to EAS as local credentials.
+**Why:** A working ASC key can create certificates/profiles even when EAS refuses to bootstrap them non-interactively. The certificate's private key is generated locally and cannot be downloaded from Apple later.
+**How to apply:** Preserve signing material with restricted permissions outside the checkout and reuse it on retries. Never create replacement certificates merely because EAS's remote credential store is empty; never revoke credentials during build troubleshooting.
+
+EAS source staging must have room for both its repository copy and compressed archive, and must not be a descendant of the source directory.
+**Why:** The workspace's 5 GiB temporary filesystem can fill during source packaging before any cloud build exists; moving TMPDIR under the workspace instead triggers fs-extra's self-copy rejection.
+**How to apply:** Treat packaging failures separately from signing. Use an external staging filesystem with enough capacity or prepare a smaller build-only source snapshot; preserve existing signing assets rather than regenerating them.
