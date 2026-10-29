@@ -4,7 +4,7 @@
  * A year costs 10 × the monthly price — the same rule the server charges
  * (api-server lib/billing/annual.ts), so the numbers shown here are exactly
  * what Stripe checkout bills:
- *   Starter $290/yr · Growth $790/yr · Pro $1,990/yr
+ *   Starter $199.90/yr · Growth $490/yr · Pro $1,290/yr
  *
  * Native (App Store / Google Play) yearly plans come from RevenueCat: the
  * current offering must contain the annual packages below (products
@@ -30,7 +30,7 @@ function dollars(cents: number): string {
     : `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** "$790" / "/yr" / "$65.83/mo billed yearly" for a plan card (web / Stripe). */
+/** "$490" / "/yr" / "$40.83/mo billed yearly" for a plan card (web / Stripe). */
 export function yearlyDisplayFor(plan: Pick<SellerPlanDefinition, 'priceCents'>): {
   price: string;
   period: string;
